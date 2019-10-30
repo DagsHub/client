@@ -1,0 +1,5 @@
+batch_size: 32
+gpus: null
+learning_rate: 0.02
+max_nb_epochs: 2
+status: success
