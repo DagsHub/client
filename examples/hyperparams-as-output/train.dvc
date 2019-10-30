@@ -1,0 +1,12 @@
+cmd: python3 mnist_trainer.py
+deps:
+- path: mnist_trainer.py
+outs:
+- path: params.yml
+  cache: false
+  metric: false
+  persist: false
+- path: metrics.csv
+  cache: false
+  metric: true
+  persist: false
