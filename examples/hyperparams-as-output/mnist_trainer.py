@@ -39,7 +39,8 @@ if __name__ == '__main__':
     trainer = Trainer(
         max_nb_epochs=hparams.max_nb_epochs,
         gpus=hparams.gpus,
+        val_check_interval=0.2,
         logger=DAGsHubLogger(),  # This is the main point - use the DAGsHub logger!
-        default_save_path='lightning-logs',
+        default_save_path='lightning_logs',
     )
     trainer.fit(model)

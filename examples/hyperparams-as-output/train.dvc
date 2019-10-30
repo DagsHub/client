@@ -1,12 +1,16 @@
 cmd: python3 mnist_trainer.py
 deps:
 - path: mnist_trainer.py
+  md5: 638897f3531133fbb5a8fc56d8b92c41
 outs:
 - path: params.yml
   cache: false
   metric: false
   persist: false
+  md5: 2746c7186a620eaea52a95f92f236d8c
 - path: metrics.csv
   cache: false
   metric: true
   persist: false
+  md5: 3edfb6bf8c77d7e112eff1df380b6268
+md5: 4f7cf60d92c98820dbf816ca6fe0b109
