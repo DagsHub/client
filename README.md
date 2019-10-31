@@ -41,4 +41,4 @@ See examples in:
 
 ---
 
-Made with 🐶 by [DAGsHub](https://dagshub.com/).
+Made with 🐶 by [<img src="https://dagshub.com/img/favicon.svg" width=30 alt=""/>DAGsHub](https://dagshub.com/).
