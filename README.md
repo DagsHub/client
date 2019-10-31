@@ -9,7 +9,7 @@ These logs include your metrics and hyperparameters, essential information to ke
 pip install pytorch-lightning-dagshub
 ```
 ```python
-from pytorch-lightning-dagshub import DAGsHubLogger
+from pytorch_lightning_dagshub import DAGsHubLogger
 from pytorch_lightning import Trainer
 
 trainer = Trainer(
