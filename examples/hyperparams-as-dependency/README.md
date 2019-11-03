@@ -3,7 +3,7 @@
 This example how to set up your hyperparameter file as a [DVC](https://dvc.org) __dependency__ of the training stage. <br/>
 This means that you manually edit your [params.yml file](params.yml) before training,
 then use [`dvc repro`](https://dvc.org/doc/command-reference/repro) to run the training stage.
-This is the more theoretically correct way to use DVC.
+In theory, this is the correct workflow with DVC.
 
 The relevant files are:
 * [mnist_trainer.py](mnist_trainer.py) - the main script, defines the `pytorch-lightning` Trainer and connects it to the
