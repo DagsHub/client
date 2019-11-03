@@ -30,7 +30,7 @@ See examples in:
     Gives a framework for setting up your hyperparameter file as a [DVC](https://dvc.org) __dependency__ of the training stage. <br/>
     This means that you manually edit your [params.yml file](examples/hyperparams-as-dependency/params.yml) before training,
     then use [`dvc repro`](https://dvc.org/doc/command-reference/repro) to run the training stage.
-    This is the more theoretically correct way to use DVC. 
+    In theory, this is the correct workflow with DVC.
     
 * [examples/hyperparams-as-output](examples/hyperparams-as-output/) <br/>
     Gives a framework for setting up your hyperparameter file as a [DVC](https://dvc.org) __output__ of the training stage. <br/>
