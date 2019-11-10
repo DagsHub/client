@@ -3,11 +3,11 @@ deps:
 - path: params.yml
   md5: 2746c7186a620eaea52a95f92f236d8c
 - path: mnist_trainer.py
-  md5: 2bffb2b5b0c101689974e6a8f05af120
+  md5: c60e49c366818d0e91af021c3a5d7734
 outs:
 - path: metrics.csv
   cache: false
   metric: true
   persist: false
   md5: bd672388079206cc41b5d8410343c704
-md5: c3dcfa3508082217aebf1da400330cc3
+md5: 08303e5ccd3d4391b6492419a07789ca

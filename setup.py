@@ -4,16 +4,16 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="pytorch-lightning-dagshub",  # Replace with your own username
+    name="dagshub",
     version="0.0.1",
     author="Guy Smoilovsky",
     author_email="guy@dagshub.com",
-    description="Integration of pytorch-lightning with DAGsHub",
+    description="DAGsHub client libraries",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/dagshub/pytorch-lightning-dagshub",
+    url="https://github.com/dagshub/dagshub-client",
     packages=setuptools.find_packages(),
-    install_requires=["pytorch-lightning>=0.5"],
+    install_requires=[],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
