@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/dagshub/dagshub-client",
     packages=setuptools.find_packages(),
-    install_requires=[],
+    install_requires=["PyYAML>=5"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
