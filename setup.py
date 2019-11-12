@@ -6,12 +6,12 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="dagshub",
     version="0.0.1",
-    author="Guy Smoilovsky",
-    author_email="guy@dagshub.com",
+    author="DAGsHub",
+    author_email="contact@dagshub.com",
     description="DAGsHub client libraries",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/dagshub/dagshub-client",
+    url="https://github.com/DAGsHub/client",
     packages=setuptools.find_packages(),
     install_requires=["PyYAML>=5"],
     classifiers=[
