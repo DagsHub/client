@@ -1,4 +1,4 @@
-# [pytorch-lightning](https://github.com/williamFalcon/pytorch-lightning/) + [<img src="https://dagshub.com/img/favicon.svg" width=50 alt=""/>DAGsHub](https://dagshub.com) integration
+# [pytorch-lightning](https://github.com/williamFalcon/pytorch-lightning/) + [DAGsHub](https://dagshub.com) integration
 
 This package allows you to output logs from `pytorch-lightning` runs to a simple, open format used by DAGsHub.
 
@@ -41,4 +41,4 @@ See examples in:
 
 ---
 
-Made with 🐶 by [<img src="https://dagshub.com/img/favicon.svg" width=30 alt=""/>DAGsHub](https://dagshub.com/).
+Made with 🐶 by [DAGsHub](https://dagshub.com/).
