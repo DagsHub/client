@@ -2,7 +2,7 @@
 Just a simple CNN for MNIST.
 Note that you need to define which values you want to log when returning from training_step, validation_end
 """
-import os
+from pathlib import Path
 import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
@@ -25,10 +25,8 @@ class MnistModel(pl.LightningModule):
         self.relu2 = torch.nn.ReLU()
         self.maxpool2 = torch.nn.MaxPool2d(3)
         self.fc = torch.nn.Linear(8 * 8 * 8, 10)
-        if data_dir:
-            self.data_dir = data_dir
-        else:
-            self.data_dir = os.path.join(os.getcwd(), '..')
+        # Default to examples/MNIST dir, relative to this script
+        self.data_dir = data_dir or Path(__file__).parents[1]
 
     def forward(self, x):
         layer1 = self.relu1(self.conv1(x))
@@ -71,17 +69,20 @@ class MnistModel(pl.LightningModule):
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
-        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()), batch_size=self.hparams.batch_size)
+        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
+                          batch_size=self.hparams.batch_size)
 
     @pl.data_loader
     def val_dataloader(self):
         # OPTIONAL
-        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()), batch_size=self.hparams.batch_size)
+        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
+                          batch_size=self.hparams.batch_size)
 
     @pl.data_loader
     def test_dataloader(self):
         # OPTIONAL
-        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()), batch_size=self.hparams.batch_size)
+        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
+                          batch_size=self.hparams.batch_size)
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -97,4 +98,3 @@ class MnistModel(pl.LightningModule):
         parser.add_argument('--max_nb_epochs', default=2, type=int)
 
         return parser
-

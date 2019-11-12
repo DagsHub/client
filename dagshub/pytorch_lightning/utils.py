@@ -2,6 +2,7 @@ import yaml
 
 from argparse import Namespace
 
+
 def read_hparams(path: str) -> Namespace:
     """
     Use to read some hyperparameters which were previously saved as YAML.
