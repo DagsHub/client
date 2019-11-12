@@ -1,4 +1,8 @@
-# [<img src="https://dagshub.com/img/favicon.svg" width=50 alt=""/>DAGsHub](https://dagshub.com) Python client libraries
+<div align="center">
+  <a href="https://dagshub.com"><img src="dagshub_github.png" width=600 alt=""/></a><br><br>
+</div>
+
+# DAGsHub Python client libraries
 Use DAGsHub to create reproducible versions of your data science research project, 
 allow others to understand your project, and to contribute back to it.
 
@@ -57,4 +61,4 @@ without having to write any logging code on your own:
 
 ---
 
-Made with 🐶 by [<img src="https://dagshub.com/img/favicon.svg" width=30 alt=""/>DAGsHub](https://dagshub.com/).
+Made with 🐶 by [DAGsHub](https://dagshub.com/).
