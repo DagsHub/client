@@ -34,7 +34,7 @@ def test_context_manager_no_eager_logging():
             assert not metrics_file.readline()
 
         with open(hparams_path) as hparams_file:
-            assert yaml.load(hparams_file) == {'R': 5, 'D': 2, 'lr': 1e-4}
+            assert yaml.safe_load(hparams_file) == {'R': 5, 'D': 2, 'lr': 1e-4}
 
     in_tmp_dir(f)
 
