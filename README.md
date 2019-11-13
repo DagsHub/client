@@ -2,6 +2,10 @@
   <a href="https://dagshub.com"><img src="https://raw.githubusercontent.com/DAGsHub/client/master/dagshub_github.png" width=600 alt=""/></a><br><br>
 </div>
 
+[![Build Status](https://travis-ci.org/DAGsHub/client.svg?branch=master)](https://travis-ci.org/DAGsHub/client)
+[![pypi](https://img.shields.io/pypi/v/dagshub.svg)](https://pypi.python.org/pypi/dagshub)
+
+
 # DAGsHub Python client libraries
 Use DAGsHub to create reproducible versions of your data science research project, 
 allow others to understand your project, and to contribute back to it.
