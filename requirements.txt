@@ -10,7 +10,7 @@ chardet==3.0.4
 colorama==0.4.1
 configobj==5.0.6
 configparser==4.0.2
-contextlib2==0.5.5
+contextlib2==0.6.0.post1
 decorator==4.4.1
 distro==1.4.0
 dvc==0.67.0
