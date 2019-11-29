@@ -40,7 +40,7 @@ pluggy==0.13.0
 ply==3.11
 protobuf==3.10.0
 py==1.8.0
-pyasn1==0.4.7
+pyasn1==0.4.8
 pyfiglet==0.8.post1
 pyparsing==2.4.2
 pytest==5.2.2
