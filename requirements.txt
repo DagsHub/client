@@ -16,7 +16,7 @@ distro==1.4.0
 dvc==0.67.0
 flufl.lock==3.2
 funcy==1.13
-future==0.18.1
+future==0.18.2
 gitdb2==2.0.6
 GitPython==3.0.4
 grandalf==0.6
