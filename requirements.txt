@@ -38,7 +38,7 @@ pathspec==0.6.0
 Pillow==6.2.1
 pluggy==0.13.0
 ply==3.11
-protobuf==3.10.0
+protobuf==3.11.2
 py==1.8.0
 pyasn1==0.4.7
 pyfiglet==0.8.post1
