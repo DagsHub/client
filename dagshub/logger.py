@@ -4,16 +4,19 @@ from datetime import datetime
 from typing import TextIO, ContextManager, Any, Dict
 
 import yaml
+import csv
 
 
 class DAGsHubLogger:
     """
     A plain Python logger for your metrics and hyperparameters.
     The saved file format is plain and open - CSV for metrics files, YAML for hyperparameters.
-    You can use this logger manually, or use one of our integrations with high-level libraries like Keras or pytorch-lightning.
+    You can use this logger manually, or use one of our integrations with high-level libraries
+    like Keras or pytorch-lightning.
     """
 
     metrics_file: TextIO
+    metrics_csv_writer: Any
     hparams: Dict[str, Any]
 
     def __init__(self,
@@ -81,7 +84,7 @@ class DAGsHubLogger:
 
             for metrics, timestamp, step_num in self.unsaved_metrics:
                 for name, value in metrics.items():
-                    self.metrics_file.write(f'{name},{value},{timestamp},{step_num}\n')
+                    self.metrics_csv_writer.writerow([name, value, timestamp, step_num])
             self.unsaved_metrics = []
 
     def save_hparams(self):
@@ -92,8 +95,9 @@ class DAGsHubLogger:
 
     def init_metrics_file(self):
         self.ensure_dir(self.metrics_path)
-        self.metrics_file = open(self.metrics_path, 'w')
+        self.metrics_file = open(self.metrics_path, 'w', newline='')  # newline='' required for csv writer
         self.metrics_file.write("Name,Value,Timestamp,Step\n")
+        self.metrics_csv_writer = csv.writer(self.metrics_file, quoting=csv.QUOTE_NONNUMERIC)
 
     def ensure_dir(self, filename: str):
         if self.should_make_dirs:
