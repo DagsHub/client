@@ -36,7 +36,7 @@ packaging==20.1
 pandas==1.0.0
 pathspec==0.7.0
 Pillow==7.0.0
-pluggy==0.13.0
+pluggy==0.13.1
 ply==3.11
 protobuf==3.10.0
 py==1.8.0
