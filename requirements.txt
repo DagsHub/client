@@ -47,7 +47,7 @@ pytest==5.3.5
 python-dateutil==2.8.1
 pytorch-lightning==0.6.0
 pytz==2019.3
-PyYAML==5.1.2
+PyYAML==5.3
 requests==2.22.0
 ruamel.yaml==0.16.5
 ruamel.yaml.clib==0.2.0
