@@ -58,7 +58,7 @@ smmap2==2.0.5
 tb-nightly==2.2.0a20200203
 test-tube==0.7.3
 torch==1.4.0
-torchvision==0.4.2
+torchvision==0.5.0
 tqdm==4.38.0
 treelib==1.5.5
 urllib3==1.25.6
