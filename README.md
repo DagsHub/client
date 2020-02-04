@@ -4,7 +4,8 @@
 
 [![Build Status](https://travis-ci.org/DAGsHub/client.svg?branch=master)](https://travis-ci.org/DAGsHub/client)
 [![pypi](https://img.shields.io/pypi/v/dagshub.svg)](https://pypi.python.org/pypi/dagshub)
-
+[![Updates](https://pyup.io/repos/github/DAGsHub/client/shield.svg)](https://pyup.io/repos/github/DAGsHub/client/)
+[![License](https://img.shields.io/pypi/l/dagshub)]
 
 # DAGsHub Python client libraries
 Use DAGsHub to create reproducible versions of your data science research project, 
