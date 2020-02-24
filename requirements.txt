@@ -17,7 +17,7 @@ dvc==0.86.5
 flufl.lock==3.2
 funcy==1.14
 future==0.18.2
-gitdb2==2.0.6
+gitdb2==4.0.1
 GitPython==3.0.5
 grandalf==0.6
 grpcio==1.26.0
