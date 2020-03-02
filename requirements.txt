@@ -11,7 +11,7 @@ colorama==0.4.3
 configobj==5.0.6
 configparser==4.0.2
 contextlib2==0.6.0.post1
-decorator==4.4.1
+decorator==4.4.2
 distro==1.4.0
 dvc==0.82.8
 flufl.lock==3.2
