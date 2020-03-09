@@ -52,7 +52,7 @@ requests==2.23.0
 ruamel.yaml==0.16.10
 ruamel.yaml.clib==0.2.0
 schema==0.7.1
-shortuuid==0.5.0
+shortuuid==1.0.1
 six==1.14.0
 smmap2==3.0.1
 tb-nightly==2.2.0a20200302
