@@ -63,5 +63,5 @@ tqdm==4.45.0
 treelib==1.6.1
 urllib3==1.25.8
 wcwidth==0.1.9
-Werkzeug==1.0.0
+Werkzeug==1.0.1
 zipp==3.1.0
