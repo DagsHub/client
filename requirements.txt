@@ -13,7 +13,7 @@ configparser==5.0.0
 contextlib2==0.6.0.post1
 decorator==4.4.2
 distro==1.5.0
-dvc==0.91.1
+dvc==0.93.0
 flufl.lock==3.2
 funcy==1.14
 future==0.18.2
