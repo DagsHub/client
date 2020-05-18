@@ -28,7 +28,7 @@ importlib-metadata==1.6.0
 inflect==4.1.0
 jsonpath-ng==1.5.1
 Markdown==3.2.2
-more-itertools==8.2.0
+more-itertools==8.3.0
 nanotime==0.5.2
 networkx==2.4
 numpy==1.18.4
