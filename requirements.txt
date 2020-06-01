@@ -32,7 +32,7 @@ more-itertools==8.3.0
 nanotime==0.5.2
 networkx==2.4
 numpy==1.18.4
-packaging==20.3
+packaging==20.4
 pandas==1.0.3
 pathspec==0.8.0
 Pillow==7.1.2
