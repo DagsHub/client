@@ -62,6 +62,6 @@ torchvision==0.6.0
 tqdm==4.46.1
 treelib==1.6.1
 urllib3==1.25.9
-wcwidth==0.1.9
+wcwidth==0.2.4
 Werkzeug==1.0.1
 zipp==3.1.0
