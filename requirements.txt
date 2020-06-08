@@ -59,7 +59,7 @@ tb-nightly==2.3.0a20200608
 test-tube==0.7.3
 torch==1.5.0
 torchvision==0.6.0
-tqdm==4.46.0
+tqdm==4.46.1
 treelib==1.6.1
 urllib3==1.25.9
 wcwidth==0.1.9
