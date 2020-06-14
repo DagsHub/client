@@ -3,7 +3,6 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import TextIO, ContextManager, Any, Dict
 
-import copy
 import yaml
 import csv
 
