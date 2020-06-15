@@ -68,7 +68,7 @@ class DAGsHubLogger:
 
     def log_hyperparams(self, params: Dict[str, Any] = None, **kwargs):
         if self.should_log_hparams:
-          self.hparams.update(self.normalize_dictionary_values(params) or {})
+          self.hparams.update(self.normalize_dictionary_values(params or {}))
           self.hparams.update(self.normalize_dictionary_values(kwargs or {}))
           if self.eager_logging:
               self.save_hparams()
