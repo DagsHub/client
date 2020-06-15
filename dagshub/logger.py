@@ -68,10 +68,10 @@ class DAGsHubLogger:
 
     def log_hyperparams(self, params: Dict[str, Any] = None, **kwargs):
         if self.should_log_hparams:
-            self.hparams.update(params or {})
-            self.hparams.update(kwargs)
-            if self.eager_logging:
-                self.save_hparams()
+          self.hparams.update(self.normalize_dictionary_values(params or {}))
+          self.hparams.update(self.normalize_dictionary_values(kwargs or {}))
+          if self.eager_logging:
+              self.save_hparams()
 
     def save(self):
         self.save_metrics()
@@ -92,6 +92,23 @@ class DAGsHubLogger:
             self.ensure_dir(self.hparams_path)
             with open(self.hparams_path, 'w') as f:
                 yaml.safe_dump(self.hparams, f)
+
+    @staticmethod
+    def normalize_dictionary_values(dictionary):
+      def normalize_dict_deep(dictionary):
+        if dictionary is None:
+          return None
+        
+        new_dict = {}
+        for key, value in dictionary.items():
+          if isinstance(value, dict):
+            new_dict[key] = normalize_dict_deep(value)
+            continue
+          new_dict[key] = value if value is None or type(value) in [int, float, bool] else str(value)
+
+        return new_dict
+
+      return normalize_dict_deep(dictionary)
 
     def init_metrics_file(self):
         self.ensure_dir(self.metrics_path)
