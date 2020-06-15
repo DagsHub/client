@@ -21,12 +21,15 @@ Therefore, you can work with DAGsHub regardless of your chosen programming langu
 __This client library is meant to help you get started quickly in Python__, but it's purely optional - 
 the data formats are very simple and you can choose to work with them directly. 
 
-You can learn more by completing our short [tutorial](https://dagshub.com/docs/overview) or reading the [docs](https://dagshub.com/docs)
+
 
 ## Installation
 ```bash
 pip install dagshub
 ```
+
+## Guide
+You can learn more by completing our short [tutorial](https://dagshub.com/docs/overview) or reading the [docs](https://dagshub.com/docs)
 
 ## Basic Usage
 ```python
