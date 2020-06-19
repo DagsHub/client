@@ -2,7 +2,7 @@
   <a href="https://dagshub.com"><img src="https://raw.githubusercontent.com/DAGsHub/client/master/dagshub_github.png" width=600 alt=""/></a><br><br>
 </div>
 
-![Discord](https://img.shields.io/discord/698874030052212737)
+[![Discord](https://img.shields.io/discord/698874030052212737)](https://discord.com/invite/qpDRQk)
 [![Build Status](https://travis-ci.org/DAGsHub/client.svg?branch=master)](https://travis-ci.org/DAGsHub/client)
 [![pypi](https://img.shields.io/pypi/v/dagshub.svg)](https://pypi.python.org/pypi/dagshub)
 [![Updates](https://pyup.io/repos/github/DAGsHub/client/shield.svg)](https://pyup.io/repos/github/DAGsHub/client/)
