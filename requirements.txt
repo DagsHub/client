@@ -24,7 +24,7 @@ grpcio==1.30.0
 humanize==2.4.1
 idna==2.10
 imageio==2.8.0
-importlib-metadata==1.6.1
+importlib-metadata==1.7.0
 inflect==4.1.0
 jsonpath-ng==1.5.1
 Markdown==3.2.2
