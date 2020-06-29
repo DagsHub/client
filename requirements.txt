@@ -45,7 +45,7 @@ pyfiglet==0.8.post1
 pyparsing==2.4.7
 pytest==5.4.3
 python-dateutil==2.8.1
-pytorch-lightning==0.8.1
+pytorch-lightning==0.8.3
 pytz==2020.1
 PyYAML==5.3.1
 requests==2.24.0
