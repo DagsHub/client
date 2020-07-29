@@ -59,12 +59,12 @@ logger.close()
 ```
 
 ## Integrations with ML frameworks
-The [basic DAGsHub logger](dagshub/logger.py) is just plain Python, and requires no specific framework.
+The [basic DAGsHub logger](https://github.com/DAGsHub/client/blob/master/dagshub/logger.py) is just plain Python, and requires no specific framework.
 
 However, for convenience, we include some integrations with common ML frameworks, which can __just work__ right out of the box, 
 without having to write any logging code on your own:
 
-* [pytorch-lightning](dagshub/pytorch_lightning)
+* [pytorch-lightning](https://github.com/DAGsHub/client/tree/master/dagshub/pytorch_lightning)
 * More - soon to come!
 
 
