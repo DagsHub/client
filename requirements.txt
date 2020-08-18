@@ -13,7 +13,7 @@ configparser==5.0.0
 contextlib2==0.6.0.post1
 decorator==4.4.2
 distro==1.5.0
-dvc==1.4.0
+dvc==1.5.0
 flufl.lock==4.0
 funcy==1.14
 future==0.18.2
@@ -21,7 +21,7 @@ gitdb2==4.0.2
 GitPython==3.1.7
 grandalf==0.7
 grpcio==1.31.0
-humanize==2.5.0
+humanize==2.6.0
 idna==2.10
 imageio==2.9.0
 importlib-metadata==1.7.0
@@ -38,7 +38,7 @@ pathspec==0.8.0
 Pillow==7.2.0
 pluggy==0.13.1
 ply==3.11
-protobuf==3.12.4
+protobuf==3.13.0
 py==1.9.0
 pyasn1==0.4.8
 pyfiglet==0.8.post1
@@ -55,7 +55,7 @@ schema==0.7.3
 shortuuid==1.0.1
 six==1.15.0
 smmap2==3.0.1
-tb-nightly==2.4.0a20200810
+tb-nightly==2.4.0a20200817
 test-tube==0.7.3
 torch==1.6.0
 torchvision==0.7.0
