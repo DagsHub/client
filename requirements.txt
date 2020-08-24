@@ -4,7 +4,7 @@ appdirs==1.4.4
 asciimatics==1.11.0
 atomicwrites==1.4.0
 atpublic==2.0
-attrs==19.3.0
+attrs==20.1.0
 certifi==2020.6.20
 chardet==3.0.4
 colorama==0.4.3
