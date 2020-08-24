@@ -1,5 +1,5 @@
 ## The following requirements were added by pip freeze:
-absl-py==0.9.0
+absl-py==0.10.0
 appdirs==1.4.4
 asciimatics==1.11.0
 atomicwrites==1.4.0
