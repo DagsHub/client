@@ -65,3 +65,7 @@ urllib3==1.25.10
 wcwidth==0.2.5
 Werkzeug==1.0.1
 zipp==3.1.0
+
+fastai~=2.0.8
+fastai2~=0.0.30
+setuptools~=47.1.0

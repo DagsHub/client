@@ -65,6 +65,7 @@ However, for convenience, we include some integrations with common ML frameworks
 without having to write any logging code on your own:
 
 * [pytorch-lightning](https://github.com/DAGsHub/client/tree/master/dagshub/pytorch_lightning)
+* [fastai v2](https://github.com/DAGsHub/client/tree/master/dagshub/fastai)
 * More - soon to come!
 
 
