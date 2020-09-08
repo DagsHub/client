@@ -1,5 +1,5 @@
-from fastai2.callback.core import Callback
-from fastai2.torch_core import rank_distrib, to_detach
+from fastai.callback.core import Callback
+from fastai.torch_core import rank_distrib, to_detach
 
 from ..logger import DAGsHubLogger as LoggerImpl
 
