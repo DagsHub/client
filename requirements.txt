@@ -4,7 +4,7 @@ appdirs==1.4.4
 asciimatics==1.11.0
 atomicwrites==1.4.0
 atpublic==2.0
-attrs==20.1.0
+attrs==20.2.0
 certifi==2020.6.20
 chardet==3.0.4
 colorama==0.4.3
@@ -18,7 +18,7 @@ flufl.lock==5.0.1
 funcy==1.14
 future==0.18.2
 gitdb2==4.0.2
-GitPython==3.1.7
+GitPython==3.1.8
 grandalf==0.7
 grpcio==1.31.0
 humanize==2.6.0
@@ -26,7 +26,7 @@ idna==2.10
 imageio==2.9.0
 importlib-metadata==1.7.0
 inflect==4.1.0
-jsonpath-ng==1.5.1
+jsonpath-ng==1.5.2
 Markdown==3.2.2
 more-itertools==8.5.0
 nanotime==0.5.2
@@ -49,13 +49,13 @@ pytorch-lightning==0.9.0
 pytz==2020.1
 PyYAML==5.3.1
 requests==2.24.0
-ruamel.yaml==0.16.10
+ruamel.yaml==0.16.12
 ruamel.yaml.clib==0.2.0
 schema==0.7.3
 shortuuid==1.0.1
 six==1.15.0
 smmap2==3.0.1
-tb-nightly==2.4.0a20200831
+tb-nightly==2.4.0a20200907
 test-tube==0.7.3
 torch==1.6.0
 torchvision==0.7.0
