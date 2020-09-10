@@ -30,7 +30,7 @@ pip install dagshub
 ```
 
 ## Guide
-You can learn more by completing our short [tutorial](https://dagshub.com/docs/overview) or reading the [docs](https://dagshub.com/docs)
+You can learn more by completing our short [tutorial](https://dagshub.com/docs/experiment-tutorial/overview/) or reading the [docs](https://dagshub.com/docs)
 
 ## Basic Usage
 ```python
