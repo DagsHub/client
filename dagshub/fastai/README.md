@@ -1,6 +1,6 @@
 # [Fastai v2](https://github.com/fastai/fastai) + [DAGsHub](https://dagshub.com) integration
 
-This package allows you to output logs from `fastai` runs to a [simple, open format](https://dagshub.com/docs/reference/open_data_science_formats/), that you can use analyze yourself or display using DAGsHub.
+This package allows you to output logs from `fastai` runs to a [simple, open format](https://dagshub.com/docs/reference/open_data_science_formats/), that you can analyze yourself or display using DAGsHub.
 
 These logs include your metrics and hyperparameters, essential information to keep a record of your experiments.
 
