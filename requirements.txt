@@ -64,6 +64,6 @@ treelib==1.6.1
 urllib3==1.25.10
 wcwidth==0.2.5
 Werkzeug==1.0.1
-zipp==3.1.0
+zipp==3.2.0
 
 fastai~=2.0.8
