@@ -18,7 +18,7 @@ flufl.lock==5.0.1
 funcy==1.15
 future==0.18.2
 gitdb2==4.0.2
-GitPython==3.1.8
+GitPython==3.1.9
 grandalf==0.7
 grpcio==1.32.0
 humanize==2.6.0
