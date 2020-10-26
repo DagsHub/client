@@ -14,7 +14,7 @@ contextlib2==0.6.0.post1
 decorator==4.4.2
 distro==1.5.0
 dvc==1.9.0
-flufl.lock==5.0.1
+flufl.lock==5.0.3
 funcy==1.15
 future==0.18.2
 gitdb2==4.0.2
