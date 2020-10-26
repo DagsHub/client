@@ -27,7 +27,7 @@ imageio==2.9.0
 importlib-metadata==2.0.0
 inflect==4.1.0
 jsonpath-ng==1.5.2
-Markdown==3.3.1
+Markdown==3.3.3
 more-itertools==8.5.0
 nanotime==0.5.2
 networkx==2.5
