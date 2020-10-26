@@ -20,7 +20,7 @@ future==0.18.2
 gitdb2==4.0.2
 GitPython==3.1.11
 grandalf==0.7
-grpcio==1.32.0
+grpcio==1.33.1
 humanize==3.0.1
 idna==2.10
 imageio==2.9.0
