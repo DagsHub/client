@@ -34,7 +34,7 @@ networkx==2.5
 numpy==1.19.4
 packaging==20.4
 pandas==1.1.4
-pathspec==0.8.0
+pathspec==0.8.1
 Pillow==8.0.1
 pluggy==0.13.1
 ply==3.11
