@@ -4,8 +4,8 @@ appdirs==1.4.4
 asciimatics==1.11.0
 atomicwrites==1.4.0
 atpublic==2.1.1
-attrs==20.2.0
-certifi==2020.6.20
+attrs==20.3.0
+certifi==2020.11.8
 chardet==3.0.4
 colorama==0.4.4
 configobj==5.0.6
@@ -31,10 +31,10 @@ Markdown==3.3.3
 more-itertools==8.6.0
 nanotime==0.5.2
 networkx==2.5
-numpy==1.19.3
+numpy==1.19.4
 packaging==20.4
 pandas==1.1.4
-pathspec==0.8.0
+pathspec==0.8.1
 Pillow==8.0.1
 pluggy==0.13.1
 ply==3.11
@@ -45,7 +45,7 @@ pyfiglet==0.8.post1
 pyparsing==2.4.7
 pytest==6.1.2
 python-dateutil==2.8.1
-pytorch-lightning==1.0.4
+pytorch-lightning==1.0.5
 pytz==2020.4
 PyYAML==5.3.1
 requests==2.24.0
@@ -55,7 +55,7 @@ schema==0.7.3
 shortuuid==1.0.1
 six==1.15.0
 smmap2==3.0.1
-tb-nightly==2.4.0a20201102
+tb-nightly==2.4.0a20201109
 test-tube==0.7.3
 torch==1.7.0
 torchvision==0.8.1
@@ -66,4 +66,4 @@ wcwidth==0.2.5
 Werkzeug==1.0.1
 zipp==3.4.0
 
-fastai==2.1.2
+fastai==2.1.4
