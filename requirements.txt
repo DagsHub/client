@@ -1,7 +1,7 @@
 ## The following requirements were added by pip freeze:
 absl-py==0.11.0
 appdirs==1.4.4
-asciimatics==1.11.0
+asciimatics==1.12.0
 atomicwrites==1.4.0
 atpublic==2.1.1
 attrs==20.3.0
@@ -25,7 +25,7 @@ humanize==3.1.0
 idna==2.10
 imageio==2.9.0
 importlib-metadata==2.0.0
-inflect==4.1.0
+inflect==5.0.2
 jsonpath-ng==1.5.2
 Markdown==3.3.3
 more-itertools==8.6.0
@@ -38,32 +38,32 @@ pathspec==0.8.1
 Pillow==8.0.1
 pluggy==0.13.1
 ply==3.11
-protobuf==3.13.0
+protobuf==3.14.0
 py==1.9.0
 pyasn1==0.4.8
 pyfiglet==0.8.post1
 pyparsing==2.4.7
 pytest==6.1.2
 python-dateutil==2.8.1
-pytorch-lightning==1.0.5
+pytorch-lightning==1.0.6
 pytz==2020.4
 PyYAML==5.3.1
-requests==2.24.0
+requests==2.25.0
 ruamel.yaml==0.16.12
 ruamel.yaml.clib==0.2.0
 schema==0.7.3
 shortuuid==1.0.1
 six==1.15.0
 smmap2==3.0.1
-tb-nightly==2.4.0a20201109
+tb-nightly==2.5.0a20201116
 test-tube==0.7.3
 torch==1.7.0
 torchvision==0.8.1
-tqdm==4.51.0
+tqdm==4.52.0
 treelib==1.6.1
-urllib3==1.25.11
+urllib3==1.26.2
 wcwidth==0.2.5
 Werkzeug==1.0.1
 zipp==3.4.0
 
-fastai==2.1.4
+fastai==2.1.5
