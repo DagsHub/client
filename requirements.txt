@@ -1,7 +1,7 @@
 ## The following requirements were added by pip freeze:
 absl-py==0.11.0
 appdirs==1.4.4
-asciimatics==1.11.0
+asciimatics==1.12.0
 atomicwrites==1.4.0
 atpublic==2.1.1
 attrs==20.3.0
