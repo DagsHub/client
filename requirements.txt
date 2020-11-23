@@ -66,4 +66,4 @@ wcwidth==0.2.5
 Werkzeug==1.0.1
 zipp==3.4.0
 
-fastai==2.1.5
+fastai==2.1.6
