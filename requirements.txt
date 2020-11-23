@@ -13,7 +13,7 @@ configparser==5.0.1
 contextlib2==0.6.0.post1
 decorator==4.4.2
 distro==1.5.0
-dvc==1.9.1
+dvc==1.10.1
 flufl.lock==5.0.3
 funcy==1.15
 future==0.18.2
@@ -24,7 +24,7 @@ grpcio==1.33.2
 humanize==3.1.0
 idna==2.10
 imageio==2.9.0
-importlib-metadata==2.0.0
+importlib-metadata==3.0.0
 inflect==5.0.2
 jsonpath-ng==1.5.2
 Markdown==3.3.3
@@ -45,7 +45,7 @@ pyfiglet==0.8.post1
 pyparsing==2.4.7
 pytest==6.1.2
 python-dateutil==2.8.1
-pytorch-lightning==1.0.6
+pytorch-lightning==1.0.7
 pytz==2020.4
 PyYAML==5.3.1
 requests==2.25.0
@@ -55,15 +55,15 @@ schema==0.7.3
 shortuuid==1.0.1
 six==1.15.0
 smmap2==3.0.1
-tb-nightly==2.5.0a20201116
+tb-nightly==2.5.0a20201123
 test-tube==0.7.3
 torch==1.7.0
 torchvision==0.8.1
-tqdm==4.52.0
+tqdm==4.53.0
 treelib==1.6.1
 urllib3==1.26.2
 wcwidth==0.2.5
 Werkzeug==1.0.1
 zipp==3.4.0
 
-fastai==2.1.5
+fastai==2.1.6
