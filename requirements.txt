@@ -55,7 +55,7 @@ schema==0.7.3
 shortuuid==1.0.1
 six==1.15.0
 smmap2==3.0.1
-tb-nightly==2.5.0a20201123
+tb-nightly==2.5.0a20201130
 test-tube==0.7.3
 torch==1.7.0
 torchvision==0.8.1
