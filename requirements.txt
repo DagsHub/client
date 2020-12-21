@@ -43,7 +43,7 @@ py==1.10.0
 pyasn1==0.4.8
 pyfiglet==0.8.post1
 pyparsing==2.4.7
-pytest==6.2.0
+pytest==6.2.1
 python-dateutil==2.8.1
 pytorch-lightning==1.1.0
 pytz==2020.4
