@@ -33,7 +33,7 @@ nanotime==0.5.2
 networkx==2.5
 numpy==1.19.4
 packaging==20.8
-pandas==1.1.5
+pandas==1.2.0
 pathspec==0.8.1
 Pillow==8.0.1
 pluggy==0.13.1
