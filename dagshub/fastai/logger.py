@@ -1,6 +1,5 @@
 from fastai.learner import Learner, Recorder
 from fastcore.basics import *
-from fastai.callback.progress import *
 from fastai.callback.core import Callback
 from fastai.callback.hook import total_params
 from fastai.torch_core import rank_distrib, to_detach
