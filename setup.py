@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="dagshub",
-    version="0.1.4",
+    version="0.1.5",
     author="DAGsHub",
     author_email="contact@dagshub.com",
     description="DAGsHub client libraries",
