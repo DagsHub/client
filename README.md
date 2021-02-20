@@ -7,6 +7,7 @@
 [![pypi](https://img.shields.io/pypi/v/dagshub.svg)](https://pypi.python.org/pypi/dagshub)
 [![Updates](https://pyup.io/repos/github/DAGsHub/client/shield.svg)](https://pyup.io/repos/github/DAGsHub/client/)
 [![License](https://img.shields.io/pypi/l/dagshub)](/LICENSE)
+<a href="https://twitter.com/TheRealDAGsHub" title="DAGsHub on Twitter"><img src="https://img.shields.io/twitter/follow/TheRealDAGsHub.svg?style=social"></a>
 
 # DAGsHub Python client libraries
 Use DAGsHub to create reproducible versions of your data science research project, 
