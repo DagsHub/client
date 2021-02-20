@@ -82,9 +82,14 @@ class DAGsHubLogger(Callback):
 
     def after_fit(self):
         self.run = True
+        self._dags_epoch = round(self._dags_epoch)
         if self._dags_status_hyperparam_name is not None and \
                 self._dags_status_hyperparam_name not in self.logger.hparams:
             self.logger.log_hyperparams({self._dags_status_hyperparam_name: self.run})
+        metrics = {n: s for n, s in zip(self.recorder.metric_names, self.recorder.log) if n not
+                   in ['train_loss', 'epoch', 'time']}
+        metrics['epoch'] = self._dags_epoch
+        self.logger.log_metrics(metrics, step_num=self._dags_step_num)
 
 
 @patch
