@@ -22,7 +22,7 @@ class DAGsHubLogger(Callback):
     """
     
     "Saves model topology, losses & metrics"
-    remove_on_fetch, order = True, Recorder.order+1
+    remove_on_fetch, order = True, Recorder.order + 1
 
     def __init__(self,
                  metrics_path: str = 'metrics.csv',
@@ -44,7 +44,7 @@ class DAGsHubLogger(Callback):
         super(DAGsHubLogger, self).__init__()
         self.logger = LoggerImpl(metrics_path=metrics_path, should_log_metrics=should_log_metrics,
                                  hparams_path=hparams_path, should_log_hparams=should_log_hparams,
-                                 should_make_dirs=should_make_dirs, eager_logging=False)
+                                 should_make_dirs=should_make_dirs, eager_logging=True)
         self._dags_status_hyperparam_name = 'success'
         self._dags_step_num = -1
         self._dags_epoch = 0
@@ -63,16 +63,18 @@ class DAGsHubLogger(Callback):
     def after_batch(self):
         if self.learn.training:
             self._dags_step_num += 1
+            self._dags_epoch += 1 / self.n_iter
             hypers = {f'{k}_{i}': v for i, h in enumerate(self.opt.hypers) for k, v in h.items()}
             metrics = {
                 'train_loss': to_detach(self.learn.smooth_loss.clone()).numpy(),
                 'raw_loss': to_detach(self.learn.loss.clone()).numpy(),
+                'epoch': self._dags_epoch,
                 **hypers
             }
             self.logger.log_metrics(metrics, step_num=self._dags_step_num)
 
     def after_epoch(self):
-        self._dags_epoch += 1
+        self._dags_epoch = round(self._dags_epoch)
         metrics = {n: s for n, s in zip(self.recorder.metric_names, self.recorder.log) if n not
                    in ['train_loss', 'epoch', 'time']}
         metrics['epoch'] = self._dags_epoch
@@ -80,19 +82,19 @@ class DAGsHubLogger(Callback):
 
     def after_fit(self):
         self.run = True
+        self._dags_epoch = round(self._dags_epoch)
         if self._dags_status_hyperparam_name is not None and \
                 self._dags_status_hyperparam_name not in self.logger.hparams:
             self.logger.log_hyperparams({self._dags_status_hyperparam_name: self.run})
-        try:
-            self.logger.save()
-            self.logger.close()
-        except:
-            print('Fitting model has already been ended')
+        metrics = {n: s for n, s in zip(self.recorder.metric_names, self.recorder.log) if n not
+                   in ['train_loss', 'epoch', 'time']}
+        metrics['epoch'] = self._dags_epoch
+        self.logger.log_metrics(metrics, step_num=self._dags_step_num)
 
 
 @patch
 def gather_args(self: Learner):
-    "Gather config parameters accessible to the learner"
+    """Gather config parameters accessible to the learner"""
     # args stored by `store_attr`
     cb_args = {f'{cb}': getattr(cb, '__stored_args__', True) for cb in self.cbs}
     args = {'Learner': self, **cb_args}
