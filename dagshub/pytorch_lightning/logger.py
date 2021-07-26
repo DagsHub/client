@@ -1,7 +1,7 @@
 from argparse import Namespace
 
 import pytorch_lightning
-from pytorch_lightning.logging import rank_zero_only
+from pytorch_lightning.utilities import rank_zero_only
 
 from ..logger import DAGsHubLogger as LoggerImpl
 
