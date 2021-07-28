@@ -6,7 +6,7 @@ from pytorch_lightning.utilities import rank_zero_only
 from ..logger import DAGsHubLogger as LoggerImpl
 
 
-class DAGsHubLogger(pytorch_lightning.logging.LightningLoggerBase):
+class DAGsHubLogger(pytorch_lightning.loggers.LightningLoggerBase):
 
     def __init__(self,
                  metrics_path: str = 'metrics.csv',
