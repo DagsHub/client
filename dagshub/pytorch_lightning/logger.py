@@ -40,7 +40,6 @@ class DAGsHubLogger(LightningLoggerBase):
                                  should_make_dirs=should_make_dirs, eager_logging=False)
         self._name = name or ""
         self._version = version
-        self._experiment = None
 
 
     @property
@@ -52,9 +51,6 @@ class DAGsHubLogger(LightningLoggerBase):
         Example::
             self.logger.experiment.some_experiment_writer_function()
         """
-        if self._experiment:
-            return self._experiment
-
         return self.logger
 
     @rank_zero_only
