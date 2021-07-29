@@ -65,7 +65,7 @@ The [basic DAGsHub logger](https://github.com/DAGsHub/client/blob/master/dagshub
 However, for convenience, we include some integrations with common ML frameworks, which can __just work__ right out of the box, 
 without having to write any logging code on your own:
 
-* [pytorch-lightning](https://github.com/DAGsHub/client/tree/master/dagshub/pytorch_lightning)
+* [pytorch-lightning](https://github.com/DAGsHub/client/tree/master/dagshub/pytorch_lightning) – supports version 1.4.0 or higher
 * [fastai v2](https://github.com/DAGsHub/client/tree/master/dagshub/fastai)
 * More - soon to come!
 
