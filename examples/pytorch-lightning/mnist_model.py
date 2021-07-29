@@ -15,10 +15,11 @@ import pytorch_lightning as pl
 
 class MnistModel(pl.LightningModule):
 
-    def __init__(self, hparams, data_dir=None):
+    def __init__(self, batch_size, learning_rate, data_dir=None):
         super(MnistModel, self).__init__()
         # not the best model...
-        self.hparams = hparams
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
         self.conv1 = torch.nn.Conv2d(1, 16, 3)
         self.relu1 = torch.nn.ReLU()
         self.conv2 = torch.nn.Conv2d(16, 8, 3)
@@ -38,7 +39,7 @@ class MnistModel(pl.LightningModule):
         x, y = batch
         y_hat = self.forward(x)
         loss = F.cross_entropy(y_hat, y)
-        return self.copy_to_log({'loss': loss})
+        return self.log('loss', loss)
 
     def validation_step(self, batch, batch_idx):
         # OPTIONAL
@@ -49,40 +50,27 @@ class MnistModel(pl.LightningModule):
     def validation_end(self, outputs):
         # OPTIONAL
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        return self.copy_to_log_and_progress_bar({'avg_val_loss': avg_loss})
-
-    @staticmethod
-    def copy_to_log(d):
-        d['log'] = dict(d)
-        return d
-
-    @staticmethod
-    def copy_to_log_and_progress_bar(d):
-        d['log'] = d['progress_bar'] = dict(d)
-        return d
+        return self.log('avg_val_loss', avg_loss, prog_bar=True)
 
     def configure_optimizers(self):
         # REQUIRED
         # can return multiple optimizers and learning_rate schedulers
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
         return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
-                          batch_size=self.hparams.batch_size)
+                          batch_size=self.batch_size)
 
-    @pl.data_loader
     def val_dataloader(self):
         # OPTIONAL
         return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
-                          batch_size=self.hparams.batch_size)
+                          batch_size=self.batch_size)
 
-    @pl.data_loader
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
-                          batch_size=self.hparams.batch_size)
+                          batch_size=self.batch_size)
 
     @staticmethod
     def add_model_specific_args(parent_parser):
