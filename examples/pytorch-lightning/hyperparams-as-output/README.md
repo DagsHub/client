@@ -5,7 +5,7 @@ This example how to set up your hyperparameter file as a [DVC](https://dvc.org) 
 This means that you can keep using `pytorch-lightning` directly from the command line, specifying non-default hyperparameters
 as command-line arguments. For example:
 ```bash
-python3 mnist_trainer.py --learning-rate 0.004
+python3 mnist_trainer.py --learning_rate 0.004
 ```
 
 The DAGsHub logger will ensure that these custom hyperparameters are recorded and saved to [`params.yml`](params.yml), so you can save them
