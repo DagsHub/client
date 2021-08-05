@@ -36,14 +36,14 @@ if __name__ == '__main__':
     MnistModel = import_model()
 
     # init module
-    model = MnistModel(hparams)
+    model = MnistModel(hparams.batch_size, hparams.learning_rate)
 
     # most basic trainer, uses good defaults
     trainer = Trainer(
-        max_nb_epochs=hparams.max_nb_epochs,
+        max_epochs=hparams.max_nb_epochs,
         gpus=hparams.gpus,
         val_check_interval=0.2,
         logger=DAGsHubLogger(should_log_hparams=False),  # This is the main point - use the DAGsHub logger!
-        default_save_path='lightning_logs',
+        default_root_dir='lightning_logs',
     )
     trainer.fit(model)
