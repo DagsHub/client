@@ -3,7 +3,7 @@
 </div>
 
 [![Discord](https://img.shields.io/discord/698874030052212737)](https://discord.com/invite/9gU36Y6)
-[![Build Status](https://travis-ci.org/DAGsHub/client.svg?branch=master)](https://travis-ci.org/DAGsHub/client)
+[![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=master)](https://github.com/DAGsHub/fds/actions/workflows/python-package.yml)
 [![pypi](https://img.shields.io/pypi/v/dagshub.svg)](https://pypi.python.org/pypi/dagshub)
 [![Updates](https://pyup.io/repos/github/DAGsHub/client/shield.svg)](https://pyup.io/repos/github/DAGsHub/client/)
 [![License](https://img.shields.io/pypi/l/dagshub)](/LICENSE)
