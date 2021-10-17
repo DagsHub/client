@@ -52,9 +52,6 @@ class DAGsHubLogger(Callback):
         self._dags_status_hyperparam_name = 'success'
 
     def on_train_begin(self, logs={}):
-        print(repr(self.model.optimizer))
-        print(repr(self.model.compiled_loss))
-        print(repr(self.model.optimizer))
         params = {}
         with ignore_exceptions():
             params.update(self.model.optimizer.get_config())
