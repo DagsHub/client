@@ -68,12 +68,12 @@ class DAGsHubLogger(Callback):
 
     def on_train_batch_end(self, batch, logs={}):
         self._step += 1
-        metrics = {'epoch': self._epoch, **logs}
-        self.logger.log_metrics(metrics, step_num=self._step)
+        self.on_epoch_end(None, logs)
     
     def on_epoch_end(self, epoch, logs={}):
         # At the end of an epoch, logs has more metrics
-        self.on_train_batch_end(None, logs)
+        metrics = {'epoch': self._epoch, **logs}
+        self.logger.log_metrics(metrics, step_num=self._step)
 
     def on_train_end(self, logs={}):
         self.logger.log_hyperparams(success=True)
