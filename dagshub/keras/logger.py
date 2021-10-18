@@ -49,7 +49,6 @@ class DAGsHubLogger(Callback):
         self.logger = LoggerImpl(metrics_path=metrics_path, should_log_metrics=should_log_metrics,
                                  hparams_path=hparams_path, should_log_hparams=should_log_hparams,
                                  should_make_dirs=should_make_dirs, eager_logging=True)
-        self._dags_status_hyperparam_name = 'success'
 
     def on_train_begin(self, logs={}):
         params = {}
@@ -60,6 +59,7 @@ class DAGsHubLogger(Callback):
         with ignore_exceptions():
             params['loss'] = self.model.loss.get_config()
         self.logger.log_hyperparams(params)
+        self.logger.log_hyperparams(success=False)
         self._epoch = -1
         self._step = 0
 
@@ -76,6 +76,7 @@ class DAGsHubLogger(Callback):
         self.on_train_batch_end(None, logs)
 
     def on_train_end(self, logs={}):
+        self.logger.log_hyperparams(success=True)
         self.logger.save()
         self.logger.close()
     
