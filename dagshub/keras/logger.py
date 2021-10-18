@@ -53,9 +53,9 @@ class DAGsHubLogger(Callback):
     def on_train_begin(self, logs={}):
         params = {}
         with ignore_exceptions():
-            params.update(self.model.optimizer.get_config())
-        with ignore_exceptions():
             params.update(self.params)
+        with ignore_exceptions():
+            params['optimizer'] = self.model.optimizer.get_config()
         with ignore_exceptions():
             params['loss'] = self.model.loss.get_config()
         self.logger.log_hyperparams(params)
