@@ -74,4 +74,8 @@ class DAGsHubLogger(Callback):
     def on_epoch_end(self, epoch, logs={}):
         # At the end of an epoch, logs has more metrics
         self.on_train_batch_end(None, logs)
+
+    def on_train_end(self, logs={}):
+        self.logger.save()
+        self.logger.close()
     
