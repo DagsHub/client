@@ -6,5 +6,5 @@ py==1.11.0
 pyparsing==3.0.6
 pytest==6.2.5
 toml==0.10.2
-PyTorch-lightning==1.4.9
+PyTorch-lightning==1.5.2
 tensorflow-cpu==2.6.0
