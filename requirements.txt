@@ -1,10 +1,10 @@
 attrs==21.2.0
 iniconfig==1.1.1
-packaging==21.0
+packaging==21.3
 pluggy==1.0.0
-py==1.10.0
-pyparsing==3.0.1
+py==1.11.0
+pyparsing==3.0.6
 pytest==6.2.5
 toml==0.10.2
-PyTorch-lightning==1.4.9
-tensorflow-cpu==2.6.0
+PyTorch-lightning==1.5.2
+tensorflow-cpu==2.7.0
