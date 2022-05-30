@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://dagshub.com"><img src="https://raw.githubusercontent.com/DAGsHub/client/master/dagshub_github.png" width=600 alt=""/></a><br><br>
+  <a href="https://dagshub.com"><img src="dagshub_github.png" width=600 alt=""/></a><br><br>
 </div>
 
 [![Discord](https://img.shields.io/discord/698874030052212737)](https://discord.com/invite/9gU36Y6)
