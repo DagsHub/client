@@ -7,18 +7,18 @@
 [![pypi](https://img.shields.io/pypi/v/dagshub.svg)](https://pypi.python.org/pypi/dagshub)
 [![Updates](https://pyup.io/repos/github/DAGsHub/client/shield.svg)](https://pyup.io/repos/github/DAGsHub/client/)
 [![License](https://img.shields.io/pypi/l/dagshub)](/LICENSE)
-<a href="https://twitter.com/TheRealDAGsHub" title="DAGsHub on Twitter"><img src="https://img.shields.io/twitter/follow/TheRealDAGsHub.svg?style=social"></a>
+<a href="https://twitter.com/TheRealDAGsHub" title="DagsHub on Twitter"><img src="https://img.shields.io/twitter/follow/TheRealDAGsHub.svg?style=social"></a>
 
-# DAGsHub Python client libraries
-Use DAGsHub to create reproducible versions of your data science research project, 
+# DagsHub Python client libraries
+Use DagsHub to create reproducible versions of your data science research project, 
 allow others to understand your project, and to contribute back to it.
 
-DAGsHub is built firmly around open, standard formats for your project. In particular:
+DagsHub is built firmly around open, standard formats for your project. In particular:
 * git
 * [DVC](https://github.com/iterative/dvc)
 * Standard data formats like YAML, JSON, CSV
 
-Therefore, you can work with DAGsHub regardless of your chosen programming language or frameworks. 
+Therefore, you can work with DagsHub regardless of your chosen programming language or frameworks. 
 
 __This client library is meant to help you get started quickly in Python__, but it's purely optional - 
 the data formats are very simple and you can choose to work with them directly. 
@@ -60,7 +60,7 @@ logger.close()
 ```
 
 ## Integrations with ML frameworks
-The [basic DAGsHub logger](https://github.com/DAGsHub/client/blob/master/dagshub/logger.py) is just plain Python, and requires no specific framework.
+The [basic DagsHub logger](https://github.com/DAGsHub/client/blob/master/dagshub/logger.py) is just plain Python, and requires no specific framework.
 
 However, for convenience, we include some integrations with common ML frameworks, which can __just work__ right out of the box, 
 without having to write any logging code on your own:
@@ -73,4 +73,4 @@ without having to write any logging code on your own:
 
 ---
 
-Made with 🐶 by [DAGsHub](https://dagshub.com/).
+Made with 🐶 by [DagsHub](https://dagshub.com/).
