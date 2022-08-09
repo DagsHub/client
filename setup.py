@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/DAGsHub/client",
     packages=setuptools.find_packages(),
-    install_requires=["PyYAML>=5"],
+    install_requires=["PyYAML>=5", "requests>=2"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
