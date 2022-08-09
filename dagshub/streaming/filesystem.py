@@ -143,6 +143,27 @@ class DagsHubFilesystem:
             else:
                 raise e
 
+    def listdir(self, path):
+        relative_path = self._relative_path(path)
+        if relative_path:
+            dircontents: set[str] = set()
+            error = None
+            try:
+                dircontents.update(self.__listdir(path))
+            except FileNotFoundError as e:
+                error = e
+            resp = requests.get(f'{self.content_api_url}/{relative_path}')
+            if resp.ok:
+                dircontents.update(Path(f['path']).name for f in resp.json())
+                return list(dircontents)
+            else:
+                if error is not None:
+                    raise error
+                else:
+                    return list(dircontents)
+        else:
+            return self.__listdir(path)
+
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
             # TODO: DRY this dictionary. i.e. __open() links cls.__open and io.open even though this dictionary links them
@@ -150,9 +171,11 @@ class DagsHubFilesystem:
             self.__class__.__unpatched = {
                 'open': io.open,
                 'stat': os.stat,
+                'listdir': os.listdir
             }
         io.open = builtins.open = _pathlib.open = self.open
         os.stat = _pathlib.stat = self.stat
+        os.listdir = _pathlib.listdir = self.listdir
         self.__class__.hooked_instance = self
 
     @classmethod
@@ -171,6 +194,11 @@ class DagsHubFilesystem:
     @property
     def __stat(cls):
         return cls.__get_unpatched('stat', os.stat)
+
+    @classmethod
+    @property
+    def __listdir(cls):
+        return cls.__get_unpatched('listdir', os.listdir)
 
 class dagshub_stat_result:
     def __init__(self, fs: DagsHubFilesystem, path: PathLike):
