@@ -1,19 +1,18 @@
 import builtins
 import io
 import os
-from multiprocessing import AuthenticationError
-from functools import wraps
 import subprocess
+from configparser import ConfigParser
+from functools import wraps
+from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
 from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
-from typing import IO, Optional, TypeVar
+from typing import Optional, TypeVar
 from urllib.parse import urlparse
-from xml.sax.handler import property_declaration_handler
 
 import requests
-from configobj import ConfigObj
 
 T = TypeVar('T')
 
@@ -60,7 +59,8 @@ class DagsHubFilesystem:
         # TODO: if no Git project found, search for .dvc project?
 
         # Find Git remote URL
-        git_config = ConfigObj(self.project_root / '.git/config')
+        git_config = ConfigParser()
+        git_config.read(self.project_root / '.git/config')
         git_remotes = [git_config[remote]['url']
                         for remote in git_config
                         if remote.startswith('remote ')]
