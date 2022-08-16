@@ -2,6 +2,7 @@ import builtins
 import io
 import os
 from multiprocessing import AuthenticationError
+from functools import wraps
 import subprocess
 from os import PathLike
 from os.path import ismount
@@ -9,11 +10,30 @@ from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
 from typing import IO, Optional, TypeVar
 from urllib.parse import urlparse
+from xml.sax.handler import property_declaration_handler
 
 import requests
 from configobj import ConfigObj
 
 T = TypeVar('T')
+
+def wrapreturn(wrappertype):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return wrappertype(func(*args, **kwargs))
+        return wrapper
+    return decorator
+
+class dagshub_ScandirIterator:
+        def __init__(self, iterator):
+            self._iterator = iterator
+        def __iter__(self):
+            return self._iterator
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return self
 
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
@@ -44,13 +64,16 @@ class DagsHubFilesystem:
         git_remotes = [git_config[remote]['url']
                         for remote in git_config
                         if remote.startswith('remote ')]
-        dagshub_remote = next(remote.removesuffix('/').removesuffix('.git')
+        dagshub_remotes = next(remote.removesuffix('/').removesuffix('.git')
                                 for remote in git_remotes
                                 if remote.startswith("https://dagshub.com/"))
         # TODO: if no DagsHub remote found, check DVC remotes (i.e. using GitHub Connect)
 
         if not repo_url:
-            repo_url = dagshub_remote
+            if len(dagshub_remotes) > 0:
+                repo_url = dagshub_remotes
+            else:
+                raise ValueError('No DagsHub git remote detected, please specify repo_url')
 
         if not branch:
             branch = (self.__open(self.project_root / '.git/HEAD')
@@ -104,6 +127,7 @@ class DagsHubFilesystem:
                 resp = requests.get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
                 if resp.ok:
                     Path(file).absolute().parent.mkdir(parents=True, exist_ok=True)
+                    # TODO: Handle symlinks
                     with self.__open(file, 'wb') as output:
                         output.write(resp.content)
                     return self.__open(file, mode)
@@ -127,8 +151,7 @@ class DagsHubFilesystem:
                 # TODO: use DVC remote cache to download file now that we have the directory json
                 resp = requests.get(f'{self.content_api_url}/{relative_path.parent}', auth=self.auth)
                 if resp.ok:
-                    json = resp.json()
-                    matches = [info for info in json if Path(info['path']) == relative_path]
+                    matches = [info for info in resp.json() if Path(info['path']) == relative_path]
                     assert len(matches) <= 1
                     if matches:
                         if matches[0]['type'] == 'dir':
@@ -143,7 +166,7 @@ class DagsHubFilesystem:
             else:
                 raise e
 
-    def listdir(self, path):
+    def listdir(self, path='.'):
         relative_path = self._relative_path(path)
         if relative_path:
             dircontents: set[str] = set()
@@ -164,6 +187,24 @@ class DagsHubFilesystem:
         else:
             return self.__listdir(path)
 
+    @wrapreturn(dagshub_ScandirIterator)
+    def scandir(self, path='.'):
+        path = Path(path)
+        relative_path = self._relative_path(path)
+        if relative_path:
+            local_filenames = set()
+            for direntry in self.__scandir(path):
+                local_filenames.add(direntry.name)
+                yield direntry
+            resp = requests.get(f'{self.content_api_url}/{relative_path}')
+            if resp.ok:
+                for f in resp.json():
+                    name = Path(f['path']).name
+                    if name not in local_filenames:
+                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
+        else:
+            return self.__scandir(path)
+
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
             # TODO: DRY this dictionary. i.e. __open() links cls.__open and io.open even though this dictionary links them
@@ -171,11 +212,13 @@ class DagsHubFilesystem:
             self.__class__.__unpatched = {
                 'open': io.open,
                 'stat': os.stat,
-                'listdir': os.listdir
+                'listdir': os.listdir,
+                'scandir': os.scandir
             }
         io.open = builtins.open = _pathlib.open = self.open
         os.stat = _pathlib.stat = self.stat
         os.listdir = _pathlib.listdir = self.listdir
+        os.scandir = _pathlib.scandir = self.scandir
         self.__class__.hooked_instance = self
 
     @classmethod
@@ -200,23 +243,10 @@ class DagsHubFilesystem:
     def __listdir(cls):
         return cls.__get_unpatched('listdir', os.listdir)
 
-class dagshub_stat_result:
-    def __init__(self, fs: DagsHubFilesystem, path: PathLike):
-        self.fs = fs
-        self.path = path
-
-    def __getattr__(self, name: str):
-        if not name.startswith('st_'):
-            raise AttributeError
-        if hasattr(self, '_true_stat'):
-            return os.stat_result.__getattr__(self._true_stat, name)
-        self.fs.open(self.path)
-        self._true_stat = self.fs._DagsHubFilesystem__stat(self.path)
-        return os.stat_result.__getattr__(self._true_stat, name)
-
-    def __repr__(self):
-        inner = repr(self._true_stat) if hasattr(self, '_true_stat') else 'pending...'
-        return f'dagshub_stat_result({inner}, path={self.path})'
+    @classmethod
+    @property
+    def __scandir(cls):
+        return cls.__get_unpatched('scandir', os.scandir)
 
 def install_hooks(project_root: Optional[PathLike] = None,
                   repo_url: Optional[str] = None,
@@ -225,6 +255,84 @@ def install_hooks(project_root: Optional[PathLike] = None,
                   password: Optional[str] = None):
     fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
     fs.install_hooks()
+
+class dagshub_stat_result:
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike):
+        self._fs = fs
+        self._path = path
+
+    def __getattr__(self, name: str):
+        if not name.startswith('st_'):
+            raise AttributeError
+        if hasattr(self, '_true_stat'):
+            return os.stat_result.__getattribute__(self._true_stat, name)
+        self._fs.open(self._path)
+        self._true_stat = self._fs._DagsHubFilesystem__stat(self._path)
+        return os.stat_result.__getattribute__(self._true_stat, name)
+
+    def __repr__(self):
+        inner = repr(self._true_stat) if hasattr(self, '_true_stat') else 'pending...'
+        return f'dagshub_stat_result({inner}, path={self._path})'
+
+class dagshub_DirEntry:
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory=False):
+        self._fs = fs
+        self._path = path
+        self._is_directory = is_directory
+    
+    @property
+    def name(self):
+        # TODO: create decorator for delegation
+        if hasattr(self, '_true_direntry'):
+            return self._true_direntry.name
+        else:
+            return self._path.name
+
+    @property
+    def path(self):
+        if hasattr(self, '_true_direntry'):
+            return self._true_direntry.path
+        else:
+            return str(self._path)
+
+    def is_dir(self):
+        if hasattr(self, '_true_direntry'):
+            return self._true_direntry.is_dir()
+        else:
+            return self._is_directory
+
+    def is_file(self):
+        if hasattr(self, '_true_direntry'):
+            return self._true_direntry.is_file()
+        else:
+            # TODO: Symlinks should return false
+            return not self._is_directory
+
+    def stat(self):
+        if hasattr(self, '_true_direntry'):
+            return self._true_direntry.stat()
+        else:
+            return self._fs.stat(self._path)
+
+    def __getattr__(self, name: str):
+        if name == '_true_direntry':
+            raise AttributeError
+        if hasattr(self, '_true_direntry'):
+            return os.DirEntry.__getattribute__(self._true_direntry, name)
+        if self._is_directory:
+            self._path.mkdir(parents=True, exist_ok=True)
+        else:
+            self._fs.open(self._path)
+        for direntry in self._fs._DagsHubFilesystem__scandir(self._path.parent):
+            if direntry.name == self._path.name:
+                self._true_direntry = direntry
+                return os.DirEntry.__getattribute__(self._true_direntry, name)
+        else:
+            raise FileNotFoundError
+
+    def __repr__(self):
+        cached = ' (cached)' if hasattr(self, '_true_direntry') else ''
+        return f'<dagshub_DirEntry \'{self.name}\'{cached}>'
 
 # Used for testing purposes only
 if __name__ == "__main__":
