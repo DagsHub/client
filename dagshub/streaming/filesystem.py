@@ -1,6 +1,7 @@
 import builtins
 import io
 import os
+import re
 import subprocess
 from configparser import ConfigParser
 from functools import wraps
@@ -64,7 +65,7 @@ class DagsHubFilesystem:
         git_remotes = [git_config[remote]['url']
                         for remote in git_config
                         if remote.startswith('remote ')]
-        dagshub_remotes = next(remote.removesuffix('/').removesuffix('.git')
+        dagshub_remotes = next(re.compile(r'(\.git)?/?$').sub('', remote)
                                 for remote in git_remotes
                                 if remote.startswith("https://dagshub.com/"))
         # TODO: if no DagsHub remote found, check DVC remotes (i.e. using GitHub Connect)
