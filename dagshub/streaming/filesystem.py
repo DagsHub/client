@@ -229,25 +229,21 @@ class DagsHubFilesystem:
         else:
             return alt
 
-    @classmethod
     @property
-    def __open(cls):
-        return cls.__get_unpatched('open', io.open)
+    def __open(self):
+        return self.__get_unpatched('open', io.open)
 
-    @classmethod
     @property
-    def __stat(cls):
-        return cls.__get_unpatched('stat', os.stat)
+    def __stat(self):
+        return self.__get_unpatched('stat', os.stat)
 
-    @classmethod
     @property
-    def __listdir(cls):
-        return cls.__get_unpatched('listdir', os.listdir)
+    def __listdir(self):
+        return self.__get_unpatched('listdir', os.listdir)
 
-    @classmethod
     @property
-    def __scandir(cls):
-        return cls.__get_unpatched('scandir', os.scandir)
+    def __scandir(self):
+        return self.__get_unpatched('scandir', os.scandir)
 
 def install_hooks(project_root: Optional[PathLike] = None,
                   repo_url: Optional[str] = None,
