@@ -114,10 +114,16 @@ class DagsHubFilesystem:
 
     def _relative_path(self, file: PathLike):
         path = Path(file).absolute()
-        if path.is_relative_to(self.project_root.absolute()):
-            return path.relative_to(self.project_root.absolute())
+        if hasattr(Path, 'is_relative_to'):
+            if path.is_relative_to(self.project_root.absolute()):
+                return path.relative_to(self.project_root.absolute())
+            else:
+                return None
         else:
-            return None
+            try:
+                return path.relative_to(self.project_root.absolute())
+            except ValueError:
+                return None
 
     def open(self, file: PathLike, mode: str = 'r', *args, **kwargs):
         try:
