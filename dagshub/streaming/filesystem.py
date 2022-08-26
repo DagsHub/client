@@ -196,7 +196,7 @@ class DagsHubFilesystem:
             dircontents: set[str] = set()
             error = None
             try:
-                dircontents.update(self.__listdir(path))
+                dircontents.update(self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)))
             except FileNotFoundError as e:
                 error = e
             resp = requests.get(f'{self.content_api_url}/{relative_path}')
@@ -217,7 +217,7 @@ class DagsHubFilesystem:
         relative_path = self._relative_path(path)
         if relative_path:
             local_filenames = set()
-            for direntry in self.__scandir(path):
+            for direntry in self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)):
                 local_filenames.add(direntry.name)
                 yield direntry
             resp = requests.get(f'{self.content_api_url}/{relative_path}')
@@ -351,10 +351,10 @@ class dagshub_DirEntry:
         if hasattr(self, '_true_direntry'):
             return os.DirEntry.__getattribute__(self._true_direntry, name)
         if self._is_directory:
-            self._path.mkdir(parents=True, exist_ok=True)
+            self._fs._mkdirs(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
         else:
             self._fs.open(self._path)
-        for direntry in self._fs._DagsHubFilesystem__scandir(self._path.parent):
+        for direntry in self._fs._DagsHubFilesystem__scandir(os.open(self._fs._relative_path(self._path).parent, os.O_DIRECTORY, dir_fd=self._fs.project_root_fd)):
             if direntry.name == self._path.name:
                 self._true_direntry = direntry
                 return os.DirEntry.__getattribute__(self._true_direntry, name)
