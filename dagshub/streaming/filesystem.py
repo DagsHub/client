@@ -151,7 +151,7 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 resp = requests.get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
                 if resp.ok:
-                    self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                    self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
                     # TODO: Handle symlinks
                     with self.__open(relative_path, 'wb', opener=self._project_root_opener) as output:
                         output.write(resp.content)
@@ -245,12 +245,16 @@ class DagsHubFilesystem:
         os.scandir = _pathlib.scandir = self.scandir
         self.__class__.hooked_instance = self
 
-    def _mkdirs(self, path: PathLike, dir_fd: Optional[int] = None):
-        for p in path.parents[::-1]:
+    def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
+        for parent in relative_path.parents[::-1]:
             try:
-                self.__stat(p, dir_fd=dir_fd)
+                self.__stat(parent, dir_fd=dir_fd)
             except (OSError, ValueError):
-                os.mkdir(p, dir_fd=dir_fd)
+                os.mkdir(parent, dir_fd=dir_fd)
+        try:
+            self.__stat(relative_path, dir_fd=dir_fd)
+        except (OSError, ValueError):
+            os.mkdir(relative_path, dir_fd=dir_fd)
 
     @classmethod
     def __get_unpatched(cls, key, alt: T) -> T:
