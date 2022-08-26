@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 from configparser import ConfigParser
-from functools import wraps
+from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
@@ -45,7 +45,8 @@ class DagsHubFilesystem:
                  repo_url: Optional[str] = None,
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
-                 password: Optional[str] = None):
+                 password: Optional[str] = None,
+                 _project_root_fd: Optional[int] = None):
 
         # Find root directory of Git project
         if not project_root:
@@ -58,6 +59,12 @@ class DagsHubFilesystem:
             self.project_root = Path(project_root)
         del project_root
         # TODO: if no Git project found, search for .dvc project?
+
+        if _project_root_fd:
+            self.project_root_fd = _project_root_fd
+        else:
+            self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
+        self._project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
 
         # Find Git remote URL
         git_config = ConfigParser()
@@ -111,6 +118,9 @@ class DagsHubFilesystem:
             else:
                 # TODO: Check .dvc/config{,.local} for credentials
                 raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+    
+    def __del__(self):
+        os.close(self.project_root_fd)
 
     def _relative_path(self, file: PathLike):
         path = Path(file).absolute()
@@ -125,26 +135,27 @@ class DagsHubFilesystem:
             except ValueError:
                 return None
 
-    def open(self, file: PathLike, mode: str = 'r', *args, **kwargs):
-        try:
-            return self.__open(file, mode, *args, **kwargs)
-        except FileNotFoundError as e:
-            relative_path = self._relative_path(file)
-            if relative_path:
+    def open(self, file: PathLike, mode: str = 'r', opener=None, *args, **kwargs):
+        if opener is not None:
+            raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
+        relative_path = self._relative_path(file)
+        if relative_path:
+            try:
+                return self.__open(relative_path, mode, *args, **kwargs, opener=self._project_root_opener)
+            except FileNotFoundError as e:
                 resp = requests.get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
                 if resp.ok:
-                    Path(file).absolute().parent.mkdir(parents=True, exist_ok=True)
+                    self._mkdirs(relative_path, dir_fd=self.project_root_fd)
                     # TODO: Handle symlinks
-                    with self.__open(file, 'wb') as output:
+                    with self.__open(relative_path, 'wb', opener=self._project_root_opener) as output:
                         output.write(resp.content)
-                    return self.__open(file, mode)
+                    return self.__open(relative_path, mode, opener=self._project_root_opener)
                 else:
                     # TODO: After API no longer 500s on FileNotFounds
                     #       check status code and only return FileNotFound on 404s
                     raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
-            else:
-                # Outside of repository
-                raise e
+        else:
+            return self.__open(file, mode, *args, **kwargs)
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
@@ -227,6 +238,14 @@ class DagsHubFilesystem:
         os.listdir = _pathlib.listdir = self.listdir
         os.scandir = _pathlib.scandir = self.scandir
         self.__class__.hooked_instance = self
+
+    @classmethod
+    def _mkdirs(self, path: PathLike, dir_fd: Optional[int] = None):
+        for p in path.parents[::-1]:
+            try:
+                self.__stat(p, dir_fd=dir_fd)
+            except (OSError, ValueError):
+                os.mkdir(p, dir_fd=dir_fd)
 
     @classmethod
     def __get_unpatched(cls, key, alt: T) -> T:
