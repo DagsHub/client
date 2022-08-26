@@ -148,7 +148,7 @@ class DagsHubFilesystem:
         if relative_path:
             try:
                 return self.__open(relative_path, mode, *args, **kwargs, opener=self._project_root_opener)
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 resp = requests.get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
                 if resp.ok:
                     self._mkdirs(relative_path, dir_fd=self.project_root_fd)
@@ -165,12 +165,12 @@ class DagsHubFilesystem:
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
-            raise NotImplementedError('DagsHub\'s patched stat() does not support additional arguments')
-        try:
-            return self.__stat(path)
-        except FileNotFoundError as e:
-            relative_path = self._relative_path(path)
-            if relative_path:
+            raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
+        relative_path = self._relative_path(path)
+        if relative_path:
+            try:
+                return self.__stat(relative_path, dir_fd=self.project_root_fd)
+            except FileNotFoundError:
                 # TODO: check single file content API instead of directory when it becomes available
                 # TODO: use DVC remote cache to download file now that we have the directory json
                 resp = requests.get(f'{self.content_api_url}/{relative_path.parent}', auth=self.auth)
@@ -179,16 +179,16 @@ class DagsHubFilesystem:
                     assert len(matches) <= 1
                     if matches:
                         if matches[0]['type'] == 'dir':
-                            Path(path).mkdir(parents=True, exist_ok=True)
-                            return self.__stat(path)
+                            self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                            return self.__stat(relative_path, dir_fd=self.project_root_fd)
                         else:
                             return dagshub_stat_result(self, path)
                     else:
                         raise FileNotFoundError
                 else:
                     raise FileNotFoundError
-            else:
-                raise e
+        else:
+            return self.__stat(path, follow_symlinks=follow_symlinks)
 
     def listdir(self, path='.'):
         relative_path = self._relative_path(path)
@@ -294,7 +294,7 @@ class dagshub_stat_result:
         if hasattr(self, '_true_stat'):
             return os.stat_result.__getattribute__(self._true_stat, name)
         self._fs.open(self._path)
-        self._true_stat = self._fs._DagsHubFilesystem__stat(self._path)
+        self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
         return os.stat_result.__getattribute__(self._true_stat, name)
 
     def __repr__(self):
