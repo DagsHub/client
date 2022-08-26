@@ -38,7 +38,13 @@ class dagshub_ScandirIterator:
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
 
-    __slots__ = 'project_root', 'content_api_url', 'raw_api_url', 'dvc_remote_url', 'auth'
+    __slots__ = ('project_root', 
+                 'project_root_fd',
+                 '_project_root_opener',
+                 'content_api_url',
+                 'raw_api_url',
+                 'dvc_remote_url',
+                 'auth')
 
     def __init__(self,
                  project_root: Optional[PathLike] = None,
@@ -239,7 +245,6 @@ class DagsHubFilesystem:
         os.scandir = _pathlib.scandir = self.scandir
         self.__class__.hooked_instance = self
 
-    @classmethod
     def _mkdirs(self, path: PathLike, dir_fd: Optional[int] = None):
         for p in path.parents[::-1]:
             try:
