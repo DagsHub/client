@@ -59,7 +59,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
 def mount(foreground=False):
     # FIXME TODO Better configurability
-    # logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(os.curdir)
     FUSE(fuse, str(fuse.fs.project_root), foreground=foreground, nonempty=True)
     if not foreground:
