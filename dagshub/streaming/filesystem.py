@@ -40,7 +40,6 @@ class DagsHubFilesystem:
 
     __slots__ = ('project_root', 
                  'project_root_fd',
-                 '_project_root_opener',
                  'content_api_url',
                  'raw_api_url',
                  'dvc_remote_url',
@@ -70,7 +69,6 @@ class DagsHubFilesystem:
             self.project_root_fd = _project_root_fd
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
-        self._project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
 
         # Find Git remote URL
         git_config = ConfigParser()
@@ -130,36 +128,37 @@ class DagsHubFilesystem:
 
     def _relative_path(self, file: PathLike):
         path = Path(file).absolute()
-        if hasattr(Path, 'is_relative_to'):
-            if path.is_relative_to(self.project_root.absolute()):
-                return path.relative_to(self.project_root.absolute())
-            else:
-                return None
-        else:
-            try:
-                return path.relative_to(self.project_root.absolute())
-            except ValueError:
-                return None
+        try:
+            return path.relative_to(self.project_root.absolute())
+        except ValueError:
+            return None
+
+    def _passthrough_path(self, relative_path: PathLike):
+        return str(relative_path).startswith(('.git/', '.dvc/'))
 
     def open(self, file: PathLike, mode: str = 'r', opener=None, *args, **kwargs):
         if opener is not None:
             raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
         relative_path = self._relative_path(file)
         if relative_path:
-            try:
-                return self.__open(relative_path, mode, *args, **kwargs, opener=self._project_root_opener)
-            except FileNotFoundError:
-                resp = requests.get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
-                if resp.ok:
-                    self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
-                    # TODO: Handle symlinks
-                    with self.__open(relative_path, 'wb', opener=self._project_root_opener) as output:
-                        output.write(resp.content)
-                    return self.__open(relative_path, mode, opener=self._project_root_opener)
-                else:
-                    # TODO: After API no longer 500s on FileNotFounds
-                    #       check status code and only return FileNotFound on 404s
-                    raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+            project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
+            if self._passthrough_path(relative_path):
+                return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+            else:
+                try:
+                    return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+                except FileNotFoundError:
+                    resp = requests.get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
+                    if resp.ok:
+                        self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
+                        # TODO: Handle symlinks
+                        with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                            output.write(resp.content)
+                        return self.__open(relative_path, mode, opener=project_root_opener)
+                    else:
+                        # TODO: After API no longer 500s on FileNotFounds
+                        #       check status code and only return FileNotFound on 404s
+                        raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
         else:
             return self.__open(file, mode, *args, **kwargs)
 
@@ -168,46 +167,53 @@ class DagsHubFilesystem:
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
         if relative_path:
-            try:
+            if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
-            except FileNotFoundError:
-                # TODO: check single file content API instead of directory when it becomes available
-                # TODO: use DVC remote cache to download file now that we have the directory json
-                resp = requests.get(f'{self.content_api_url}/{relative_path.parent}', auth=self.auth)
-                if resp.ok:
-                    matches = [info for info in resp.json() if Path(info['path']) == relative_path]
-                    assert len(matches) <= 1
-                    if matches:
-                        if matches[0]['type'] == 'dir':
-                            self._mkdirs(relative_path, dir_fd=self.project_root_fd)
-                            return self.__stat(relative_path, dir_fd=self.project_root_fd)
+            else:
+                try:
+                    return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                except FileNotFoundError:
+                    # TODO: check single file content API instead of directory when it becomes available
+                    # TODO: use DVC remote cache to download file now that we have the directory json
+                    resp = requests.get(f'{self.content_api_url}/{relative_path.parent}', auth=self.auth)
+                    if resp.ok:
+                        matches = [info for info in resp.json() if Path(info['path']) == relative_path]
+                        assert len(matches) <= 1
+                        if matches:
+                            if matches[0]['type'] == 'dir':
+                                self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                                return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                                # TODO: perhaps don't create directories on stat
+                            else:
+                                return dagshub_stat_result(self, path, is_directory=False)
                         else:
-                            return dagshub_stat_result(self, path)
+                            raise FileNotFoundError
                     else:
                         raise FileNotFoundError
-                else:
-                    raise FileNotFoundError
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
     def listdir(self, path='.'):
         relative_path = self._relative_path(path)
         if relative_path:
-            dircontents: set[str] = set()
-            error = None
-            try:
-                dircontents.update(self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)))
-            except FileNotFoundError as e:
-                error = e
-            resp = requests.get(f'{self.content_api_url}/{relative_path}')
-            if resp.ok:
-                dircontents.update(Path(f['path']).name for f in resp.json())
-                return list(dircontents)
+            if self._passthrough_path(relative_path):
+                return self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd))
             else:
-                if error is not None:
-                    raise error
-                else:
+                dircontents: set[str] = set()
+                error = None
+                try:
+                    dircontents.update(self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)))
+                except FileNotFoundError as e:
+                    error = e
+                resp = requests.get(f'{self.content_api_url}/{relative_path}')
+                if resp.ok:
+                    dircontents.update(Path(f['path']).name for f in resp.json())
                     return list(dircontents)
+                else:
+                    if error is not None:
+                        raise error
+                    else:
+                        return list(dircontents)
         else:
             return self.__listdir(path)
 
@@ -216,16 +222,19 @@ class DagsHubFilesystem:
         path = Path(path)
         relative_path = self._relative_path(path)
         if relative_path:
-            local_filenames = set()
-            for direntry in self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)):
-                local_filenames.add(direntry.name)
-                yield direntry
-            resp = requests.get(f'{self.content_api_url}/{relative_path}')
-            if resp.ok:
-                for f in resp.json():
-                    name = Path(f['path']).name
-                    if name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
+            if self._passthrough_path(relative_path):
+                return self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd))
+            else:
+                local_filenames = set()
+                for direntry in self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)):
+                    local_filenames.add(direntry.name)
+                    yield direntry
+                resp = requests.get(f'{self.content_api_url}/{relative_path}')
+                if resp.ok:
+                    for f in resp.json():
+                        name = Path(f['path']).name
+                        if name not in local_filenames:
+                            yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
         else:
             return self.__scandir(path)
 
@@ -288,15 +297,24 @@ def install_hooks(project_root: Optional[PathLike] = None,
     fs.install_hooks()
 
 class dagshub_stat_result:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
         self._fs = fs
         self._path = path
+        self._is_directory = is_directory
 
     def __getattr__(self, name: str):
         if not name.startswith('st_'):
             raise AttributeError
         if hasattr(self, '_true_stat'):
             return os.stat_result.__getattribute__(self._true_stat, name)
+        if name == 'st_uid':
+            return os.getuid()
+        elif name == 'st_gid':
+            return os.getgid()
+        elif name == 'st_atime' or name == 'st_mtime' or name == 'st_ctime':
+            return 0
+        elif name == 'st_mode':
+            return 0o100644
         self._fs.open(self._path)
         self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
         return os.stat_result.__getattribute__(self._true_stat, name)
@@ -306,7 +324,7 @@ class dagshub_stat_result:
         return f'dagshub_stat_result({inner}, path={self._path})'
 
 class dagshub_DirEntry:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory=False):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory

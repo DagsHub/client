@@ -32,9 +32,19 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             print('No fd allowed')
             exit()
         st = self.fs.stat(path)
-        return dict((key, getattr(st, key)) for key in (
-            'st_atime', 'st_ctime', 'st_gid', 'st_mode', 'st_mtime',
-            'st_nlink', 'st_size', 'st_uid'))
+        return {
+            key: getattr(st, key)
+            for key in (
+                'st_atime',
+                'st_ctime',
+                'st_gid',
+                'st_mode',
+                'st_mtime',
+                # 'st_nlink',
+                # 'st_size',
+                'st_uid',
+            )
+        }
 
     def read(self, path, size, offset, fh):
         with self.rwlock:
@@ -49,7 +59,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
 def mount(foreground=False):
     # FIXME TODO Better configurability
-    logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(os.curdir)
     FUSE(fuse, str(fuse.fs.project_root), foreground=foreground, nonempty=True)
     if not foreground:
