@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 from configparser import ConfigParser
-from functools import lru_cache, partial, wraps
+from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
@@ -35,6 +35,16 @@ class dagshub_ScandirIterator:
         def __exit__(self, *args):
             return self
 
+def cache_path(func):
+    cache = {}
+    @wraps(func)
+    def wrapper(self, path):
+        if path not in cache:
+            cache[path] = func(self, path)
+        return cache[path]
+    wrapper.cache = cache
+    return wrapper
+
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
 
@@ -43,7 +53,8 @@ class DagsHubFilesystem:
                  'content_api_url',
                  'raw_api_url',
                  'dvc_remote_url',
-                 'auth')
+                 'auth',
+                 '__weakref__')
 
     def __init__(self,
                  project_root: Optional[PathLike] = None,
@@ -106,7 +117,7 @@ class DagsHubFilesystem:
         # Determine if any authentication is needed
         self.auth = (username, password) if username or password else None
         del username, password
-        response = self.http_get(self.content_api_url, auth=self.auth)
+        response = self._api_listdir('')
         if response.ok:
             # No authentication needed
             pass
@@ -148,7 +159,7 @@ class DagsHubFilesystem:
                 try:
                     return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
                 except FileNotFoundError:
-                    resp = self.http_get(f'{self.raw_api_url}/{relative_path}', auth=self.auth)
+                    resp = self._api_download_file_git(relative_path)
                     if resp.ok:
                         self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
                         # TODO: Handle symlinks
@@ -175,7 +186,7 @@ class DagsHubFilesystem:
                 except FileNotFoundError:
                     # TODO: check single file content API instead of directory when it becomes available
                     # TODO: use DVC remote cache to download file now that we have the directory json
-                    resp = self.http_get(f'{self.content_api_url}/{relative_path.parent}', auth=self.auth)
+                    resp = self._api_listdir(relative_path.parent)
                     if resp.ok:
                         matches = [info for info in resp.json() if Path(info['path']) == relative_path]
                         assert len(matches) <= 1
@@ -205,7 +216,7 @@ class DagsHubFilesystem:
                     dircontents.update(self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)))
                 except FileNotFoundError as e:
                     error = e
-                resp = self.http_get(f'{self.content_api_url}/{relative_path}', auth=self.auth)
+                resp = self._api_listdir(relative_path)
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     return list(dircontents)
@@ -229,7 +240,7 @@ class DagsHubFilesystem:
                 for direntry in self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)):
                     local_filenames.add(direntry.name)
                     yield direntry
-                resp = self.http_get(f'{self.content_api_url}/{relative_path}', auth=self.auth)
+                resp = self._api_listdir(relative_path)
                 if resp.ok:
                     for f in resp.json():
                         name = Path(f['path']).name
@@ -238,12 +249,12 @@ class DagsHubFilesystem:
         else:
             return self.__scandir(path)
 
-    @staticmethod
-    @lru_cache(maxsize=None)
-    def http_get(url, auth):
-        # TODO cache only directory listings to avoid cache races
-        return requests.get(url, auth=auth)
+    @cache_path
+    def _api_listdir(self, path: str):
+        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth)
 
+    def _api_download_file_git(self, path: str):
+        return requests.get(f'{self.content_api_url}/path', auth=self.auth)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
