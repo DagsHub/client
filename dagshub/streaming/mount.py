@@ -1,3 +1,4 @@
+import errno
 import logging
 import os
 from errno import EACCES
@@ -47,7 +48,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
                 )
             }
         except FileNotFoundError:
-            raise FuseOSError(2)#errno.ENOENT
+            raise FuseOSError(errno.ENOENT)
 
     def read(self, path, size, offset, fh):
         with self.rwlock:

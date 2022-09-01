@@ -48,6 +48,8 @@ def cache_by_path(func):
     wrapper.cache = cache
     return wrapper
 
+SPECIAL_FILE = Path('.dagshub-streaming')
+
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
 
@@ -158,6 +160,11 @@ class DagsHubFilesystem:
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
             if self._passthrough_path(relative_path):
                 return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+            elif relative_path == SPECIAL_FILE:
+                # TODO: Don't even persist this file to disk, keep it completely virtual using tempdir/TextIO
+                with self.__open(relative_path, 'w', opener=project_root_opener) as output:
+                    output.write('v0') #TODO better versioning protocol!
+                return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
             else:
                 try:
                     return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
@@ -182,6 +189,9 @@ class DagsHubFilesystem:
         relative_path = self._relative_path(path)
         if relative_path:
             if self._passthrough_path(relative_path):
+                return self.__stat(relative_path, dir_fd=self.project_root_fd)
+            elif relative_path == SPECIAL_FILE:
+                self.open(relative_path).close()
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
             else:
                 try:
@@ -222,6 +232,8 @@ class DagsHubFilesystem:
                         dircontents.update(self.__listdir(fd))
                 except FileNotFoundError as e:
                     error = e
+                if relative_path == Path():
+                    dircontents.add(SPECIAL_FILE.name)
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
@@ -248,6 +260,17 @@ class DagsHubFilesystem:
                     for direntry in self.__scandir(fd):
                         local_filenames.add(direntry.name)
                         yield direntry
+                if relative_path == Path():
+                    if SPECIAL_FILE.name not in local_filenames:
+                        self.open(relative_path / SPECIAL_FILE).close()
+                        with self._open_fd(relative_path) as fd:
+                            for direntry in self.__scandir(fd):
+                                if direntry.name == SPECIAL_FILE.name:
+                                    local_filenames.add(SPECIAL_FILE.name)
+                                    yield direntry
+                                    break
+                            else:
+                                raise FileNotFoundError
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     for f in resp.json():
