@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 from configparser import ConfigParser
+from contextlib import contextmanager
 from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
@@ -208,12 +209,14 @@ class DagsHubFilesystem:
         relative_path = self._relative_path(path)
         if relative_path:
             if self._passthrough_path(relative_path):
-                return self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd))
+                with self._open_fd(relative_path) as fd:
+                    return self.__listdir(fd)
             else:
                 dircontents: set[str] = set()
                 error = None
                 try:
-                    dircontents.update(self.__listdir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)))
+                    with self._open_fd(relative_path) as fd:
+                        dircontents.update(self.__listdir(fd))
                 except FileNotFoundError as e:
                     error = e
                 resp = self._api_listdir(relative_path)
@@ -234,12 +237,14 @@ class DagsHubFilesystem:
         relative_path = self._relative_path(path)
         if relative_path:
             if self._passthrough_path(relative_path):
-                return self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd))
+                with self._open_fd(relative_path) as fd:
+                    return self.__scandir(fd)
             else:
                 local_filenames = set()
-                for direntry in self.__scandir(os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)):
-                    local_filenames.add(direntry.name)
-                    yield direntry
+                with self._open_fd(relative_path) as fd:
+                    for direntry in self.__scandir(fd):
+                        local_filenames.add(direntry.name)
+                        yield direntry
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     for f in resp.json():
@@ -282,6 +287,14 @@ class DagsHubFilesystem:
             self.__stat(relative_path, dir_fd=dir_fd)
         except (OSError, ValueError):
             os.mkdir(relative_path, dir_fd=dir_fd)
+
+    @contextmanager
+    def _open_fd(self, relative_path):
+        try:
+            fd = os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)
+            yield fd
+        finally:
+            os.close(fd)
 
     @classmethod
     def __get_unpatched(cls, key, alt: T) -> T:
@@ -390,12 +403,13 @@ class dagshub_DirEntry:
             self._fs._mkdirs(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
         else:
             self._fs.open(self._path)
-        for direntry in self._fs._DagsHubFilesystem__scandir(os.open(self._fs._relative_path(self._path).parent, os.O_DIRECTORY, dir_fd=self._fs.project_root_fd)):
-            if direntry.name == self._path.name:
-                self._true_direntry = direntry
-                return os.DirEntry.__getattribute__(self._true_direntry, name)
-        else:
-            raise FileNotFoundError
+        with self._open_fd(self._fs._relative_path(self._path).parent) as fd:
+            for direntry in self._fs._DagsHubFilesystem__scandir(fd):
+                if direntry.name == self._path.name:
+                    self._true_direntry = direntry
+                    return os.DirEntry.__getattribute__(self._true_direntry, name)
+            else:
+                raise FileNotFoundError
 
     def __repr__(self):
         cached = ' (cached)' if hasattr(self, '_true_direntry') else ''
