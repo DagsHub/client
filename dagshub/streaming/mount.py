@@ -28,23 +28,26 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return os.open(path, flags, dir_fd=self.fs.project_root_fd)
 
     def getattr(self, path, fd=None):
-        if fd:
-            print('No fd allowed')
-            exit()
-        st = self.fs.stat(path)
-        return {
-            key: getattr(st, key)
-            for key in (
-                'st_atime',
-                'st_ctime',
-                'st_gid',
-                'st_mode',
-                'st_mtime',
-                # 'st_nlink',
-                # 'st_size',
-                'st_uid',
-            )
-        }
+        try:
+            if fd:
+                st = self.fs._DagsHubFilesystem__stat(fd)
+            else:
+                st = self.fs.stat(path)
+            return {
+                key: getattr(st, key)
+                for key in (
+                    'st_atime',
+                    'st_ctime',
+                    'st_gid',
+                    'st_mode',
+                    'st_mtime',
+                    # 'st_nlink',
+                    'st_size',
+                    'st_uid',
+                )
+            }
+        except FileNotFoundError:
+            raise FuseOSError(2)#errno.ENOENT
 
     def read(self, path, size, offset, fh):
         with self.rwlock:

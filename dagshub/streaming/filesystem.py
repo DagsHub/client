@@ -36,13 +36,15 @@ class dagshub_ScandirIterator:
         def __exit__(self, *args):
             return self
 
-def cache_path(func):
+def cache_by_path(func):
     cache = {}
     @wraps(func)
-    def wrapper(self, path):
-        if path not in cache:
-            cache[path] = func(self, path)
-        return cache[path]
+    def wrapper(self, path: str, include_size : bool = False):
+        if not include_size and (path, True) in cache:
+            cache[path, False] = cache[path, True]
+        if (path, include_size) not in cache:
+            cache[path, include_size] = func(self, path, include_size)
+        return cache[path, include_size]
     wrapper.cache = cache
     return wrapper
 
@@ -187,7 +189,7 @@ class DagsHubFilesystem:
                 except FileNotFoundError:
                     # TODO: check single file content API instead of directory when it becomes available
                     # TODO: use DVC remote cache to download file now that we have the directory json
-                    resp = self._api_listdir(relative_path.parent)
+                    resp = self._api_listdir(relative_path.parent, include_size=True)
                     if resp.ok:
                         matches = [info for info in resp.json() if Path(info['path']) == relative_path]
                         assert len(matches) <= 1
@@ -197,7 +199,8 @@ class DagsHubFilesystem:
                                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
                                 # TODO: perhaps don't create directories on stat
                             else:
-                                return dagshub_stat_result(self, path, is_directory=False)
+                                size = matches[0]['size']
+                                return dagshub_stat_result(self, path, size, is_directory=False)
                         else:
                             raise FileNotFoundError
                     else:
@@ -254,12 +257,12 @@ class DagsHubFilesystem:
         else:
             return self.__scandir(path)
 
-    @cache_path
-    def _api_listdir(self, path: str):
-        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth)
+    @cache_by_path
+    def _api_listdir(self, path: str, include_size: bool = False):
+        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth, params={'include_size': 'true'} if include_size else {})
 
     def _api_download_file_git(self, path: str):
-        return requests.get(f'{self.content_api_url}/path', auth=self.auth)
+        return requests.get(f'{self.raw_api_url}/{path}', auth=self.auth)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
@@ -328,10 +331,12 @@ def install_hooks(project_root: Optional[PathLike] = None,
     fs.install_hooks()
 
 class dagshub_stat_result:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, size: int, is_directory: bool):
         self._fs = fs
         self._path = path
+        self._size = size
         self._is_directory = is_directory
+        assert not self._is_directory # TODO make folder stats lazy?
 
     def __getattr__(self, name: str):
         if not name.startswith('st_'):
@@ -346,6 +351,8 @@ class dagshub_stat_result:
             return 0
         elif name == 'st_mode':
             return 0o100644
+        elif name == 'st_size':
+            return self._size
         self._fs.open(self._path)
         self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
         return os.stat_result.__getattribute__(self._true_stat, name)
