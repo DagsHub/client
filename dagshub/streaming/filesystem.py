@@ -154,7 +154,7 @@ class DagsHubFilesystem:
 
     def _special_file(self):
         # TODO Include more information in this file
-        return b'v0'
+        return b'v0\n'
 
     def open(self, file: PathLike, mode: str = 'r', opener=None, *args, **kwargs):
         if opener is not None:

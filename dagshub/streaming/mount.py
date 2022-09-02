@@ -90,7 +90,7 @@ def mount(foreground=False,
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('project_root')
+    parser.add_argument('project_root', nargs='?')
     parser.add_argument('--repo_url')
     parser.add_argument('--branch')
     parser.add_argument('--username')
