@@ -1,19 +1,27 @@
+from argparse import ArgumentParser
+import argparse
 import errno
-import logging
 import os
+from os import PathLike
 from pathlib import Path
 from threading import Lock
+from typing import Optional
 
-from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
+from fuse import FUSE, FuseOSError, Operations
 
-from filesystem import SPECIAL_FILE, DagsHubFilesystem
+from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
 SPECIAL_FILE_FH = (1<<64)-1
 
-class DagsHubFUSE(LoggingMixIn, Operations):
-    def __init__(self, project_root):
+class DagsHubFUSE(Operations):
+    def __init__(self,
+                 project_root: Optional[PathLike] = None,
+                 repo_url: Optional[str] = None,
+                 branch: Optional[str] = None,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None):
         # FIXME TODO move autoconfiguration out of FUSE object constructor and to main method
-        self.fs = DagsHubFilesystem(project_root=Path(project_root))
+        self.fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
         self.rwlock = Lock()
 
     def __call__(self, op, path, *args):
@@ -67,13 +75,24 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         if fh != SPECIAL_FILE_FH: 
             return os.close(fh)
 
-def mount(foreground=False):
-    # FIXME TODO Better configurability
-    logging.basicConfig(level=logging.DEBUG)
-    fuse = DagsHubFUSE(os.curdir)
+def mount(foreground=False,
+          project_root: Optional[PathLike] = None,
+          repo_url: Optional[str] = None,
+          branch: Optional[str] = None,
+          username: Optional[str] = None,
+          password: Optional[str] = None):
+    fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
+    print(f'\n\nMounting DagsHubFUSE filesystem at {fuse.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.\n\n')
     FUSE(fuse, str(fuse.fs.project_root), foreground=foreground, nonempty=True)
     if not foreground:
         os.chdir(os.path.realpath(os.curdir))
+    # TODO: Clean unmounting procedure
 
 if __name__ == '__main__':
-    mount(foreground=True)
+    parser = ArgumentParser()
+    parser.add_argument('project_root')
+    parser.add_argument('--repo_url')
+    parser.add_argument('--branch')
+    parser.add_argument('--username')
+    parser.add_argument('--password')
+    mount(foreground=True, **vars(parser.parse_args))

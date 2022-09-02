@@ -71,11 +71,11 @@ class DagsHubFilesystem:
 
         # Find root directory of Git project
         if not project_root:
-            self.project_root = Path('.').absolute()
+            self.project_root = Path('.')
             while not (self.project_root / '.git').is_dir():
                 if ismount(self.project_root):
                     raise ValueError('No git project found! (stopped at mountpoint {self.project_root})')
-                self.project_root = self.project_root.parent
+                self.project_root = self.project_root / '..'
         else:
             self.project_root = Path(project_root)
         del project_root
@@ -308,11 +308,13 @@ class DagsHubFilesystem:
 
     @contextmanager
     def _open_fd(self, relative_path):
+        fd = None
         try:
             fd = os.open(relative_path, os.O_DIRECTORY, dir_fd=self.project_root_fd)
             yield fd
         finally:
-            os.close(fd)
+            if fd is not None:
+                os.close(fd)
 
     @classmethod
     def __get_unpatched(cls, key, alt: T) -> T:

@@ -1,4 +1,4 @@
-from gettext import install
 from .filesystem import DagsHubFilesystem, install_hooks
+from .mount import mount
 
-__all__ = [DagsHubFilesystem.__name__, install_hooks.__name__]
+__all__ = [DagsHubFilesystem.__name__, install_hooks.__name__, mount.__name__]
