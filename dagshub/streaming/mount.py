@@ -95,4 +95,4 @@ if __name__ == '__main__':
     parser.add_argument('--branch')
     parser.add_argument('--username')
     parser.add_argument('--password')
-    mount(foreground=True, **vars(parser.parse_args))
+    mount(foreground=True, **vars(parser.parse_args()))
