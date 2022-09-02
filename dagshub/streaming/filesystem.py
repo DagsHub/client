@@ -152,6 +152,10 @@ class DagsHubFilesystem:
     def _passthrough_path(self, relative_path: PathLike):
         return str(relative_path).startswith(('.git/', '.dvc/'))
 
+    def _special_file(self):
+        # TODO Include more information in this file
+        return b'v0'
+
     def open(self, file: PathLike, mode: str = 'r', opener=None, *args, **kwargs):
         if opener is not None:
             raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
@@ -161,10 +165,7 @@ class DagsHubFilesystem:
             if self._passthrough_path(relative_path):
                 return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
             elif relative_path == SPECIAL_FILE:
-                # TODO: Don't even persist this file to disk, keep it completely virtual using tempdir/TextIO
-                with self.__open(relative_path, 'w', opener=project_root_opener) as output:
-                    output.write('v0') #TODO better versioning protocol!
-                return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+                return io.BytesIO(self._special_file())
             else:
                 try:
                     return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
@@ -191,8 +192,7 @@ class DagsHubFilesystem:
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
             elif relative_path == SPECIAL_FILE:
-                self.open(relative_path).close()
-                return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                return dagshub_stat_result(self, path, len(self._special_file()), is_directory=False)
             else:
                 try:
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
@@ -262,15 +262,7 @@ class DagsHubFilesystem:
                         yield direntry
                 if relative_path == Path():
                     if SPECIAL_FILE.name not in local_filenames:
-                        self.open(relative_path / SPECIAL_FILE).close()
-                        with self._open_fd(relative_path) as fd:
-                            for direntry in self.__scandir(fd):
-                                if direntry.name == SPECIAL_FILE.name:
-                                    local_filenames.add(SPECIAL_FILE.name)
-                                    yield direntry
-                                    break
-                            else:
-                                raise FileNotFoundError
+                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     for f in resp.json():

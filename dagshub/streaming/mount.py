@@ -1,13 +1,14 @@
 import errno
 import logging
 import os
-from errno import EACCES
 from pathlib import Path
 from threading import Lock
 
 from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
 
-from filesystem import DagsHubFilesystem
+from filesystem import SPECIAL_FILE, DagsHubFilesystem
+
+SPECIAL_FILE_FH = (1<<64)-1
 
 class DagsHubFUSE(LoggingMixIn, Operations):
     def __init__(self, project_root):
@@ -25,6 +26,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             return False
 
     def open(self, path, flags):
+        if path == Path(self.fs.project_root / SPECIAL_FILE):
+            return SPECIAL_FILE_FH
         self.fs.open(path).close()
         return os.open(path, flags, dir_fd=self.fs.project_root_fd)
 
@@ -51,6 +54,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             raise FuseOSError(errno.ENOENT)
 
     def read(self, path, size, offset, fh):
+        if fh == SPECIAL_FILE_FH:
+            return self.fs._special_file()[offset:offset+size]
         with self.rwlock:
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
@@ -59,7 +64,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return ['.', '..'] + self.fs.listdir(path)
 
     def release(self, path, fh):
-        return os.close(fh)
+        if fh != SPECIAL_FILE_FH: 
+            return os.close(fh)
 
 def mount(foreground=False):
     # FIXME TODO Better configurability
