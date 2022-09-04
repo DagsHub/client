@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import argparse
+import logging
 import errno
 import os
 from os import PathLike
@@ -7,13 +8,13 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from fuse import FUSE, FuseOSError, Operations
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
 SPECIAL_FILE_FH = (1<<64)-1
 
-class DagsHubFUSE(Operations):
+class DagsHubFUSE(LoggingMixIn, Operations):
     def __init__(self,
                  project_root: Optional[PathLike] = None,
                  repo_url: Optional[str] = None,
@@ -75,16 +76,17 @@ class DagsHubFUSE(Operations):
         if fh != SPECIAL_FILE_FH: 
             return os.close(fh)
 
-def mount(foreground=False,
+def mount(debug=False,
           project_root: Optional[PathLike] = None,
           repo_url: Optional[str] = None,
           branch: Optional[str] = None,
           username: Optional[str] = None,
           password: Optional[str] = None):
+    logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
-    print(f'\n\nMounting DagsHubFUSE filesystem at {fuse.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.\n\n')
-    FUSE(fuse, str(fuse.fs.project_root), foreground=foreground, nonempty=True)
-    if not foreground:
+    print(f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.')
+    FUSE(fuse, str(fuse.fs.project_root), foreground=debug, nonempty=True)
+    if not debug:
         os.chdir(os.path.realpath(os.curdir))
     # TODO: Clean unmounting procedure
 
@@ -95,4 +97,10 @@ if __name__ == '__main__':
     parser.add_argument('--branch')
     parser.add_argument('--username')
     parser.add_argument('--password')
-    mount(foreground=True, **vars(parser.parse_args()))
+    parser.add_argument('--debug', action=argparse.BooleanOptionalAction)#  default=False, nargs=0)
+
+    args = parser.parse_args()
+    mount(**vars(args))
+
+
+
