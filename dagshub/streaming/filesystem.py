@@ -197,9 +197,11 @@ class DagsHubFilesystem:
                 try:
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
+                    return dagshub_stat_result(self, path, 1100, is_directory=False)
+
                     # TODO: check single file content API instead of directory when it becomes available
                     # TODO: use DVC remote cache to download file now that we have the directory json
-                    resp = self._api_listdir(relative_path.parent, include_size=True)
+                    resp = self._api_listdir(relative_path.parent, include_size=False)
                     if resp.ok:
                         matches = [info for info in resp.json() if Path(info['path']) == relative_path]
                         assert len(matches) <= 1
@@ -209,8 +211,7 @@ class DagsHubFilesystem:
                                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
                                 # TODO: perhaps don't create directories on stat
                             else:
-                                size = matches[0]['size']
-                                return dagshub_stat_result(self, path, size, is_directory=False)
+                                return dagshub_stat_result(self, path, is_directory=False)
                         else:
                             raise FileNotFoundError
                     else:
@@ -348,10 +349,9 @@ def install_hooks(project_root: Optional[PathLike] = None,
     fs.install_hooks()
 
 class dagshub_stat_result:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, size: int, is_directory: bool):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
         self._fs = fs
         self._path = path
-        self._size = size
         self._is_directory = is_directory
         assert not self._is_directory # TODO make folder stats lazy?
 
@@ -369,7 +369,7 @@ class dagshub_stat_result:
         elif name == 'st_mode':
             return 0o100644
         elif name == 'st_size':
-            return self._size
+            return 1100 ## hardcoded size because size requests take a disproportionate amount of time
         self._fs.open(self._path)
         self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
         return os.stat_result.__getattribute__(self._true_stat, name)
