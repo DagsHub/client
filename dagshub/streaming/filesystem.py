@@ -118,7 +118,7 @@ class DagsHubFilesystem:
         self.content_api_url = parsed_repo_url._replace(path=content_api_path).geturl()
         self.raw_api_url = f'{repo_url}/raw/{branch}'
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
-        self.dirtree = []
+        self.dirtree = {}
 
         del repo_url, branch, parsed_repo_url, content_api_path
 
@@ -191,7 +191,6 @@ class DagsHubFilesystem:
         if dir_fd is not None or not follow_symlinks:
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
-        print('STAT', relative_path, self.dirtree)
         if relative_path:
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
@@ -201,12 +200,10 @@ class DagsHubFilesystem:
                 try:
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
-                    print('__RUNNING_STAT', path, relative_path.parent, self.dirtree)
-                    if str(relative_path.parent) not in self.dirtree:
+                    if str(relative_path.name) not in self.dirtree[str(relative_path.parent)]:
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
-                        print(relative_path)
-                        self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                        self._mkdirs(path, dir_fd=self.project_root_fd)
                         # [os.mkdir(os.path.join(relative_path.parent, dir), dir_fd=self.project_root_fd) for dir in self.dirtree[str(relative_path.parent)] if not os.path.exists(os.path.join(relative_path.parent, dir))]
                         return self.__stat(relative_path, dir_fd=self.project_root_fd)
                         # TODO: perhaps don't create directories on stat
@@ -233,7 +230,6 @@ class DagsHubFilesystem:
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     # TODO: optimize + make subroutine async
-                    print('LISTDIR', resp.content, path, [Path(f['path']).name for f in resp.json() if f['type'] == 'dir'])
                     self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir'] 
                     return list(dircontents)
                 else:
