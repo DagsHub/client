@@ -94,16 +94,15 @@ class DagsHubFilesystem:
         git_remotes = [git_config[remote]['url']
                         for remote in git_config
                         if remote.startswith('remote ')]
-        dagshub_remotes = next(re.compile(r'(\.git)?/?$').sub('', remote)
-                                for remote in git_remotes
-                                if remote.startswith("https://dagshub.com/"))
-        # TODO: if no DagsHub remote found, check DVC remotes (i.e. using GitHub Connect)
+        dagshub_remotes = [re.compile(r'(\.git)?/?$').sub('', remote)
+                            for remote in git_remotes
+                            if remote.startswith("https://dagshub.com/")]
 
         if not repo_url:
             if len(dagshub_remotes) > 0:
-                repo_url = dagshub_remotes
+                repo_url = dagshub_remotes[0]
             else:
-                raise ValueError('No DagsHub git remote detected, please specify repo_url')
+                raise ValueError('No DagsHub git remote detected, please specify repo_url= argument or --repo_url flag')
 
         if not branch:
             branch = (self.__open(self.project_root / '.git/HEAD')
