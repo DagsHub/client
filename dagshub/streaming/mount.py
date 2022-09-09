@@ -1,14 +1,14 @@
-from argparse import ArgumentParser
-import argparse
-import logging
 import errno
+import logging
 import os
+import sys
+from argparse import ArgumentParser
 from os import PathLike
 from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
@@ -100,6 +100,11 @@ def main():
     parser.add_argument('--debug', action='store_false', default=False)#  default=False, nargs=0)
 
     args = parser.parse_args()
+
+    if not args.debug:
+        # Hide tracebacks of errors, display only error message
+        sys.tracebacklimit = 0
+
     mount(**vars(args))
 
 if __name__ == '__main__':
