@@ -90,7 +90,7 @@ def mount(debug=False,
         os.chdir(os.path.realpath(os.curdir))
     # TODO: Clean unmounting procedure
 
-if __name__ == '__main__':
+def main():
     parser = ArgumentParser()
     parser.add_argument('project_root', nargs='?')
     parser.add_argument('--repo_url')
@@ -102,5 +102,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     mount(**vars(args))
 
-
-
+if __name__ == '__main__':
+	main()
