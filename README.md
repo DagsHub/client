@@ -30,6 +30,7 @@ the data formats are very simple and you can choose to work with them directly.
 pip install dagshub
 ```
 
+# Training Logger
 ## Guide
 You can learn more by completing our short [tutorial](https://dagshub.com/docs/experiment-tutorial/overview/) or reading the [docs](https://dagshub.com/docs)
 
@@ -70,6 +71,60 @@ without having to write any logging code on your own:
 * [keras](https://github.com/DAGsHub/client/tree/master/dagshub/keras)
 * More - soon to come!
 
+# Data Streaming
+
+By using the DagsHub client, you can stream files from your DagsHub repository without needing to download them to your local disk ahead of time! You'll no longer need to wait for the lengthy `dvc pull` to complete before you start training your models, you can launch the script immediately after connecting DagsHub Streaming and watch as the data files automatically get downloaded as they are needed!
+
+The DagsHub client is architectured specifically to make streamed files nearly *indistinguishable* from real files saved to your disk! Using any of the supported integration methods, streamed files will appear alongside real files, and when your code attempts to read from them, they will transparently first be converted into real files and cached on disk for future uses!
+
+Supported ways to enable the DagsHub Streaming include
+
+## 1. CLI launcher
+Launch a terminal, and `cd` into the directory of your project. Then run
+```bash
+$ dagshub-mount
+```
+If you launch a new terminal and navigate to that directory, or run `cd .` in any existing terminals in that directory, you should now be able to see that any files in your repository but not saved locally appear in your directory listings! Run
+```bash
+$ cat .dagshub-streaming
+```
+from the root of your project to confirm that the streaming works.
+
+## 2. Python entrypoint
+Simply add
+```python
+from dagshub.streaming import mount
+mount()
+```
+to your Python program, and any files in your repository but not saved locally will appear in your directory listings! Run
+```python
+print(open(PROJECT_ROOT_DIRECTORY + '/.dagshub-streaming').read())
+```
+to confirm that the streaming works.
+
+## 3. Python-only "Lite" Hooks
+If hooking into the operating system's filesystem layer is too hard-core for you, we also provide a way to only hook into Python's filesystem operations. Run
+```python
+from dagshub.streaming import install_hooks
+install_hooks()
+```
+Note that many popular ML frameworks such as PyTorch and TensorFlow have input/output routines written in C/C++, so they will not see the new files.
+
+## 4. No-magic Python API
+If you hate magic and want to explicitly and unambigiously state that you're using DagsHub Streaming, we also offer a boring Python client class that you can use
+```python
+from dagshub.streaming import DagsHubFilesystem
+fs = DagsHubFilesystem()
+```
+Then replace any use of `open()`, `os.stat()`, `os.listdir()`, and `os.scandir()` with `fs.open()`, `fs.stat()`, `fs.listdir()`, and `fs.scandir()` respectively. You don't even have to provide relative paths from the project directory, we take care of that for you! Pass the exact same arguments you would to the built-in functions to our client's functions, and streaming functionality will be provided.
+
+## Automagic Configuration
+All of the supported ways to enable DagsHub Streaming should automatically detect the configuration needed, including
+- the git/dvc project folder on disk
+- the DagsHub repository URL to stream files from
+- the username and token to stream files from DagsHub
+
+If you need to override the automatically detected configuration, pass the `--repo_url`, `--username`, and `--password` flags to the CLI, or the `repo_url=`, `username=`, and `password=` keyword arguments to either of the python entrypoints.
 
 ---
 
