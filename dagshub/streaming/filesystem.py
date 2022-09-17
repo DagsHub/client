@@ -203,7 +203,6 @@ class DagsHubFilesystem:
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
                         self._mkdirs(path, dir_fd=self.project_root_fd)
-                        # [os.mkdir(os.path.join(relative_path.parent, dir), dir_fd=self.project_root_fd) for dir in self.dirtree[str(relative_path.parent)] if not os.path.exists(os.path.join(relative_path.parent, dir))]
                         return self.__stat(relative_path, dir_fd=self.project_root_fd)
                         # TODO: perhaps don't create directories on stat
         else:
@@ -289,7 +288,7 @@ class DagsHubFilesystem:
         self.__class__.hooked_instance = self
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
-        for parent in relative_path.parents[::-1]:
+        for parent in list(relative_path.parents)[::-1]:
             try:
                 self.__stat(parent, dir_fd=dir_fd)
             except (OSError, ValueError):

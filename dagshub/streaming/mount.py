@@ -97,7 +97,7 @@ def main():
     parser.add_argument('--branch')
     parser.add_argument('--username')
     parser.add_argument('--password')
-    parser.add_argument('--debug', action='store_false', default=False)#  default=False, nargs=0)
+    parser.add_argument('--debug', action='store_true', default=False)#  default=False, nargs=0)
 
     args = parser.parse_args()
 
