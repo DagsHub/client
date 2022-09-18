@@ -16,7 +16,7 @@ setuptools.setup(
     install_requires=[
         "PyYAML>=5",
         "requests>=2",
-        "fuse-python @ git+https://github.com/libfuse/python-fuse@v1.0.5#egg=some-pkg",
+        "fuse-python @ git+https://github.com/libfuse/python-fuse@v1.0.5#egg=fuse-python",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
