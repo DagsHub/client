@@ -8,19 +8,28 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
+# from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
+try:
+    import _find_fuse_parts
+except ImportError:
+    pass
+import fuse
+from fuse import Fuse
 
-from .filesystem import SPECIAL_FILE, DagsHubFilesystem
+from filesystem import SPECIAL_FILE, DagsHubFilesystem
+fuse.fuse_python_api = (0, 2)
 
 SPECIAL_FILE_FH = (1<<64)-1
 
-class DagsHubFUSE(LoggingMixIn, Operations):
+class DagsHubFUSE(Fuse):
     def __init__(self,
                  project_root: Optional[PathLike] = None,
                  repo_url: Optional[str] = None,
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
-                 password: Optional[str] = None):
+                 password: Optional[str] = None,
+                 *args, **kwargs):
+        Fuse.__init__(self, *args, **kwargs)
         # FIXME TODO move autoconfiguration out of FUSE object constructor and to main method
         self.fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
         self.rwlock = Lock()
@@ -60,7 +69,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
                 )
             }
         except FileNotFoundError:
-            raise FuseOSError(errno.ENOENT)
+            raise -errno.ENOENT
 
     def read(self, path, size, offset, fh):
         if fh == SPECIAL_FILE_FH:
@@ -73,7 +82,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return ['.', '..'] + self.fs.listdir(path)
 
     def release(self, path, fh):
-        if fh != SPECIAL_FILE_FH: 
+        if fh != SPECIAL_FILE_FH:
             return os.close(fh)
 
 def mount(debug=False,
@@ -83,11 +92,22 @@ def mount(debug=False,
           username: Optional[str] = None,
           password: Optional[str] = None):
     logging.basicConfig(level=logging.DEBUG)
-    fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
-    print(f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.')
-    FUSE(fuse, str(fuse.fs.project_root), foreground=debug, nonempty=True)
-    if not debug:
-        os.chdir(os.path.realpath(os.curdir))
+
+    usage="""
+Userspace ioctl example
+""" + Fuse.fusage
+    server = DagsHubFUSE(version="%prog " + fuse.__version__,
+                       usage=usage,
+                       dash_s_do='setsingle',
+                       project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
+    print(f'Mounting DagsHubFUSE filesystem at {server.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.')
+    server.parser.add_option(mountopt="root", metavar="PATH", default='/',
+                             help="mirror filesystem from under PATH [default: %default]")
+    server.parse(values=server, errex=1)
+    server.main()
+    # FUSE(fuse, str(fuse.fs.project_root), foreground=True)
+    # if not debug:
+    #     os.chdir(os.path.realpath(os.curdir))
     # TODO: Clean unmounting procedure
 
 def main():

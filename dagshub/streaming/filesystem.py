@@ -53,7 +53,7 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
 
-    __slots__ = ('project_root', 
+    __slots__ = ('project_root',
                  'project_root_fd',
                  'content_api_url',
                  'raw_api_url',
@@ -140,7 +140,7 @@ class DagsHubFilesystem:
             else:
                 # TODO: Check .dvc/config{,.local} for credentials
                 raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
-    
+
     def __del__(self):
         os.close(self.project_root_fd)
 
@@ -199,7 +199,7 @@ class DagsHubFilesystem:
                 try:
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
-                    if str(relative_path.name) not in self.dirtree[str(relative_path.parent)]:
+                    if str(relative_path.name) not in self.dirtree.get(str(relative_path.parent)):
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
                         self._mkdirs(path, dir_fd=self.project_root_fd)
@@ -228,7 +228,7 @@ class DagsHubFilesystem:
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     # TODO: optimize + make subroutine async
-                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir'] 
+                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
                     return list(dircontents)
                 else:
                     if error is not None:
@@ -374,7 +374,7 @@ class dagshub_DirEntry:
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
-    
+
     @property
     def name(self):
         # TODO: create decorator for delegation

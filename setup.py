@@ -13,7 +13,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/DagsHub/client",
     packages=setuptools.find_packages(),
-    install_requires=["PyYAML>=5", "requests>=2", "fusepy>=3"],
+    install_requires=[
+        "PyYAML>=5",
+        "requests>=2",
+        "fuse-python @ git+https://github.com/libfuse/python-fuse@v1.0.5#egg=some-pkg",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
