@@ -88,7 +88,8 @@ class DagsHubFilesystem:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
         if not repo_url:
-            dagshub_remotes = self._get_remotes()
+            print(f"getting remotes for {self.project_root}, {self.project_root.resolve()}")
+            dagshub_remotes = self._get_remotes(self.project_root.resolve())
             if len(dagshub_remotes) > 0:
                 repo_url = dagshub_remotes[0]
             else:
@@ -153,9 +154,11 @@ class DagsHubFilesystem:
         os.close(self.project_root_fd)
 
     def _relative_path(self, file: PathLike):
-        path = Path(file).absolute()
+        path = Path(file).resolve()
         try:
-            return path.relative_to(self.project_root.absolute())
+            rel = path.relative_to(self.project_root.resolve())
+            if str(rel.resolve()).startswith("<"):
+                raise ValueError
         except ValueError:
             return None
 
@@ -297,6 +300,7 @@ class DagsHubFilesystem:
         self.__class__.hooked_instance = self
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
+        print(f"mkdir: relative_path: {relative_path}")
         for parent in list(relative_path.parents)[::-1]:
             try:
                 self.__stat(parent, dir_fd=dir_fd)
