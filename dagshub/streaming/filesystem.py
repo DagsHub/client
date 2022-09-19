@@ -207,7 +207,7 @@ class DagsHubFilesystem:
                 try:
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
-                    if str(relative_path.name) not in self.dirtree[str(relative_path.parent)]:
+                    if str(relative_path.name) not in self.dirtree.get(str(relative_path.parent)):
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
                         self._mkdirs(path, dir_fd=self.project_root_fd)
