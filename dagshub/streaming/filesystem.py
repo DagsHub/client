@@ -145,7 +145,7 @@ class DagsHubFilesystem:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
-            dagshub_remotes.append(remote)
+            dagshub_remotes.append(remote.geturl())
 
         return dagshub_remotes
 
