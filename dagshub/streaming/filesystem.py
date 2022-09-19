@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 import requests
 
 T = TypeVar('T')
+DAGSHUB_ROOT = os.environ.get("DAGSHUB_HOST_PATH", "dagshub.com")
 
 def wrapreturn(wrappertype):
     def decorator(func):
@@ -156,8 +157,8 @@ class DagsHubFilesystem:
         path = Path(file).resolve()
         try:
             rel = path.relative_to(self.project_root.resolve())
-            if str(rel.resolve()).startswith("<"):
-                raise ValueError
+            if str(rel).startswith("<"):
+                return None
             return rel
         except ValueError:
             return None
@@ -201,6 +202,7 @@ class DagsHubFilesystem:
         if dir_fd is not None or not follow_symlinks:
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
+        # print(f"relative path: {relative_path}")
         if relative_path:
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
@@ -214,7 +216,7 @@ class DagsHubFilesystem:
                     if parent_tree is not None and str(relative_path.name) not in parent_tree:
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
-                        self._mkdirs(path, dir_fd=self.project_root_fd)
+                        # self._mkdirs(path, dir_fd=self.project_root_fd)
                         return self.__stat(relative_path, dir_fd=self.project_root_fd)
                         # TODO: perhaps don't create directories on stat
         else:
