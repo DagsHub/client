@@ -132,27 +132,21 @@ class DagsHubFilesystem:
                 raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
     @staticmethod
-    def _get_remotes():
+    def _get_remotes(repo_root='.'):
         # Find Git remote URL
         git_config = ConfigParser()
-        git_config.read(Path('.') / '.git/config')
+        git_config.read(Path(repo_root) / '.git/config')
         git_remotes = [urlparse(git_config[remote]['url'])
                        for remote in git_config
                        if remote.startswith('remote ')]
         dagshub_remotes = []
         for remote in git_remotes:
-            parsed = urlparse(remote)
-            if parsed.hostname != 'dagshub.com':
+            if remote.hostname != 'dagshub.com':
                 continue
-            parsed.username = parsed.password = ""
-            parsed.path = re.compile(r'(\.git)?/?$').sub('', remote)
-            dagshub_remotes.append(parsed)
+            remote = remote._replace(netloc=remote.hostname)
+            remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
+            dagshub_remotes.append(remote)
 
-        dagshub_remotes = [remote._replace(netloc=remote.hostname).geturl()
-                           for remote in git_remotes
-                           if remote.hostname == 'dagshub.com']
-        dagshub_remotes = [re.compile(r'(\.git)?/?$').sub('', remote)
-                           for remote in dagshub_remotes]
         return dagshub_remotes
 
     def __del__(self):
