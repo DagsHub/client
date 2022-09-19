@@ -32,6 +32,8 @@ class dagshub_ScandirIterator:
             self._iterator = iterator
         def __iter__(self):
             return self._iterator
+        def __next__(self):
+            return self._iterator.__next__()
         def __enter__(self):
             return self
         def __exit__(self, *args):
