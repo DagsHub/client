@@ -53,7 +53,7 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
 
-    __slots__ = ('project_root', 
+    __slots__ = ('project_root',
                  'project_root_fd',
                  'content_api_url',
                  'raw_api_url',
@@ -87,18 +87,8 @@ class DagsHubFilesystem:
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
-
-        # Find Git remote URL
-        git_config = ConfigParser()
-        git_config.read(self.project_root / '.git/config')
-        git_remotes = [git_config[remote]['url']
-                        for remote in git_config
-                        if remote.startswith('remote ')]
-        dagshub_remotes = [re.compile(r'(\.git)?/?$').sub('', remote)
-                            for remote in git_remotes
-                            if remote.startswith("https://dagshub.com/")]
-
         if not repo_url:
+            dagshub_remotes = self._get_remotes()
             if len(dagshub_remotes) > 0:
                 repo_url = dagshub_remotes[0]
             else:
@@ -140,7 +130,31 @@ class DagsHubFilesystem:
             else:
                 # TODO: Check .dvc/config{,.local} for credentials
                 raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
-    
+
+    @staticmethod
+    def _get_remotes():
+        # Find Git remote URL
+        git_config = ConfigParser()
+        git_config.read(Path('.') / '.git/config')
+        git_remotes = [urlparse(git_config[remote]['url'])
+                       for remote in git_config
+                       if remote.startswith('remote ')]
+        dagshub_remotes = []
+        for remote in git_remotes:
+            parsed = urlparse(remote)
+            if parsed.hostname != 'dagshub.com':
+                continue
+            parsed.username = parsed.password = ""
+            parsed.path = re.compile(r'(\.git)?/?$').sub('', remote)
+            dagshub_remotes.append(parsed)
+
+        dagshub_remotes = [remote._replace(netloc=remote.hostname).geturl()
+                           for remote in git_remotes
+                           if remote.hostname == 'dagshub.com']
+        dagshub_remotes = [re.compile(r'(\.git)?/?$').sub('', remote)
+                           for remote in dagshub_remotes]
+        return dagshub_remotes
+
     def __del__(self):
         os.close(self.project_root_fd)
 
@@ -228,7 +242,7 @@ class DagsHubFilesystem:
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     # TODO: optimize + make subroutine async
-                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir'] 
+                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
                     return list(dircontents)
                 else:
                     if error is not None:
@@ -374,7 +388,7 @@ class dagshub_DirEntry:
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
-    
+
     @property
     def name(self):
         # TODO: create decorator for delegation
