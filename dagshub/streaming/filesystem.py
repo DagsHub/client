@@ -88,7 +88,6 @@ class DagsHubFilesystem:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
         if not repo_url:
-            print(f"getting remotes for {self.project_root}, {self.project_root.resolve()}")
             dagshub_remotes = self._get_remotes(self.project_root.resolve())
             if len(dagshub_remotes) > 0:
                 repo_url = dagshub_remotes[0]
@@ -159,6 +158,7 @@ class DagsHubFilesystem:
             rel = path.relative_to(self.project_root.resolve())
             if str(rel.resolve()).startswith("<"):
                 raise ValueError
+            return rel
         except ValueError:
             return None
 
