@@ -158,7 +158,7 @@ class DagsHubFilesystem:
     def _relative_path(self, file: PathLike):
         path = Path(file).resolve()
         try:
-            rel = path.relative_to(self.project_root.resolve())
+            rel = path.resolve().relative_to(self.project_root.resolve())
             if str(rel).startswith("<"):
                 return None
             return rel

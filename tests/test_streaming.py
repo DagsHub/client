@@ -3,9 +3,8 @@ from dagshub.streaming import install_hooks
 
 
 def test_torch_load():
-    install_hooks(project_root="/Users/simonlousky/workspace/dags/projects/baby-yoda-segmentor")
-    import torch
-    for my_tple in os.walk("."):
+    install_hooks(project_root="/Users/simonlousky/workspace/dags/user_repos/public/SavtaDepth")
+    for my_tple in os.walk("src"):
         print(my_tple)
 
 
