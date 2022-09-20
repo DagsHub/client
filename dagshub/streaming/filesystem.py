@@ -264,13 +264,16 @@ class DagsHubFilesystem:
                     return self.__scandir(fd)
             else:
                 local_filenames = set()
-                with self._open_fd(relative_path) as fd:
-                    for direntry in self.__scandir(fd):
-                        local_filenames.add(direntry.name)
-                        yield direntry
-                if relative_path == Path():
-                    if SPECIAL_FILE.name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+                try:
+                    with self._open_fd(relative_path) as fd:
+                        for direntry in self.__scandir(fd):
+                            local_filenames.add(direntry.name)
+                            yield direntry
+                    if relative_path == Path():
+                        if SPECIAL_FILE.name not in local_filenames:
+                            yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+                except FileNotFoundError:
+                    pass
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     for f in resp.json():
