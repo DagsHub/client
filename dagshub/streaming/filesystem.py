@@ -206,7 +206,6 @@ class DagsHubFilesystem:
         if dir_fd is not None or not follow_symlinks:
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
-        # print(f"relative path: {relative_path}")
         if relative_path:
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
@@ -309,7 +308,6 @@ class DagsHubFilesystem:
         self.__class__.hooked_instance = self
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
-        # print(f"mkdir: relative_path: {relative_path}")
         for parent in list(relative_path.parents)[::-1]:
             try:
                 self.__stat(parent, dir_fd=dir_fd)
