@@ -156,7 +156,7 @@ class DagsHubFilesystem:
         os.close(self.project_root_fd)
 
     def _relative_path(self, file: Union[PathLike, int]):
-        if not isinstance(file, PathLike):
+        if isinstance(file, int):
             return None
         path = Path(file).resolve()
         try:
