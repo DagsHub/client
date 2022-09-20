@@ -11,7 +11,7 @@ from os import PathLike
 from os.path import ismount
 from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
 
 import requests
@@ -155,7 +155,9 @@ class DagsHubFilesystem:
     def __del__(self):
         os.close(self.project_root_fd)
 
-    def _relative_path(self, file: PathLike):
+    def _relative_path(self, file: Union[PathLike, int]):
+        if not isinstance(file, PathLike):
+            return None
         path = Path(file).resolve()
         try:
             rel = path.resolve().relative_to(self.project_root.resolve())
@@ -172,7 +174,7 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: PathLike, mode: str = 'r', opener=None, *args, **kwargs):
+    def open(self, file: Union[PathLike, int], mode: str = 'r', opener=None, *args, **kwargs):
         if opener is not None:
             raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
         relative_path = self._relative_path(file)
@@ -307,7 +309,7 @@ class DagsHubFilesystem:
         self.__class__.hooked_instance = self
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
-        print(f"mkdir: relative_path: {relative_path}")
+        # print(f"mkdir: relative_path: {relative_path}")
         for parent in list(relative_path.parents)[::-1]:
             try:
                 self.__stat(parent, dir_fd=dir_fd)
