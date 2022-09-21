@@ -1,19 +1,23 @@
-from unicodedata import name
 import requests
 import urllib
 import os
 from pprint import pprint
 
-# TODO: specify api request URL & stuff
+if "BASE_URL" in os.environ:
+	BASE_URL = os.environ['BASE_URL']
+else:
+	BASE_URL = "https://dagshub.com/"
 
-BASE_URL = "http://localhost:3000/"
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/main/{path}"
 
 class Repo:
-	def __init__(self, owner, name, authToken):
+	def __init__(self, owner, name):
 		self.owner = owner
 		self.name = name
-		self.authToken = authToken
+		if "ACCESS_TOKEN" in os.environ:
+			self.authToken = os.environ['ACCESS_TOKEN']
+		else:
+			raise Exception("Can't find access token. Please set enviroment variable ACCESS_TOKEN with a DagsHub access token")
 		# TODO: verify token
 
 	def directory(self, path):
@@ -41,9 +45,9 @@ class DataSet:
 			path=urllib.parse.quote(directory, safe="")
 		))
 
-	def add(self, file, path):
+	def add(self, file, path="."):
 		file_path = os.path.join(path, os.path.basename(os.path.normpath(file.name)))
-		self.files.append(file_path, file)
+		self.files.append((file_path, file))
 
 	def commit(self, message, versioning=None, new_branch=None):
 		data = {}
@@ -77,6 +81,6 @@ class DataSet:
 			self.request_url, 
 			data, 
 			files=[("files", file) for file in self.files], 
-			headers={'Authorization': 'token '+self.repo.authToken})
+			headers={'Authorization': 'token ' + self.repo.authToken})
 		print("Response: ", res.status_code)
-		
+		pprint(res.content)
