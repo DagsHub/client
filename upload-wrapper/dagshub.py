@@ -1,6 +1,7 @@
 from unicodedata import name
 import requests
 import urllib
+import os
 from pprint import pprint
 
 # TODO: specify api request URL & stuff
@@ -41,7 +42,8 @@ class DataSet:
 		))
 
 	def add(self, file, path):
-		self.files.append((path+file.name, file))
+		file_path = os.path.join(path, os.path.basename(os.path.normpath(file.name)))
+		self.files.append(file_path, file)
 
 	def commit(self, message, versioning=None, new_branch=None):
 		data = {}
@@ -77,6 +79,4 @@ class DataSet:
 			files=[("files", file) for file in self.files], 
 			headers={'Authorization': 'token '+self.repo.authToken})
 		print("Response: ", res.status_code)
-		pprint(res.json())
-		pprint(res.content)
 		
