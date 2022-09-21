@@ -11,12 +11,13 @@ from os import PathLike
 from os.path import ismount
 from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
 
 import requests
 
 T = TypeVar('T')
+DAGSHUB_ROOT = os.environ.get("DAGSHUB_HOST_PATH", "dagshub.com")
 
 def wrapreturn(wrappertype):
     def decorator(func):
@@ -31,6 +32,8 @@ class dagshub_ScandirIterator:
             self._iterator = iterator
         def __iter__(self):
             return self._iterator
+        def __next__(self):
+            return self._iterator.__next__()
         def __enter__(self):
             return self
         def __exit__(self, *args):
@@ -53,7 +56,7 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
 
-    __slots__ = ('project_root', 
+    __slots__ = ('project_root',
                  'project_root_fd',
                  'content_api_url',
                  'raw_api_url',
@@ -87,18 +90,8 @@ class DagsHubFilesystem:
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
-
-        # Find Git remote URL
-        git_config = ConfigParser()
-        git_config.read(self.project_root / '.git/config')
-        git_remotes = [git_config[remote]['url']
-                        for remote in git_config
-                        if remote.startswith('remote ')]
-        dagshub_remotes = [re.compile(r'(\.git)?/?$').sub('', remote)
-                            for remote in git_remotes
-                            if remote.startswith("https://dagshub.com/")]
-
         if not repo_url:
+            dagshub_remotes = self._get_remotes(self.project_root.resolve())
             if len(dagshub_remotes) > 0:
                 repo_url = dagshub_remotes[0]
             else:
@@ -140,14 +133,37 @@ class DagsHubFilesystem:
             else:
                 # TODO: Check .dvc/config{,.local} for credentials
                 raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
-    
+
+    @staticmethod
+    def _get_remotes(repo_root='.'):
+        # Find Git remote URL
+        git_config = ConfigParser()
+        git_config.read(Path(repo_root) / '.git/config')
+        git_remotes = [urlparse(git_config[remote]['url'])
+                       for remote in git_config
+                       if remote.startswith('remote ')]
+        dagshub_remotes = []
+        for remote in git_remotes:
+            if remote.hostname != 'dagshub.com':
+                continue
+            remote = remote._replace(netloc=remote.hostname)
+            remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
+            dagshub_remotes.append(remote.geturl())
+
+        return dagshub_remotes
+
     def __del__(self):
         os.close(self.project_root_fd)
 
-    def _relative_path(self, file: PathLike):
-        path = Path(file).absolute()
+    def _relative_path(self, file: Union[PathLike, int]):
+        if isinstance(file, int):
+            return None
+        path = Path(file).resolve()
         try:
-            return path.relative_to(self.project_root.absolute())
+            rel = path.resolve().relative_to(self.project_root.resolve())
+            if str(rel).startswith("<"):
+                return None
+            return rel
         except ValueError:
             return None
 
@@ -158,7 +174,7 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: PathLike, mode: str = 'r', opener=None, *args, **kwargs):
+    def open(self, file: Union[PathLike, int], mode: str = 'r', opener=None, *args, **kwargs):
         if opener is not None:
             raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
         relative_path = self._relative_path(file)
@@ -199,10 +215,11 @@ class DagsHubFilesystem:
                 try:
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
-                    if str(relative_path.name) not in self.dirtree[str(relative_path.parent)]:
+                    parent_tree = self.dirtree.get(str(relative_path.parent))
+                    if parent_tree is not None and str(relative_path.name) not in parent_tree:
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
-                        self._mkdirs(path, dir_fd=self.project_root_fd)
+                        # self._mkdirs(path, dir_fd=self.project_root_fd)
                         return self.__stat(relative_path, dir_fd=self.project_root_fd)
                         # TODO: perhaps don't create directories on stat
         else:
@@ -228,7 +245,7 @@ class DagsHubFilesystem:
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     # TODO: optimize + make subroutine async
-                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir'] 
+                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
                     return list(dircontents)
                 else:
                     if error is not None:
@@ -248,13 +265,16 @@ class DagsHubFilesystem:
                     return self.__scandir(fd)
             else:
                 local_filenames = set()
-                with self._open_fd(relative_path) as fd:
-                    for direntry in self.__scandir(fd):
-                        local_filenames.add(direntry.name)
-                        yield direntry
-                if relative_path == Path():
-                    if SPECIAL_FILE.name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+                try:
+                    with self._open_fd(relative_path) as fd:
+                        for direntry in self.__scandir(fd):
+                            local_filenames.add(direntry.name)
+                            yield direntry
+                    if relative_path == Path():
+                        if SPECIAL_FILE.name not in local_filenames:
+                            yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+                except FileNotFoundError:
+                    pass
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     for f in resp.json():
@@ -374,7 +394,7 @@ class dagshub_DirEntry:
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
-    
+
     @property
     def name(self):
         # TODO: create decorator for delegation
