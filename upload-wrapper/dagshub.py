@@ -1,7 +1,12 @@
+from unicodedata import name
 import requests
+import urllib
 from pprint import pprint
 
 # TODO: specify api request URL & stuff
+
+BASE_URL = "http://localhost:3000/"
+CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/main/{path}"
 
 class Repo:
 	def __init__(self, owner, name, authToken):
@@ -20,6 +25,7 @@ class Commit:
 	new_branch=""
 	def __init__(self):
 		return
+
 class DataSet:
 	directory = ""
 	files = []
@@ -27,10 +33,15 @@ class DataSet:
 	def __init__(self, repo, directory):
 		self.repo = repo
 		self.directory = directory
-	
+		self.request_url = urllib.parse.urljoin(BASE_URL, CONTENT_UPLOAD_URL.format(
+			owner=repo.owner,
+			reponame=repo.name,
+			path=urllib.parse.quote(directory, safe="")
+		))
+
 	def add(self, file, path):
 		self.files.append((path+file.name, file))
-	
+
 	def commit(self, message, versioning=None, new_branch=None):
 		data = {}
 		if versioning is not None:
@@ -54,4 +65,7 @@ class DataSet:
 
 		data["files"] = ("files", (file for file in self.files))
 
-		pprint(data) # For debugging
+		# For debugging
+		print("URL: ", self.request_url)
+		print("DATA:")
+		pprint(data)
