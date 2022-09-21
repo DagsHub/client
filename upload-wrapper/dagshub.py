@@ -13,6 +13,7 @@ class Repo:
 		self.owner = owner
 		self.name = name
 		self.authToken = authToken
+		# TODO: verify token
 
 	def directory(self, path):
 		return DataSet(self, path)
@@ -63,9 +64,19 @@ class DataSet:
 			raise Exception("You must provide a valid commit message")
 		data["commit_message"] = self.commit_data.message
 
-		data["files"] = ("files", (file for file in self.files))
-
-		# For debugging
+		# Prints for debugging
 		print("URL: ", self.request_url)
 		print("DATA:")
 		pprint(data)
+		print("Files:")
+		pprint(self.files)
+		print("making request...")
+		res = requests.put(
+			self.request_url, 
+			data, 
+			files=[("files", file) for file in self.files], 
+			headers={'Authorization': 'token '+self.repo.authToken})
+		print("Response: ", res.status_code)
+		pprint(res.json())
+		pprint(res.content)
+		
