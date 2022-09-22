@@ -15,13 +15,15 @@ class Repo:
 		if authToken != None:
 			self.authToken = authToken
 		elif "ACCESS_TOKEN" in os.environ:
-			self.authToken = os.environ['ACCESS_TOKEN']
+			self.authToken = os.environ["ACCESS_TOKEN"]
 		else:
 			raise Exception("Can't find access token. Please set enviroment variable ACCESS_TOKEN with a DagsHub access token")
 		# TODO: verify token
-
+		
 		if src_url != None:
 			self.src_url = src_url
+		elif "SRC_URL" in os.environ:
+			self.src_url = os.environ["SRC_URL"]
 
 	def directory(self, path):
 		return DataSet(self, path)
