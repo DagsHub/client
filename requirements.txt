@@ -8,3 +8,4 @@ pytest==7.1.1
 toml==0.10.2
 PyTorch-lightning==1.5.10
 tensorflow-cpu==2.8.0
+requests==2.26.0
