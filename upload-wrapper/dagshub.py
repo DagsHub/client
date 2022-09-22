@@ -4,12 +4,6 @@ import os
 from pprint import pprint
 
 DEFAULT_SOURCE_URL = "https://dagshub.com/"
-
-if "BASE_URL" in os.environ:
-	BASE_URL = os.environ['BASE_URL']
-else:
-	BASE_URL = "https://dagshub.com/"
-
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/main/{path}"
 
 class Repo:
@@ -18,7 +12,7 @@ class Repo:
 		self.owner = owner
 		self.name = name
 
-		if authToken is not None:
+		if authToken != None:
 			self.authToken = authToken
 		elif "ACCESS_TOKEN" in os.environ:
 			self.authToken = os.environ['ACCESS_TOKEN']
@@ -26,7 +20,7 @@ class Repo:
 			raise Exception("Can't find access token. Please set enviroment variable ACCESS_TOKEN with a DagsHub access token")
 		# TODO: verify token
 
-		if src_url is not None:
+		if src_url != None:
 			self.src_url = src_url
 
 	def directory(self, path):
@@ -48,23 +42,36 @@ class DataSet:
 	def __init__(self, repo, directory):
 		self.repo = repo
 		self.directory = directory
-		self.request_url = urllib.parse.urljoin(BASE_URL, CONTENT_UPLOAD_URL.format(
+		self.request_url = urllib.parse.urljoin(self.repo.src_url, CONTENT_UPLOAD_URL.format(
 			owner=repo.owner,
 			reponame=repo.name,
 			path=urllib.parse.quote(directory, safe="")
 		))
 
-	def add(self, file, path="."):
-		file_path = os.path.join(path, os.path.basename(os.path.normpath(file.name)))
-		self.files.append((file_path, file))
+	def add(self, file, path=".", target_dir=None):
+		# path is the full target path, including the file name
+		if target_dir != None:
+			if path != ".":
+				raise Exception("You must provide either a path or a target_dir. You can't provide both")
+			path = os.path.join(target_dir, os.path.basename(os.path.normpath(file if type(file) is str else file.name)))
+
+		if type(file) is str:
+			try:
+				f = open(file, 'rb')
+				self.files.append((path, f))
+				return
+			except IsADirectoryError:
+				raise IsADirectoryError("'file' must describe a file, not a directory.")
+
+		self.files.append((path, file))
 
 	def commit(self, message, versioning=None, new_branch=None):
 		data = {}
-		if versioning is not None:
+		if versioning != None:
 			self.commit_data.versioning = versioning
 		data["versioning"] = self.commit_data.versioning
 
-		if new_branch is not None:
+		if new_branch != None:
 			self.commit_data.choice = "commit-to-new-branch"
 			self.commit_data.new_branch = new_branch
 

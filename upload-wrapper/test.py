@@ -1,13 +1,13 @@
 import dagshub
 
 # A basic use case
-repo = dagshub.Repo("idonov8", "test-all-file-kinds")
-ds = repo.directory("path/to/ds")
+repo = dagshub.Repo("idonov8", "baby-yoda-segmentation-dataset")
+ds = repo.directory(".")
 
-with open("test_photo.png", 'rb') as f:
-	# path is the enclosing folder, not including file name
-	ds.add(file=f, path="new_folder") 
-	ds.commit("Add a photo", versioning="dvc", new_branch="meow-2")
+# with open("test_photo.png", 'rb') as f:
+# 	ds.add(file=f, path="images") 
+# 	ds.commit("Add a photo with the api", versioning="dvc")
 
-# # path is a full path, including the file name.	
-# ds.add(file="files/my_file.txt", path="remote_files/my_file.txt")
+# path is a full path, including the file name.	
+ds.add(file="test_photo.png", path="images/my_awesome_image.png")
+ds.commit("Add a photo with the api", versioning="dvc")
