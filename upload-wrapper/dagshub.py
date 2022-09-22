@@ -3,6 +3,8 @@ import urllib
 import os
 from pprint import pprint
 
+DEFAULT_SOURCE_URL = "https://dagshub.com/"
+
 if "BASE_URL" in os.environ:
 	BASE_URL = os.environ['BASE_URL']
 else:
@@ -11,14 +13,21 @@ else:
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/main/{path}"
 
 class Repo:
-	def __init__(self, owner, name):
+	src_url = DEFAULT_SOURCE_URL
+	def __init__(self, owner, name, authToken=None, src_url=None):
 		self.owner = owner
 		self.name = name
-		if "ACCESS_TOKEN" in os.environ:
+
+		if authToken is not None:
+			self.authToken = authToken
+		elif "ACCESS_TOKEN" in os.environ:
 			self.authToken = os.environ['ACCESS_TOKEN']
 		else:
 			raise Exception("Can't find access token. Please set enviroment variable ACCESS_TOKEN with a DagsHub access token")
 		# TODO: verify token
+
+		if src_url is not None:
+			self.src_url = src_url
 
 	def directory(self, path):
 		return DataSet(self, path)
