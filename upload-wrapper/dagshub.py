@@ -32,6 +32,7 @@ class Commit:
 	summary=""
 	versioning="auto"
 	new_branch=""
+	last_commit=""
 	def __init__(self):
 		return
 
@@ -65,11 +66,15 @@ class DataSet:
 
 		self.files.append((path, file))
 
-	def commit(self, message, versioning=None, new_branch=None):
+	def commit(self, message, versioning=None, new_branch=None, last_commit=None):
 		data = {}
 		if versioning != None:
 			self.commit_data.versioning = versioning
 		data["versioning"] = self.commit_data.versioning
+
+		if last_commit != None:
+			self.commit_data.last_commit = last_commit
+		data["last_commit"] = self.commit_data.last_commit
 
 		if new_branch != None:
 			self.commit_data.choice = "commit-to-new-branch"
