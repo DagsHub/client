@@ -38,6 +38,15 @@ Using any of the supported integration methods, streamed files will appear along
 
 Supported ways to enable the DagsHub Streaming include:
 
+## Data Streaming - Installation (**temporary**)
+
+Use Git to install the Data Streaming Client on your machine, by running the following command:
+
+```bash
+pip install git+https://github.com/DagsHub/client.git@alpha
+```
+
+
 ## 1. Python-only "Lite" Hooks
 This method automatically detects calls to Python's built-in file operations (such as `open()`), and if the files exist on your DagsHub repo, will load them on the fly as they're requested.
 This means that most Python ML and data libraries will automatically work with this method, without requiring any manual integration!
