@@ -25,7 +25,7 @@ the data formats are very simple and you can choose to work with them directly.
 
 ## Installation
 ```bash
-pip install dagshub
+pip install git+https://github.com/DagsHub/client.git@alpha
 ```
 
 
@@ -37,15 +37,6 @@ The DagsHub client is designed specifically to make streamed files nearly *indis
 Using any of the supported integration methods, streamed files will appear alongside real files, and when your code attempts to read from them, they will transparently first be converted into real files and cached on disk for future uses.
 
 Supported ways to enable the DagsHub Streaming include:
-
-## Data Streaming - Installation (**temporary**)
-
-Use Git to install the Data Streaming Client on your machine, by running the following command:
-
-```bash
-pip install git+https://github.com/DagsHub/client.git@alpha
-```
-
 
 ## 1. Python-only "Lite" Hooks
 This method automatically detects calls to Python's built-in file operations (such as `open()`), and if the files exist on your DagsHub repo, will load them on the fly as they're requested.
