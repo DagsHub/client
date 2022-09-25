@@ -42,31 +42,25 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return os.open(path, flags, dir_fd=self.fs.project_root_fd)
 
     def getattr(self, path, fd=None):
-        print('GETTING ATTR', path, fd)
         try:
             if fd:
-                print('FD')
                 st = self.fs._DagsHubFilesystem__stat(fd)
             else:
-                print('NORMAL')
                 st = self.fs.stat(path)
             self.depth += 1
-            if self.depth < 4:
-                return {
-                    key: getattr(st, key)
-                    for key in (
-                        'st_atime',
-                        'st_ctime',
-                        'st_gid',
-                        'st_mode',
-                        'st_mtime',
-                        # 'st_nlink',
-                        'st_size',
-                        'st_uid',
-                    )
-                }
-            else:
-                raise FuseOSError(errno.ENOENT)
+            return {
+                key: getattr(st, key)
+                for key in (
+                    'st_atime',
+                    'st_ctime',
+                    'st_gid',
+                    'st_mode',
+                    'st_mtime',
+                    # 'st_nlink',
+                    'st_size',
+                    'st_uid',
+                )
+            }
         except FileNotFoundError:
             raise FuseOSError(errno.ENOENT)
 

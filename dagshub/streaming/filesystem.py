@@ -159,14 +159,11 @@ class DagsHubFilesystem:
         if isinstance(file, int):
             return None
         print('RELATIVE PATH NOT INT. PATH', file)
-        path = Path(file).resolve()
+        path = Path(file).absolute()
         print('RELATIVE PATH RESOLVED', path)
         try:
-            rel = path.resolve().relative_to(self.project_root.resolve())
-            print('FURTHER RESOLUTION')
-            if str(rel).startswith("<"):
-                return None
-            return rel
+            rel = path.relative_to(self.project_root.absolute())
+            return rel if not str(rel).startswith("<") else None 
         except ValueError:
             return None
 
