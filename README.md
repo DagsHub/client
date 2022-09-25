@@ -102,7 +102,7 @@ A basic use looks like this:
 ```python
 from dagshub.upload import Repo
 
-repo = Repo("idonov8", "baby-yoda-segmentation-dataset")
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset", branch="new_annotations")
 ds = repo.directory("images")
 
 with open("test_photo.png", 'rb') as f:

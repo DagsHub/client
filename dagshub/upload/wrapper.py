@@ -93,7 +93,7 @@ class DataSet:
 
 		if last_commit != None:
 			self.commit_data.last_commit = last_commit
-		data["last_commit"] = self.commit_data.last_commit
+			data["last_commit"] = self.commit_data.last_commit
 
 		if new_branch != None:
 			self.commit_data.choice = "commit-to-new-branch"
