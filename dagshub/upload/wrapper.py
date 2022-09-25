@@ -4,11 +4,12 @@ import os
 from pprint import pprint
 
 DEFAULT_SOURCE_URL = "https://dagshub.com/"
-CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/main/{path}"
+CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
+REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 
 class Repo:
 	src_url = DEFAULT_SOURCE_URL
-	def __init__(self, owner, name, authToken=None, src_url=None):
+	def __init__(self, owner, name, authToken=None, src_url=None, branch=None):
 		self.owner = owner
 		self.name = name
 
@@ -24,6 +25,21 @@ class Repo:
 			self.src_url = src_url
 		elif "SRC_URL" in os.environ:
 			self.src_url = os.environ["SRC_URL"]
+
+		if branch != None:
+			self.branch = branch
+		else:
+			# Find default branch and set it if not specified
+			res = requests.get(urllib.parse.urljoin(self.src_url, REPO_INFO_URL.format(
+				owner=self.owner,
+				reponame=self.name
+				)))
+			try:
+				self.branch = res.json().get('default_branch')
+				print("Set default branch: ", self.branch)
+			except:
+				raise Exception("Failed to get default branch for repository. Please specify a branch and make sure repository details are correct.")
+
 
 	def directory(self, path):
 		return DataSet(self, path)
@@ -45,9 +61,10 @@ class DataSet:
 	def __init__(self, repo, directory):
 		self.repo = repo
 		self.directory = directory
-		self.request_url = urllib.parse.urljoin(self.repo.src_url, CONTENT_UPLOAD_URL.format(
+		self.request_url = urllib.parse.urljoin(repo.src_url, CONTENT_UPLOAD_URL.format(
 			owner=repo.owner,
 			reponame=repo.name,
+			branch=repo.branch,
 			path=urllib.parse.quote(directory, safe="")
 		))
 
