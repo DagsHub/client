@@ -25,7 +25,7 @@ the data formats are very simple and you can choose to work with them directly.
 
 ## Installation
 ```bash
-pip install dagshub
+pip install git+https://github.com/DagsHub/client.git@alpha
 ```
 
 
