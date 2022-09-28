@@ -158,11 +158,10 @@ class DagsHubFilesystem:
     def _relative_path(self, file: Union[PathLike, int]):
         if isinstance(file, int):
             return None
-        print('RELATIVE PATH NOT INT. PATH', file)
-        path = Path(file).absolute()
-        print('RELATIVE PATH RESOLVED', path)
+        path = os.path.abspath(file)
+        parent = os.path.abspath(self.project_root)
         try:
-            rel = path.relative_to(self.project_root.absolute())
+            rel = Path(path[len(parent)+1:]) if parent in path else None
             return rel if not str(rel).startswith("<") else None 
         except ValueError:
             return None
@@ -203,31 +202,22 @@ class DagsHubFilesystem:
             return self.__open(file, mode, *args, **kwargs)
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
-        print('RUNNING STAT')
         if dir_fd is not None or not follow_symlinks:
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
-        print('CHECKED DIR_FD')
         relative_path = self._relative_path(path)
-        print('CHECKED RELATIVE PATH')
         if relative_path:
             if self._passthrough_path(relative_path):
-                PRINT('PASSTHROUGH PATH')
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
             elif relative_path == SPECIAL_FILE:
-                print('SPECIAL FILE')
                 return dagshub_stat_result(self, path, len(self._special_file()), is_directory=False)
             else:
                 try:
-                    print('__STAT')
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
-                    print('FILENOTFOUNDERROR')
                     parent_tree = self.dirtree.get(str(relative_path.parent))
                     if parent_tree is not None and str(relative_path.name) not in parent_tree:
-                        print('DAGSHUB STAT')
                         return dagshub_stat_result(self, path, is_directory=False)
                     else:
-                        print("MKDIRS")
                         self._mkdirs(path, dir_fd=self.project_root_fd)
                         return self.__stat(relative_path, dir_fd=self.project_root_fd)
                         # TODO: perhaps don't create directories on stat
