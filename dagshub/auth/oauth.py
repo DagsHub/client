@@ -1,3 +1,4 @@
+from typing import Optional, Dict
 import appdirs
 import datetime
 import getpass
@@ -5,7 +6,7 @@ import logging
 import os
 import requests
 import traceback
-from typing import Optional, Dict
+import urllib
 import uuid
 import yaml
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class OAuthAuthenticator:
     def __init__(self, **kwargs):
-        self.host: str = kwargs.get("host", os.environ.get(HOST_KEY, DEFAULT_HOST))
+        self.host: str = kwargs.get("host", os.environ.get(HOST_KEY, DEFAULT_HOST)).strip("/")
         self.client_id: str = kwargs.get(
             "client_id", os.environ.get(CLIENT_ID_KEY, DEFAULT_CLIENT_ID)
         )
@@ -42,7 +43,7 @@ class OAuthAuthenticator:
 
     def oauth_flow(self) -> Dict:
         state = uuid.uuid4()
-        dagshub_url = f"{self.host}/login/oauth"
+        dagshub_url = urllib.parse.urljoin(self.host, "login/oauth")
         print(
             f"Go to {dagshub_url}/authorize?state={state}&client_id={self.client_id} and paste the code back in here."
         )
