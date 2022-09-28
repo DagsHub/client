@@ -96,7 +96,11 @@ All of the supported ways to enable DagsHub Streaming should automatically detec
 
 If you need to override the automatically detected configuration, pass the `--repo_url`, `--username`, and `--password` flags to the CLI, or the `repo_url=`, `username=`, and `password=` keyword arguments to either of the python entrypoints.
 
-# Upload API
+# Data Upload
+*You don't need to pull the entire dataset anymore.*
+
+The upload API lets you append files to existing DVC directories, without downloading anything to your maching, quickly and efficiently.
+
 You can use the DagsHub client to upload files directly to DagsHub, **using both Git & DVC.**
 A basic use looks like this:
 ```python
@@ -114,7 +118,6 @@ with open("test_photo.png", 'rb') as f:
 ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
-
 # Training Logger
 ## Guide
 You can learn more by completing our short [tutorial](https://dagshub.com/docs/experiment-tutorial/overview/) or reading the [docs](https://dagshub.com/docs)
