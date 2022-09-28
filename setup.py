@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/DagsHub/client",
     packages=setuptools.find_packages(),
-    install_requires=["PyYAML>=5", "requests>=2", "fusepy>=3"],
+    install_requires=["PyYAML>=5", "requests>=2", "fusepy>=3", "appdirs>=1.4.4"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -23,6 +23,7 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "dagshub-mount = dagshub.streaming.mount:main",
+            "dagshub-auth = dagshub.auth:console_entrypoint",
         ]
     }
 )
