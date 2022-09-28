@@ -32,13 +32,21 @@ class Repo:
 		if branch is not None:
 			self.branch = branch
 		else:
-			print("Branch wasn't provided. Fetching default branch.")
+			print("Branch wasn't provided. Fetching default branch...")
 			self._set_default_branch()
 		print("Set branch: ", self.branch)
 
 	def directory(self, path):
 		return DataSet(self, path)
 		
+	def get_request_url(self, directory):
+		return urllib.parse.urljoin(self.src_url, CONTENT_UPLOAD_URL.format(
+			owner=self.owner,
+			reponame=self.name,
+			branch=self.branch,
+			path=urllib.parse.quote(directory, safe="")
+		))
+
 
 	def _set_default_branch(self):
 		try:
@@ -56,18 +64,12 @@ class Commit:
 		self.last_commit=""
 
 class DataSet:
-	directory = ""
 	files = []
 	commit_data = Commit()
 	def __init__(self, repo, directory):
 		self.repo = repo
 		self.directory = directory
-		self.request_url = urllib.parse.urljoin(repo.src_url, CONTENT_UPLOAD_URL.format(
-			owner=repo.owner,
-			reponame=repo.name,
-			branch=repo.branch,
-			path=urllib.parse.quote(directory, safe="")
-		))
+		self.request_url = self.repo.get_request_url(directory)
 
 	def add(self, file, path=".", target_dir=None):
 		# path is the full target path, including the file name
