@@ -104,10 +104,10 @@ class OAuthAuthenticator:
 _authenticator: Optional[OAuthAuthenticator] = None
 
 
-def get_oauth_token() -> str:
+def get_oauth_token(**kwargs) -> str:
     global _authenticator
     if _authenticator is None:
-        _authenticator = OAuthAuthenticator()
+        _authenticator = OAuthAuthenticator(**kwargs)
     return _authenticator.get_oauth_token()
 
 
