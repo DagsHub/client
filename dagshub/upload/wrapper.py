@@ -1,6 +1,7 @@
 import requests
 import urllib
 import os
+from dagshub.auth import get_oauth_token
 from pprint import pprint
 
 DEFAULT_SOURCE_URL = "https://dagshub.com/"
@@ -26,7 +27,10 @@ class Repo:
 		elif "ACCESS_TOKEN" in os.environ:
 			self.authToken = os.environ["ACCESS_TOKEN"]
 		else:
-			raise Exception("Can't find access token. Please set enviroment variable ACCESS_TOKEN with a DagsHub access token")
+			try:
+				self.authToken = get_oauth_token(host=self.src_url)
+			except:
+				raise Exception("\n --- OAuth failed, try again --- \n Altenatively, you can set an enviroment variable ACCESS_TOKEN with a DagsHub access token or pass it to Repo with 'authToken' instead.")
 		# TODO: verify token
 
 		if branch is not None:
