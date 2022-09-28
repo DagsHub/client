@@ -118,6 +118,11 @@ with open("test_photo.png", 'rb') as f:
 ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
+## Authentication
+By default, OAuth flow will launch to help you authenticate. **No setup is needed.**
+
+Alternatively, an access token can be provided as an envirement variable named `ACCESS_TOKEN`, or passed as the keyword argument `authToken` to `Repo()`.
+
 # Training Logger
 ## Guide
 You can learn more by completing our short [tutorial](https://dagshub.com/docs/experiment-tutorial/overview/) or reading the [docs](https://dagshub.com/docs)
