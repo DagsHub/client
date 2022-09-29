@@ -21,20 +21,21 @@ logger = logging.getLogger(__name__)
 
 
 class OAuthAuthenticator:
-    def __init__(self, **kwargs):
-        self.host: str = kwargs.get("host", os.environ.get(HOST_KEY, DEFAULT_HOST)).strip("/")
-        self.client_id: str = kwargs.get(
-            "client_id", os.environ.get(CLIENT_ID_KEY, DEFAULT_CLIENT_ID)
-        )
-        self.cache_location: str = kwargs.get(
-            "cache_location", os.environ.get(CACHE_LOCATION_KEY, DEFAULT_CACHE_LOCATION)
-        )
+    def __init__(
+        self,
+        host: str = os.environ.get(HOST_KEY, DEFAULT_HOST),
+        client_id: str = os.environ.get(CLIENT_ID_KEY, DEFAULT_CLIENT_ID),
+        cache_location: str = os.environ.get(CACHE_LOCATION_KEY, DEFAULT_CACHE_LOCATION),
+    ):
+        self.host = host.strip("/")
+        self.client_id = client_id
+        self.cache_location = cache_location
         self._token_cache: Optional[Dict[str, Dict]] = None
 
     def get_oauth_token(self) -> str:
         if self._token_cache is None:
             self._token_cache = self._load_cache_file()
-        token = self._token_cache.get(self.host, None)
+        token = self._token_cache.get(self.host)
         if token is None or self._is_expired(token):
             token = self.oauth_flow()
             self._token_cache[self.host] = token
