@@ -16,11 +16,10 @@ def get_default_branch(src_url, owner, reponame):
 	return res.json().get('default_branch')
 
 class Repo:
-	src_url = DEFAULT_SOURCE_URL
 	def __init__(self, owner, name, authToken=None, src_url=None, branch=None):
 		self.owner = owner
 		self.name = name
-		self.src_url = src_url if src_url is not None else os.environ.get("SRC_URL")
+		self.src_url = src_url if src_url is not None else os.environ.get("SRC_URL") if "SRC_URL" in os.environ else DEFAULT_SOURCE_URL
 
 		if authToken is not None:
 			self.authToken = authToken
@@ -75,12 +74,13 @@ class DataSet:
 		self.directory = directory
 		self.request_url = self.repo.get_request_url(directory)
 
-	def add(self, file, path=".", target_dir=None):
-		# path is the full target path, including the file name
-		if target_dir is not None:
-			if path != ".":
-				raise Exception("You must provide either a path or a target_dir. You can't provide both")
-			path = os.path.join(target_dir, os.path.basename(os.path.normpath(file if type(file) is str else file.name)))
+	def add(self, file, path=None):
+		# if path is not provided, fall back to the file name
+		if path is None:
+			try:
+				path = os.path.basename(os.path.normpath(file if type(file) is str else file.name))
+			except:
+				raise Exception("Could not interprate your file's name. Please specify it in the keyword parameter 'path'.")
 
 		if type(file) is str:
 			try:

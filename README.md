@@ -110,11 +110,10 @@ repo = Repo("idonov8", "baby-yoda-segmentation-dataset", branch="new_annotations
 ds = repo.directory("images")
 
 with open("test_photo.png", 'rb') as f:
-    # 'target_dir' is just the enclosing directory name. 
-    ds.add(file=f, target_dir="test_images") 
+    ds.add(f)
     ds.commit("Add a photo with the api using a file object", versioning="dvc")
 
-# 'path' is a full path, including the file name.	
+# 'path' is a full path inside the ds directory, including the file name.	
 ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
