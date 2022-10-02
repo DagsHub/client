@@ -73,6 +73,37 @@ All of the supported ways to enable DagsHub Streaming should automatically detec
 
 If you need to override the automatically detected configuration, pass the `--repo_url`, `--username`, and `--password` flags to the CLI, or the `repo_url=`, `username=`, and `password=` keyword arguments to either of the python entrypoints.
 
+# Data Upload
+*You don't need to pull the entire dataset anymore.*
+
+The upload API lets you append files to existing DVC directories, without downloading anything to your maching, quickly and efficiently.
+
+You can use the DagsHub client to upload files directly to DagsHub, **using both Git & DVC.**
+A basic use looks like this:
+```python
+from dagshub.upload import Repo
+
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset") # Optional: username, password, src_url, branch
+
+# Upload a single file to a repository with one line
+repo.upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
+
+# Upload multiple files to a dvc folder in a repository with a single commit
+ds = repo.directory("images")
+
+with open("test_photo.png", 'rb') as f:
+    ds.add(f)
+    ds.commit("Add a photo with the api using a file object", versioning="dvc") # Optional: versioning, new_branch, last_commit
+
+# 'path' is a full path inside the ds directory, including the file name.	
+ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
+ds.commit("Add a photo with the api using plain text", versioning="dvc")
+```
+## Authentication
+**Username -** can be provided via an envirement variable named `DAGSHUB_USERNAME`**or** passed as the keyword argument `username` to `Repo()`.
+**Password or access token -** can be provided via an envirement variable named `DAGSHUB_PASSWORD` **or** passed as the keyword argument `password` to `Repo()`.
+
+**Coming soon: support for OAuth 2.0**
 
 # Training Logger
 ## Guide
