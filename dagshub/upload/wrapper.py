@@ -37,6 +37,11 @@ class Repo:
 			self._set_default_branch()
 		print("Set branch: ", self.branch)
 
+	def upload(self, file: Union[str, IOBase], message, versioning=None, new_branch=None, last_commit=None, path=None):
+		ds = DataSet(self, ".")
+		ds.add(file, path)
+		ds.commit(message, versioning, new_branch, last_commit)
+
 	def directory(self, path):
 		return DataSet(self, path)
 		
@@ -78,7 +83,7 @@ class DataSet:
 			try:
 				path = os.path.basename(os.path.normpath(file if type(file) is str else file.name))
 			except:
-				raise Exception("Could not interprate your file's name. Please specify it in the keyword parameter 'path'.")
+				raise Exception("Could not interpret your file's name. Please specify it in the keyword parameter 'path'.")
 
 		if type(file) is str:
 			try:

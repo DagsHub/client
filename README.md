@@ -106,12 +106,16 @@ A basic use looks like this:
 ```python
 from dagshub.upload import Repo
 
-repo = Repo("idonov8", "baby-yoda-segmentation-dataset", branch="new_annotations")
+# Upload a single file to a repository with one line
+Repo("idonov8", "baby-yoda-segmentation-dataset").upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
+
+# Upload files to dvc folder in a repository
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset", branch="new_annotations") # Optional: authToken, src_url, branch
 ds = repo.directory("images")
 
 with open("test_photo.png", 'rb') as f:
     ds.add(f)
-    ds.commit("Add a photo with the api using a file object", versioning="dvc")
+    ds.commit("Add a photo with the api using a file object", versioning="dvc") # Optional: versioning, new_branch, last_commit
 
 # 'path' is a full path inside the ds directory, including the file name.	
 ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
