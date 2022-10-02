@@ -42,9 +42,9 @@ class Repo:
 			if branch is not None:
 				self.branch = branch
 			else:
-				print("Branch wasn't provided. Fetching default branch...")
+				logger.info("Branch wasn't provided. Fetching default branch...")
 				self._set_default_branch()
-			print("Set branch: ", self.branch)
+			logger.info(f"Set branch: {self.branch}")
 
 		except Exception as e:
 			logger.error(e)
@@ -140,23 +140,27 @@ class DataSet:
 			data["commit_message"] = self.commit_data.message
 
 			# Prints for debugging
-			print("URL: ", self.request_url)
+			logger.debug(f"Request URL: {self.request_url}")
 			print("DATA:")
 			pprint(data)
-			print("Files:")
+			logger.debug("Files:")
 			pprint(self.files)
-			print("making request...")
+			logger.debug("making request...")
 			res = requests.put(
 				self.request_url, 
 				data, 
 				params={"is_dvc_dir": True},
 				files=[("files", file) for file in self.files],
 				auth=(self.repo.username, self.repo.password ))
-			print("Response: ", res.status_code)
-			pprint(res.content)
+			logger.debug(f"Response: {res.status_code}")
+			print("Response content:")
+			try:
+				pprint(res.json())
+			except Exception:
+				pprint(res.content)
 
 			if res.status_code == 200:
-				print("Upload finished successfully!")
+				log.info("Upload finished successfully!")
 
 		except Exception as e:
 			logger.error(e)
