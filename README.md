@@ -51,7 +51,7 @@ For those frameworks, check out the alternative methods below.
 ## 2. CLI launcher
 Launch a terminal, and `cd` into the directory of your project. Then run
 ```bash
-$ dagshub-mount
+$ dagshub mount
 ```
 If you launch a new terminal and navigate to that directory, or run `cd .` in any existing terminals in that directory, you should now be able to see that any files in your repository but not saved locally appear in your directory listings! Run
 ```bash
