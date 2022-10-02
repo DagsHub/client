@@ -106,11 +106,12 @@ A basic use looks like this:
 ```python
 from dagshub.upload import Repo
 
-# Upload a single file to a repository with one line
-Repo("idonov8", "baby-yoda-segmentation-dataset").upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset") # Optional: authToken, src_url, branch
 
-# Upload files to dvc folder in a repository
-repo = Repo("idonov8", "baby-yoda-segmentation-dataset", branch="new_annotations") # Optional: authToken, src_url, branch
+# Upload a single file to a repository with one line
+repo.upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
+
+# Upload multiple files to a dvc folder in a repository with a single commit
 ds = repo.directory("images")
 
 with open("test_photo.png", 'rb') as f:
@@ -122,9 +123,7 @@ ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
 ## Authentication
-By default, OAuth flow will launch to help you authenticate. **No setup is needed.**
-
-Alternatively, an access token can be provided as an envirement variable named `ACCESS_TOKEN`, or passed as the keyword argument `authToken` to `Repo()`.
+An access token can be provided as an envirement variable named `ACCESS_TOKEN`, or passed as the keyword argument `authToken` to `Repo()`.
 
 # Training Logger
 ## Guide
