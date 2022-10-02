@@ -28,8 +28,8 @@ def wrapreturn(wrappertype):
     return decorator
 
 class dagshub_ScandirIterator:
-        def __init__(self, iterator):
-            self._iterator = iterator
+    def __init__(self, iterator):
+        self._iterator = iterator
         def __iter__(self):
             return self._iterator
         def __next__(self):
@@ -99,9 +99,9 @@ class DagsHubFilesystem:
 
         if not branch:
             branch = (self.__open(self.project_root / '.git/HEAD')
-                          .readline()
-                          .strip()
-                          .split('/')[-1]) or 'main'
+                      .readline()
+                      .strip()
+                      .split('/')[-1]) or 'main'
             # TODO: check DagsHub for default branch if no branch/commit checked out
 
         parsed_repo_url = urlparse(repo_url)
@@ -112,7 +112,7 @@ class DagsHubFilesystem:
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
         self.dirtree = {}
 
-        del repo_url, branch, parsed_repo_url, content_api_path
+        del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
         self.auth = (username, password) if username or password else None
@@ -124,12 +124,15 @@ class DagsHubFilesystem:
         else:
             # Check Git credential stores
             proc = subprocess.run(['git', 'credential', 'fill'],
-                                input=f'url={repo_url}'.encode(),
-                                capture_output=True)
+                                  input=f'url={repo_url}'.encode(),
+                                  capture_output=True)
             answer = {line[:line.index('=')]: line[line.index('=')+1:]
-                        for line in proc.stdout.decode().splitlines()}
+                      for line in proc.stdout.decode().splitlines()}
             if 'username' in answer and 'password' in answer:
                 self.auth = (answer['username'], answer['password'])
+            response = self._api_listdir('')
+            if not response.ok:
+                raise AuthenticationError('DagsHub credentials required; provided credentials are invalid')
             else:
                 # TODO: Check .dvc/config{,.local} for credentials
                 raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
@@ -220,7 +223,7 @@ class DagsHubFilesystem:
                     else:
                         self._mkdirs(path, dir_fd=self.project_root_fd)
                         return self.__stat(relative_path, dir_fd=self.project_root_fd)
-                        # TODO: perhaps don't create directories on stat
+                    # TODO: perhaps don't create directories on stat
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
@@ -295,11 +298,11 @@ class DagsHubFilesystem:
             # TODO: DRY this dictionary. i.e. __open() links cls.__open and io.open even though this dictionary links them
             #       Cannot use a dict as the source of truth because type hints rely on __get_unpatched inferring the right type
             self.__class__.__unpatched = {
-                'open': io.open,
-                'stat': os.stat,
-                'listdir': os.listdir,
-                'scandir': os.scandir
-            }
+                    'open': io.open,
+                    'stat': os.stat,
+                    'listdir': os.listdir,
+                    'scandir': os.scandir
+                    }
         io.open = builtins.open = _pathlib.open = self.open
         os.stat = _pathlib.stat = self.stat
         os.listdir = _pathlib.listdir = self.listdir
