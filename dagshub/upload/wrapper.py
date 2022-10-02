@@ -3,6 +3,8 @@ import urllib
 import os
 from dagshub.auth import get_oauth_token
 from pprint import pprint
+from typing import Union
+from io import IOBase
 
 DEFAULT_SOURCE_URL = "https://dagshub.com/"
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -74,7 +76,7 @@ class DataSet:
 		self.directory = directory
 		self.request_url = self.repo.get_request_url(directory)
 
-	def add(self, file, path=None):
+	def add(self, file: Union[str, IOBase], path=None):
 		# if path is not provided, fall back to the file name
 		if path is None:
 			try:
