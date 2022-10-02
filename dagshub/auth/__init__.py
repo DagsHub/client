@@ -1,7 +1,7 @@
-from .oauth import get_oauth_token, console_entrypoint, OAuthAuthenticator
+from .tokens import get_token, add_app_token, add_oauth_token
 
 __all__ = [
-    get_oauth_token.__name__,
-    console_entrypoint.__name__,
-    OAuthAuthenticator.__name__,
+    get_token.__name__,
+    add_app_token.__name__,
+    add_oauth_token.__name__,
 ]

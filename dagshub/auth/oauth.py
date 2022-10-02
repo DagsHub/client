@@ -1,127 +1,56 @@
+import sys
 from typing import Optional, Dict
-import appdirs
-import datetime
-import getpass
 import logging
-import os
+
+import pytimedinput
 import requests
-import traceback
 import urllib
 import uuid
-import yaml
+from dagshub.common import config
 
-HOST_KEY = "DAGSHUB_CLIENT_HOST"
-DEFAULT_HOST = "https://dagshub.com"
-CACHE_LOCATION_KEY = "DAGSHUB_CLIENT_CONFIG"
-DEFAULT_CACHE_LOCATION = os.path.join(appdirs.user_cache_dir("dagshub"), "tokens")
-CLIENT_ID_KEY = "DAGSHUB_CLIENT_ID"
-DEFAULT_CLIENT_ID = "32b60ba385aa7cecf24046d8195a71c07dd345d9657977863b52e7748e0f0f28"
+
+CODE_INPUT_TIMEOUT = 60
 
 logger = logging.getLogger(__name__)
 
 
-class OAuthAuthenticator:
-    def __init__(
-        self,
-        host: str = os.environ.get(HOST_KEY, DEFAULT_HOST),
-        client_id: str = os.environ.get(CLIENT_ID_KEY, DEFAULT_CLIENT_ID),
-        cache_location: str = os.environ.get(CACHE_LOCATION_KEY, DEFAULT_CACHE_LOCATION),
-    ):
-        self.host = host.strip("/")
-        self.client_id = client_id
-        self.cache_location = cache_location
-        self._token_cache: Optional[Dict[str, Dict]] = None
-
-    def get_oauth_token(self) -> str:
-        if self._token_cache is None:
-            self._token_cache = self._load_cache_file()
-        token = self._token_cache.get(self.host)
-        if token is None or self._is_expired(token):
-            token = self.oauth_flow()
-            self._token_cache[self.host] = token
-            self._store_cache_file()
-        return token["access_token"]
-
-    def oauth_flow(self) -> Dict:
-        state = uuid.uuid4()
-        dagshub_url = urllib.parse.urljoin(self.host, "login/oauth")
-        print(
-            f"Go to {dagshub_url}/authorize?state={state}&client_id={self.client_id} and paste the code back in here."
+def oauth_flow(
+    host: str,
+    client_id: Optional[str] = None,
+    code_input_timeout: Optional[int] = None,
+) -> Dict:
+    if client_id is None:
+        client_id = config.client_id
+    if code_input_timeout is None:
+        code_input_timeout = CODE_INPUT_TIMEOUT
+    state = uuid.uuid4()
+    host = host.strip("/")
+    dagshub_url = urllib.parse.urljoin(host, "login/oauth")
+    link_prompt = f"Go to {dagshub_url}/authorize?state={state}&client_id={client_id} and paste the code back in here."
+    code_prompt = "Code:"
+    if code_input_timeout <= 0:
+        print(link_prompt)
+        code = input(code_prompt)
+    else:
+        if not sys.__stdin__.isatty():
+            raise RuntimeError(
+                "Can't perform OAuth in a non-interactive shell. "
+                "Please get a token using this command in a shell: dagshub auth login"
+            )
+        print(link_prompt)
+        code, timed_out = pytimedinput.timedInput(
+            prompt=code_prompt, timeout=code_input_timeout
         )
-        code = getpass.getpass("Code:")
-        res = requests.post(
-            f"{dagshub_url}/access_token",
-            data={"client_id": self.client_id, "code": code, "state": state},
-        )
-        if res.status_code != 200:
-            raise Exception(
-                f"Error while getting OAuth token: HTTP {res.status_code}, Body: {res.json()}"
-            )
-        token = res.json()
-        logger.debug(f"Got token: {token}")
-        return token
-
-    @staticmethod
-    def _is_expired(token: Dict[str, str]) -> bool:
-        if "expiry" not in token:
-            return True
-        # Need to cut off the three additional precision numbers in milliseconds, because %f only parses 6 digits
-        expiry = token["expiry"][:-4] + "Z"
-        expiry_dt = datetime.datetime.strptime(expiry, "%Y-%m-%dT%H:%M:%S.%fZ")
-        is_expired = expiry_dt < datetime.datetime.utcnow()
-        if is_expired:
-            logger.warning("OAuth token expired, need to reauthenticate")
-        return is_expired
-
-    def _load_cache_file(self) -> Optional[Dict[str, Dict]]:
-        logger.debug(f"Loading OAuth token cache from {self.cache_location}")
-        if not os.path.exists(self.cache_location):
-            logger.debug("OAuth token cache file doesn't exist")
-            return {}
-        try:
-            with open(self.cache_location) as f:
-                tokens_cache = yaml.load(f, yaml.Loader)
-                return tokens_cache
-        except:
-            logger.error(
-                f"Error while loading DagsHub OAuth token cache: {traceback.format_exc()}"
-            )
-            raise
-
-    def _store_cache_file(self):
-        logger.debug(f"Dumping OAuth token cache to {self.cache_location}")
-        try:
-            dirpath = os.path.dirname(self.cache_location)
-            if not os.path.exists(dirpath):
-                os.makedirs(dirpath)
-            with open(self.cache_location, "w") as f:
-                yaml.dump(self._token_cache, f, yaml.Dumper)
-        except:
-            logger.error(
-                f"Error while storing DagsHub OAuth token cache: {traceback.format_exc()}"
-            )
-            raise
-
-
-_authenticator: Optional[OAuthAuthenticator] = None
-
-
-def get_oauth_token(**kwargs) -> str:
-    global _authenticator
-    if _authenticator is None:
-        _authenticator = OAuthAuthenticator(**kwargs)
-    return _authenticator.get_oauth_token()
-
-
-def console_entrypoint():
-    get_oauth_token()
-    print(
-        f"Your DagsHub OAuth token is now stored at {_authenticator.cache_location}"
-        f" and will be used next time you use the client"
+        if timed_out:
+            raise RuntimeError("Timed out input of OAuth code")
+    res = requests.post(
+        f"{dagshub_url}/access_token",
+        data={"client_id": client_id, "code": code, "state": state},
     )
-
-
-if __name__ == "__main__":
-    # For debug
-    logging.basicConfig(level=logging.DEBUG)
-    logger.info(get_oauth_token())
+    if res.status_code != 200:
+        raise Exception(
+            f"Error while getting OAuth token: HTTP {res.status_code}, Body: {res.json()}"
+        )
+    token = res.json()
+    logger.debug(f"Got token: {token}")
+    return token
