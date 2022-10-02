@@ -160,7 +160,7 @@ class DataSet:
 				pprint(res.content)
 
 			if res.status_code == 200:
-				log.info("Upload finished successfully!")
+				logger.info("Upload finished successfully!")
 
 		except Exception as e:
 			logger.error(e)
