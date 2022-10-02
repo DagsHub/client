@@ -130,7 +130,8 @@ class DataSet:
 		res = requests.put(
 			self.request_url, 
 			data, 
-			files=[("files", file) for file in self.files], 
+			params={"is_dvc_dir": True},
+			files=[("files", file) for file in self.files],
 			headers={'Authorization': 'token ' + self.repo.authToken})
 		print("Response: ", res.status_code)
 		pprint(res.content)
