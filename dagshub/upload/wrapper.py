@@ -48,7 +48,7 @@ class Repo:
 
 		except Exception as e:
 			logger.error(e)
-			exit()
+			raise e
 
 	def upload(self, file: Union[str, IOBase], message, versioning=None, new_branch=None, last_commit=None, path=None):
 		ds = DataSet(self, ".")
@@ -111,12 +111,11 @@ class DataSet:
 
 		except Exception as e:
 			logger.error(e)
-			exit()
+			raise e
 
 	def _reset_dataset(self):
 		self.files = []
 		self.commit_data = Commit()
-
 	def commit(self, message, versioning=None, new_branch=None, last_commit=None):
 		try:
 			data = {}
@@ -172,4 +171,4 @@ class DataSet:
 	
 		except Exception as e:
 			logger.error(e)
-			exit()
+			raise e
