@@ -85,7 +85,7 @@ from dagshub.upload import Repo
 
 repo = Repo("idonov8", "baby-yoda-segmentation-dataset", username="<username>" password="<access token OR password>") # Optional: src_url, branch
 
-# Upload a single file to a repository with one line
+# Upload a single file to a repository in one line
 repo.upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
 
 # Upload multiple files to a dvc folder in a repository with a single commit
@@ -100,8 +100,8 @@ ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
 ## Authentication
-**Username -** can be provided via an envirement variable named `DAGSHUB_USERNAME`**or** passed as the keyword argument `username` to `Repo()`.
-**Password or access token -** can be provided via an envirement variable named `DAGSHUB_PASSWORD` **or** passed as the keyword argument `password` to `Repo()`.
+- **Username -** can be provided via an envirement variable named `DAGSHUB_USERNAME`**or** passed as the keyword argument `username` to `Repo()`
+- **Password or [access token](https://dagshub.com/user/settings/tokens) -** can be provided via an envirement variable named `DAGSHUB_PASSWORD` **or** passed as the keyword argument `password` to `Repo()`
 
 **Coming soon: support for OAuth 2.0**
 
