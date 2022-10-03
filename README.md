@@ -10,7 +10,7 @@
 <a href="https://twitter.com/TheRealDAGsHub" title="DagsHub on Twitter"><img src="https://img.shields.io/twitter/follow/TheRealDAGsHub.svg?style=social"></a>
 
 # DagsHub Python client libraries
-Use DagsHub to create reproducible versions of your data science research project, 
+Use DagsHub to create reproducible versions of your data science research project,
 allow others to understand your project, and to contribute back to it.
 
 DagsHub is built firmly around open, standard formats for your project. In particular:
@@ -18,10 +18,10 @@ DagsHub is built firmly around open, standard formats for your project. In parti
 * [DVC](https://github.com/iterative/dvc)
 * Standard data formats like YAML, JSON, CSV
 
-Therefore, you can work with DagsHub regardless of your chosen programming language or frameworks. 
+Therefore, you can work with DagsHub regardless of your chosen programming language or frameworks.
 
-__This client library is meant to help you get started quickly in Python__, but it's purely optional - 
-the data formats are very simple and you can choose to work with them directly. 
+__This client library is meant to help you get started quickly in Python__, but it's purely optional -
+the data formats are very simple and you can choose to work with them directly.
 
 ## Installation
 ```bash
@@ -33,7 +33,7 @@ pip install git+https://github.com/DagsHub/client.git@alpha
 
 By using the DagsHub client, you can stream files from your DagsHub repository without needing to download them to your local disk ahead of time! You'll no longer need to wait for the lengthy `dvc pull` to complete before you start training your models, you can launch the script immediately after connecting DagsHub Streaming and watch as the data files automatically get downloaded as they are needed!
 
-The DagsHub client is designed specifically to make streamed files nearly *indistinguishable* from real files saved to your disk!  
+The DagsHub client is designed specifically to make streamed files nearly *indistinguishable* from real files saved to your disk!
 Using any of the supported integration methods, streamed files will appear alongside real files, and when your code attempts to read from them, they will transparently first be converted into real files and cached on disk for future uses.
 
 Supported ways to enable the DagsHub Streaming include:
@@ -49,33 +49,10 @@ Note that some popular ML frameworks, such as TensorFlow, have input/output rout
 For those frameworks, check out the alternative methods below.
 
 ## 2. CLI launcher
-Launch a terminal, and `cd` into the directory of your project. Then run
-```bash
-$ dagshub mount
-```
-If you launch a new terminal and navigate to that directory, or run `cd .` in any existing terminals in that directory, you should now be able to see that any files in your repository but not saved locally appear in your directory listings! Run
-```bash
-$ cat .dagshub-streaming
-```
-from the root of your project to confirm that the streaming works.
-
-This works by mounting a FUSE filesystem, and therefore is only supported on Linux, or on Mac and Windows with custom setup.
-It also means that any non-Python programs you want to run on your data will work without any added integration effort!
+Under development
 
 ## 3. Python entrypoint
-This method is the same as the CLI launcher, and also mounts a FUSE filesystem, except you can execute it from inside your Python code.
-
-Simply add
-```python
-from dagshub.streaming import mount
-mount()
-```
-to your Python program, and any files in your repository but not saved locally will appear in your directory listings! Run
-```python
-print(open(PROJECT_ROOT_DIRECTORY + '/.dagshub-streaming').read())
-```
-to confirm that the streaming works.
-
+Under development
 
 ## 4. No-magic Python API
 If you hate magic and want to explicitly and unambigiously state that you're using DagsHub Streaming, or else none of the other methods are supported on your machine, we also offer a straightforward Python client class that you can use:
@@ -83,9 +60,9 @@ If you hate magic and want to explicitly and unambigiously state that you're usi
 from dagshub.streaming import DagsHubFilesystem
 fs = DagsHubFilesystem()
 ```
-Then replace any use of `open()`, `os.stat()`, `os.listdir()`, and `os.scandir()` with `fs.open()`, `fs.stat()`, `fs.listdir()`, and `fs.scandir()` respectively.  
-You don't even have to provide relative paths from the project directory, we take care of that for you!  
-Pass the exact same arguments you would to the built-in functions to our client's functions, and streaming functionality will be provided.  
+Then replace any use of `open()`, `os.stat()`, `os.listdir()`, and `os.scandir()` with `fs.open()`, `fs.stat()`, `fs.listdir()`, and `fs.scandir()` respectively.
+You don't even have to provide relative paths from the project directory, we take care of that for you!
+Pass the exact same arguments you would to the built-in functions to our client's functions, and streaming functionality will be provided.
 e.g.:  `fs.open('/full/path/from/root/to/dvc/managed/file')`
 
 ## Automagic Configuration
@@ -96,6 +73,37 @@ All of the supported ways to enable DagsHub Streaming should automatically detec
 
 If you need to override the automatically detected configuration, pass the `--repo_url`, `--username`, and `--password` flags to the CLI, or the `repo_url=`, `username=`, and `password=` keyword arguments to either of the python entrypoints.
 
+# Data Upload
+*You don't need to pull the entire dataset anymore.*
+
+The upload API lets you append files to existing DVC directories, without downloading anything to your maching, quickly and efficiently.
+
+You can use the DagsHub client to upload files directly to DagsHub, **using both Git & DVC.**
+A basic use looks like this:
+```python
+from dagshub.upload import Repo
+
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset", username="<username>" password="<access token OR password>") # Optional: src_url, branch
+
+# Upload a single file to a repository in one line
+repo.upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
+
+# Upload multiple files to a dvc folder in a repository with a single commit
+ds = repo.directory("images")
+
+with open("test_photo.png", 'rb') as f:
+    ds.add(f)
+    ds.commit("Add a photo with the api using a file object", versioning="dvc") # Optional: versioning, new_branch, last_commit
+
+# 'path' is a full path inside the ds directory, including the file name.	
+ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
+ds.commit("Add a photo with the api using plain text", versioning="dvc")
+```
+## Authentication
+- **Username -** can be provided via an envirement variable named `DAGSHUB_USERNAME`**or** passed as the keyword argument `username` to `Repo()`
+- **Password or [access token](https://dagshub.com/user/settings/tokens) -** can be provided via an envirement variable named `DAGSHUB_PASSWORD` **or** passed as the keyword argument `password` to `Repo()`
+
+**Coming soon: support for OAuth 2.0**
 
 # Training Logger
 ## Guide
@@ -114,12 +122,12 @@ with dagshub_logger() as logger:
     logger.log_metrics(loss=3.14, step_num=1)
     # OR:
     logger.log_metrics({'val_loss': 6.28}, step_num=2)
-    
+
     # Hyperparameters:
     logger.log_hyperparams(lr=1e-4)
     # OR:
     logger.log_hyperparams({'optimizer': 'sgd'})
-    
+
 
 # As a normal Python object:
 logger = DAGsHubLogger()
@@ -133,7 +141,7 @@ logger.close()
 ## Integrations with ML frameworks
 The [basic DagsHub logger](https://github.com/DAGsHub/client/blob/master/dagshub/logger.py) is just plain Python, and requires no specific framework.
 
-However, for convenience, we include some integrations with common ML frameworks, which can __just work__ right out of the box, 
+However, for convenience, we include some integrations with common ML frameworks, which can __just work__ right out of the box,
 without having to write any logging code on your own:
 
 * [pytorch-lightning](https://github.com/DAGsHub/client/tree/master/dagshub/pytorch_lightning) – supports version 1.4.0 or higher
