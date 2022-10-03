@@ -1,3 +1,4 @@
+import getpass
 import sys
 from typing import Optional, Dict
 import logging
@@ -19,8 +20,7 @@ def oauth_flow(
     client_id: Optional[str] = None,
     code_input_timeout: Optional[int] = None,
 ) -> Dict:
-    if client_id is None:
-        client_id = config.client_id
+    client_id = client_id or config.client_id
     if code_input_timeout is None:
         code_input_timeout = CODE_INPUT_TIMEOUT
     state = uuid.uuid4()
@@ -30,7 +30,7 @@ def oauth_flow(
     code_prompt = "Code:"
     if code_input_timeout <= 0:
         print(link_prompt)
-        code = input(code_prompt)
+        code = getpass.getpass(code_prompt)
     else:
         if not sys.__stdin__.isatty():
             raise RuntimeError(

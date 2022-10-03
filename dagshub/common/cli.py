@@ -39,34 +39,16 @@ def mount(ctx, **kwargs):
     mount(**kwargs)
 
 
-@cli.group()
+@cli.command()
+@click.option("--token", help="Login using a specified token")
+@click.option("--host", help="DagsHub instance to which you want to login")
 @click.pass_context
-def auth(ctx):
-    """
-    Authentication commands
-    """
-    pass
-
-
-@auth.command(name="add")
-@click.argument("token")
-@click.pass_context
-def auth_add(ctx, token):
-    """
-    Add a long-lived auth token
-    """
-    dagshub.auth.add_app_token(token, ctx.obj["host"])
-    print("Token added")
-
-
-@auth.command(name="login")
-@click.pass_context
-def auth_login(ctx):
-    """
-    Add a short-lived OAuth token by logging in at DagsHub
-    """
-    dagshub.auth.add_oauth_token(ctx.obj["host"])
-    print("Successfully stored OAuth token in cache")
+def login(ctx, **kwargs):
+    host = kwargs["host"] or ctx.obj["host"]
+    if kwargs["token"] is not None:
+        dagshub.auth.add_app_token(kwargs["token"], host)
+    else:
+        dagshub.auth.add_oauth_token(host)
 
 
 if __name__ == "__main__":

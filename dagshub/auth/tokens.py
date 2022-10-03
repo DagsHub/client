@@ -16,8 +16,7 @@ APP_TOKEN_TYPE = "app-token"
 
 class TokenStorage:
     def __init__(self, cache_location: str = None, **kwargs):
-        if cache_location is None:
-            cache_location = config.cache_location
+        cache_location = cache_location or config.cache_location
         self.cache_location = cache_location
         self.__token_cache: Optional[Dict[str, List[Dict]]] = None
 
@@ -28,26 +27,26 @@ class TokenStorage:
         return self.__token_cache
 
     def add_token(self, token: Dict, host: str = None):
-        if host is None:
-            host = config.host
+        host = host or config.host
         if host not in self._token_cache:
             self._token_cache[host] = []
         self._token_cache[host].append(token)
         self._store_cache_file()
 
     def get_token(self, host: str = None):
-        if host is None:
-            host = config.host
+        host = host or config.host
         tokens = self._token_cache.get(host, [])
-        app_tokens = list(filter(lambda t: t["token_type"] == APP_TOKEN_TYPE, tokens))
+        app_tokens = [t for t in tokens if t.get("token_type") == APP_TOKEN_TYPE]
         if len(app_tokens) > 0:
             token = app_tokens[0]
         else:
-            non_expired_tokens = list(filter(lambda t: not self._is_expired(t), tokens))
+            non_expired_tokens = [t for t in tokens if not self._is_expired(t)]
             if len(non_expired_tokens) > 0:
                 token = non_expired_tokens[0]
             else:
-                logger.warning(f"No valid tokens left for host '{host}'. Reauthenticating with OAuth")
+                logger.warning(
+                    f"No valid tokens found for host '{host}'. Authenticating with OAuth"
+                )
                 token = oauth.oauth_flow(host)
                 tokens.append(token)
                 self._token_cache[host] = tokens
@@ -70,7 +69,7 @@ class TokenStorage:
         logger.debug(f"Loading OAuth token cache from {self.cache_location}")
         if not os.path.exists(self.cache_location):
             logger.debug("OAuth token cache file doesn't exist")
-            return {"version": config.CONFIG_SCHEMA_VERSION}
+            return self._get_empty_cache_dict()
         try:
             with open(self.cache_location) as f:
                 tokens_cache = yaml.load(f, yaml.Loader)
@@ -80,6 +79,10 @@ class TokenStorage:
                 f"Error while loading DagsHub OAuth token cache: {traceback.format_exc()}"
             )
             raise
+
+    @staticmethod
+    def _get_empty_cache_dict():
+        return {"version": config.TOKENS_CACHE_SCHEMA_VERSION}
 
     def _store_cache_file(self):
         logger.debug(f"Dumping OAuth token cache to {self.cache_location}")
@@ -120,7 +123,6 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 
 
 def add_oauth_token(host: Optional[str] = None, **kwargs):
-    if host is None:
-        host = config.host
+    host = host or config.host
     token = oauth.oauth_flow(host, code_input_timeout=0)
     _get_token_storage(**kwargs).add_token(token, host)
