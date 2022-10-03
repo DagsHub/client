@@ -1,0 +1,2 @@
+setuptools==60.2.0
+pytest==7.1.3
