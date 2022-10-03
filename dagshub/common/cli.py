@@ -39,10 +39,10 @@ def mount(ctx, **kwargs):
 @click.option("--token", help="Login using a specified token")
 @click.option("--host", help="DagsHub instance to which you want to login")
 @click.pass_context
-def login(ctx, **kwargs):
-    host = kwargs["host"] or ctx.obj["host"]
-    if kwargs["token"] is not None:
-        dagshub.auth.add_app_token(kwargs["token"], host)
+def login(ctx, token, host):
+    host = host or ctx.obj["host"]
+    if token is not None:
+        dagshub.auth.add_app_token(token, host)
         print("Token added successfully")
     else:
         dagshub.auth.add_oauth_token(host)
