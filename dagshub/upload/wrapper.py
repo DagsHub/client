@@ -10,11 +10,11 @@ DEFAULT_SOURCE_URL = "https://dagshub.com/"
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 
-def get_default_branch(src_url, owner, reponame):
+def get_default_branch(src_url, owner, reponame, auth):
 	res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
 		owner=owner,
 		reponame=reponame
-		)))
+		)), auth=auth)
 	return res.json().get('default_branch')
 
 class Repo:
@@ -69,7 +69,7 @@ class Repo:
 
 	def _set_default_branch(self):
 		try:
-			self.branch = get_default_branch(self.src_url, self.owner, self.name)
+			self.branch = get_default_branch(self.src_url, self.owner, self.name, (self.username, self.password))
 		except:
 			raise Exception("Failed to get default branch for repository. Please specify a branch and make sure repository details are correct.")
 
