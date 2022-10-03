@@ -1,12 +1,8 @@
-import argparse
 import sys
-
 import click
 
 import dagshub.auth
 from dagshub.common import config
-
-parser = argparse.ArgumentParser(prog="dagshub")
 
 
 @click.group()
@@ -47,8 +43,10 @@ def login(ctx, **kwargs):
     host = kwargs["host"] or ctx.obj["host"]
     if kwargs["token"] is not None:
         dagshub.auth.add_app_token(kwargs["token"], host)
+        print("Token added successfully")
     else:
         dagshub.auth.add_oauth_token(host)
+        print("OAuth token added")
 
 
 if __name__ == "__main__":
