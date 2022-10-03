@@ -48,7 +48,7 @@ class Repo:
 
 		except Exception as e:
 			logger.error(e)
-			quit()
+			exit()
 
 	def upload(self, file: Union[str, IOBase], message, versioning=None, new_branch=None, last_commit=None, path=None):
 		ds = DataSet(self, ".")
@@ -83,9 +83,9 @@ class Commit:
 		self.last_commit=None
 
 class DataSet:
-	files = []
-	commit_data = Commit()
 	def __init__(self, repo: Repo, directory):
+		self.files = []
+		self.commit_data = Commit()
 		self.repo = repo
 		self.directory = directory
 		self.request_url = self.repo.get_request_url(directory)
@@ -111,7 +111,11 @@ class DataSet:
 
 		except Exception as e:
 			logger.error(e)
-			quit()
+			exit()
+
+	def _reset_dataset(self):
+		self.files = []
+		self.commit_data = Commit()
 
 	def commit(self, message, versioning=None, new_branch=None, last_commit=None):
 		try:
@@ -139,6 +143,9 @@ class DataSet:
 				raise Exception("You must provide a valid commit message")
 			data["commit_message"] = self.commit_data.message
 
+			if versioning != "git":
+				data["is_dvc_dir"] = True
+
 			# Prints for debugging
 			logger.debug(f"Request URL: {self.request_url}")
 			print("DATA:")
@@ -149,7 +156,6 @@ class DataSet:
 			res = requests.put(
 				self.request_url, 
 				data, 
-				params={"is_dvc_dir": True},
 				files=[("files", file) for file in self.files],
 				auth=(self.repo.username, self.repo.password ))
 			logger.debug(f"Response: {res.status_code}")
@@ -162,6 +168,8 @@ class DataSet:
 			if res.status_code == 200:
 				logger.info("Upload finished successfully!")
 
+			self._reset_dataset()
+	
 		except Exception as e:
 			logger.error(e)
-			quit()
+			exit()
