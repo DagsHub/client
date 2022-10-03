@@ -83,7 +83,7 @@ A basic use looks like this:
 ```python
 from dagshub.upload import Repo
 
-repo = Repo("idonov8", "baby-yoda-segmentation-dataset") # Optional: username, password, src_url, branch
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset", username="<username>" password="<access token OR password>") # Optional: src_url, branch
 
 # Upload a single file to a repository with one line
 repo.upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
