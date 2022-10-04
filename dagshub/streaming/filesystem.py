@@ -75,12 +75,11 @@ class DagsHubFilesystem:
 
         # Find root directory of Git project
         if not project_root:
-            self.project_root = Path('.')
+            self.project_root = Path(os.path.abspath('.'))
             while not (self.project_root / '.git').is_dir():
                 if ismount(self.project_root):
                     raise ValueError('No git project found! (stopped at mountpoint {self.project_root})')
                 self.project_root = self.project_root / '..'
-            self.project_root = Path(os.path.abspath(self.project_root))
         else:
             self.project_root = Path(os.path.abspath(project_root))
         del project_root
