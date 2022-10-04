@@ -80,8 +80,9 @@ class DagsHubFilesystem:
                 if ismount(self.project_root):
                     raise ValueError('No git project found! (stopped at mountpoint {self.project_root})')
                 self.project_root = self.project_root / '..'
+            self.project_root = Path(os.path.abspath(self.project_root))
         else:
-            self.project_root = Path(project_root)
+            self.project_root = Path(os.path.abspath(project_root))
         del project_root
         # TODO: if no Git project found, search for .dvc project?
 
