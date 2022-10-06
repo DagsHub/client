@@ -34,7 +34,7 @@ class Repo:
             else:
                 logger.warning(
                     "No DagsHub username specified, defaulting to repo owner. If you're not the owner of the repository you're working on, please speciy your username.")
-            self.username = owner
+                self.username = owner
             if password is not None:
                 self.password = password
             elif "DAGSHUB_PASSWORD" in os.environ:
