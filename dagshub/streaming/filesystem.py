@@ -233,6 +233,7 @@ class DagsHubFilesystem:
                 self.__chdir(abspath)
             except FileNotFoundError:
                 resp = self._api_listdir(relative_path)
+                # FIXME: if path is file, return FileNotFound instead of the listdir error
                 if resp.ok:
                     self._mkdirs(relative_path, dir_fd=self.project_root_fd)
                     self.__chdir(abspath)
