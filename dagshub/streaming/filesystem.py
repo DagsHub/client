@@ -117,6 +117,8 @@ class DagsHubFilesystem:
 
         # Determine if any authentication is needed
         self.auth = (username, password) if username or password else None
+        print(username)
+        print(password)
         del username, password
         response = self._api_listdir('')
         if response.ok:
