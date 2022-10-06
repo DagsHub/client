@@ -13,11 +13,13 @@ from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
+from functools import cached_property
+from dagshub.common import config
+from http import HTTPStatus
 
 import requests
 
 T = TypeVar('T')
-DAGSHUB_ROOT = os.environ.get("DAGSHUB_HOST_PATH", "dagshub.com")
 
 def wrapreturn(wrappertype):
     def decorator(func):
@@ -71,6 +73,7 @@ class DagsHubFilesystem:
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
                  password: Optional[str] = None,
+                 token: Optional[str] = None,
                  _project_root_fd: Optional[int] = None):
 
         # Find root directory of Git project
@@ -116,26 +119,38 @@ class DagsHubFilesystem:
         del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
-        self.auth = (username, password) if username or password else None
-        print(username)
-        print(password)
-        del username, password
+        self.username = username
+        self.password = password
+        self.token = token
+
         response = self._api_listdir('')
         if response.ok:
-            # No authentication needed
             pass
         else:
-            # Check Git credential stores
-            proc = subprocess.run(['git', 'credential', 'fill'],
-                                input=f'url={repo_url}'.encode(),
-                                capture_output=True)
-            answer = {line[:line.index('=')]: line[line.index('=')+1:]
-                        for line in proc.stdout.decode().splitlines()}
-            if 'username' in answer and 'password' in answer:
-                self.auth = (answer['username'], answer['password'])
-            else:
-                # TODO: Check .dvc/config{,.local} for credentials
-                raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+            # TODO: Check .dvc/config{,.local} for credentials
+            raise
+            raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+
+    @cached_property
+    def auth(self):
+        from dagshub.auth import oauth
+        from dagshub.auth.token_auth import HTTPBearerAuth
+
+        if self.username is not None and self.password is not None:
+            return self.username, self.password
+
+        token = self.token or config.token or oauth.oauth_flow(config.host)
+        if token is not None:
+            return HTTPBearerAuth(self.token)
+
+        # Try to fetch credentials from the git credential file
+        proc = subprocess.run(['git', 'credential', 'fill'],
+                              input=f'url={self.repo_url}'.encode(),
+                              capture_output=True)
+        answer = {line[:line.index('=')]: line[line.index('=')+1:]
+                  for line in proc.stdout.decode().splitlines()}
+        if 'username' in answer and 'password' in answer:
+            return answer['username'], answer['password']
 
     @staticmethod
     def _get_remotes(repo_root='.'):
@@ -147,7 +162,7 @@ class DagsHubFilesystem:
                        if remote.startswith('remote ')]
         dagshub_remotes = []
         for remote in git_remotes:
-            if remote.hostname != 'dagshub.com':
+            if remote.hostname != config.host:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
