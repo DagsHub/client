@@ -15,10 +15,11 @@ from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
 from functools import lru_cache
 from dagshub.common import config
-
+import logging
 import requests
 
 T = TypeVar('T')
+logger = logging.getLogger(__name__)
 
 def wrapreturn(wrappertype):
     def decorator(func):
@@ -140,7 +141,10 @@ class DagsHubFilesystem:
         if self.username is not None and self.password is not None:
             return self.username, self.password
 
-        token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
+        try:
+            token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
+        except dagshub.auth.OauthNonInteractiveShellException as e:
+            logger.debug("Failed in performing Oauth in non interactive shell")
         if token is not None:
             return HTTPBearerAuth(token)
 
