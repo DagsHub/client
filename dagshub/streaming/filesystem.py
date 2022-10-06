@@ -106,13 +106,14 @@ class DagsHubFilesystem:
 
         parsed_repo_url = urlparse(repo_url)
         content_api_path = f'/api/v1/repos{parsed_repo_url.path}/content/{branch}'
+        raw_api_path = f'/api/v1/repos{parsed_repo_url.path}/raw/{branch}'
 
         self.content_api_url = parsed_repo_url._replace(path=content_api_path).geturl()
-        self.raw_api_url = f'{repo_url}/raw/{branch}'
+        self.raw_api_url = parsed_repo_url._replace(path=raw_api_path).geturl()
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
         self.dirtree = {}
 
-        del repo_url, branch, parsed_repo_url, content_api_path
+        del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
         self.auth = (username, password) if username or password else None
