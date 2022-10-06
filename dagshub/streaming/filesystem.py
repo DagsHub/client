@@ -13,9 +13,8 @@ from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
-from functools import cached_property
+from functools import lru_cache
 from dagshub.common import config
-from http import HTTPStatus
 
 import requests
 
@@ -63,8 +62,10 @@ class DagsHubFilesystem:
                  'content_api_url',
                  'raw_api_url',
                  'dvc_remote_url',
-                 'auth',
                  'dirtree',
+                 'username',
+                 'password',
+                 'token',
                  '__weakref__')
 
     def __init__(self,
@@ -119,29 +120,29 @@ class DagsHubFilesystem:
         del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
-        self.username = username
-        self.password = password
-        self.token = token
+        self.username = username if username else None
+        self.password = password if password else None
+        self.token = token if token else None
 
         response = self._api_listdir('')
         if response.ok:
             pass
         else:
             # TODO: Check .dvc/config{,.local} for credentials
-            raise
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
-    @cached_property
+    @property
+    @lru_cache()
     def auth(self):
-        from dagshub.auth import oauth
+        import dagshub.auth
         from dagshub.auth.token_auth import HTTPBearerAuth
 
         if self.username is not None and self.password is not None:
             return self.username, self.password
 
-        token = self.token or config.token or oauth.oauth_flow(config.host)
+        token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
         if token is not None:
-            return HTTPBearerAuth(self.token)
+            return HTTPBearerAuth(token)
 
         # Try to fetch credentials from the git credential file
         proc = subprocess.run(['git', 'credential', 'fill'],
@@ -162,7 +163,7 @@ class DagsHubFilesystem:
                        if remote.startswith('remote ')]
         dagshub_remotes = []
         for remote in git_remotes:
-            if remote.hostname != config.host:
+            if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))

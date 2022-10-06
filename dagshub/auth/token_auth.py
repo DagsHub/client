@@ -2,7 +2,7 @@ from requests.auth import AuthBase
 
 
 class HTTPBearerAuth(AuthBase):
-    """Attaches HTTP Basic Authentication to the given Request object."""
+    """Attaches HTTP Bearer Authorization to the given Request object."""
 
     def __init__(self, token):
         self.token = token
