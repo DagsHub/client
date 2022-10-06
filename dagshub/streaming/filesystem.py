@@ -13,11 +13,12 @@ from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
-
+from dagshub.common import config
+import logging
 import requests
 
 T = TypeVar('T')
-DAGSHUB_ROOT = os.environ.get("DAGSHUB_HOST_PATH", "dagshub.com")
+logger = logging.getLogger(__name__)
 
 def wrapreturn(wrappertype):
     def decorator(func):
@@ -61,8 +62,10 @@ class DagsHubFilesystem:
                  'content_api_url',
                  'raw_api_url',
                  'dvc_remote_url',
-                 'auth',
                  'dirtree',
+                 'username',
+                 'password',
+                 'token',
                  '__weakref__')
 
     def __init__(self,
@@ -71,6 +74,7 @@ class DagsHubFilesystem:
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
                  password: Optional[str] = None,
+                 token: Optional[str] = None,
                  _project_root_fd: Optional[int] = None):
 
         # Find root directory of Git project
@@ -106,33 +110,50 @@ class DagsHubFilesystem:
 
         parsed_repo_url = urlparse(repo_url)
         content_api_path = f'/api/v1/repos{parsed_repo_url.path}/content/{branch}'
+        raw_api_path = f'/api/v1/repos{parsed_repo_url.path}/raw/{branch}'
 
         self.content_api_url = parsed_repo_url._replace(path=content_api_path).geturl()
-        self.raw_api_url = f'{repo_url}/raw/{branch}'
+        self.raw_api_url = parsed_repo_url._replace(path=raw_api_path).geturl()
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
         self.dirtree = {}
 
-        del repo_url, branch, parsed_repo_url, content_api_path
+        del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
-        self.auth = (username, password) if username or password else None
-        del username, password
+        self.username = username if username else None
+        self.password = password if password else None
+        self.token = token if token else None
+
         response = self._api_listdir('')
         if response.ok:
-            # No authentication needed
             pass
         else:
-            # Check Git credential stores
-            proc = subprocess.run(['git', 'credential', 'fill'],
-                                input=f'url={repo_url}'.encode(),
-                                capture_output=True)
-            answer = {line[:line.index('=')]: line[line.index('=')+1:]
-                        for line in proc.stdout.decode().splitlines()}
-            if 'username' in answer and 'password' in answer:
-                self.auth = (answer['username'], answer['password'])
-            else:
-                # TODO: Check .dvc/config{,.local} for credentials
-                raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+            # TODO: Check .dvc/config{,.local} for credentials
+            raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+
+    @property
+    def auth(self):
+        import dagshub.auth
+        from dagshub.auth.token_auth import HTTPBearerAuth
+
+        if self.username is not None and self.password is not None:
+            return self.username, self.password
+
+        try:
+            token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
+        except dagshub.auth.OauthNonInteractiveShellException:
+            logger.debug("Failed to perform OAuth in a non interactive shell")
+        if token is not None:
+            return HTTPBearerAuth(token)
+
+        # Try to fetch credentials from the git credential file
+        proc = subprocess.run(['git', 'credential', 'fill'],
+                              input=f'url={self.repo_url}'.encode(),
+                              capture_output=True)
+        answer = {line[:line.index('=')]: line[line.index('=')+1:]
+                  for line in proc.stdout.decode().splitlines()}
+        if 'username' in answer and 'password' in answer:
+            return answer['username'], answer['password']
 
     @staticmethod
     def _get_remotes(repo_root='.'):
@@ -144,7 +165,7 @@ class DagsHubFilesystem:
                        if remote.startswith('remote ')]
         dagshub_remotes = []
         for remote in git_remotes:
-            if remote.hostname != 'dagshub.com':
+            if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
