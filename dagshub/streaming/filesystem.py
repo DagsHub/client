@@ -13,7 +13,6 @@ from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
-from functools import lru_cache
 from dagshub.common import config
 import logging
 import requests
@@ -133,7 +132,6 @@ class DagsHubFilesystem:
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
     @property
-    @lru_cache()
     def auth(self):
         import dagshub.auth
         from dagshub.auth.token_auth import HTTPBearerAuth
@@ -143,7 +141,7 @@ class DagsHubFilesystem:
 
         try:
             token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
-        except dagshub.auth.OauthNonInteractiveShellException as e:
+        except dagshub.auth.OauthNonInteractiveShellException:
             logger.debug("Failed to perform OAuth in a non interactive shell")
         if token is not None:
             return HTTPBearerAuth(token)
