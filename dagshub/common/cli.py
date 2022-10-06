@@ -19,7 +19,7 @@ def cli(ctx, host):
 @click.option("--username", help="User's username")
 @click.option("--password", help="User's password")
 @click.option(
-    "--debug", default=False, type=bool, help="URL of the repo hosted on DagsHub"
+    "--debug", default=False, type=bool, help="Run fuse in foreground"
 )
 @click.pass_context
 def mount(ctx, **kwargs):
@@ -47,6 +47,28 @@ def login(ctx, token, host):
     else:
         dagshub.auth.add_oauth_token(host)
         print("OAuth token added")
+
+
+@cli.command()
+@click.argument("filename", help="Path the file you want to upload")
+@click.argument("--target", help="Where should the file be saved inside the repository")
+@click.option("--repo", help="Full name of DagsHub repository, i.e: nirbarazida/yolov6")
+@click.option("--branch", help="Repository's branch")
+@click.option("--username", help="Username")
+@click.option("--password", help="Password or Token")
+@click.pass_context
+def upload(ctx, **kwargs):
+    """
+    Upload a single file using the upload API to any location on a DagsHub repository, including DVC directories.
+    """
+    from dagshub.upload import Repo
+    repo = Repo("idonov8", "baby-yoda-segmentation-dataset", username="<username>" password="<access token OR password>")
+    repo.upload(file="image.png", path="images/category1/my-new-image.png", "Added new image to category 1")
+
+    if not kwargs["debug"]:
+        # Hide tracebacks of errors, display only error message
+        sys.tracebacklimit = 0
+    mount(**kwargs)
 
 
 if __name__ == "__main__":

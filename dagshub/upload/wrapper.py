@@ -10,6 +10,7 @@ DEFAULT_SOURCE_URL = "https://dagshub.com/"
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 
+
 def get_default_branch(src_url, owner, reponame):
 	res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
 		owner=owner,
@@ -57,7 +58,7 @@ class Repo:
 
 	def directory(self, path):
 		return DataSet(self, path)
-		
+
 	def get_request_url(self, directory):
 		return urllib.parse.urljoin(self.src_url, CONTENT_UPLOAD_URL.format(
 			owner=self.owner,
@@ -129,10 +130,10 @@ class DataSet:
 				self.commit_data.new_branch = new_branch
 
 			data["commit_choice"] = self.commit_data.choice
-			
+
 			if self.commit_data.choice == "commit-to-new-branch":
 				data["new_branch_name"] = self.commit_data.new_branch
-			
+
 			if message != "":
 				self.commit_data.message = message
 			else:
@@ -147,8 +148,8 @@ class DataSet:
 			pprint(self.files)
 			logger.debug("making request...")
 			res = requests.put(
-				self.request_url, 
-				data, 
+				self.request_url,
+				data,
 				params={"is_dvc_dir": True},
 				files=[("files", file) for file in self.files],
 				auth=(self.repo.username, self.repo.password ))
