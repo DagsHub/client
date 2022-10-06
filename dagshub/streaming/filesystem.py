@@ -144,7 +144,7 @@ class DagsHubFilesystem:
         try:
             token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
         except dagshub.auth.OauthNonInteractiveShellException as e:
-            logger.debug("Failed in performing Oauth in non interactive shell")
+            logger.debug("Failed to perform OAuth in a non interactive shell")
         if token is not None:
             return HTTPBearerAuth(token)
 
