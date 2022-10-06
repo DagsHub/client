@@ -53,7 +53,7 @@ class Repo:
 
         except Exception as e:
             logger.error(e)
-            raise e
+            raise
 
     def upload(self, file: Union[str, IOBase], message, versioning=None, new_branch=None, last_commit=None, path=None):
         ds = DataSet(self, ".")
