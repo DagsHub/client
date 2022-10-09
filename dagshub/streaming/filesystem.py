@@ -115,8 +115,8 @@ class DagsHubFilesystem:
 
         if not branch:
             branch = (self.__open(self.project_root / '.git/HEAD')
-            .readline()
-            .strip()
+            .readline()  # noqa
+            .strip()  # noqa
             .split('/')[-1]) or 'main'  # noqa
             # TODO: check DagsHub for default branch if no branch/commit checked out
 
