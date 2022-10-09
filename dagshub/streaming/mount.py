@@ -10,7 +10,6 @@ from threading import Lock
 from typing import Optional
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
-from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
 
 SPECIAL_FILE_FH = (1 << 64) - 1
 
@@ -20,6 +19,7 @@ if system not in fuse_enabled_systems:
     err_str = f"FUSE mounting isn't supported on {system}.\n" \
               f"Please use install_hooks to access DagsHub hosted files from a python script"
     raise ImportError(err_str)
+from fuse import FUSE, FuseOSError, LoggingMixIn, Operations  # noqa
 
 
 class DagsHubFUSE(LoggingMixIn, Operations):
