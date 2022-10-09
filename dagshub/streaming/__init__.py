@@ -5,7 +5,6 @@ try:
 except ImportError as e:
     error = e.msg
 
-
     def mount(*args, **kwargs):
         print(error)
 

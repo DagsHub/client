@@ -1,5 +1,5 @@
 from fastai.learner import Learner, Recorder
-from fastcore.basics import ignore_exceptions, patch
+from fastcore.basics import ignore_exceptions, patch, detuplify
 from fastai.callback.core import Callback
 from fastai.callback.hook import total_params
 from fastai.torch_core import rank_distrib, to_detach

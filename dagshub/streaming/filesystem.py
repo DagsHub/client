@@ -117,7 +117,7 @@ class DagsHubFilesystem:
             branch = (self.__open(self.project_root / '.git/HEAD')
             .readline()
             .strip()
-            .split('/')[-1]) or 'main'  # nopep8
+            .split('/')[-1]) or 'main'  # noqa
             # TODO: check DagsHub for default branch if no branch/commit checked out
 
         parsed_repo_url = urlparse(repo_url)
