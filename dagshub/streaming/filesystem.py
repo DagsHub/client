@@ -20,43 +20,55 @@ import requests
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
+
 def wrapreturn(wrappertype):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             return wrappertype(func(*args, **kwargs))
+
         return wrapper
+
     return decorator
 
+
 class dagshub_ScandirIterator:
-        def __init__(self, iterator):
-            self._iterator = iterator
-        def __iter__(self):
-            return self._iterator
-        def __next__(self):
-            return self._iterator.__next__()
-        def __enter__(self):
-            return self
-        def __exit__(self, *args):
-            return self
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def __iter__(self):
+        return self._iterator
+
+    def __next__(self):
+        return self._iterator.__next__()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return self
+
 
 def cache_by_path(func):
     cache = {}
+
     @wraps(func)
-    def wrapper(self, path: str, include_size : bool = False):
+    def wrapper(self, path: str, include_size: bool = False):
         if not include_size and (path, True) in cache:
             cache[path, False] = cache[path, True]
         if (path, include_size) not in cache:
             cache[path, include_size] = func(self, path, include_size)
         return cache[path, include_size]
+
     wrapper.cache = cache
     return wrapper
 
+
 SPECIAL_FILE = Path('.dagshub-streaming')
+
 
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
-
     __slots__ = ('project_root',
                  'project_root_fd',
                  'content_api_url',
@@ -103,9 +115,9 @@ class DagsHubFilesystem:
 
         if not branch:
             branch = (self.__open(self.project_root / '.git/HEAD')
-                          .readline()
-                          .strip()
-                          .split('/')[-1]) or 'main'
+            .readline()
+            .strip()
+            .split('/')[-1]) or 'main'
             # TODO: check DagsHub for default branch if no branch/commit checked out
 
         parsed_repo_url = urlparse(repo_url)
@@ -150,7 +162,7 @@ class DagsHubFilesystem:
         proc = subprocess.run(['git', 'credential', 'fill'],
                               input=f'url={self.repo_url}'.encode(),
                               capture_output=True)
-        answer = {line[:line.index('=')]: line[line.index('=')+1:]
+        answer = {line[:line.index('=')]: line[line.index('=') + 1:]
                   for line in proc.stdout.decode().splitlines()}
         if 'username' in answer and 'password' in answer:
             return answer['username'], answer['password']
@@ -307,7 +319,8 @@ class DagsHubFilesystem:
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
-        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth, params={'include_size': 'true'} if include_size else {})
+        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth,
+                            params={'include_size': 'true'} if include_size else {})
 
     def _api_download_file_git(self, path: str):
         return requests.get(f'{self.raw_api_url}/{path}', auth=self.auth)
@@ -372,20 +385,23 @@ class DagsHubFilesystem:
     def __scandir(self):
         return self.__get_unpatched('scandir', os.scandir)
 
+
 def install_hooks(project_root: Optional[PathLike] = None,
                   repo_url: Optional[str] = None,
                   branch: Optional[str] = None,
                   username: Optional[str] = None,
                   password: Optional[str] = None):
-    fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
+    fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
+                           password=password)
     fs.install_hooks()
+
 
 class dagshub_stat_result:
     def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
-        assert not self._is_directory # TODO make folder stats lazy?
+        assert not self._is_directory  # TODO make folder stats lazy?
 
     def __getattr__(self, name: str):
         if not name.startswith('st_'):
@@ -401,14 +417,16 @@ class dagshub_stat_result:
         elif name == 'st_mode':
             return 0o100644
         elif name == 'st_size':
-            return 1100 ## hardcoded size because size requests take a disproportionate amount of time
+            return 1100  ## hardcoded size because size requests take a disproportionate amount of time
         self._fs.open(self._path)
-        self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
+        self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path),
+                                                            dir_fd=self._fs.project_root_fd)
         return os.stat_result.__getattribute__(self._true_stat, name)
 
     def __repr__(self):
         inner = repr(self._true_stat) if hasattr(self, '_true_stat') else 'pending...'
         return f'dagshub_stat_result({inner}, path={self._path})'
+
 
 class dagshub_DirEntry:
     def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False):
@@ -470,6 +488,7 @@ class dagshub_DirEntry:
     def __repr__(self):
         cached = ' (cached)' if hasattr(self, '_true_direntry') else ''
         return f'<dagshub_DirEntry \'{self.name}\'{cached}>'
+
 
 # Used for testing purposes only
 if __name__ == "__main__":
