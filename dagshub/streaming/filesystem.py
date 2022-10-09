@@ -258,6 +258,23 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
+    def chdir(self, path):
+        relative_path = self._relative_path(path)
+        if relative_path:
+            abspath = os.path.join(self.project_root, relative_path)
+            try:
+                self.__chdir(abspath)
+            except FileNotFoundError:
+                resp = self._api_listdir(relative_path)
+                # FIXME: if path is file, return FileNotFound instead of the listdir error
+                if resp.ok:
+                    self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                    self.__chdir(abspath)
+                else:
+                    raise
+        else:
+            self.__chdir(path)
+
     def listdir(self, path='.'):
         relative_path = self._relative_path(path)
         if relative_path:
@@ -335,12 +352,14 @@ class DagsHubFilesystem:
                 'open': io.open,
                 'stat': os.stat,
                 'listdir': os.listdir,
-                'scandir': os.scandir
+                'scandir': os.scandir,
+                'chdir': os.chdir,
             }
         io.open = builtins.open = _pathlib.open = self.open
         os.stat = _pathlib.stat = self.stat
         os.listdir = _pathlib.listdir = self.listdir
         os.scandir = _pathlib.scandir = self.scandir
+        os.chdir = self.chdir
         self.__class__.hooked_instance = self
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
@@ -386,6 +405,10 @@ class DagsHubFilesystem:
     @property
     def __scandir(self):
         return self.__get_unpatched('scandir', os.scandir)
+
+    @property
+    def __chdir(self):
+        return self.__get_unpatched("chdir", os.chdir)
 
 
 def install_hooks(project_root: Optional[PathLike] = None,
