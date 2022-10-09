@@ -11,7 +11,7 @@ from typing import Optional
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
-SPECIAL_FILE_FH = (1<<64)-1
+SPECIAL_FILE_FH = (1 << 64) - 1
 
 fuse_enabled_systems = ["Linux"]
 system = platform.system()
@@ -19,8 +19,8 @@ if system not in fuse_enabled_systems:
     err_str = f"FUSE mounting isn't supported on {system}.\n" \
               f"Please use install_hooks to access DagsHub hosted files from a python script"
     raise ImportError(err_str)
+from fuse import FUSE, FuseOSError, LoggingMixIn, Operations  # noqa
 
-from fuse import FUSE, FuseOSError, LoggingMixIn, Operations
 
 class DagsHubFUSE(LoggingMixIn, Operations):
     def __init__(self,
@@ -30,7 +30,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
                  username: Optional[str] = None,
                  password: Optional[str] = None):
         # FIXME TODO move autoconfiguration out of FUSE object constructor and to main method
-        self.fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
+        self.fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
+                                    password=password)
         self.rwlock = Lock()
 
     def __call__(self, op, path, *args):
@@ -72,7 +73,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
     def read(self, path, size, offset, fh):
         if fh == SPECIAL_FILE_FH:
-            return self.fs._special_file()[offset:offset+size]
+            return self.fs._special_file()[offset:offset + size]
         with self.rwlock:
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
@@ -81,8 +82,9 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return ['.', '..'] + self.fs.listdir(path)
 
     def release(self, path, fh):
-        if fh != SPECIAL_FILE_FH: 
+        if fh != SPECIAL_FILE_FH:
             return os.close(fh)
+
 
 def mount(debug=False,
           project_root: Optional[PathLike] = None,
@@ -91,12 +93,16 @@ def mount(debug=False,
           username: Optional[str] = None,
           password: Optional[str] = None):
     logging.basicConfig(level=logging.DEBUG)
-    fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
-    print(f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.')
+    fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
+                       password=password)
+    print(
+        f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\n'
+        f'Run `cd .` in any existing terminals to utilize mounted FS.')
     FUSE(fuse, str(fuse.fs.project_root), foreground=debug, nonempty=True)
     if not debug:
         os.chdir(os.path.realpath(os.curdir))
     # TODO: Clean unmounting procedure
+
 
 def main():
     parser = ArgumentParser()
@@ -105,7 +111,7 @@ def main():
     parser.add_argument('--branch')
     parser.add_argument('--username')
     parser.add_argument('--password')
-    parser.add_argument('--debug', action='store_true', default=False)#  default=False, nargs=0)
+    parser.add_argument('--debug', action='store_true', default=False)  # default=False, nargs=0)
 
     args = parser.parse_args()
 
@@ -115,5 +121,6 @@ def main():
 
     mount(**vars(args))
 
+
 if __name__ == '__main__':
-	main()
+    main()

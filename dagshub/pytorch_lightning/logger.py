@@ -41,7 +41,6 @@ class DAGsHubLogger(LightningLoggerBase):
         self._name = name or ""
         self._version = version
 
-
     @property
     @rank_zero_experiment
     def experiment(self) -> LoggerImpl:

@@ -33,7 +33,8 @@ class Repo:
                 self.username = os.environ["DAGSHUB_USERNAME"]
             else:
                 logger.warning(
-                    "No DagsHub username specified, defaulting to repo owner. If you're not the owner of the repository you're working on, please speciy your username.")
+                    "No DagsHub username specified, defaulting to repo owner. "
+                    "If you're not the owner of the repository you're working on, please speciy your username.")
                 self.username = owner
             if password is not None:
                 self.password = password
@@ -41,7 +42,8 @@ class Repo:
                 self.password = os.environ["DAGSHUB_PASSWORD"]
             else:
                 raise Exception(
-                    "Can't find a password/access token. You can set an enviroment variable DAGSHUB_PASSWORD with it or pass it to Repo with 'password'.")
+                    "Can't find a password/access token. "
+                    "You can set an enviroment variable DAGSHUB_PASSWORD with it or pass it to Repo with 'password'.")
             # TODO: verify token
 
             if branch is not None:
@@ -74,9 +76,10 @@ class Repo:
     def _set_default_branch(self):
         try:
             self.branch = get_default_branch(self.src_url, self.owner, self.name)
-        except:
-            raise Exception(
-                "Failed to get default branch for repository. Please specify a branch and make sure repository details are correct.")
+        except Exception:
+            raise RuntimeError(
+                "Failed to get default branch for repository. "
+                "Please specify a branch and make sure repository details are correct.")
 
 
 class Commit:
@@ -103,8 +106,8 @@ class DataSet:
             if path is None:
                 try:
                     path = os.path.basename(os.path.normpath(file if type(file) is str else file.name))
-                except:
-                    raise Exception(
+                except Exception:
+                    raise RuntimeError(
                         "Could not interpret your file's name. Please specify it in the keyword parameter 'path'.")
 
             if type(file) is str:
