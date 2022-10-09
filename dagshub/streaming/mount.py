@@ -96,7 +96,8 @@ def mount(debug=False,
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
                        password=password)
     print(
-        f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\nRun `cd .` in any existing terminals to utilize mounted FS.')
+        f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\n'
+        f'Run `cd .` in any existing terminals to utilize mounted FS.')
     FUSE(fuse, str(fuse.fs.project_root), foreground=debug, nonempty=True)
     if not debug:
         os.chdir(os.path.realpath(os.curdir))

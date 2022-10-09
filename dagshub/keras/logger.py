@@ -2,11 +2,15 @@ from tensorflow.keras.callbacks import Callback
 
 from ..logger import DAGsHubLogger as LoggerImpl
 
+
 class ignore_exceptions:
-    #Taken from fastcore code
-    "Context manager to ignore exceptions"
+    # Taken from fastcore code
+    """Context manager to ignore exceptions"""
+
     def __enter__(self): pass
+
     def __exit__(self, *args): return True
+
 
 class DAGsHubLogger(Callback):
     """
@@ -69,7 +73,7 @@ class DAGsHubLogger(Callback):
     def on_train_batch_end(self, batch, logs={}):
         self._step += 1
         self.on_epoch_end(None, logs)
-    
+
     def on_epoch_end(self, epoch, logs={}):
         # At the end of an epoch, logs has more metrics
         metrics = {'epoch': self._epoch, **logs}
@@ -79,4 +83,3 @@ class DAGsHubLogger(Callback):
         self.logger.log_hyperparams(success=True)
         self.logger.save()
         self.logger.close()
-    

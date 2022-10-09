@@ -74,7 +74,7 @@ class TokenStorage:
             with open(self.cache_location) as f:
                 tokens_cache = yaml.load(f, yaml.Loader)
                 return tokens_cache
-        except:
+        except Exception:
             logger.error(
                 f"Error while loading DagsHub OAuth token cache: {traceback.format_exc()}"
             )
@@ -92,7 +92,7 @@ class TokenStorage:
                 os.makedirs(dirpath)
             with open(self.cache_location, "w") as f:
                 yaml.dump(self.__token_cache, f, yaml.Dumper)
-        except:
+        except Exception:
             logger.error(
                 f"Error while storing DagsHub OAuth token cache: {traceback.format_exc()}"
             )

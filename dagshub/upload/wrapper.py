@@ -106,8 +106,8 @@ class DataSet:
             if path is None:
                 try:
                     path = os.path.basename(os.path.normpath(file if type(file) is str else file.name))
-                except:
-                    raise Exception(
+                except Exception:
+                    raise RuntimeError(
                         "Could not interpret your file's name. Please specify it in the keyword parameter 'path'.")
 
             if type(file) is str:

@@ -117,7 +117,7 @@ class DagsHubFilesystem:
             branch = (self.__open(self.project_root / '.git/HEAD')
             .readline()
             .strip()
-            .split('/')[-1]) or 'main'
+            .split('/')[-1]) or 'main'  # nopep8
             # TODO: check DagsHub for default branch if no branch/commit checked out
 
         parsed_repo_url = urlparse(repo_url)
@@ -327,8 +327,10 @@ class DagsHubFilesystem:
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
-            # TODO: DRY this dictionary. i.e. __open() links cls.__open and io.open even though this dictionary links them
-            #       Cannot use a dict as the source of truth because type hints rely on __get_unpatched inferring the right type
+            # TODO: DRY this dictionary. i.e. __open() links cls.__open
+            #  and io.open even though this dictionary links them
+            #  Cannot use a dict as the source of truth because type hints rely on
+            #  __get_unpatched inferring the right type
             self.__class__.__unpatched = {
                 'open': io.open,
                 'stat': os.stat,
@@ -417,7 +419,7 @@ class dagshub_stat_result:
         elif name == 'st_mode':
             return 0o100644
         elif name == 'st_size':
-            return 1100  ## hardcoded size because size requests take a disproportionate amount of time
+            return 1100  # hardcoded size because size requests take a disproportionate amount of time
         self._fs.open(self._path)
         self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path),
                                                             dir_fd=self._fs.project_root_fd)
