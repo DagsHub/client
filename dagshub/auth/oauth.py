@@ -33,9 +33,9 @@ def oauth_flow(
         code = getpass.getpass(code_prompt)
     else:
         if not sys.__stdin__.isatty():
-            raise RuntimeError(
+            raise OauthNonInteractiveShellException(
                 "Can't perform OAuth in a non-interactive shell. "
-                "Please get a token using this command in a shell: dagshub auth login"
+                "Please get a token using this command in a shell: dagshub login"
             )
         print(link_prompt)
         code, timed_out = pytimedinput.timedInput(
@@ -54,3 +54,7 @@ def oauth_flow(
     token = res.json()
     logger.debug(f"Got token: {token}")
     return token
+
+
+class OauthNonInteractiveShellException(Exception):
+    pass

@@ -1,5 +1,5 @@
 from fastai.learner import Learner, Recorder
-from fastcore.basics import *
+from fastcore.basics import ignore_exceptions, patch, detuplify
 from fastai.callback.core import Callback
 from fastai.callback.hook import total_params
 from fastai.torch_core import rank_distrib, to_detach
@@ -20,7 +20,7 @@ class DAGsHubLogger(Callback):
     learn.fit(..., cbs=DAGsHubLogger())
     ```
     """
-    
+
     "Saves model topology, losses & metrics"
     remove_on_fetch, order = True, Recorder.order + 1
 
@@ -105,8 +105,8 @@ def gather_args(self: Learner):
         xb = self.dls.train.one_batch()[:n_inp]
         args.update({f'input {n + 1} dim {i + 1}': d for n in range(n_inp) for i, d in
                      enumerate(list(detuplify(xb[n]).shape))})
-    except:
-        print(f'Could not gather input dimensions')
+    except Exception:
+        print('Could not gather input dimensions')
     # other useful information
     with ignore_exceptions():
         args['batch size'] = self.dls.bs
