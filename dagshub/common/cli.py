@@ -1,8 +1,13 @@
+import os.path
 import sys
 import click
 
 import dagshub.auth
 from dagshub.common import config
+import dagshub.common.logging
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -49,26 +54,70 @@ def login(ctx, token, host):
         print("OAuth token added")
 
 
+def validate_repo(ctx, param, value):
+    parts = value.split("/")
+    if len(parts) != 2:
+        raise click.BadParameter("repo needs to be in the format <repo-owner>/<repo-name>")
+    return tuple(parts)
+
+
+def validate_user(ctx, param, value):
+    if value is None:
+        return None, None
+    parts = value.split(":")
+    if len(parts) != 2:
+        raise click.BadParameter("user needs to be in the format <username>:<password>")
+    return tuple(parts)
+
+
+def to_log_level(verbosity):
+    if verbosity == 0:
+        return logging.ERROR
+    elif verbosity == 1:
+        return logging.WARN
+    elif verbosity == 2:
+        return logging.INFO
+    elif verbosity >= 3:
+        return logging.DEBUG
+
+
 @cli.command()
-@click.argument("filename", help="Path the file you want to upload")
-@click.argument("--target", help="Where should the file be saved inside the repository")
-@click.option("--repo", help="Full name of DagsHub repository, i.e: nirbarazida/yolov6")
-@click.option("--branch", help="Repository's branch")
-@click.option("--username", help="Username")
-@click.option("--password", help="Password or Token")
+@click.argument("repo", callback=validate_repo)
+@click.argument("filename", type=click.Path(exists=True))
+@click.argument("target")
+@click.option("-m", "--message", help="Commit message for the upload")
+@click.option("-b", "--branch", help="Branch to upload the file to")
+@click.option("-u", "--user", callback=validate_user, help="Username and password in the format '<user>:<password>'."
+                                                           "This option is not recommended, instead leave this empty "
+                                                           "to use oauth or specify --token to use an existing "
+                                                           "user token.")
+@click.option("--update", is_flag=True, help="Specify --update to force update an existing file")
+@click.option("--token", help="Authenticate using an existing user token")
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.pass_context
-def upload(ctx, **kwargs):
+def upload(ctx,
+           filename,
+           target,
+           repo,
+           message,
+           user,
+           branch,
+           token,
+           verbose,
+           update,
+           **kwargs):
     """
-    Upload a single file using the upload API to any location on a DagsHub repository, including DVC directories.
+    Upload FILENAME to REPO at location TARGET.
+    REPO should be of the form <owner>/<repo-name>, i.e nirbarazida/yolov6.
+    TARGET should include the full path inside the repo, including the filename itself.
     """
     from dagshub.upload import Repo
-    repo = Repo("idonov8", "baby-yoda-segmentation-dataset", username="<username>" password="<access token OR password>")
-    repo.upload(file="image.png", path="images/category1/my-new-image.png", "Added new image to category 1")
+    dagshub.common.logging.logger.setLevel(to_log_level(verbose))
 
-    if not kwargs["debug"]:
-        # Hide tracebacks of errors, display only error message
-        sys.tracebacklimit = 0
-    mount(**kwargs)
+    owner, repo_name = repo
+    username, password = user
+    repo = Repo(owner=owner, name=repo_name, username=username, password=password, token=token, branch=branch)
+    repo.upload(file=filename, path=target, commit_message=message, force=update)
 
 
 if __name__ == "__main__":

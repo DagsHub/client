@@ -8,6 +8,7 @@ import yaml
 
 from dagshub.auth import oauth
 from dagshub.common import config
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class TokenStorage:
             if len(non_expired_tokens) > 0:
                 token = non_expired_tokens[0]
             else:
-                logger.warning(
+                logger.info(
                     f"No valid tokens found for host '{host}'. Authenticating with OAuth"
                 )
                 token = oauth.oauth_flow(host, **kwargs)

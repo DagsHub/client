@@ -7,7 +7,7 @@ class CustomFormatter(logging.Formatter):
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+    format = "%(asctime)s - [%(levelname)s]  - [%(filename)s:%(lineno)d] - %(message)s"
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
@@ -24,13 +24,8 @@ class CustomFormatter(logging.Formatter):
 
 
 # create logger with 'spam_application'
-logger = logging.getLogger("DagsHub")
-logger.setLevel(logging.DEBUG)
-
+logger = logging.getLogger()
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
 ch.setFormatter(CustomFormatter())
-
 logger.addHandler(ch)
