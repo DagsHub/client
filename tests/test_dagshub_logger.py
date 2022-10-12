@@ -1,8 +1,8 @@
 import tempfile
 import os.path
 import re
-
-from dagshub.logger import *
+import yaml
+from dagshub.logger import dagshub_logger, DAGsHubLogger
 
 
 def in_tmp_dir(f):
@@ -52,7 +52,8 @@ def test_eager_logging():
 def test_forbidden_csv_chars_in_metric_names():
     def f(metrics_path, hparams_path):
         with dagshub_logger(metrics_path=metrics_path, hparams_path=hparams_path) as logger:
-            logger.log_metrics({'this/is/forbidden': 1, 'so,is,this': 2, 'and "this"': 3, 'also \n this': 4, 'normal': 5})
+            logger.log_metrics(
+                {'this/is/forbidden': 1, 'so,is,this': 2, 'and "this"': 3, 'also \n this': 4, 'normal': 5})
 
         lines = list(open(metrics_path))
         assert lines[0] == "Name,Value,Timestamp,Step\n"
@@ -64,3 +65,9 @@ def test_forbidden_csv_chars_in_metric_names():
         assert lines[6].startswith('"normal",5'), lines[6]
 
     in_tmp_dir(f)
+
+
+if __name__ == '__main__':
+    test_forbidden_csv_chars_in_metric_names()
+    test_context_manager_no_eager_logging()
+    test_eager_logging()
