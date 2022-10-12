@@ -96,7 +96,6 @@ class Repo:
 class DataSet:
     def __init__(self, repo: Repo, directory):
         self.files = []
-        # self.commit_data = CommitParams()
         self.repo = repo
         self.directory = directory
         self.request_url = self.repo.get_request_url(directory)
