@@ -23,9 +23,10 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-# create logger with 'spam_application'
-logger = logging.getLogger()
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setFormatter(CustomFormatter())
-logger.addHandler(ch)
+def init_logger():
+    # create logger with 'spam_application'
+    logger = logging.getLogger()
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setFormatter(CustomFormatter())
+    logger.addHandler(ch)

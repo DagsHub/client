@@ -7,13 +7,12 @@ from dagshub.common import config
 import dagshub.common.logging
 import logging
 
-logger = logging.getLogger(__name__)
-
 
 @click.group()
 @click.option("--host", default=config.host, help="Hostname of DagsHub instance")
 @click.pass_context
 def cli(ctx, host):
+    dagshub.common.logging.init_logger()
     ctx.obj = {"host": host.strip("/")}
 
 
@@ -77,12 +76,10 @@ def validate_user(ctx, param, value):
 
 def to_log_level(verbosity):
     if verbosity == 0:
-        return logging.ERROR
-    elif verbosity == 1:
         return logging.WARN
-    elif verbosity == 2:
+    elif verbosity == 1:
         return logging.INFO
-    elif verbosity >= 3:
+    elif verbosity >= 2:
         return logging.DEBUG
 
 
@@ -96,7 +93,7 @@ def to_log_level(verbosity):
                                                            "This option is not recommended, instead leave this empty "
                                                            "to use oauth or specify --token to use an existing "
                                                            "user token.")
-@click.option("--update", is_flag=True, help="Specify --update to force update an existing file")
+@click.option("--update", is_flag=True, help="Force update an existing file")
 @click.option("--token", help="Authenticate using an existing user token")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.pass_context
@@ -117,7 +114,8 @@ def upload(ctx,
     TARGET should include the full path inside the repo, including the filename itself.
     """
     from dagshub.upload import Repo
-    dagshub.common.logging.logger.setLevel(to_log_level(verbose))
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
 
     owner, repo_name = repo
     username, password = user
