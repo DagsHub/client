@@ -79,7 +79,6 @@ class DagsHubFilesystem:
                  'username',
                  'password',
                  'dagshub_remotes',
-                 'branch_remotes',
                  'token',
                  '__weakref__')
 
@@ -110,7 +109,6 @@ class DagsHubFilesystem:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
         self.dagshub_remotes = []
-        self.branch_remotes = {}
         self.parse_git_config()
 
         if not repo_url:
@@ -223,15 +221,6 @@ class DagsHubFilesystem:
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
             self.dagshub_remotes.append(remote.geturl())
-        # Build a dictionary of branch: path to remote's HEAD
-        for branch, branch_section in [(b, git_config[b]) for b in git_config if b.startswith("branch ")]:
-            branch_name = branch.split('"')[1]
-            remote_name = branch_section["remote"]
-            head_path = self.project_root / f".git/refs/remotes/{remote_name}/{branch_name}"
-            # Check that file exists. If it doesn't - then use the local branch's HEAD
-            if not os.path.exists(head_path):
-                head_path = self.project_root / f".git/refs/heads/{branch_name}"
-            self.branch_remotes[branch_name] = head_path
 
     def __del__(self):
         os.close(self.project_root_fd)
