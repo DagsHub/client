@@ -160,7 +160,7 @@ class DataSet:
             content = res.json()
             try:
                 return content["commit"]["id"]
-            except KeyError as e:
+            except KeyError:
                 logger.error(f"Cannot get commit sha for branch '{self.repo.branch}'")
         return ""
 

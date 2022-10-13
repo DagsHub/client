@@ -8,7 +8,6 @@ import yaml
 
 from dagshub.auth import oauth
 from dagshub.common import config
-import logging
 
 logger = logging.getLogger(__name__)
 
