@@ -132,9 +132,9 @@ class DagsHubFilesystem:
         del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
-        self.username = username if username else None
-        self.password = password if password else None
-        self.token = token if token else None
+        self.username = username or config.username
+        self.password = password or config.password
+        self.token = token or config.token
 
         response = self._api_listdir('')
         if response.ok:
@@ -152,7 +152,7 @@ class DagsHubFilesystem:
             return self.username, self.password
 
         try:
-            token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
+            token = self.token or dagshub.auth.get_token(code_input_timeout=0)
         except dagshub.auth.OauthNonInteractiveShellException:
             logger.debug("Failed to perform OAuth in a non interactive shell")
         if token is not None:

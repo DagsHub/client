@@ -12,6 +12,8 @@ DEFAULT_TOKENS_CACHE_LOCATION = os.path.join(
 )
 TOKENS_CACHE_SCHEMA_VERSION = "1"
 DAGSHUB_USER_TOKEN_KEY = "DAGSHUB_USER_TOKEN"
+DAGSHUB_USERNAME_KEY = "DAGSHUB_USERNAME"
+DAGSHUB_PASSWORD_KEY = "DAGSHUB_PASSWORD"
 
 parsed_host = urlparse(os.environ.get(HOST_KEY, DEFAULT_HOST))
 hostname = parsed_host.hostname
@@ -21,3 +23,5 @@ cache_location = os.environ.get(
     TOKENS_CACHE_LOCATION_KEY, DEFAULT_TOKENS_CACHE_LOCATION
 )
 token = os.environ.get(DAGSHUB_USER_TOKEN_KEY)
+username = os.environ.get(DAGSHUB_USERNAME_KEY)
+password = os.environ.get(DAGSHUB_PASSWORD_KEY)

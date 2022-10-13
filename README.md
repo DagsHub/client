@@ -49,7 +49,52 @@ Note that some popular ML frameworks, such as TensorFlow, have input/output rout
 For those frameworks, check out the alternative methods below.
 
 ## 2. CLI launcher
-Under development
+This client comes with a `dagshub` CLI utility tool. The command line tool lets you configure authentication,
+and upload files without having to spin up a python terminal or run code from a python module.
+
+### Help
+You can run
+```bash
+dagshub <subcommand> --help
+```
+for any subcommand to get a usage description and list all the available options.
+
+### Subcommands
+### `dagshub login`
+Initiate an OAuth authentication process. This process will generate and cache a short-lived token in your
+local machine, and allow you to perform actions that require authentication. After running `dagshub login` you can
+use data streaming and upload files without providing authentication info.
+
+#### Options
+`--token`
+
+Provide a long-lived user token to use for any future actions. All the client features will work until the token is
+revoked from the DagsHub UI.
+
+### `dagshub upload`
+Upload a single file to any location in your repository, including DVC directories. This utility is useful for
+active learning scenarios, when you want to append a new file to your dataset.
+#### Example
+```bash
+dagshub upload nirbarazida/yolov6 my-new-image.png data/raw/images/my-new-image.png
+```
+#### Options
+`--message`
+
+Specify a commit message for the upload.
+
+`--branch`
+
+Specify branch to upload the file to.
+
+`--user`
+
+Perform action using basic auth. Should be of the form `username:password`
+
+`--update`
+
+Specify this flag to force update an existing file
+
 
 ## 3. Python entrypoint
 Under development
@@ -95,7 +140,7 @@ with open("test_photo.png", 'rb') as f:
     ds.add(f)
     ds.commit("Add a photo with the api using a file object", versioning="dvc") # Optional: versioning, new_branch, last_commit
 
-# 'path' is a full path inside the ds directory, including the file name.	
+# 'path' is a full path inside the ds directory, including the file name.
 ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
