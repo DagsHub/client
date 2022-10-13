@@ -75,7 +75,7 @@ class Repo:
 
     def _set_default_branch(self):
         try:
-            self.branch = get_default_branch(self.src_url, self.owner, self.name)
+            self.branch = get_default_branch(self.src_url, self.owner, self.name, (self.username, self.password))
         except Exception:
             raise RuntimeError(
                 "Failed to get default branch for repository. "
