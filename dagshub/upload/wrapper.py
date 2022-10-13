@@ -16,7 +16,7 @@ DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 logger = logging.getLogger(__name__)
 
 
-def get_default_branch(src_url, owner, reponame):
+def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
         reponame=reponame
@@ -82,7 +82,7 @@ class Repo:
 
     def _set_default_branch(self):
         try:
-            self.branch = get_default_branch(self.src_url, self.owner, self.name)
+            self.branch = get_default_branch(self.src_url, self.owner, self.name, self.auth)
         except Exception:
             raise RuntimeError(
                 "Failed to get default branch for repository. "

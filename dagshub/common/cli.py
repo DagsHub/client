@@ -45,6 +45,11 @@ def mount(ctx, **kwargs):
 @click.option("--host", help="DagsHub instance to which you want to login")
 @click.pass_context
 def login(ctx, token, host):
+    """
+    Initiate an Oauth authentication process. This process will generate and cache a short-lived token in your
+    local machine, to allow you to perform actions that require authentication. After running `dagshub login` you can
+    use data streaming and upload files without providing authentication info.
+    """
     host = host or ctx.obj["host"]
     if token is not None:
         dagshub.auth.add_app_token(token, host)
