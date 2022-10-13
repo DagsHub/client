@@ -164,28 +164,27 @@ class DagsHubFilesystem:
 
     @property
     def content_api_url(self):
-        content_api_path = f'/api/v1/repos{self.parsed_repo_url.path}/content/{self._current_revision}'
-        return self.parsed_repo_url._replace(path=content_api_path).geturl()
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/content/{self._current_revision}")
 
     @property
     def raw_api_url(self):
-        raw_api_path = f'/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}'
-        return self.parsed_repo_url._replace(path=raw_api_path).geturl()
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
 
     def is_commit_on_remote(self, sha1):
-        commit_api_path = f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}"
-        url = self.parsed_repo_url._replace(path=commit_api_path).geturl()
+        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
         resp = requests.get(url, auth=self.auth)
         return resp.status_code == 200
 
     def get_remote_branch_head(self, branch):
-        branch_api_path = f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}"
-        url = self.parsed_repo_url._replace(path=branch_api_path).geturl()
+        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
         resp = requests.get(url, auth=self.auth)
         if resp.status_code != 200:
             raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
                                f"Response body: {resp.content}")
         return resp.json()["commit"]["id"]
+
+    def get_api_url(self, path):
+        return self.parsed_repo_url._replace(path=path).geturl()
 
     @property
     def auth(self):
