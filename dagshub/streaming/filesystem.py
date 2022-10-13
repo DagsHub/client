@@ -6,7 +6,7 @@ import subprocess
 import sys
 from configparser import ConfigParser
 from contextlib import contextmanager
-from functools import partial, wraps
+from functools import partial, wraps, lru_cache
 from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
@@ -137,13 +137,13 @@ class DagsHubFilesystem:
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
     @property
+    @lru_cache(maxsize=None)
     def _current_revision(self) -> str:
         """
         Gets current revision on repo:
         - If User specified a branch, returns HEAD of that brunch on the remote
         - If HEAD is a branch, tries to find a dagshub remote associated with it and get its HEAD
-        -                      if no associated remote,
-        - If HEAD is a commit revision, returns that
+        - If HEAD is a commit revision, checks that the commit exists on DagsHub
         """
 
         if self.user_specified_branch:
@@ -154,18 +154,13 @@ class DagsHubFilesystem:
             if head.startswith("ref"):
                 branch = head.split("/")[-1]
             else:
-                # contents of HEAD is the revision - return that
-                return head
-        if branch not in self.branch_remotes:
-            logger.warning(f"No remote specified for branch {branch}. Fetching from main")
-            if "main" in self.branch_remotes:
-                branch = "main"
-            elif "master" in self.branch_remotes:
-                branch = "master"
-            else:
-                raise RuntimeError("No tracked main or master branch in current repository")
-        with self.__open(self.branch_remotes[branch]) as remote_head:
-            return remote_head.readline().strip()
+                # contents of HEAD is the revision - check that this commit exists on remote
+                if self.is_commit_on_remote(head):
+                    return head
+                else:
+                    raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
+                                       f"Please push your changes to the remote or checkout a tracked branch.")
+        return self.get_remote_branch_head(branch)
 
     @property
     def content_api_url(self):
@@ -176,6 +171,21 @@ class DagsHubFilesystem:
     def raw_api_url(self):
         raw_api_path = f'/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}'
         return self.parsed_repo_url._replace(path=raw_api_path).geturl()
+
+    def is_commit_on_remote(self, sha1):
+        commit_api_path = f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}"
+        url = self.parsed_repo_url._replace(path=commit_api_path).geturl()
+        resp = requests.get(url, auth=self.auth)
+        return resp.status_code == 200
+
+    def get_remote_branch_head(self, branch):
+        branch_api_path = f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}"
+        url = self.parsed_repo_url._replace(path=branch_api_path).geturl()
+        resp = requests.get(url, auth=self.auth)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
+                               f"Response body: {resp.content}")
+        return resp.json()["commit"]["id"]
 
     @property
     def auth(self):
