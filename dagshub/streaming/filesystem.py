@@ -13,56 +13,71 @@ from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
-
+from dagshub.common import config
+import logging
 import requests
 
 T = TypeVar('T')
-DAGSHUB_ROOT = os.environ.get("DAGSHUB_HOST_PATH", "dagshub.com")
+logger = logging.getLogger(__name__)
+
 
 def wrapreturn(wrappertype):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             return wrappertype(func(*args, **kwargs))
+
         return wrapper
+
     return decorator
 
+
 class dagshub_ScandirIterator:
-        def __init__(self, iterator):
-            self._iterator = iterator
-        def __iter__(self):
-            return self._iterator
-        def __next__(self):
-            return self._iterator.__next__()
-        def __enter__(self):
-            return self
-        def __exit__(self, *args):
-            return self
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def __iter__(self):
+        return self._iterator
+
+    def __next__(self):
+        return self._iterator.__next__()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return self
+
 
 def cache_by_path(func):
     cache = {}
+
     @wraps(func)
-    def wrapper(self, path: str, include_size : bool = False):
+    def wrapper(self, path: str, include_size: bool = False):
         if not include_size and (path, True) in cache:
             cache[path, False] = cache[path, True]
         if (path, include_size) not in cache:
             cache[path, include_size] = func(self, path, include_size)
         return cache[path, include_size]
+
     wrapper.cache = cache
     return wrapper
 
+
 SPECIAL_FILE = Path('.dagshub-streaming')
+
 
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
-
     __slots__ = ('project_root',
                  'project_root_fd',
                  'content_api_url',
                  'raw_api_url',
                  'dvc_remote_url',
-                 'auth',
                  'dirtree',
+                 'username',
+                 'password',
+                 'token',
                  '__weakref__')
 
     def __init__(self,
@@ -71,17 +86,18 @@ class DagsHubFilesystem:
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
                  password: Optional[str] = None,
+                 token: Optional[str] = None,
                  _project_root_fd: Optional[int] = None):
 
         # Find root directory of Git project
         if not project_root:
-            self.project_root = Path('.')
+            self.project_root = Path(os.path.abspath('.'))
             while not (self.project_root / '.git').is_dir():
                 if ismount(self.project_root):
                     raise ValueError('No git project found! (stopped at mountpoint {self.project_root})')
                 self.project_root = self.project_root / '..'
         else:
-            self.project_root = Path(project_root)
+            self.project_root = Path(os.path.abspath(project_root))
         del project_root
         # TODO: if no Git project found, search for .dvc project?
 
@@ -99,40 +115,57 @@ class DagsHubFilesystem:
 
         if not branch:
             branch = (self.__open(self.project_root / '.git/HEAD')
-                          .readline()
-                          .strip()
-                          .split('/')[-1]) or 'main'
+            .readline()  # noqa
+            .strip()  # noqa
+            .split('/')[-1]) or 'main'  # noqa
             # TODO: check DagsHub for default branch if no branch/commit checked out
 
         parsed_repo_url = urlparse(repo_url)
         content_api_path = f'/api/v1/repos{parsed_repo_url.path}/content/{branch}'
+        raw_api_path = f'/api/v1/repos{parsed_repo_url.path}/raw/{branch}'
 
         self.content_api_url = parsed_repo_url._replace(path=content_api_path).geturl()
-        self.raw_api_url = f'{repo_url}/raw/{branch}'
+        self.raw_api_url = parsed_repo_url._replace(path=raw_api_path).geturl()
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
         self.dirtree = {}
 
-        del repo_url, branch, parsed_repo_url, content_api_path
+        del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
-        self.auth = (username, password) if username or password else None
-        del username, password
+        self.username = username if username else None
+        self.password = password if password else None
+        self.token = token if token else None
+
         response = self._api_listdir('')
         if response.ok:
-            # No authentication needed
             pass
         else:
-            # Check Git credential stores
-            proc = subprocess.run(['git', 'credential', 'fill'],
-                                input=f'url={repo_url}'.encode(),
-                                capture_output=True)
-            answer = {line[:line.index('=')]: line[line.index('=')+1:]
-                        for line in proc.stdout.decode().splitlines()}
-            if 'username' in answer and 'password' in answer:
-                self.auth = (answer['username'], answer['password'])
-            else:
-                # TODO: Check .dvc/config{,.local} for credentials
-                raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+            # TODO: Check .dvc/config{,.local} for credentials
+            raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+
+    @property
+    def auth(self):
+        import dagshub.auth
+        from dagshub.auth.token_auth import HTTPBearerAuth
+
+        if self.username is not None and self.password is not None:
+            return self.username, self.password
+
+        try:
+            token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
+        except dagshub.auth.OauthNonInteractiveShellException:
+            logger.debug("Failed to perform OAuth in a non interactive shell")
+        if token is not None:
+            return HTTPBearerAuth(token)
+
+        # Try to fetch credentials from the git credential file
+        proc = subprocess.run(['git', 'credential', 'fill'],
+                              input=f'url={self.repo_url}'.encode(),
+                              capture_output=True)
+        answer = {line[:line.index('=')]: line[line.index('=') + 1:]
+                  for line in proc.stdout.decode().splitlines()}
+        if 'username' in answer and 'password' in answer:
+            return answer['username'], answer['password']
 
     @staticmethod
     def _get_remotes(repo_root='.'):
@@ -144,7 +177,7 @@ class DagsHubFilesystem:
                        if remote.startswith('remote ')]
         dagshub_remotes = []
         for remote in git_remotes:
-            if remote.hostname != 'dagshub.com':
+            if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
@@ -225,6 +258,23 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
+    def chdir(self, path):
+        relative_path = self._relative_path(path)
+        if relative_path:
+            abspath = os.path.join(self.project_root, relative_path)
+            try:
+                self.__chdir(abspath)
+            except FileNotFoundError:
+                resp = self._api_listdir(relative_path)
+                # FIXME: if path is file, return FileNotFound instead of the listdir error
+                if resp.ok:
+                    self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                    self.__chdir(abspath)
+                else:
+                    raise
+        else:
+            self.__chdir(path)
+
     def listdir(self, path='.'):
         relative_path = self._relative_path(path)
         if relative_path:
@@ -286,25 +336,30 @@ class DagsHubFilesystem:
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
-        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth, params={'include_size': 'true'} if include_size else {})
+        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth,
+                            params={'include_size': 'true'} if include_size else {})
 
     def _api_download_file_git(self, path: str):
         return requests.get(f'{self.raw_api_url}/{path}', auth=self.auth)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
-            # TODO: DRY this dictionary. i.e. __open() links cls.__open and io.open even though this dictionary links them
-            #       Cannot use a dict as the source of truth because type hints rely on __get_unpatched inferring the right type
+            # TODO: DRY this dictionary. i.e. __open() links cls.__open
+            #  and io.open even though this dictionary links them
+            #  Cannot use a dict as the source of truth because type hints rely on
+            #  __get_unpatched inferring the right type
             self.__class__.__unpatched = {
                 'open': io.open,
                 'stat': os.stat,
                 'listdir': os.listdir,
-                'scandir': os.scandir
+                'scandir': os.scandir,
+                'chdir': os.chdir,
             }
         io.open = builtins.open = _pathlib.open = self.open
         os.stat = _pathlib.stat = self.stat
         os.listdir = _pathlib.listdir = self.listdir
         os.scandir = _pathlib.scandir = self.scandir
+        os.chdir = self.chdir
         self.__class__.hooked_instance = self
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
@@ -351,20 +406,27 @@ class DagsHubFilesystem:
     def __scandir(self):
         return self.__get_unpatched('scandir', os.scandir)
 
+    @property
+    def __chdir(self):
+        return self.__get_unpatched("chdir", os.chdir)
+
+
 def install_hooks(project_root: Optional[PathLike] = None,
                   repo_url: Optional[str] = None,
                   branch: Optional[str] = None,
                   username: Optional[str] = None,
                   password: Optional[str] = None):
-    fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username, password=password)
+    fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
+                           password=password)
     fs.install_hooks()
+
 
 class dagshub_stat_result:
     def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
-        assert not self._is_directory # TODO make folder stats lazy?
+        assert not self._is_directory  # TODO make folder stats lazy?
 
     def __getattr__(self, name: str):
         if not name.startswith('st_'):
@@ -380,14 +442,16 @@ class dagshub_stat_result:
         elif name == 'st_mode':
             return 0o100644
         elif name == 'st_size':
-            return 1100 ## hardcoded size because size requests take a disproportionate amount of time
+            return 1100  # hardcoded size because size requests take a disproportionate amount of time
         self._fs.open(self._path)
-        self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path), dir_fd=self._fs.project_root_fd)
+        self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path),
+                                                            dir_fd=self._fs.project_root_fd)
         return os.stat_result.__getattribute__(self._true_stat, name)
 
     def __repr__(self):
         inner = repr(self._true_stat) if hasattr(self, '_true_stat') else 'pending...'
         return f'dagshub_stat_result({inner}, path={self._path})'
+
 
 class dagshub_DirEntry:
     def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False):
@@ -449,6 +513,7 @@ class dagshub_DirEntry:
     def __repr__(self):
         cached = ' (cached)' if hasattr(self, '_true_direntry') else ''
         return f'<dagshub_DirEntry \'{self.name}\'{cached}>'
+
 
 # Used for testing purposes only
 if __name__ == "__main__":

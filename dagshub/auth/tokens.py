@@ -33,7 +33,7 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
-    def get_token(self, host: str = None):
+    def get_token(self, host: str = None, **kwargs):
         host = host or config.host
         tokens = self._token_cache.get(host, [])
         app_tokens = [t for t in tokens if t.get("token_type") == APP_TOKEN_TYPE]
@@ -47,7 +47,7 @@ class TokenStorage:
                 logger.warning(
                     f"No valid tokens found for host '{host}'. Authenticating with OAuth"
                 )
-                token = oauth.oauth_flow(host)
+                token = oauth.oauth_flow(host, **kwargs)
                 tokens.append(token)
                 self._token_cache[host] = tokens
                 self._store_cache_file()
@@ -74,7 +74,7 @@ class TokenStorage:
             with open(self.cache_location) as f:
                 tokens_cache = yaml.load(f, yaml.Loader)
                 return tokens_cache
-        except:
+        except Exception:
             logger.error(
                 f"Error while loading DagsHub OAuth token cache: {traceback.format_exc()}"
             )
@@ -92,7 +92,7 @@ class TokenStorage:
                 os.makedirs(dirpath)
             with open(self.cache_location, "w") as f:
                 yaml.dump(self.__token_cache, f, yaml.Dumper)
-        except:
+        except Exception:
             logger.error(
                 f"Error while storing DagsHub OAuth token cache: {traceback.format_exc()}"
             )
