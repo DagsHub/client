@@ -5,7 +5,7 @@ import re
 import subprocess
 from configparser import ConfigParser
 from contextlib import contextmanager
-from functools import partial, wraps
+from functools import partial, wraps, lru_cache
 from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
@@ -71,12 +71,13 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 class DagsHubFilesystem:
     __slots__ = ('project_root',
                  'project_root_fd',
-                 'content_api_url',
-                 'raw_api_url',
                  'dvc_remote_url',
+                 'user_specified_branch',
+                 'parsed_repo_url',
                  'dirtree',
                  'username',
                  'password',
+                 'dagshub_remotes',
                  'token',
                  '__weakref__')
 
@@ -106,30 +107,19 @@ class DagsHubFilesystem:
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
+        self.dagshub_remotes = []
+        self.parse_git_config()
+
         if not repo_url:
-            dagshub_remotes = self._get_remotes(self.project_root.resolve())
-            if len(dagshub_remotes) > 0:
-                repo_url = dagshub_remotes[0]
+            if len(self.dagshub_remotes) > 0:
+                repo_url = self.dagshub_remotes[0]
             else:
                 raise ValueError('No DagsHub git remote detected, please specify repo_url= argument or --repo_url flag')
 
-        if not branch:
-            branch = (self.__open(self.project_root / '.git/HEAD')
-            .readline()  # noqa
-            .strip()  # noqa
-            .split('/')[-1]) or 'main'  # noqa
-            # TODO: check DagsHub for default branch if no branch/commit checked out
-
-        parsed_repo_url = urlparse(repo_url)
-        content_api_path = f'/api/v1/repos{parsed_repo_url.path}/content/{branch}'
-        raw_api_path = f'/api/v1/repos{parsed_repo_url.path}/raw/{branch}'
-
-        self.content_api_url = parsed_repo_url._replace(path=content_api_path).geturl()
-        self.raw_api_url = parsed_repo_url._replace(path=raw_api_path).geturl()
+        self.user_specified_branch = branch
+        self.parsed_repo_url = urlparse(repo_url)
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
         self.dirtree = {}
-
-        del branch, parsed_repo_url, content_api_path
 
         # Determine if any authentication is needed
         self.username = username or config.username
@@ -142,6 +132,56 @@ class DagsHubFilesystem:
         else:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+
+    @property
+    @lru_cache(maxsize=None)
+    def _current_revision(self) -> str:
+        """
+        Gets current revision on repo:
+        - If User specified a branch, returns HEAD of that brunch on the remote
+        - If HEAD is a branch, tries to find a dagshub remote associated with it and get its HEAD
+        - If HEAD is a commit revision, checks that the commit exists on DagsHub
+        """
+
+        if self.user_specified_branch:
+            branch = self.user_specified_branch
+        else:
+            with open(self.project_root / ".git/HEAD") as head_file:
+                head = head_file.readline().strip()
+            if head.startswith("ref"):
+                branch = head.split("/")[-1]
+            else:
+                # contents of HEAD is the revision - check that this commit exists on remote
+                if self.is_commit_on_remote(head):
+                    return head
+                else:
+                    raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
+                                       f"Please push your changes to the remote or checkout a tracked branch.")
+        return self.get_remote_branch_head(branch)
+
+    @property
+    def content_api_url(self):
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/content/{self._current_revision}")
+
+    @property
+    def raw_api_url(self):
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
+
+    def is_commit_on_remote(self, sha1):
+        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
+        resp = requests.get(url, auth=self.auth)
+        return resp.status_code == 200
+
+    def get_remote_branch_head(self, branch):
+        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
+        resp = requests.get(url, auth=self.auth)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
+                               f"Response body: {resp.content}")
+        return resp.json()["commit"]["id"]
+
+    def get_api_url(self, path):
+        return self.parsed_repo_url._replace(path=path).geturl()
 
     @property
     def auth(self):
@@ -167,23 +207,19 @@ class DagsHubFilesystem:
         if 'username' in answer and 'password' in answer:
             return answer['username'], answer['password']
 
-    @staticmethod
-    def _get_remotes(repo_root='.'):
-        # Find Git remote URL
+    def parse_git_config(self):
+        # Get URLs of dagshub remotes
         git_config = ConfigParser()
-        git_config.read(Path(repo_root) / '.git/config')
+        git_config.read(Path(self.project_root) / '.git/config')
         git_remotes = [urlparse(git_config[remote]['url'])
                        for remote in git_config
                        if remote.startswith('remote ')]
-        dagshub_remotes = []
         for remote in git_remotes:
             if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
-            dagshub_remotes.append(remote.geturl())
-
-        return dagshub_remotes
+            self.dagshub_remotes.append(remote.geturl())
 
     def __del__(self):
         os.close(self.project_root_fd)
@@ -530,6 +566,8 @@ class dagshub_DirEntry:
 
 # Used for testing purposes only
 if __name__ == "__main__":
-    install_hooks()
+    logging.basicConfig(level=logging.DEBUG)
+    fs = DagsHubFilesystem()
+    fs.install_hooks()
 
 __all__ = [DagsHubFilesystem.__name__, install_hooks.__name__]
