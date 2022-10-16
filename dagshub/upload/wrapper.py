@@ -40,18 +40,59 @@ class Repo:
             self._set_default_branch()
         logger.info(f"Set branch: {self.branch}")
 
-    def upload(self,
-               file: Union[str, IOBase],
-               commit_message=None,
-               versioning=None,
-               new_branch=None,
-               last_commit=None,
-               path=None,
-               force=False):
+    def upload(self, file: Union[str, IOBase], path=None, **kwargs):
+        file_for_upload = DataSet.get_file(file, path)
+        self.upload_files([file_for_upload], **kwargs)
 
-        ds = DataSet(self, ".")
-        ds.add(file, path)
-        ds.commit(commit_message, versioning, new_branch, last_commit, force)
+    def upload_files(self,
+                     files,
+                     directory_path="",
+                     commit_message=DEFAULT_COMMIT_MESSAGE,
+                     versioning=None,
+                     new_branch=None,
+                     last_commit=None,
+                     force=False):
+
+        data = {
+            "commit_choice": "direct",
+            "commit_message": commit_message,
+            "versioning": versioning,
+            "last_commit": last_commit,
+            "is_dvc_dir": directory_path != "" and versioning != "git",
+        }
+
+        if new_branch is not None:
+            data.update({
+                "commit_choice": "commit-to-new-branch",
+                "new_branch_name": new_branch,
+            })
+
+        if force:
+            data["last_commit"] = self._get_last_commit()
+        res = requests.put(
+            self.get_request_url(directory_path),
+            data,
+            files=[("files", file) for file in files],
+            auth=self.auth)
+        self._log_upload_details(data, res, files)
+
+    def _log_upload_details(self, data, res, files):
+        logger.debug(f"Request URL: {res.request.url}\n"
+                     f"Data:\n{json.dumps(data, indent=4)}\n"
+                     f"Files:\n{json.dumps(list(map(str, files)), indent=4)}")
+        try:
+            content = json.dumps(res.json(), indent=4)
+        except Exception:
+            content = res.content.decode("utf-8")
+
+        if res.status_code != HTTPStatus.OK:
+            logger.error(f"Response ({res.status_code}):\n"
+                         f"{content}")
+        else:
+            logger.debug(f"Response ({res.status_code})\n")
+
+        if res.status_code == 200:
+            logger.info("Upload finished successfully!")
 
     @property
     def auth(self):
@@ -101,6 +142,12 @@ class DataSet:
         self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
+        file = self.get_file(file, path)
+        if file is not None:
+            self.files.append(file)
+
+    @staticmethod
+    def get_file(file: Union[str, IOBase], path=None):
         try:
             # if path is not provided, fall back to the file name
             if path is None:
@@ -113,12 +160,12 @@ class DataSet:
             if type(file) is str:
                 try:
                     f = open(file, 'rb')
-                    self.files.append((path, f))
+                    return path, f
                     return
                 except IsADirectoryError:
                     raise IsADirectoryError("'file' must describe a file, not a directory.")
 
-            self.files.append((path, file))
+            return path, file
 
         except Exception as e:
             logger.error(e)
@@ -127,29 +174,8 @@ class DataSet:
     def _reset_dataset(self):
         self.files = []
 
-    def commit(self, commit_message=None, versioning=None, new_branch=None, last_commit=None, force=False):
-        data = {
-            "commit_choice": "direct",
-            "commit_message": commit_message,
-            "versioning": versioning,
-            "last_commit": last_commit,
-            "is_dvc_dir": versioning != "git",
-        }
-
-        if new_branch is not None:
-            data.update({
-                "commit_choice": "commit-to-new-branch",
-                "new_branch_name": new_branch,
-            })
-
-        if force:
-            data["last_commit"] = self._get_last_commit()
-        res = requests.put(
-            self.request_url,
-            data,
-            files=[("files", file) for file in self.files],
-            auth=self.repo.auth)
-        self._log_upload_details(data, res)
+    def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
+        self.repo.upload_files(self.files, self.directory, commit_message=commit_message, *args, **kwargs)
         self._reset_dataset()
 
     def _get_last_commit(self):
@@ -163,21 +189,3 @@ class DataSet:
             except KeyError:
                 logger.error(f"Cannot get commit sha for branch '{self.repo.branch}'")
         return ""
-
-    def _log_upload_details(self, data, res):
-        logger.debug(f"Request URL: {self.request_url}\n"
-                     f"Data:\n{json.dumps(data, indent=4)}\n"
-                     f"Files:\n{json.dumps(list(map(str, self.files)), indent=4)}")
-        try:
-            content = json.dumps(res.json(), indent=4)
-        except Exception:
-            content = res.content.decode("utf-8")
-
-        if res.status_code != HTTPStatus.OK:
-            logger.error(f"Response ({res.status_code}):\n"
-                         f"{content}")
-        else:
-            logger.debug(f"Response ({res.status_code})\n")
-
-        if res.status_code == 200:
-            logger.info("Upload finished successfully!")
