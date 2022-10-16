@@ -362,6 +362,15 @@ class DagsHubFilesystem:
         os.chdir = self.chdir
         self.__class__.hooked_instance = self
 
+    @classmethod
+    def uninstall_hooks(cls):
+        if hasattr(cls, f'_{cls.__name__}__unpatched'):
+            io.open = cls.__unpatched['open']
+            os.stat = cls.__unpatched['stat']
+            os.listdir = cls.__unpatched['listdir']
+            os.scandir = cls.__unpatched['scandir']
+            os.chdir = cls.__unpatched['chdir']
+
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:
             try:
@@ -419,6 +428,10 @@ def install_hooks(project_root: Optional[PathLike] = None,
     fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
                            password=password)
     fs.install_hooks()
+
+
+def uninstall_hooks():
+    DagsHubFilesystem.uninstall_hooks()
 
 
 class dagshub_stat_result:
