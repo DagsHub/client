@@ -365,10 +365,10 @@ class DagsHubFilesystem:
     @classmethod
     def uninstall_hooks(cls):
         if hasattr(cls, f'_{cls.__name__}__unpatched'):
-            io.open = cls.__unpatched['open']
-            os.stat = cls.__unpatched['stat']
-            os.listdir = cls.__unpatched['listdir']
-            os.scandir = cls.__unpatched['scandir']
+            io.open = builtins.open = cls.__unpatched['open']
+            os.stat = _pathlib.stat = cls.__unpatched['stat']
+            os.listdir = _pathlib.listdir = cls.__unpatched['listdir']
+            os.scandir = _pathlib.scandir = cls.__unpatched['scandir']
             os.chdir = cls.__unpatched['chdir']
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
