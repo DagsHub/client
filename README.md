@@ -125,22 +125,23 @@ The upload API lets you append files to existing DVC directories, without downlo
 
 You can use the DagsHub client to upload files directly to DagsHub, **using both Git & DVC.**
 A basic use looks like this:
+
 ```python
 from dagshub.upload import Repo
 
-repo = Repo("idonov8", "baby-yoda-segmentation-dataset", username="<username>" password="<access token OR password>") # Optional: src_url, branch
+repo = Repo("idonov8", "baby-yoda-segmentation-dataset")  # Optional: username, password, token
 
 # Upload a single file to a repository in one line
-repo.upload("file.txt", "commit message") # Optional: versioning, new_branch, last_commit, path
+repo.upload(file="file.txt", path="path/to/file.txt")  # Optional: versioning, new_branch, commit_message
 
 # Upload multiple files to a dvc folder in a repository with a single commit
 ds = repo.directory("images")
 
-with open("test_photo.png", 'rb') as f:
-    ds.add(f)
-    ds.commit("Add a photo with the api using a file object", versioning="dvc") # Optional: versioning, new_branch, last_commit
+# Add file-like object
+f = open("test_photo.png", 'rb')
+ds.add(file=f, path="tests/test_photo")
 
-# 'path' is a full path inside the ds directory, including the file name.
+# Add local file path
 ds.add(file="test_photo.png", path="test_images/my_awesome_image.png")
 ds.commit("Add a photo with the api using plain text", versioning="dvc")
 ```
