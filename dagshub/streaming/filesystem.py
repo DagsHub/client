@@ -147,7 +147,7 @@ class DagsHubFilesystem:
         if self.user_specified_branch:
             branch = self.user_specified_branch
         else:
-            with self.__open(self.project_root / ".git/HEAD") as head_file:
+            with open(self.project_root / ".git/HEAD") as head_file:
                 head = head_file.readline().strip()
             if head.startswith("ref"):
                 branch = head.split("/")[-1]
@@ -555,8 +555,6 @@ class dagshub_DirEntry:
 # Used for testing purposes only
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    if len(sys.argv) > 1:
-        os.chdir(sys.argv[1])
     fs = DagsHubFilesystem()
     fs.install_hooks()
 
