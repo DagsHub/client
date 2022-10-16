@@ -40,9 +40,9 @@ class Repo:
             self._set_default_branch()
         logger.info(f"Set branch: {self.branch}")
 
-    def upload(self, file: Union[str, IOBase], path=None, **kwargs):
+    def upload(self, file: Union[str, IOBase], commit_message=DEFAULT_COMMIT_MESSAGE, path=None, **kwargs):
         file_for_upload = DataSet.get_file(file, path)
-        self.upload_files([file_for_upload], **kwargs)
+        self.upload_files([file_for_upload], commit_message, **kwargs)
 
     def upload_files(self,
                      files,
