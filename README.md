@@ -45,8 +45,8 @@ This means that most Python ML and data libraries will automatically work with t
 from dagshub.streaming import install_hooks
 install_hooks()
 ```
-Note that some popular ML frameworks, such as TensorFlow, have input/output routines written in C/C++, so they will not see the new files.
-For those frameworks, check out the alternative methods below.
+###  Known Limitations
+1. Some ML frameworks, such as TensorFlow and Open CV, are **currently not suppurted** -  frameworks that have input/output routines written in C/C++ will not see the new files and therefore are currently not suppurted.
 
 ## 2. CLI launcher
 This client comes with a `dagshub` CLI utility tool. The command line tool lets you configure authentication,
