@@ -146,7 +146,7 @@ class DataSet:
         if file is not None:
             if path in self.files:
                 logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
-            self.files[path] = file
+            self.files[path] = (path, file)
 
     @staticmethod
     def get_file(file: Union[str, IOBase], path=None):
@@ -176,7 +176,7 @@ class DataSet:
         self.files.clear()
 
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
-        file_list = list(self.files.items())
+        file_list = list(self.files.values())
         self.repo.upload_files(file_list, self.directory, commit_message=commit_message, *args, **kwargs)
         self._reset_dataset()
 
