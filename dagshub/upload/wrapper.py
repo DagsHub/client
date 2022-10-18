@@ -12,7 +12,7 @@ from http import HTTPStatus
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
-DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
+DEFAULT_COMMIT_SUMMARY = "Upload files using DagsHub client"
 logger = logging.getLogger(__name__)
 
 
@@ -40,14 +40,14 @@ class Repo:
             self._set_default_branch()
         logger.info(f"Set branch: {self.branch}")
 
-    def upload(self, file: Union[str, IOBase], commit_message=DEFAULT_COMMIT_MESSAGE, path=None, **kwargs):
+    def upload(self, file: Union[str, IOBase], commit_summary=DEFAULT_COMMIT_SUMMARY, path=None, **kwargs):
         file_for_upload = DataSet.get_file(file, path)
-        self.upload_files([file_for_upload], commit_message=commit_message, **kwargs)
+        self.upload_files([file_for_upload], commit_summary=commit_summary, **kwargs)
 
     def upload_files(self,
                      files,
                      directory_path="",
-                     commit_message=DEFAULT_COMMIT_MESSAGE,
+                     commit_summary=DEFAULT_COMMIT_SUMMARY,
                      versioning=None,
                      new_branch=None,
                      last_commit=None,
@@ -55,7 +55,7 @@ class Repo:
 
         data = {
             "commit_choice": "direct",
-            "commit_message": commit_message,
+            "commit_summary": commit_summary,
             "versioning": versioning,
             "last_commit": last_commit,
             "is_dvc_dir": directory_path != "" and versioning != "git",
@@ -174,8 +174,8 @@ class DataSet:
     def _reset_dataset(self):
         self.files = []
 
-    def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
-        self.repo.upload_files(self.files, self.directory, commit_message=commit_message, *args, **kwargs)
+    def commit(self, commit_summary=DEFAULT_COMMIT_SUMMARY, *args, **kwargs):
+        self.repo.upload_files(self.files, self.directory, commit_summary=commit_summary, *args, **kwargs)
         self._reset_dataset()
 
     def _get_last_commit(self):
