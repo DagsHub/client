@@ -119,7 +119,7 @@ def upload(ctx,
     owner, repo_name = repo
     username, password = user
     repo = Repo(owner=owner, name=repo_name, username=username, password=password, token=token, branch=branch)
-    repo.upload(file=filename, path=target, commit_summary=message, force=update)
+    repo.upload(file=filename, path=target, commit_message=message, force=update)
 
 
 if __name__ == "__main__":
