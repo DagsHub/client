@@ -136,15 +136,17 @@ class Repo:
 
 class DataSet:
     def __init__(self, repo: Repo, directory):
-        self.files = []
+        self.files = {}
         self.repo = repo
         self.directory = directory
         self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
-        file = self.get_file(file, path)
+        path, file = self.get_file(file, path)
         if file is not None:
-            self.files.append(file)
+            if path in self.files:
+                logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
+            self.files[path] = (path, file)
 
     @staticmethod
     def get_file(file: Union[str, IOBase], path=None):
@@ -161,7 +163,6 @@ class DataSet:
                 try:
                     f = open(file, 'rb')
                     return path, f
-                    return
                 except IsADirectoryError:
                     raise IsADirectoryError("'file' must describe a file, not a directory.")
 
@@ -172,10 +173,11 @@ class DataSet:
             raise e
 
     def _reset_dataset(self):
-        self.files = []
+        self.files.clear()
 
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
-        self.repo.upload_files(self.files, self.directory, commit_message=commit_message, *args, **kwargs)
+        file_list = list(self.files.values())
+        self.repo.upload_files(file_list, self.directory, commit_message=commit_message, *args, **kwargs)
         self._reset_dataset()
 
     def _get_last_commit(self):
