@@ -55,7 +55,7 @@ class Repo:
 
         data = {
             "commit_choice": "direct",
-            "commit_message": commit_message,
+            "commit_summary": commit_message,
             "versioning": versioning,
             "last_commit": last_commit,
             "is_dvc_dir": directory_path != "" and versioning != "git",
