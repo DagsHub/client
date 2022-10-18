@@ -47,6 +47,7 @@ install_hooks()
 ```
 ###  Known Limitations
 1. Some ML frameworks, such as TensorFlow and Open CV, are **currently not suppurted** -  frameworks that have input/output routines written in C/C++ will not see the new files and therefore are currently not suppurted.
+2. `dvc repro` and `dvc run` commands for stages that have dvc tracked files in `deps` will not work, showing errors of missing data.
 
 ## 2. CLI launcher
 This client comes with a `dagshub` CLI utility tool. The command line tool lets you configure authentication,
