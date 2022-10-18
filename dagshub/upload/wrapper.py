@@ -148,7 +148,6 @@ class DataSet:
                 logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
             self.files[path] = file
 
-
     @staticmethod
     def get_file(file: Union[str, IOBase], path=None):
         try:
