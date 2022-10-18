@@ -42,7 +42,7 @@ class Repo:
 
     def upload(self, file: Union[str, IOBase], commit_message=DEFAULT_COMMIT_MESSAGE, path=None, **kwargs):
         file_for_upload = DataSet.get_file(file, path)
-        self.upload_files([file_for_upload], commit_message, **kwargs)
+        self.upload_files([file_for_upload], commit_message=commit_message, **kwargs)
 
     def upload_files(self,
                      files,
