@@ -227,9 +227,9 @@ class DagsHubFilesystem:
     def _relative_path(self, file: Union[PathLike, int]):
         if isinstance(file, int):
             return None
-        path = Path(file).resolve()
+        path = os.path.abspath(file)
         try:
-            rel = path.resolve().relative_to(self.project_root.resolve())
+            rel = Path(path).relative_to(os.path.abspath(self.project_root))
             if str(rel).startswith("<"):
                 return None
             return rel
@@ -273,24 +273,35 @@ class DagsHubFilesystem:
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
+            print("fs.stat - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
+        # todo: remove False
         if relative_path:
+            print("fs.stat - is relative path")
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
             elif relative_path == SPECIAL_FILE:
-                return dagshub_stat_result(self, path, len(self._special_file()), is_directory=False)
+                return dagshub_stat_result(self, path, is_directory=False, custom_size=len(self._special_file()))
             else:
                 try:
+                    print(f"fs.stat - calling __stat - relative_path: {path}, dir_fd: {self.project_root_fd}")
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
+                    print("fs.stat - FileNotFoundError")
+                    print(f"dirtree: {self.dirtree}")
                     parent_tree = self.dirtree.get(str(relative_path.parent))
-                    if parent_tree is not None and str(relative_path.name) not in parent_tree:
-                        return dagshub_stat_result(self, path, is_directory=False)
-                    else:
-                        # self._mkdirs(path, dir_fd=self.project_root_fd)
-                        return self.__stat(relative_path, dir_fd=self.project_root_fd)
-                        # TODO: perhaps don't create directories on stat
+                    print(f"parent_tree: {parent_tree}")
+                    
+                    if parent_tree is not None:
+                        if str(relative_path.name) not in parent_tree:
+                            print(f"'{relative_path.name}' not in parent_tree")
+                            return dagshub_stat_result(self, path, is_directory=False)
+                        else:
+                            print(f"'{relative_path.name}' is in parent tree, running _mkdirs for {path}")
+                            self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                            return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                            # TODO: perhaps don't create directories on stat
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
@@ -331,7 +342,7 @@ class DagsHubFilesystem:
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     # TODO: optimize + make subroutine async
-                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
+                    self.dirtree[str(relative_path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
                     return list(dircontents)
                 else:
                     if error is not None:
@@ -471,7 +482,7 @@ def uninstall_hooks():
 
 
 class dagshub_stat_result:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool, custom_size: int=None):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
