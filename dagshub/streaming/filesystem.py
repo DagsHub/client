@@ -359,28 +359,23 @@ class DagsHubFilesystem:
     def scandir(self, path='.'):
         path = Path(path)
         relative_path = self._relative_path(path)
-        if relative_path:
-            if self._passthrough_path(relative_path):
-                with self._open_fd(relative_path) as fd:
-                    return self.__scandir(fd)
-            else:
-                local_filenames = set()
-                try:
-                    with self._open_fd(relative_path) as fd:
-                        for direntry in self.__scandir(fd):
-                            local_filenames.add(direntry.name)
-                            yield direntry
-                    if relative_path == Path():
-                        if SPECIAL_FILE.name not in local_filenames:
-                            yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
-                except FileNotFoundError:
-                    pass
-                resp = self._api_listdir(relative_path)
-                if resp.ok:
-                    for f in resp.json():
-                        name = Path(f['path']).name
-                        if name not in local_filenames:
-                            yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
+        if relative_path and not self._passthrough_path(relative_path):
+            local_filenames = set()
+            try:
+                for direntry in self.__scandir(path):
+                    local_filenames.add(direntry.name)
+                    yield direntry
+                if relative_path == Path():
+                    if SPECIAL_FILE.name not in local_filenames:
+                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+            except FileNotFoundError:
+                pass
+            resp = self._api_listdir(relative_path)
+            if resp.ok:
+                for f in resp.json():
+                    name = Path(f['path']).name
+                    if name not in local_filenames:
+                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
         else:
             return self.__scandir(path)
 
