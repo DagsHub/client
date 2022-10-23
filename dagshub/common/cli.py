@@ -21,16 +21,22 @@ def cli(ctx, host):
 @click.option("--branch", help="Repository's branch")
 @click.option("--username", help="User's username")
 @click.option("--password", help="User's password")
+@click.option("--token", help="Long lasting user token")
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option(
     "--debug", default=False, type=bool, help="Run fuse in foreground"
 )
+# todo: add log level
 @click.pass_context
-def mount(ctx, **kwargs):
+def mount(ctx, verbose, **kwargs):
     """
     Mount a DagsHub Storage folder via FUSE
     """
     # Since pyfuse can crash on init-time, import it here instead of up top
     from dagshub.streaming import mount
+
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
 
     if not kwargs["debug"]:
         # Hide tracebacks of errors, display only error message
