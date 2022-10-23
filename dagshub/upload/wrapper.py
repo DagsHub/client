@@ -48,6 +48,13 @@ def create_repo(repo_name, description="", private=False, auto_init=False, gitig
     if username is None:
         username = userJson["username"]
 
+    repoRes = requests.get(urllib.parse.urljoin(config.host, REPO_INFO_URL.format(
+        owner=username,
+        reponame=repo_name
+    )))
+    if repoRes.status_code == HTTPStatus.OK:
+        return Repo(owner=username, name=repo_name, username=username, token=token)
+
     data = {
         "name": repo_name,
         "description": description,
