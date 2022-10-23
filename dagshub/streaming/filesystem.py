@@ -487,6 +487,7 @@ class dagshub_stat_result:
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
+        self._custom_size = custom_size
         assert not self._is_directory  # TODO make folder stats lazy?
 
     def __getattr__(self, name: str):
@@ -503,6 +504,8 @@ class dagshub_stat_result:
         elif name == 'st_mode':
             return 0o100644
         elif name == 'st_size':
+            if self._custom_size:
+                return self._custom_size
             return 1100  # hardcoded size because size requests take a disproportionate amount of time
         self._fs.open(self._path)
         self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path),
