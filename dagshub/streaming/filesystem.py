@@ -273,32 +273,32 @@ class DagsHubFilesystem:
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
-            print("fs.stat - NotImplemented")
+            logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
         # todo: remove False
         if relative_path:
-            print("fs.stat - is relative path")
+            logger.debug("fs.stat - is relative path")
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
             elif relative_path == SPECIAL_FILE:
                 return dagshub_stat_result(self, path, is_directory=False, custom_size=len(self._special_file()))
             else:
                 try:
-                    print(f"fs.stat - calling __stat - relative_path: {path}, dir_fd: {self.project_root_fd}")
+                    logger.debug(f"fs.stat - calling __stat - relative_path: {path}, dir_fd: {self.project_root_fd}")
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
-                    print("fs.stat - FileNotFoundError")
-                    print(f"dirtree: {self.dirtree}")
+                    logger.debug("fs.stat - FileNotFoundError")
+                    logger.debug(f"dirtree: {self.dirtree}")
                     parent_tree = self.dirtree.get(str(relative_path.parent))
-                    print(f"parent_tree: {parent_tree}")
+                    logger.debug(f"parent_tree: {parent_tree}")
                     
                     if parent_tree is not None:
                         if str(relative_path.name) not in parent_tree:
-                            print(f"'{relative_path.name}' not in parent_tree")
+                            logger.debug(f"'{relative_path.name}' not in parent_tree")
                             return dagshub_stat_result(self, path, is_directory=False)
                         else:
-                            print(f"'{relative_path.name}' is in parent tree, running _mkdirs for {path}")
+                            logger.debug(f"'{relative_path.name}' is in parent tree, running _mkdirs for {path}")
                             self._mkdirs(relative_path, dir_fd=self.project_root_fd)
                             return self.__stat(relative_path, dir_fd=self.project_root_fd)
                             # TODO: perhaps don't create directories on stat
