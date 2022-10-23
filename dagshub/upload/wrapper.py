@@ -26,7 +26,7 @@ def get_default_branch(src_url, owner, reponame, auth):
     return res.json().get('default_branch')
 
 
-def create_repo(repo_name, description="", private=False, auto_init=False, gitignores="", license="", readme="", template="none"):
+def create_repo(repo_name, description="", private=False, auto_init=False, gitignores="", license="", readme="", template="notebook-template"):
     import logging
     logging.basicConfig(level=logging.DEBUG)
     import dagshub.auth
@@ -54,6 +54,11 @@ def create_repo(repo_name, description="", private=False, auto_init=False, gitig
     )))
     if repoRes.status_code == HTTPStatus.OK:
         return Repo(owner=username, name=repo_name, username=username, token=token)
+
+    if license is None and readme is None and template is None and gitignores is None:
+        raise RuntimeError(
+            "In order to create the repository please choose a project template. "
+            "Our options are cookiecutter-dagshub-dvc or notebook-template.")
 
     data = {
         "name": repo_name,
