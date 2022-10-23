@@ -292,7 +292,7 @@ class DagsHubFilesystem:
                     logger.debug(f"dirtree: {self.dirtree}")
                     parent_tree = self.dirtree.get(str(relative_path.parent))
                     logger.debug(f"parent_tree: {parent_tree}")
-                    
+
                     if parent_tree is not None:
                         if str(relative_path.name) not in parent_tree:
                             logger.debug(f"'{relative_path.name}' not in parent_tree")
@@ -483,7 +483,7 @@ def uninstall_hooks():
 
 
 class dagshub_stat_result:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool, custom_size: int=None):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool, custom_size: int = None):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory

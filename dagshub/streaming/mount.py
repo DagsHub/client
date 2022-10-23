@@ -2,9 +2,6 @@ import errno
 import logging
 import os
 import platform
-
-logger = logging.getLogger(__name__)
-
 import sys
 from argparse import ArgumentParser
 from os import PathLike
@@ -59,7 +56,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             self.fs.open(path).close()
         except FileNotFoundError:
             raise FuseOSError(errno.ENOENT)
-        logger.debug("finised fs.open")
+        logger.debug("finished fs.open")
         return os.open(self.fs._relative_path(path), flags, dir_fd=self.fs.project_root_fd)
 
     def getattr(self, path, fd=None):
@@ -118,10 +115,9 @@ def mount(debug=False,
     logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
                        password=password, token=token)
-    logger.debug(
+    print(
         f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\n'
         f'Run `cd .` in any existing terminals to utilize mounted FS.')
-    logger.debug("with debug logs v0")
     FUSE(fuse, str(fuse.fs.project_root), foreground=debug, nonempty=True)
     if not debug:
         os.chdir(os.path.realpath(os.curdir))
