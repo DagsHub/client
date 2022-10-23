@@ -302,6 +302,7 @@ class DagsHubFilesystem:
                             self._mkdirs(relative_path, dir_fd=self.project_root_fd)
                             return self.__stat(relative_path, dir_fd=self.project_root_fd)
                             # TODO: perhaps don't create directories on stat
+                    raise
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
