@@ -13,6 +13,8 @@ from http import HTTPStatus
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
+REPO_CREATE_URL = "api/v1/user/repos"
+USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +24,54 @@ def get_default_branch(src_url, owner, reponame, auth):
         reponame=reponame
     )))
     return res.json().get('default_branch')
+
+
+def create_repo(repo_name, description="", private=False, auto_init=False, gitignores="", license="", readme="", template="none"):
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    import dagshub.auth
+    from dagshub.auth.token_auth import HTTPBearerAuth
+
+    username = config.username
+    password = config.password
+    if username is not None and password is not None:
+        return username, password
+    try:
+        token = dagshub.auth.get_token(code_input_timeout=0)
+    except dagshub.auth.OauthNonInteractiveShellException:
+        logger.debug("Failed to perform OAuth in a non interactive shell")
+    if token is not None:
+        auth = HTTPBearerAuth(token)
+
+    userRes = requests.get(urllib.parse.urljoin(config.host, USER_INFO_URL), auth=auth)
+    userJson = userRes.json()
+    if username is None:
+        username = userJson["username"]
+
+    data = {
+        "name": repo_name,
+        "description": description,
+        "private": private,
+        "auto_init": auto_init,
+        "gitignores": gitignores,
+        "license": license,
+        "readme": readme,
+        "project_template": template,
+    }
+
+    res = requests.post(
+        urllib.parse.urljoin(config.host, REPO_CREATE_URL),
+        data,
+        auth=auth)
+
+    if res.status_code != HTTPStatus.CREATED:
+        logger.error(f"Response ({res.status_code}):\n"
+                     f"{res.content}")
+        return
+    else:
+        logger.debug(f"Response ({res.status_code})\n")
+
+    return Repo(owner=username, name=repo_name, username=username, token=token)
 
 
 class Repo:
