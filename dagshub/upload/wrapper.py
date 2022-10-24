@@ -14,6 +14,7 @@ CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 REPO_CREATE_URL = "api/v1/user/repos"
+ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
@@ -26,34 +27,14 @@ def get_default_branch(src_url, owner, reponame, auth):
     return res.json().get('default_branch')
 
 
-def create_repo(repo_name, description="", private=False, auto_init=False, gitignores="", license="", readme="", template="notebook-template"):
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
+def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False, gitignores="", license="", readme="",
+                template="notebook-template"):
     import dagshub.auth
     from dagshub.auth.token_auth import HTTPBearerAuth
 
-    username = config.username
-    password = config.password
-    if username is not None and password is not None:
-        return username, password
-    try:
-        token = dagshub.auth.get_token(code_input_timeout=0)
-    except dagshub.auth.OauthNonInteractiveShellException:
-        logger.debug("Failed to perform OAuth in a non interactive shell")
+    token = dagshub.auth.get_token(code_input_timeout=0)
     if token is not None:
         auth = HTTPBearerAuth(token)
-
-    userRes = requests.get(urllib.parse.urljoin(config.host, USER_INFO_URL), auth=auth)
-    userJson = userRes.json()
-    if username is None:
-        username = userJson["username"]
-
-    repoRes = requests.get(urllib.parse.urljoin(config.host, REPO_INFO_URL.format(
-        owner=username,
-        reponame=repo_name
-    )))
-    if repoRes.status_code == HTTPStatus.OK:
-        return Repo(owner=username, name=repo_name, username=username, token=token)
 
     if license is None and readme is None and template is None and gitignores is None:
         raise RuntimeError(
@@ -71,19 +52,29 @@ def create_repo(repo_name, description="", private=False, auto_init=False, gitig
         "project_template": template,
     }
 
+    url = REPO_CREATE_URL
+    if is_org is True:
+        url = ORG_REPO_CREATE_URL.format(
+            orgname=org_name,
+        )
+
     res = requests.post(
-        urllib.parse.urljoin(config.host, REPO_CREATE_URL),
+        urllib.parse.urljoin(config.host, url),
         data,
         auth=auth)
 
     if res.status_code != HTTPStatus.CREATED:
         logger.error(f"Response ({res.status_code}):\n"
                      f"{res.content}")
-        return
+        if res.status_code == HTTPStatus.UNPROCESSABLE_ENTITY:
+            raise RuntimeError("Repository name is invalid or it already exists.")
+        else:
+            raise RuntimeError("Failed to create the desired repository.")
     else:
         logger.debug(f"Response ({res.status_code})\n")
 
-    return Repo(owner=username, name=repo_name, username=username, token=token)
+    repo = res.json()
+    return Repo(owner=repo["owner"]["login"], name=repo["name"], username=repo["owner"]["login"], token=token)
 
 
 class Repo:
