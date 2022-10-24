@@ -21,7 +21,7 @@ if system not in fuse_enabled_systems:
     err_str = f"FUSE mounting isn't supported on {system}.\n" \
               f"Please use install_hooks to access DagsHub hosted files from a python script"
     raise ImportError(err_str)
-from fuse import FUSE, FuseOSError, LoggingMixIn, Operations  # noqa
+from fuse import FUSE, FuseOSError, LoggingMixIn, Operations, fuse_exit  # noqa
 
 
 class DagsHubFUSE(LoggingMixIn, Operations):
@@ -39,7 +39,12 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         self.rwlock = Lock()
 
     def __call__(self, op, path, *args):
-        return super(DagsHubFUSE, self).__call__(op, self.fs.project_root / path[1:], *args)
+        try:
+            return super(DagsHubFUSE, self).__call__(op, self.fs.project_root / path[1:], *args)
+        except OSError:
+            raise
+        except Exception:
+            fuse_exit()
 
     def access(self, path, mode):
         logger.debug(f"access - path: {path}, mode:{mode}")
@@ -122,6 +127,11 @@ def mount(debug=False,
     if not debug:
         os.chdir(os.path.realpath(os.curdir))
     # TODO: Clean unmounting procedure
+
+
+def unmount():
+    logger.debug("Unmounting")
+    fuse_exit()
 
 
 def main():

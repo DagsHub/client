@@ -24,7 +24,7 @@ def cli(ctx, host):
 @click.option("--token", help="Long lasting user token")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option(
-    "--debug", default=False, type=bool, help="Run fuse in foreground"
+    "--debug", default=False, is_flag=True, help="Run fuse in foreground"
 )
 # todo: add log level
 @click.pass_context
@@ -42,6 +42,18 @@ def mount(ctx, verbose, **kwargs):
         # Hide tracebacks of errors, display only error message
         sys.tracebacklimit = 0
     mount(**kwargs)
+
+
+@cli.command()
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+def unmount(ctx, verbose):
+    """
+    Unmount the DasHub repository
+    """
+    from dagshub.streaming import unmount
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
+    unmount()
 
 
 @cli.command()
