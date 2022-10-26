@@ -27,9 +27,8 @@ def get_default_branch(src_url, owner, reponame, auth):
     return res.json().get('default_branch')
 
 
-def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False, gitignores="",
-                license="", readme="",
-                template="notebook-template"):
+def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
+                 gitignores="Python", license="", readme="", template=""):
     import dagshub.auth
     from dagshub.auth.token_auth import HTTPBearerAuth
 
@@ -39,8 +38,10 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
 
     if license is None and readme is None and template is None and gitignores is None:
         raise RuntimeError(
-            "In order to create the repository please choose a project template. "
-            "Our options are cookiecutter-dagshub-dvc or notebook-template.")
+            "Creating an empty repository is not supported. "
+            "Please choose a valid gitignore, license, readme, or project template. "
+            "You can see the list of options here: https://dagshub.com/repo/create . "
+            "Our template options are 'cookiecutter-dagshub-dvc' or 'notebook-template' .")
 
     data = {
         "name": repo_name,
@@ -71,11 +72,9 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
             raise RuntimeError("Repository name is invalid or it already exists.")
         else:
             raise RuntimeError("Failed to create the desired repository.")
-    else:
-        logger.debug(f"Response ({res.status_code})\n")
 
     repo = res.json()
-    return Repo(owner=repo["owner"]["login"], name=repo["name"], username=repo["owner"]["login"], token=token)
+    return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token)
 
 
 class Repo:
