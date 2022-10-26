@@ -244,10 +244,10 @@ class DagsHubFilesystem:
         return b'v0\n'
 
     def open(self, file: Union[PathLike, int], mode: str = 'r', opener=None, *args, **kwargs):
-        if opener is not None:
-            raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
         relative_path = self._relative_path(file)
         if relative_path:
+            if opener is not None:
+                raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
             if self._passthrough_path(relative_path):
                 return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
@@ -269,7 +269,7 @@ class DagsHubFilesystem:
                         #       check status code and only return FileNotFound on 404s
                         raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
         else:
-            return self.__open(file, mode, *args, **kwargs)
+            return self.__open(file, mode, *args, **kwargs, opener=opener)
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
