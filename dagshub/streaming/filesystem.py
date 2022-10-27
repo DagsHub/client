@@ -377,7 +377,8 @@ class DagsHubFilesystem:
                     if name not in local_filenames:
                         yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
         else:
-            return self.__scandir(path)
+            for entry in self.__scandir(path):
+                yield entry
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
