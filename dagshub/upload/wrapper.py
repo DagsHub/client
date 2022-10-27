@@ -1,18 +1,22 @@
+import json
+
 import requests
 import urllib
 import os
-from pprint import pprint
+import logging
 from typing import Union
 from io import IOBase
-from dagshub.upload.debug_logger import logger
 from dagshub.common import config
+from http import HTTPStatus
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
+DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
+logger = logging.getLogger(__name__)
 
 
-def get_default_branch(src_url, owner, reponame):
+def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
         reponame=reponame
@@ -21,46 +25,90 @@ def get_default_branch(src_url, owner, reponame):
 
 
 class Repo:
-    def __init__(self, owner, name, username=None, password=None, src_url=None, branch=None):
+    def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
+        self.owner = owner
+        self.name = name
+        self.src_url = config.host
+
+        self.username = username or config.username
+        self.password = password or config.password
+        self.token = token or config.token
+        self.branch = branch
+
+        if self.branch is None:
+            logger.info("Branch wasn't provided. Fetching default branch...")
+            self._set_default_branch()
+        logger.info(f"Set branch: {self.branch}")
+
+    def upload(self, file: Union[str, IOBase], commit_message=DEFAULT_COMMIT_MESSAGE, path=None, **kwargs):
+        file_for_upload = DataSet.get_file(file, path)
+        self.upload_files([file_for_upload], commit_message=commit_message, **kwargs)
+
+    def upload_files(self,
+                     files,
+                     directory_path="",
+                     commit_message=DEFAULT_COMMIT_MESSAGE,
+                     versioning=None,
+                     new_branch=None,
+                     last_commit=None,
+                     force=False):
+
+        data = {
+            "commit_choice": "direct",
+            "commit_summary": commit_message,
+            "versioning": versioning,
+            "last_commit": last_commit,
+            "is_dvc_dir": directory_path != "" and versioning != "git",
+        }
+
+        if new_branch is not None:
+            data.update({
+                "commit_choice": "commit-to-new-branch",
+                "new_branch_name": new_branch,
+            })
+
+        if force:
+            data["last_commit"] = self._get_last_commit()
+        res = requests.put(
+            self.get_request_url(directory_path),
+            data,
+            files=[("files", file) for file in files],
+            auth=self.auth)
+        self._log_upload_details(data, res, files)
+
+    def _log_upload_details(self, data, res, files):
+        logger.debug(f"Request URL: {res.request.url}\n"
+                     f"Data:\n{json.dumps(data, indent=4)}\n"
+                     f"Files:\n{json.dumps(list(map(str, files)), indent=4)}")
         try:
-            self.owner = owner
-            self.name = name
-            self.src_url = config.host
+            content = json.dumps(res.json(), indent=4)
+        except Exception:
+            content = res.content.decode("utf-8")
 
-            if username is not None:
-                self.username = username
-            elif "DAGSHUB_USERNAME" in os.environ:
-                self.username = os.environ["DAGSHUB_USERNAME"]
-            else:
-                logger.warning(
-                    "No DagsHub username specified, defaulting to repo owner. "
-                    "If you're not the owner of the repository you're working on, please speciy your username.")
-                self.username = owner
-            if password is not None:
-                self.password = password
-            elif "DAGSHUB_PASSWORD" in os.environ:
-                self.password = os.environ["DAGSHUB_PASSWORD"]
-            else:
-                raise Exception(
-                    "Can't find a password/access token. "
-                    "You can set an enviroment variable DAGSHUB_PASSWORD with it or pass it to Repo with 'password'.")
-            # TODO: verify token
+        if res.status_code != HTTPStatus.OK:
+            logger.error(f"Response ({res.status_code}):\n"
+                         f"{content}")
+        else:
+            logger.debug(f"Response ({res.status_code})\n")
 
-            if branch is not None:
-                self.branch = branch
-            else:
-                logger.info("Branch wasn't provided. Fetching default branch...")
-                self._set_default_branch()
-            logger.info(f"Set branch: {self.branch}")
+        if res.status_code == 200:
+            logger.info("Upload finished successfully!")
 
-        except Exception as e:
-            logger.error(e)
-            raise
+    @property
+    def auth(self):
+        import dagshub.auth
+        from dagshub.auth.token_auth import HTTPBearerAuth
 
-    def upload(self, file: Union[str, IOBase], message, versioning=None, new_branch=None, last_commit=None, path=None):
-        ds = DataSet(self, ".")
-        ds.add(file, path)
-        ds.commit(message, versioning, new_branch, last_commit)
+        username = self.username or config.username
+        password = self.password or config.password
+        if username is not None and password is not None:
+            return username, password
+        try:
+            token = self.token or dagshub.auth.get_token(code_input_timeout=0)
+        except dagshub.auth.OauthNonInteractiveShellException:
+            logger.debug("Failed to perform OAuth in a non interactive shell")
+        if token is not None:
+            return HTTPBearerAuth(token)
 
     def directory(self, path):
         return DataSet(self, path)
@@ -75,32 +123,33 @@ class Repo:
 
     def _set_default_branch(self):
         try:
-            self.branch = get_default_branch(self.src_url, self.owner, self.name)
+            self.branch = get_default_branch(self.src_url, self.owner, self.name, self.auth)
         except Exception:
             raise RuntimeError(
                 "Failed to get default branch for repository. "
                 "Please specify a branch and make sure repository details are correct.")
 
-
-class Commit:
-    def __init__(self):
-        self.choice = "direct"
-        self.message = None
-        self.summary = None
-        self.versioning = "auto"
-        self.new_branch = None
-        self.last_commit = None
+    @property
+    def full_name(self):
+        return f"{self.owner}/{self.name}"
 
 
 class DataSet:
     def __init__(self, repo: Repo, directory):
-        self.files = []
-        self.commit_data = Commit()
+        self.files = {}
         self.repo = repo
         self.directory = directory
         self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
+        path, file = self.get_file(file, path)
+        if file is not None:
+            if path in self.files:
+                logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
+            self.files[path] = (path, file)
+
+    @staticmethod
+    def get_file(file: Union[str, IOBase], path=None):
         try:
             # if path is not provided, fall back to the file name
             if path is None:
@@ -113,74 +162,32 @@ class DataSet:
             if type(file) is str:
                 try:
                     f = open(file, 'rb')
-                    self.files.append((path, f))
-                    return
+                    return path, f
                 except IsADirectoryError:
                     raise IsADirectoryError("'file' must describe a file, not a directory.")
 
-            self.files.append((path, file))
+            return path, file
 
         except Exception as e:
             logger.error(e)
             raise e
 
     def _reset_dataset(self):
-        self.files = []
-        self.commit_data = Commit()
+        self.files.clear()
 
-    def commit(self, message, versioning=None, new_branch=None, last_commit=None):
-        try:
-            data = {}
-            if versioning is not None:
-                self.commit_data.versioning = versioning
-            data["versioning"] = self.commit_data.versioning
+    def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
+        file_list = list(self.files.values())
+        self.repo.upload_files(file_list, self.directory, commit_message=commit_message, *args, **kwargs)
+        self._reset_dataset()
 
-            if last_commit is not None:
-                self.commit_data.last_commit = last_commit
-                data["last_commit"] = self.commit_data.last_commit
-
-            if new_branch is not None:
-                self.commit_data.choice = "commit-to-new-branch"
-                self.commit_data.new_branch = new_branch
-
-            data["commit_choice"] = self.commit_data.choice
-
-            if self.commit_data.choice == "commit-to-new-branch":
-                data["new_branch_name"] = self.commit_data.new_branch
-
-            if message != "":
-                self.commit_data.message = message
-            else:
-                raise Exception("You must provide a valid commit message")
-            data["commit_message"] = self.commit_data.message
-
-            if versioning != "git":
-                data["is_dvc_dir"] = True
-
-            # Prints for debugging
-            logger.debug(f"Request URL: {self.request_url}")
-            print("DATA:")
-            pprint(data)
-            logger.debug("Files:")
-            pprint(self.files)
-            logger.debug("making request...")
-            res = requests.put(
-                self.request_url,
-                data,
-                files=[("files", file) for file in self.files],
-                auth=(self.repo.username, self.repo.password))
-            logger.debug(f"Response: {res.status_code}")
-            print("Response content:")
+    def _get_last_commit(self):
+        api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
+        api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
+        res = requests.get(api_url)
+        if res.status_code == HTTPStatus.OK:
+            content = res.json()
             try:
-                pprint(res.json())
-            except Exception:
-                pprint(res.content)
-
-            if res.status_code == 200:
-                logger.info("Upload finished successfully!")
-
-            self._reset_dataset()
-
-        except Exception as e:
-            logger.error(e)
-            raise e
+                return content["commit"]["id"]
+            except KeyError:
+                logger.error(f"Cannot get commit sha for branch '{self.repo.branch}'")
+        return ""

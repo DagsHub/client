@@ -11,6 +11,8 @@ from typing import Optional
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
+logger = logging.getLogger(__name__)
+
 SPECIAL_FILE_FH = (1 << 64) - 1
 
 fuse_enabled_systems = ["Linux"]
@@ -28,10 +30,12 @@ class DagsHubFUSE(LoggingMixIn, Operations):
                  repo_url: Optional[str] = None,
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
-                 password: Optional[str] = None):
+                 password: Optional[str] = None,
+                 token: Optional[str] = None):
         # FIXME TODO move autoconfiguration out of FUSE object constructor and to main method
         self.fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
-                                    password=password)
+                                    password=password, token=token)
+        logger.debug("__init__")
         self.rwlock = Lock()
         self.depth = 0
 
@@ -39,24 +43,34 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return super(DagsHubFUSE, self).__call__(op, self.fs.project_root / path[1:], *args)
 
     def access(self, path, mode):
+        logger.debug(f"access - path: {path}, mode:{mode}")
         try:
             self.fs.stat(path)
         except FileNotFoundError:
             return False
 
     def open(self, path, flags):
+        logger.debug(f"open - path: {path}, flags: {flags}")
         if path == Path(self.fs.project_root / SPECIAL_FILE):
             return SPECIAL_FILE_FH
-        self.fs.open(path).close()
-        return os.open(path, flags, dir_fd=self.fs.project_root_fd)
+        try:
+            self.fs.open(path).close()
+        except FileNotFoundError:
+            raise FuseOSError(errno.ENOENT)
+        logger.debug("finished fs.open")
+        return os.open(self.fs._relative_path(path), flags, dir_fd=self.fs.project_root_fd)
 
     def getattr(self, path, fd=None):
+        logger.debug(f"getattr - path:{str(path)}, fd:{fd}")
         try:
             if fd:
+                logger.debug("with __stat")
                 st = self.fs._DagsHubFilesystem__stat(fd)
             else:
+                logger.debug("with fs.stat")
                 st = self.fs.stat(path)
-            self.depth += 1
+
+            logger.debug(f"st: {st}")
             return {
                 key: getattr(st, key)
                 for key in (
@@ -71,9 +85,11 @@ class DagsHubFUSE(LoggingMixIn, Operations):
                 )
             }
         except FileNotFoundError:
+            logger.debug("FileNotFound")
             raise FuseOSError(errno.ENOENT)
 
     def read(self, path, size, offset, fh):
+        logger.debug(f"read - path: {path}, offset: {offset}, fh: {fh}")
         if fh == SPECIAL_FILE_FH:
             return self.fs._special_file()[offset:offset + size]
         with self.rwlock:
@@ -81,9 +97,11 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             return os.read(fh, size)
 
     def readdir(self, path, fh):
+        logger.debug(f"readdir - path: {path}, fh: {fh}")
         return ['.', '..'] + self.fs.listdir(path)
 
     def release(self, path, fh):
+        logger.debug(f"release - path: {path}, fh: {fh}")
         if fh != SPECIAL_FILE_FH:
             return os.close(fh)
 
@@ -93,10 +111,11 @@ def mount(debug=False,
           repo_url: Optional[str] = None,
           branch: Optional[str] = None,
           username: Optional[str] = None,
-          password: Optional[str] = None):
+          password: Optional[str] = None,
+          token: Optional[str] = None):
     logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
-                       password=password)
+                       password=password, token=token)
     print(
         f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\n'
         f'Run `cd .` in any existing terminals to utilize mounted FS.')

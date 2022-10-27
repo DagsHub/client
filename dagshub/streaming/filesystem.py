@@ -5,7 +5,7 @@ import re
 import subprocess
 from configparser import ConfigParser
 from contextlib import contextmanager
-from functools import partial, wraps
+from functools import partial, wraps, lru_cache
 from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
@@ -71,12 +71,13 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 class DagsHubFilesystem:
     __slots__ = ('project_root',
                  'project_root_fd',
-                 'content_api_url',
-                 'raw_api_url',
                  'dvc_remote_url',
+                 'user_specified_branch',
+                 'parsed_repo_url',
                  'dirtree',
                  'username',
                  'password',
+                 'dagshub_remotes',
                  'token',
                  '__weakref__')
 
@@ -106,35 +107,24 @@ class DagsHubFilesystem:
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
+        self.dagshub_remotes = []
+        self.parse_git_config()
+
         if not repo_url:
-            dagshub_remotes = self._get_remotes(self.project_root.resolve())
-            if len(dagshub_remotes) > 0:
-                repo_url = dagshub_remotes[0]
+            if len(self.dagshub_remotes) > 0:
+                repo_url = self.dagshub_remotes[0]
             else:
                 raise ValueError('No DagsHub git remote detected, please specify repo_url= argument or --repo_url flag')
 
-        if not branch:
-            branch = (self.__open(self.project_root / '.git/HEAD')
-            .readline()  # noqa
-            .strip()  # noqa
-            .split('/')[-1]) or 'main'  # noqa
-            # TODO: check DagsHub for default branch if no branch/commit checked out
-
-        parsed_repo_url = urlparse(repo_url)
-        content_api_path = f'/api/v1/repos{parsed_repo_url.path}/content/{branch}'
-        raw_api_path = f'/api/v1/repos{parsed_repo_url.path}/raw/{branch}'
-
-        self.content_api_url = parsed_repo_url._replace(path=content_api_path).geturl()
-        self.raw_api_url = parsed_repo_url._replace(path=raw_api_path).geturl()
+        self.user_specified_branch = branch
+        self.parsed_repo_url = urlparse(repo_url)
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
         self.dirtree = {}
 
-        del branch, parsed_repo_url, content_api_path
-
         # Determine if any authentication is needed
-        self.username = username if username else None
-        self.password = password if password else None
-        self.token = token if token else None
+        self.username = username or config.username
+        self.password = password or config.password
+        self.token = token or config.token
 
         response = self._api_listdir('')
         if response.ok:
@@ -142,6 +132,56 @@ class DagsHubFilesystem:
         else:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
+
+    @property
+    @lru_cache(maxsize=None)
+    def _current_revision(self) -> str:
+        """
+        Gets current revision on repo:
+        - If User specified a branch, returns HEAD of that brunch on the remote
+        - If HEAD is a branch, tries to find a dagshub remote associated with it and get its HEAD
+        - If HEAD is a commit revision, checks that the commit exists on DagsHub
+        """
+
+        if self.user_specified_branch:
+            branch = self.user_specified_branch
+        else:
+            with open(self.project_root / ".git/HEAD") as head_file:
+                head = head_file.readline().strip()
+            if head.startswith("ref"):
+                branch = head.split("/")[-1]
+            else:
+                # contents of HEAD is the revision - check that this commit exists on remote
+                if self.is_commit_on_remote(head):
+                    return head
+                else:
+                    raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
+                                       f"Please push your changes to the remote or checkout a tracked branch.")
+        return self.get_remote_branch_head(branch)
+
+    @property
+    def content_api_url(self):
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/content/{self._current_revision}")
+
+    @property
+    def raw_api_url(self):
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
+
+    def is_commit_on_remote(self, sha1):
+        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
+        resp = requests.get(url, auth=self.auth)
+        return resp.status_code == 200
+
+    def get_remote_branch_head(self, branch):
+        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
+        resp = requests.get(url, auth=self.auth)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
+                               f"Response body: {resp.content}")
+        return resp.json()["commit"]["id"]
+
+    def get_api_url(self, path):
+        return self.parsed_repo_url._replace(path=path).geturl()
 
     @property
     def auth(self):
@@ -152,7 +192,7 @@ class DagsHubFilesystem:
             return self.username, self.password
 
         try:
-            token = self.token or config.token or dagshub.auth.get_token(code_input_timeout=0)
+            token = self.token or dagshub.auth.get_token(code_input_timeout=0)
         except dagshub.auth.OauthNonInteractiveShellException:
             logger.debug("Failed to perform OAuth in a non interactive shell")
         if token is not None:
@@ -167,23 +207,19 @@ class DagsHubFilesystem:
         if 'username' in answer and 'password' in answer:
             return answer['username'], answer['password']
 
-    @staticmethod
-    def _get_remotes(repo_root='.'):
-        # Find Git remote URL
+    def parse_git_config(self):
+        # Get URLs of dagshub remotes
         git_config = ConfigParser()
-        git_config.read(Path(repo_root) / '.git/config')
+        git_config.read(Path(self.project_root) / '.git/config')
         git_remotes = [urlparse(git_config[remote]['url'])
                        for remote in git_config
                        if remote.startswith('remote ')]
-        dagshub_remotes = []
         for remote in git_remotes:
             if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
-            dagshub_remotes.append(remote.geturl())
-
-        return dagshub_remotes
+            self.dagshub_remotes.append(remote.geturl())
 
     def __del__(self):
         os.close(self.project_root_fd)
@@ -192,10 +228,11 @@ class DagsHubFilesystem:
         if isinstance(file, int):
             return None
         path = os.path.abspath(file)
-        parent = os.path.abspath(self.project_root)
         try:
-            rel = Path(path[len(parent)+1:]) if parent in path else None
-            return rel if not str(rel).startswith("<") else None 
+            rel = Path(path).relative_to(os.path.abspath(self.project_root))
+            if str(rel).startswith("<"):
+                return None
+            return rel
         except ValueError:
             return None
 
@@ -236,24 +273,36 @@ class DagsHubFilesystem:
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
+            logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
         relative_path = self._relative_path(path)
+        # todo: remove False
         if relative_path:
+            logger.debug("fs.stat - is relative path")
             if self._passthrough_path(relative_path):
                 return self.__stat(relative_path, dir_fd=self.project_root_fd)
             elif relative_path == SPECIAL_FILE:
-                return dagshub_stat_result(self, path, len(self._special_file()), is_directory=False)
+                return dagshub_stat_result(self, path, is_directory=False, custom_size=len(self._special_file()))
             else:
                 try:
+                    logger.debug(f"fs.stat - calling __stat - relative_path: {path}, dir_fd: {self.project_root_fd}")
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError:
+                    logger.debug("fs.stat - FileNotFoundError")
+                    logger.debug(f"dirtree: {self.dirtree}")
                     parent_tree = self.dirtree.get(str(relative_path.parent))
-                    if parent_tree is not None and str(relative_path.name) not in parent_tree:
-                        return dagshub_stat_result(self, path, is_directory=False)
-                    else:
-                        self._mkdirs(path, dir_fd=self.project_root_fd)
-                        return self.__stat(relative_path, dir_fd=self.project_root_fd)
-                    # TODO: perhaps don't create directories on stat
+                    logger.debug(f"parent_tree: {parent_tree}")
+
+                    if parent_tree is not None:
+                        if str(relative_path.name) not in parent_tree:
+                            logger.debug(f"'{relative_path.name}' not in parent_tree")
+                            return dagshub_stat_result(self, path, is_directory=False)
+                        else:
+                            logger.debug(f"'{relative_path.name}' is in parent tree, running _mkdirs for {path}")
+                            self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                            return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                            # TODO: perhaps don't create directories on stat
+                    raise
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
@@ -294,7 +343,7 @@ class DagsHubFilesystem:
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     # TODO: optimize + make subroutine async
-                    self.dirtree[str(path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
+                    self.dirtree[str(relative_path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
                     return list(dircontents)
                 else:
                     if error is not None:
@@ -361,6 +410,15 @@ class DagsHubFilesystem:
         os.chdir = self.chdir
         self.__class__.hooked_instance = self
 
+    @classmethod
+    def uninstall_hooks(cls):
+        if hasattr(cls, f'_{cls.__name__}__unpatched'):
+            io.open = builtins.open = cls.__unpatched['open']
+            os.stat = _pathlib.stat = cls.__unpatched['stat']
+            os.listdir = _pathlib.listdir = cls.__unpatched['listdir']
+            os.scandir = _pathlib.scandir = cls.__unpatched['scandir']
+            os.chdir = cls.__unpatched['chdir']
+
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:
             try:
@@ -420,11 +478,16 @@ def install_hooks(project_root: Optional[PathLike] = None,
     fs.install_hooks()
 
 
+def uninstall_hooks():
+    DagsHubFilesystem.uninstall_hooks()
+
+
 class dagshub_stat_result:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool, custom_size: int = None):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
+        self._custom_size = custom_size
         assert not self._is_directory  # TODO make folder stats lazy?
 
     def __getattr__(self, name: str):
@@ -441,6 +504,8 @@ class dagshub_stat_result:
         elif name == 'st_mode':
             return 0o100644
         elif name == 'st_size':
+            if self._custom_size:
+                return self._custom_size
             return 1100  # hardcoded size because size requests take a disproportionate amount of time
         self._fs.open(self._path)
         self._true_stat = self._fs._DagsHubFilesystem__stat(self._fs._relative_path(self._path),
@@ -516,6 +581,8 @@ class dagshub_DirEntry:
 
 # Used for testing purposes only
 if __name__ == "__main__":
-    install_hooks()
+    logging.basicConfig(level=logging.DEBUG)
+    fs = DagsHubFilesystem()
+    fs.install_hooks()
 
 __all__ = [DagsHubFilesystem.__name__, install_hooks.__name__]
