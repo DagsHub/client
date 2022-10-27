@@ -32,9 +32,17 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     import dagshub.auth
     from dagshub.auth.token_auth import HTTPBearerAuth
 
-    token = config.token or dagshub.auth.get_token(code_input_timeout=0)
-    if token is not None:
-        auth = HTTPBearerAuth(token)
+    username = config.username
+    password = config.password
+    if username is not None and password is not None:
+        auth = username, password
+    else:
+        token = config.token or dagshub.auth.get_token(code_input_timeout=0)
+        if token is not None:
+            auth = HTTPBearerAuth(token)
+
+    if auth is None:
+        raise RuntimeError("You can't create a repository without being authenticated.")
 
     if license is None and readme is None and template is None and gitignores is None:
         raise RuntimeError(
