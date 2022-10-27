@@ -15,6 +15,7 @@ from typing import Optional, TypeVar, Union
 from urllib.parse import urlparse
 from dagshub.common import config
 import logging
+from threading import Lock
 import requests
 
 T = TypeVar('T')
@@ -77,6 +78,7 @@ class DagsHubFilesystem:
                  'dirtree',
                  'username',
                  'password',
+                 'rwlock',
                  'dagshub_remotes',
                  'token',
                  '__weakref__')
@@ -119,6 +121,7 @@ class DagsHubFilesystem:
         self.user_specified_branch = branch
         self.parsed_repo_url = urlparse(repo_url)
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
+        self.rwlock = Lock()
         self.dirtree = {}
 
         # Determine if any authentication is needed
@@ -267,9 +270,15 @@ class DagsHubFilesystem:
                     else:
                         # TODO: After API no longer 500s on FileNotFounds
                         #       check status code and only return FileNotFound on 404s
-                        raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+                        return self.__open(relative_path, mode, opener=project_root_opener)
         else:
             return self.__open(file, mode, *args, **kwargs)
+
+    def write(self, path, data, offset, fh):
+        with self.rwlock:
+            os.lseek(fh, offset, 0)
+            return os.write(fh, data)
+
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
         if dir_fd is not None or not follow_symlinks:
