@@ -227,6 +227,8 @@ class DagsHubFilesystem:
     def _relative_path(self, file: Union[PathLike, int]):
         if isinstance(file, int):
             return None
+        if file == "":
+            return None
         path = os.path.abspath(file)
         try:
             rel = Path(path).relative_to(os.path.abspath(self.project_root))
