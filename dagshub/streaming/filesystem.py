@@ -308,7 +308,7 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path):
+    def chdir(self, path: Union[PathLike, int]):
         relative_path = self._relative_path(path)
         if relative_path:
             abspath = os.path.join(self.project_root, relative_path)
@@ -325,7 +325,7 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path='.'):
+    def listdir(self, path: Union[PathLike, int] = '.'):
         relative_path = self._relative_path(path)
         if relative_path:
             if self._passthrough_path(relative_path):
@@ -356,10 +356,10 @@ class DagsHubFilesystem:
             return self.__listdir(path)
 
     @wrapreturn(dagshub_ScandirIterator)
-    def scandir(self, path='.'):
-        path = Path(path)
+    def scandir(self, path: Union[PathLike, int] = '.'):
         relative_path = self._relative_path(path)
         if relative_path and not self._passthrough_path(relative_path):
+            path = Path(path)
             local_filenames = set()
             try:
                 for direntry in self.__scandir(path):
