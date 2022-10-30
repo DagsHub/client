@@ -279,7 +279,7 @@ class DagsHubFilesystem:
                     else:
                         try:
                             # Using the fact that stat creates tracked dirs
-                            _ = self.stat(relative_path.parent)
+                            _ = self.stat(self.project_root / relative_path.parent)
                         except FileNotFoundError:
                             raise FileNotFoundError(f"{relative_path.parent} does not exist on the filesystem "
                                                     f"and is not a tracked directory")
@@ -311,12 +311,15 @@ class DagsHubFilesystem:
                     if str(parent_path) not in self.remote_tree:
                         try:
                             # Run listdir to update cache
-                            self.listdir(parent_path)
+                            self.listdir(self.project_root / parent_path)
                         except FileNotFoundError:
                             raise err
 
                     cached_remote_parent_tree = self.remote_tree.get(str(parent_path))
                     logger.debug(f"cached_remote_parent_tree: {cached_remote_parent_tree}")
+
+                    if cached_remote_parent_tree is None:
+                        raise err
 
                     filetype = cached_remote_parent_tree.get(relative_path.name)
                     if filetype is None:
