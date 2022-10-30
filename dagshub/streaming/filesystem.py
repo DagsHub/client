@@ -262,17 +262,29 @@ class DagsHubFilesystem:
                 try:
                     return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
                 except FileNotFoundError:
-                    resp = self._api_download_file_git(relative_path)
-                    if resp.ok:
-                        self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
-                        # TODO: Handle symlinks
-                        with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
-                            output.write(resp.content)
-                        return self.__open(relative_path, mode, opener=project_root_opener)
+                    if "r" in mode:
+                        resp = self._api_download_file_git(relative_path)
+                        if resp.ok:
+                            self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
+                            # TODO: Handle symlinks
+                            with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                                output.write(resp.content)
+                            return self.__open(relative_path, mode, opener=project_root_opener)
+                        else:
+                            # TODO: After API no longer 500s on FileNotFounds
+                            #       check status code and only return FileNotFound on 404s
+                            raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+                    # Write modes - make sure that the folder is a tracked folder (create if doesn't exist on disk),
+                    # and then let the user write to file
                     else:
-                        # TODO: After API no longer 500s on FileNotFounds
-                        #       check status code and only return FileNotFound on 404s
-                        raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+                        try:
+                            # Using the fact that stat creates tracked dirs
+                            _ = self.stat(relative_path.parent)
+                        except FileNotFoundError:
+                            raise FileNotFoundError(f"{relative_path.parent} does not exist on the filesystem "
+                                                    f"and is not a tracked directory")
+                        return self.__open(relative_path, mode, opener=project_root_opener)
+
         else:
             return self.__open(file, mode, *args, **kwargs, opener=opener)
 
