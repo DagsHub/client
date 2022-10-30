@@ -246,7 +246,9 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: Union[PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
+    def open(self, file: Union[bytes, PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
+        if type(file) is bytes:
+            file = file.decode("utf-8")
         relative_path = self._relative_path(file)
         if relative_path:
             if opener is not None:
