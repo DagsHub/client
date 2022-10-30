@@ -230,6 +230,8 @@ class DagsHubFilesystem:
     def _relative_path(self, file: Union[PathLike, int]):
         if isinstance(file, int):
             return None
+        if file == "":
+            return None
         path = os.path.abspath(file)
         try:
             rel = Path(path).relative_to(os.path.abspath(self.project_root))
@@ -246,12 +248,11 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: Union[PathLike, int], mode: str = 'r', opener=None, *args, **kwargs):
-        print('OPEN: ', file, mode)
-        if opener is not None:
-            raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
+    def open(self, file: Union[PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
         relative_path = self._relative_path(file)
         if relative_path:
+            if opener is not None:
+                raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
             if self._passthrough_path(relative_path):
                 return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
@@ -273,7 +274,7 @@ class DagsHubFilesystem:
                         #       check status code and only return FileNotFound on 404s
                         return self.__open(relative_path, mode, opener=project_root_opener)
         else:
-            return self.__open(file, mode, *args, **kwargs)
+            return self.__open(file, mode, *args, **kwargs, opener=opener)
 
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
@@ -311,7 +312,7 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path):
+    def chdir(self, path: Union[PathLike, int]):
         relative_path = self._relative_path(path)
         if relative_path:
             abspath = os.path.join(self.project_root, relative_path)
@@ -328,7 +329,7 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path='.'):
+    def listdir(self, path: Union[PathLike, int] = '.'):
         relative_path = self._relative_path(path)
         if relative_path:
             if self._passthrough_path(relative_path):
@@ -359,33 +360,29 @@ class DagsHubFilesystem:
             return self.__listdir(path)
 
     @wrapreturn(dagshub_ScandirIterator)
-    def scandir(self, path='.'):
-        path = Path(path)
+    def scandir(self, path: Union[PathLike, int] = '.'):
         relative_path = self._relative_path(path)
-        if relative_path:
-            if self._passthrough_path(relative_path):
-                with self._open_fd(relative_path) as fd:
-                    return self.__scandir(fd)
-            else:
-                local_filenames = set()
-                try:
-                    with self._open_fd(relative_path) as fd:
-                        for direntry in self.__scandir(fd):
-                            local_filenames.add(direntry.name)
-                            yield direntry
-                    if relative_path == Path():
-                        if SPECIAL_FILE.name not in local_filenames:
-                            yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
-                except FileNotFoundError:
-                    pass
-                resp = self._api_listdir(relative_path)
-                if resp.ok:
-                    for f in resp.json():
-                        name = Path(f['path']).name
-                        if name not in local_filenames:
-                            yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
+        if relative_path and not self._passthrough_path(relative_path):
+            path = Path(path)
+            local_filenames = set()
+            try:
+                for direntry in self.__scandir(path):
+                    local_filenames.add(direntry.name)
+                    yield direntry
+                if relative_path == Path():
+                    if SPECIAL_FILE.name not in local_filenames:
+                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+            except FileNotFoundError:
+                pass
+            resp = self._api_listdir(relative_path)
+            if resp.ok:
+                for f in resp.json():
+                    name = Path(f['path']).name
+                    if name not in local_filenames:
+                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
         else:
-            return self.__scandir(path)
+            for entry in self.__scandir(path):
+                yield entry
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):

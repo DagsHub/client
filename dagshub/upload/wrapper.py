@@ -13,6 +13,9 @@ from http import HTTPStatus
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
+REPO_CREATE_URL = "api/v1/user/repos"
+ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
+USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +25,56 @@ def get_default_branch(src_url, owner, reponame, auth):
         reponame=reponame
     )))
     return res.json().get('default_branch')
+
+
+def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
+                gitignores="Python", license="", readme="", template=""):
+    import dagshub.auth
+    from dagshub.auth.token_auth import HTTPBearerAuth
+
+    token = config.token or dagshub.auth.get_token(code_input_timeout=0)
+    if token is not None:
+        auth = HTTPBearerAuth(token)
+
+    if license is None and readme is None and template is None and gitignores is None:
+        raise RuntimeError(
+            "Creating an empty repository is not supported. "
+            "Please choose a valid gitignore, license, readme, or project template. "
+            "You can see the list of options here: https://dagshub.com/repo/create . "
+            "Our template options are 'cookiecutter-dagshub-dvc' or 'notebook-template' .")
+
+    data = {
+        "name": repo_name,
+        "description": description,
+        "private": private,
+        "auto_init": auto_init,
+        "gitignores": gitignores,
+        "license": license,
+        "readme": readme,
+        "project_template": template,
+    }
+
+    url = REPO_CREATE_URL
+    if is_org is True:
+        url = ORG_REPO_CREATE_URL.format(
+            orgname=org_name,
+        )
+
+    res = requests.post(
+        urllib.parse.urljoin(config.host, url),
+        data,
+        auth=auth)
+
+    if res.status_code != HTTPStatus.CREATED:
+        logger.error(f"Response ({res.status_code}):\n"
+                     f"{res.content}")
+        if res.status_code == HTTPStatus.UNPROCESSABLE_ENTITY:
+            raise RuntimeError("Repository name is invalid or it already exists.")
+        else:
+            raise RuntimeError("Failed to create the desired repository.")
+
+    repo = res.json()
+    return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token)
 
 
 class Repo:
