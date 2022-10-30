@@ -11,7 +11,7 @@ from os import PathLike
 from os.path import ismount
 from pathlib import Path
 from pathlib import _NormalAccessor as _pathlib
-from typing import Optional, TypeVar, Union
+from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
 from dagshub.common import config
 import logging
@@ -74,7 +74,7 @@ class DagsHubFilesystem:
                  'dvc_remote_url',
                  'user_specified_branch',
                  'parsed_repo_url',
-                 'dirtree',
+                 'remote_tree',
                  'username',
                  'password',
                  'dagshub_remotes',
@@ -119,7 +119,8 @@ class DagsHubFilesystem:
         self.user_specified_branch = branch
         self.parsed_repo_url = urlparse(repo_url)
         self.dvc_remote_url = f'{repo_url}.dvc/cache'
-        self.dirtree = {}
+        # Key: path, value: dict of {name, type} on that path (in remote)
+        self.remote_tree: Dict[str, Dict[str, str]] = {}
 
         # Determine if any authentication is needed
         self.username = username or config.username
@@ -289,22 +290,32 @@ class DagsHubFilesystem:
                 try:
                     logger.debug(f"fs.stat - calling __stat - relative_path: {path}, dir_fd: {self.project_root_fd}")
                     return self.__stat(relative_path, dir_fd=self.project_root_fd)
-                except FileNotFoundError:
+                except FileNotFoundError as err:
                     logger.debug("fs.stat - FileNotFoundError")
-                    logger.debug(f"dirtree: {self.dirtree}")
-                    parent_tree = self.dirtree.get(str(relative_path.parent))
-                    logger.debug(f"parent_tree: {parent_tree}")
+                    logger.debug(f"remote_tree: {self.remote_tree}")
+                    parent_path = relative_path.parent
+                    if str(parent_path) not in self.remote_tree:
+                        try:
+                            # Run listdir to update cache
+                            self.listdir(parent_path)
+                        except FileNotFoundError:
+                            raise err
 
-                    if parent_tree is not None:
-                        if str(relative_path.name) not in parent_tree:
-                            logger.debug(f"'{relative_path.name}' not in parent_tree")
-                            return dagshub_stat_result(self, path, is_directory=False)
-                        else:
-                            logger.debug(f"'{relative_path.name}' is in parent tree, running _mkdirs for {path}")
-                            self._mkdirs(relative_path, dir_fd=self.project_root_fd)
-                            return self.__stat(relative_path, dir_fd=self.project_root_fd)
-                            # TODO: perhaps don't create directories on stat
-                    raise
+                    cached_remote_parent_tree = self.remote_tree.get(str(parent_path))
+                    logger.debug(f"cached_remote_parent_tree: {cached_remote_parent_tree}")
+
+                    filetype = cached_remote_parent_tree.get(relative_path.name)
+                    if filetype is None:
+                        raise err
+
+                    if filetype == "file":
+                        return dagshub_stat_result(self, path, is_directory=False)
+                    elif filetype == "dir":
+                        self._mkdirs(relative_path, dir_fd=self.project_root_fd)
+                        return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                    else:
+                        raise RuntimeError(f"Unknown file type {filetype} for path {str(relative_path)}")
+
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
@@ -332,7 +343,7 @@ class DagsHubFilesystem:
                 with self._open_fd(relative_path) as fd:
                     return self.__listdir(fd)
             else:
-                dircontents: set[str] = set()
+                dircontents: Set[str] = set()
                 error = None
                 try:
                     with self._open_fd(relative_path) as fd:
@@ -344,8 +355,10 @@ class DagsHubFilesystem:
                 resp = self._api_listdir(relative_path)
                 if resp.ok:
                     dircontents.update(Path(f['path']).name for f in resp.json())
-                    # TODO: optimize + make subroutine async
-                    self.dirtree[str(relative_path)] = [Path(f['path']).name for f in resp.json() if f['type'] == 'dir']
+                    self.remote_tree[str(relative_path)] = {
+                        Path(f["path"]).name: f["type"]
+                        for f in resp.json()
+                    }
                     return list(dircontents)
                 else:
                     if error is not None:
