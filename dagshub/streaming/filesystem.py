@@ -247,6 +247,7 @@ class DagsHubFilesystem:
         return b'v0\n'
 
     def open(self, file: Union[PathLike, int], mode: str = 'r', opener=None, *args, **kwargs):
+        print('OPEN: ', file, mode)
         if opener is not None:
             raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
         relative_path = self._relative_path(file)
@@ -273,11 +274,6 @@ class DagsHubFilesystem:
                         return self.__open(relative_path, mode, opener=project_root_opener)
         else:
             return self.__open(file, mode, *args, **kwargs)
-
-    def write(self, path, data, offset, fh):
-        with self.rwlock:
-            os.lseek(fh, offset, 0)
-            return os.write(fh, data)
 
 
     def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):

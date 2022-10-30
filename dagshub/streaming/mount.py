@@ -105,6 +105,57 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         if fh != SPECIAL_FILE_FH:
             return os.close(fh)
 
+    chmod = os.chmod
+    chown = os.chown
+
+    def create(self, path, mode):
+        return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+
+    def flush(self, path, fh):
+        return os.fsync(fh)
+
+    def fsync(self, path, datasync, fh):
+        if datasync != 0:
+            return os.fdatasync(fh)
+        else:
+            return os.fsync(fh)
+
+    readlink = os.readlink
+    getxattr = None
+
+    def link(self, target, source):
+        return os.link(self.root + source, target)
+
+    listxattr = None
+    mkdir = os.mkdir
+    mknod = os.mknod
+    open = os.open
+
+    def rename(self, old, new):
+        return os.rename(old, self.root + new)
+
+    rmdir = os.rmdir
+
+    def statfs(self, path):
+        stv = os.statvfs(path)
+        return dict((key, getattr(stv, key)) for key in (
+            'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
+            'f_ffree', 'f_files', 'f_flag', 'f_frsize', 'f_namemax'))
+
+    def symlink(self, target, source):
+        return os.symlink(source, target)
+
+    def truncate(self, path, length, fh=None):
+        with open(path, 'r+') as f:
+            f.truncate(length)
+
+    unlink = os.unlink
+    utimens = os.utime
+
+    def write(self, path, data, offset, fh):
+        with self.rwlock:
+            os.lseek(fh, offset, 0)
+            return os.write(fh, data)
 
 def mount(debug=False,
           project_root: Optional[PathLike] = None,
