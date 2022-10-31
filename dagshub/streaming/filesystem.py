@@ -246,7 +246,9 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: Union[PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
+    def open(self, file: Union[bytes, PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
+        if type(file) is bytes:
+            file = os.fsdecode(file)
         relative_path = self._relative_path(file)
         if relative_path:
             if opener is not None:
@@ -259,22 +261,35 @@ class DagsHubFilesystem:
             else:
                 try:
                     return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
-                except FileNotFoundError:
-                    resp = self._api_download_file_git(relative_path)
-                    if resp.ok:
-                        self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
-                        # TODO: Handle symlinks
-                        with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
-                            output.write(resp.content)
-                        return self.__open(relative_path, mode, opener=project_root_opener)
+                except FileNotFoundError as err:
+                    if "r" in mode:
+                        resp = self._api_download_file_git(relative_path)
+                        if resp.ok:
+                            self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
+                            # TODO: Handle symlinks
+                            with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                                output.write(resp.content)
+                            return self.__open(relative_path, mode, opener=project_root_opener)
+                        else:
+                            # TODO: After API no longer 500s on FileNotFounds
+                            #       check status code and only return FileNotFound on 404s
+                            raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+                    # Write modes - make sure that the folder is a tracked folder (create if doesn't exist on disk),
+                    # and then let the user write to file
                     else:
-                        # TODO: After API no longer 500s on FileNotFounds
-                        #       check status code and only return FileNotFound on 404s
-                        raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+                        try:
+                            # Using the fact that stat creates tracked dirs
+                            _ = self.stat(self.project_root / relative_path.parent)
+                        except FileNotFoundError:
+                            raise err
+                        return self.__open(relative_path, mode, opener=project_root_opener)
+
         else:
             return self.__open(file, mode, *args, **kwargs, opener=opener)
 
-    def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
+    def stat(self, path: Union[str, bytes, PathLike], *, dir_fd=None, follow_symlinks=True):
+        if type(path) is bytes:
+            path = os.fsdecode(path)
         if dir_fd is not None or not follow_symlinks:
             logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
@@ -297,12 +312,15 @@ class DagsHubFilesystem:
                     if str(parent_path) not in self.remote_tree:
                         try:
                             # Run listdir to update cache
-                            self.listdir(parent_path)
+                            self.listdir(self.project_root / parent_path)
                         except FileNotFoundError:
                             raise err
 
                     cached_remote_parent_tree = self.remote_tree.get(str(parent_path))
                     logger.debug(f"cached_remote_parent_tree: {cached_remote_parent_tree}")
+
+                    if cached_remote_parent_tree is None:
+                        raise err
 
                     filetype = cached_remote_parent_tree.get(relative_path.name)
                     if filetype is None:
@@ -319,7 +337,9 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path: Union[PathLike, int]):
+    def chdir(self, path: Union[str, bytes, PathLike, int]):
+        if type(path) is bytes:
+            path = os.fsdecode(path)
         relative_path = self._relative_path(path)
         if relative_path:
             abspath = os.path.join(self.project_root, relative_path)
@@ -336,8 +356,14 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path: Union[PathLike, int] = '.'):
-        relative_path = self._relative_path(path)
+    def listdir(self, path: Union[str, bytes, PathLike, int] = '.'):
+        # listdir needs to return results for bytes path arg also in bytes
+        is_bytes_path_arg = type(path) is bytes
+        if is_bytes_path_arg:
+            str_path = os.fsdecode(path)
+        else:
+            str_path = path
+        relative_path = self._relative_path(str_path)
         if relative_path:
             if self._passthrough_path(relative_path):
                 with self._open_fd(relative_path) as fd:
@@ -359,20 +385,32 @@ class DagsHubFilesystem:
                         Path(f["path"]).name: f["type"]
                         for f in resp.json()
                     }
-                    return list(dircontents)
+                    res = list(dircontents)
+                    if is_bytes_path_arg:
+                        res = [os.fsencode(p) for p in res]
+                    return res
                 else:
                     if error is not None:
                         raise error
                     else:
-                        return list(dircontents)
+                        res = list(dircontents)
+                        if is_bytes_path_arg:
+                            res = [os.fsencode(p) for p in res]
+                        return res
         else:
             return self.__listdir(path)
 
     @wrapreturn(dagshub_ScandirIterator)
-    def scandir(self, path: Union[PathLike, int] = '.'):
-        relative_path = self._relative_path(path)
+    def scandir(self, path: Union[str, bytes, PathLike, int] = '.'):
+        # scandir needs to return name and path as bytes, if entry arg is bytes
+        is_bytes_path_arg = type(path) is bytes
+        if is_bytes_path_arg:
+            str_path = os.fsdecode(path)
+        else:
+            str_path = path
+        relative_path = self._relative_path(str_path)
         if relative_path and not self._passthrough_path(relative_path):
-            path = Path(path)
+            path = Path(str_path)
             local_filenames = set()
             try:
                 for direntry in self.__scandir(path):
@@ -380,7 +418,8 @@ class DagsHubFilesystem:
                     yield direntry
                 if relative_path == Path():
                     if SPECIAL_FILE.name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+                        yield dagshub_DirEntry(self, path / SPECIAL_FILE,
+                                               is_directory=False, is_binary=is_bytes_path_arg)
             except FileNotFoundError:
                 pass
             resp = self._api_listdir(relative_path)
@@ -388,7 +427,7 @@ class DagsHubFilesystem:
                 for f in resp.json():
                     name = Path(f['path']).name
                     if name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
+                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir', is_binary=is_bytes_path_arg)
         else:
             for entry in self.__scandir(path):
                 yield entry
@@ -529,25 +568,28 @@ class dagshub_stat_result:
 
 
 class dagshub_DirEntry:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False, is_binary: bool = False):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
+        self._is_binary = is_binary
 
     @property
     def name(self):
         # TODO: create decorator for delegation
         if hasattr(self, '_true_direntry'):
-            return self._true_direntry.name
+            name = self._true_direntry.name
         else:
-            return self._path.name
+            name = self._path.name
+        return os.fsencode(name) if self._is_binary else name
 
     @property
     def path(self):
         if hasattr(self, '_true_direntry'):
-            return self._true_direntry.path
+            path = self._true_direntry.path
         else:
-            return str(self._path)
+            path = str(self._path)
+        return os.fsencode(path) if self._is_binary else path
 
     def is_dir(self):
         if hasattr(self, '_true_direntry'):
