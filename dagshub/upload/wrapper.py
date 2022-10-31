@@ -37,7 +37,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     if username is not None and password is not None:
         auth = username, password
     else:
-        token = config.token or dagshub.auth.get_token(code_input_timeout=0)
+        token = config.token or dagshub.auth.get_token()
         if token is not None:
             auth = HTTPBearerAuth(token)
 
