@@ -3,6 +3,7 @@ import io
 import os
 import re
 import subprocess
+import sys
 from configparser import ConfigParser
 from contextlib import contextmanager
 from functools import partial, wraps, lru_cache
@@ -10,7 +11,11 @@ from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
 from pathlib import Path
-from pathlib import _NormalAccessor as _pathlib
+PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
+# Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
+# In 3.11 _NormalAccessor was removed
+if PRE_PYTHON3_11:
+    from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
 from dagshub.common import config
@@ -293,6 +298,34 @@ class DagsHubFilesystem:
             return self.__open(file, mode, buffering, encoding, errors, newline,
                                closefd, opener)
 
+    def os_open(self, path, flags, mode=0o777, *, dir_fd=None):
+        """
+        os.open is supposed to be lower level, but it's still being used by e.g. Pathlib
+        We're trying to wrap around it here, by parsing flags and calling the higher-level open
+        Caveats: list of flags being handled is not exhaustive + mode doesn't work
+                 (because we lose them when passing to builtin open)
+        WARNING: DO NOT patch actual os.open, because the builtin uses os.open.
+                 This is only for the purposes of patching pathlib.open
+        """
+        filemodes = set()
+        if flags & os.O_EXCL:
+            filemodes.add("x")
+        if flags & os.O_APPEND:
+            filemodes.add("a")
+        if flags & os.O_RDONLY:
+            filemodes.add("r")
+        if flags & (os.O_WRONLY | os.O_TRUNC):
+            filemodes.add("w")
+        if flags & os.O_RDWR:
+            filemodes.add("+")
+        if flags & os.O_BINARY:
+            filemodes.add("b")
+        if flags & os.O_RDWR:
+            filemodes.add("r")
+            filemodes.add("w")
+        filemode = ''.join(filemodes)
+        return self.open(path, filemode)
+
     def stat(self, path: Union[str, bytes, PathLike], *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
             path = os.fsdecode(path)
@@ -459,21 +492,39 @@ class DagsHubFilesystem:
                 'scandir': os.scandir,
                 'chdir': os.chdir,
             }
-        io.open = builtins.open = _pathlib.open = self.open
-        os.stat = _pathlib.stat = self.stat
-        os.listdir = _pathlib.listdir = self.listdir
-        os.scandir = _pathlib.scandir = self.scandir
+            if PRE_PYTHON3_11:
+                self.__class__.__unpatched["pathlib_open"] = _pathlib.open
+        io.open = builtins.open = self.open
+        os.stat = self.stat
+        os.listdir = self.listdir
+        os.scandir = self.scandir
         os.chdir = self.chdir
+        if PRE_PYTHON3_11:
+            if sys.version_info.minor == 10:
+                # Python 3.10 - pathlib uses io.open
+                _pathlib.open = self.open
+            else:
+                # Python <3.9 - pathlib uses os.open
+                _pathlib.open = self.os_open
+            _pathlib.stat = self.stat
+            _pathlib.listdir = self.listdir
+            _pathlib.scandir = self.scandir
+
         self.__class__.hooked_instance = self
 
     @classmethod
     def uninstall_hooks(cls):
         if hasattr(cls, f'_{cls.__name__}__unpatched'):
             io.open = builtins.open = cls.__unpatched['open']
-            os.stat = _pathlib.stat = cls.__unpatched['stat']
-            os.listdir = _pathlib.listdir = cls.__unpatched['listdir']
-            os.scandir = _pathlib.scandir = cls.__unpatched['scandir']
+            os.stat = cls.__unpatched['stat']
+            os.listdir = cls.__unpatched['listdir']
+            os.scandir = cls.__unpatched['scandir']
             os.chdir = cls.__unpatched['chdir']
+            if PRE_PYTHON3_11:
+                _pathlib.open = cls.__unpatched['pathlib_open']
+                _pathlib.stat = cls.__unpatched['stat']
+                _pathlib.listdir = cls.__unpatched['listdir']
+                _pathlib.scandir = cls.__unpatched['scandir']
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:
