@@ -246,7 +246,8 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: Union[bytes, PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
+    def open(self, file: Union[bytes, PathLike, int], mode: str = 'r', buffering=-1, encoding=None,
+             errors=None, newline=None, closefd=True, opener=None):
         if type(file) is bytes:
             file = os.fsdecode(file)
         relative_path = self._relative_path(file)
@@ -255,12 +256,14 @@ class DagsHubFilesystem:
                 raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
             if self._passthrough_path(relative_path):
-                return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+                return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                   closefd, opener=project_root_opener)
             elif relative_path == SPECIAL_FILE:
                 return io.BytesIO(self._special_file())
             else:
                 try:
-                    return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+                    return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                       closefd, opener=project_root_opener)
                 except FileNotFoundError as err:
                     if "r" in mode:
                         resp = self._api_download_file_git(relative_path)
@@ -269,7 +272,8 @@ class DagsHubFilesystem:
                             # TODO: Handle symlinks
                             with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
                                 output.write(resp.content)
-                            return self.__open(relative_path, mode, opener=project_root_opener)
+                            return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                               closefd, opener=project_root_opener)
                         else:
                             # TODO: After API no longer 500s on FileNotFounds
                             #       check status code and only return FileNotFound on 404s
@@ -282,10 +286,12 @@ class DagsHubFilesystem:
                             _ = self.stat(self.project_root / relative_path.parent)
                         except FileNotFoundError:
                             raise err
-                        return self.__open(relative_path, mode, opener=project_root_opener)
+                        return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                           closefd, opener=project_root_opener)
 
         else:
-            return self.__open(file, mode, *args, **kwargs, opener=opener)
+            return self.__open(file, mode, buffering, encoding, errors, newline,
+                               closefd, opener)
 
     def stat(self, path: Union[str, bytes, PathLike], *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
