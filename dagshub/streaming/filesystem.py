@@ -261,7 +261,7 @@ class DagsHubFilesystem:
             else:
                 try:
                     return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
-                except FileNotFoundError:
+                except FileNotFoundError as err:
                     if "r" in mode:
                         resp = self._api_download_file_git(relative_path)
                         if resp.ok:
@@ -281,8 +281,7 @@ class DagsHubFilesystem:
                             # Using the fact that stat creates tracked dirs
                             _ = self.stat(self.project_root / relative_path.parent)
                         except FileNotFoundError:
-                            raise FileNotFoundError(f"{relative_path.parent} does not exist on the filesystem "
-                                                    f"and is not a tracked directory")
+                            raise err
                         return self.__open(relative_path, mode, opener=project_root_opener)
 
         else:
