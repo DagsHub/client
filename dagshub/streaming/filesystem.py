@@ -288,7 +288,9 @@ class DagsHubFilesystem:
         else:
             return self.__open(file, mode, *args, **kwargs, opener=opener)
 
-    def stat(self, path: PathLike, *, dir_fd=None, follow_symlinks=True):
+    def stat(self, path: Union[str, bytes, PathLike], *, dir_fd=None, follow_symlinks=True):
+        if type(path) is bytes:
+            path = os.fsdecode(path)
         if dir_fd is not None or not follow_symlinks:
             logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
@@ -336,7 +338,9 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path: Union[PathLike, int]):
+    def chdir(self, path: Union[str, bytes, PathLike, int]):
+        if type(path) is bytes:
+            path = os.fsdecode(path)
         relative_path = self._relative_path(path)
         if relative_path:
             abspath = os.path.join(self.project_root, relative_path)
@@ -353,8 +357,14 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path: Union[PathLike, int] = '.'):
-        relative_path = self._relative_path(path)
+    def listdir(self, path: Union[str, bytes, PathLike, int] = '.'):
+        # listdir needs to return results for bytes path arg also in bytes
+        is_bytes_path_arg = type(path) is bytes
+        if is_bytes_path_arg:
+            str_path = os.fsdecode(path)
+        else:
+            str_path = path
+        relative_path = self._relative_path(str_path)
         if relative_path:
             if self._passthrough_path(relative_path):
                 with self._open_fd(relative_path) as fd:
@@ -376,20 +386,32 @@ class DagsHubFilesystem:
                         Path(f["path"]).name: f["type"]
                         for f in resp.json()
                     }
-                    return list(dircontents)
+                    res = list(dircontents)
+                    if is_bytes_path_arg:
+                        res = [os.fsencode(p) for p in res]
+                    return res
                 else:
                     if error is not None:
                         raise error
                     else:
-                        return list(dircontents)
+                        res = list(dircontents)
+                        if is_bytes_path_arg:
+                            res = [os.fsencode(p) for p in res]
+                        return res
         else:
             return self.__listdir(path)
 
     @wrapreturn(dagshub_ScandirIterator)
-    def scandir(self, path: Union[PathLike, int] = '.'):
-        relative_path = self._relative_path(path)
+    def scandir(self, path: Union[str, bytes, PathLike, int] = '.'):
+        # scandir needs to return name and path as bytes, if entry arg is bytes
+        is_bytes_path_arg = type(path) is bytes
+        if is_bytes_path_arg:
+            str_path = os.fsdecode(path)
+        else:
+            str_path = path
+        relative_path = self._relative_path(str_path)
         if relative_path and not self._passthrough_path(relative_path):
-            path = Path(path)
+            path = Path(str_path)
             local_filenames = set()
             try:
                 for direntry in self.__scandir(path):
@@ -397,7 +419,8 @@ class DagsHubFilesystem:
                     yield direntry
                 if relative_path == Path():
                     if SPECIAL_FILE.name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / SPECIAL_FILE, is_directory=False)
+                        yield dagshub_DirEntry(self, path / SPECIAL_FILE,
+                                               is_directory=False, is_binary=is_bytes_path_arg)
             except FileNotFoundError:
                 pass
             resp = self._api_listdir(relative_path)
@@ -405,7 +428,7 @@ class DagsHubFilesystem:
                 for f in resp.json():
                     name = Path(f['path']).name
                     if name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir')
+                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir', is_binary=is_bytes_path_arg)
         else:
             for entry in self.__scandir(path):
                 yield entry
@@ -546,25 +569,28 @@ class dagshub_stat_result:
 
 
 class dagshub_DirEntry:
-    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False):
+    def __init__(self, fs: 'DagsHubFilesystem', path: PathLike, is_directory: bool = False, is_binary: bool = False):
         self._fs = fs
         self._path = path
         self._is_directory = is_directory
+        self._is_binary = is_binary
 
     @property
     def name(self):
         # TODO: create decorator for delegation
         if hasattr(self, '_true_direntry'):
-            return self._true_direntry.name
+            name = self._true_direntry.name
         else:
-            return self._path.name
+            name = self._path.name
+        return os.fsencode(name) if self._is_binary else name
 
     @property
     def path(self):
         if hasattr(self, '_true_direntry'):
-            return self._true_direntry.path
+            path = self._true_direntry.path
         else:
-            return str(self._path)
+            path = str(self._path)
+        return os.fsencode(path) if self._is_binary else path
 
     def is_dir(self):
         if hasattr(self, '_true_direntry'):
