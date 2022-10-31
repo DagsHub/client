@@ -505,7 +505,7 @@ class DagsHubFilesystem:
                 # Python 3.10 - pathlib uses io.open
                 _pathlib.open = self.open
             else:
-                # Python <3.9 - pathlib uses os.open
+                # Python <=3.9 - pathlib uses os.open
                 _pathlib.open = self.os_open
             _pathlib.stat = self.stat
             _pathlib.listdir = self.listdir
