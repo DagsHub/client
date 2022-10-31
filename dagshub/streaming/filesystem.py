@@ -11,16 +11,17 @@ from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
 from pathlib import Path
-PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
-# Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
-# In 3.11 _NormalAccessor was removed
-if PRE_PYTHON3_11:
-    from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
 from dagshub.common import config
 import logging
 import requests
+
+# Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
+# In 3.11 _NormalAccessor was removed
+PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
+if PRE_PYTHON3_11:
+    from pathlib import _NormalAccessor as _pathlib  # noqa: E402
 
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
