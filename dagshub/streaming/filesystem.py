@@ -230,7 +230,7 @@ class DagsHubFilesystem:
     def __del__(self):
         os.close(self.project_root_fd)
 
-    def _relative_path(self, file: Union[PathLike, int]):
+    def _relative_path(self, file: Union[str, PathLike, int]):
         if isinstance(file, int):
             return None
         if file == "":
@@ -251,7 +251,7 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: Union[bytes, PathLike, int], mode: str = 'r', buffering=-1, encoding=None,
+    def open(self, file, mode='r', buffering=-1, encoding=None,
              errors=None, newline=None, closefd=True, opener=None):
         if type(file) is bytes:
             file = os.fsdecode(file)
@@ -326,7 +326,7 @@ class DagsHubFilesystem:
         filemode = ''.join(filemodes)
         return self.open(path, filemode)
 
-    def stat(self, path: Union[str, bytes, PathLike], *, dir_fd=None, follow_symlinks=True):
+    def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
             path = os.fsdecode(path)
         if dir_fd is not None or not follow_symlinks:
@@ -376,7 +376,7 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path: Union[str, bytes, PathLike, int]):
+    def chdir(self, path):
         if type(path) is bytes:
             path = os.fsdecode(path)
         relative_path = self._relative_path(path)
@@ -395,7 +395,7 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path: Union[str, bytes, PathLike, int] = '.'):
+    def listdir(self, path='.'):
         # listdir needs to return results for bytes path arg also in bytes
         is_bytes_path_arg = type(path) is bytes
         if is_bytes_path_arg:
@@ -440,7 +440,7 @@ class DagsHubFilesystem:
             return self.__listdir(path)
 
     @wrapreturn(dagshub_ScandirIterator)
-    def scandir(self, path: Union[str, bytes, PathLike, int] = '.'):
+    def scandir(self, path='.'):
         # scandir needs to return name and path as bytes, if entry arg is bytes
         is_bytes_path_arg = type(path) is bytes
         if is_bytes_path_arg:
