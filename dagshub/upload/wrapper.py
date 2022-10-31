@@ -28,7 +28,7 @@ def get_default_branch(src_url, owner, reponame, auth):
 
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
-                gitignores="Python", license="", readme="", template=""):
+                gitignores="Python", license="", readme="", template="custom"):
     import dagshub.auth
     from dagshub.auth.token_auth import HTTPBearerAuth
 
@@ -82,7 +82,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
             raise RuntimeError("Failed to create the desired repository.")
 
     repo = res.json()
-    return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token)
+    return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token, branch="main")
 
 
 class Repo:
