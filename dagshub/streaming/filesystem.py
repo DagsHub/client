@@ -319,7 +319,7 @@ class DagsHubFilesystem:
             filemodes.add("w")
         if flags & os.O_RDWR:
             filemodes.add("+")
-        if flags & os.O_BINARY:
+        if hasattr(os, 'O_BINARY') and flags & os.O_BINARY:
             filemodes.add("b")
         if flags & os.O_RDWR:
             filemodes.add("r")
