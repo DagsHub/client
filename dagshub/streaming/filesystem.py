@@ -313,7 +313,7 @@ class DagsHubFilesystem:
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
         try:
             logger.debug("fs.os_open - trying to materialize path")
-            self.open(path)
+            self.open(path).close()
             logger.debug("fs.os_open - successfully materialized path")
         except FileNotFoundError:
             logger.debug("fs.os_open - failed to materialize path, os.open will throw")
