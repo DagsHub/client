@@ -308,24 +308,16 @@ class DagsHubFilesystem:
         WARNING: DO NOT patch actual os.open, because the builtin uses os.open.
                  This is only for the purposes of patching pathlib.open
         """
-        filemodes = set()
-        if flags & os.O_EXCL:
-            filemodes.add("x")
-        if flags & os.O_APPEND:
-            filemodes.add("a")
-        if flags & os.O_RDONLY:
-            filemodes.add("r")
-        if flags & (os.O_WRONLY | os.O_TRUNC):
-            filemodes.add("w")
-        if flags & os.O_RDWR:
-            filemodes.add("+")
-        if flags & os.O_BINARY:
-            filemodes.add("b")
-        if flags & os.O_RDWR:
-            filemodes.add("r")
-            filemodes.add("w")
-        filemode = ''.join(filemodes)
-        return self.open(path, filemode)
+        if dir_fd is not None:
+            logger.debug("fs.os_open - NotImplemented")
+            raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
+        try:
+            logger.debug("fs.os_open - trying to materialize path")
+            self.open(path).close()
+            logger.debug("fs.os_open - successfully materialized path")
+        except FileNotFoundError:
+            logger.debug("fs.os_open - failed to materialize path, os.open will throw")
+        return os.open(path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
