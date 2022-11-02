@@ -154,12 +154,8 @@ class Repo:
 
         if self.username is not None and self.password is not None:
             return self.username, self.password
-        try:
-            token = self.token or dagshub.auth.get_token(code_input_timeout=0)
-        except dagshub.auth.OauthNonInteractiveShellException:
-            logger.warning("Failed to perform OAuth in a non interactive shell")
-        if token is not None:
-            return HTTPBearerAuth(token)
+        token = self.token or dagshub.auth.get_token(code_input_timeout=0)
+        return HTTPBearerAuth(token)
 
     def directory(self, path):
         return DataSet(self, path)
