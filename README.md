@@ -1,4 +1,4 @@
-[![DagsHub Client](dagshub_github.png)](https://dagshub.com)
+[![DagsHub Client](https://github.com/DagsHub/client/raw/master/dagshub_github.png)](https://dagshub.com)
 
 <div align="center">
     <h3>🚀 Launching <a href="#data-streaming">Streaming</a> and <a href="#data-streaming">Upload</a> of DVC versioned Data 🚀</h3>
