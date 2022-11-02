@@ -321,7 +321,9 @@ class DagsHubFilesystem:
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
         try:
             open_mode = "r"
-            # Write modes - calling in append mode, so we create the folders if file doesn't exist, but not truncate it
+            # Write modes - calling in append mode,
+            # This way we create the intermediate folders if file doesn't exist, but the folder it's in does
+            # Append so we don't truncate the file
             if not (flags & os.O_RDONLY):
                 open_mode = "a"
             logger.debug("fs.os_open - trying to materialize path")
