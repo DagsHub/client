@@ -84,6 +84,8 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     repo = res.json()
     return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token, branch="main")
 
+def clean_directory_name(directory: str):
+    return os.path.normpath(directory)
 
 class Repo:
     def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
@@ -153,7 +155,7 @@ class Repo:
             logger.debug(f"Response ({res.status_code})\n")
 
         if res.status_code == 200:
-            logger.info("Upload finished successfully!")
+            print("Upload finished successfully!")
 
     @property
     def auth(self):
@@ -196,10 +198,10 @@ class Repo:
 
 
 class DataSet:
-    def __init__(self, repo: Repo, directory):
+    def __init__(self, repo: Repo, directory: str):
         self.files = {}
         self.repo = repo
-        self.directory = directory
+        self.directory = clean_directory_name(directory)
         self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
