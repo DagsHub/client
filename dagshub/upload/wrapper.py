@@ -8,6 +8,9 @@ from typing import Union
 from io import IOBase
 from dagshub.common import config
 from http import HTTPStatus
+import dagshub.auth
+from dagshub.auth.token_auth import HTTPBearerAuth
+from requests.auth import HTTPBasicAuth
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -22,13 +25,13 @@ logger = logging.getLogger(__name__)
 def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
-        reponame=reponame
-    )))
+        reponame=reponame,
+    )), auth=auth)
     return res.json().get('default_branch')
 
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
-                gitignores="", license="", readme="", template="none"):
+                gitignores="Python", license="", readme="", template="custom"):
     if template == "":
         template = "none"
 
@@ -156,19 +159,10 @@ class Repo:
 
     @property
     def auth(self):
-        import dagshub.auth
-        from dagshub.auth.token_auth import HTTPBearerAuth
-
-        username = self.username or config.username
-        password = self.password or config.password
-        if username is not None and password is not None:
-            return username, password
-        try:
-            token = self.token or dagshub.auth.get_token(code_input_timeout=0)
-        except dagshub.auth.OauthNonInteractiveShellException:
-            logger.debug("Failed to perform OAuth in a non interactive shell")
-        if token is not None:
-            return HTTPBearerAuth(token)
+        if self.username is not None and self.password is not None:
+            return HTTPBasicAuth(self.username, self.password)
+        token = self.token or dagshub.auth.get_token(code_input_timeout=0)
+        return HTTPBearerAuth(token)
 
     def directory(self, path):
         return DataSet(self, path)

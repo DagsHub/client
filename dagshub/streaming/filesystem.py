@@ -3,6 +3,7 @@ import io
 import os
 import re
 import subprocess
+import sys
 from configparser import ConfigParser
 from contextlib import contextmanager
 from functools import partial, wraps, lru_cache
@@ -10,12 +11,17 @@ from multiprocessing import AuthenticationError
 from os import PathLike
 from os.path import ismount
 from pathlib import Path
-from pathlib import _NormalAccessor as _pathlib
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
 from dagshub.common import config
 import logging
 import requests
+
+# Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
+# In 3.11 _NormalAccessor was removed
+PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
+if PRE_PYTHON3_11:
+    from pathlib import _NormalAccessor as _pathlib  # noqa: E402
 
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
@@ -225,7 +231,7 @@ class DagsHubFilesystem:
     def __del__(self):
         os.close(self.project_root_fd)
 
-    def _relative_path(self, file: Union[PathLike, int]):
+    def _relative_path(self, file: Union[str, PathLike, int]):
         if isinstance(file, int):
             return None
         if file == "":
@@ -246,7 +252,8 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b'v0\n'
 
-    def open(self, file: Union[bytes, PathLike, int], mode: str = 'r', *args, opener=None, **kwargs):
+    def open(self, file, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None, closefd=True, opener=None):
         if type(file) is bytes:
             file = os.fsdecode(file)
         relative_path = self._relative_path(file)
@@ -255,13 +262,16 @@ class DagsHubFilesystem:
                 raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
             if self._passthrough_path(relative_path):
-                return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+                return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                   closefd, opener=project_root_opener)
             elif relative_path == SPECIAL_FILE:
                 return io.BytesIO(self._special_file())
             else:
                 try:
-                    return self.__open(relative_path, mode, *args, **kwargs, opener=project_root_opener)
+                    return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                       closefd, opener=project_root_opener)
                 except FileNotFoundError as err:
+                    # Open for reading - try to download the file
                     if "r" in mode:
                         resp = self._api_download_file_git(relative_path)
                         if resp.ok:
@@ -269,7 +279,8 @@ class DagsHubFilesystem:
                             # TODO: Handle symlinks
                             with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
                                 output.write(resp.content)
-                            return self.__open(relative_path, mode, opener=project_root_opener)
+                            return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                               closefd, opener=project_root_opener)
                         else:
                             # TODO: After API no longer 500s on FileNotFounds
                             #       check status code and only return FileNotFound on 404s
@@ -278,16 +289,51 @@ class DagsHubFilesystem:
                     # and then let the user write to file
                     else:
                         try:
-                            # Using the fact that stat creates tracked dirs
+                            # Using the fact that stat creates tracked dirs (but still throws on nonexistent dirs)
                             _ = self.stat(self.project_root / relative_path.parent)
                         except FileNotFoundError:
                             raise err
-                        return self.__open(relative_path, mode, opener=project_root_opener)
+                        # Try to download the file if we're in append modes
+                        if "a" in mode or "+" in mode:
+                            resp = self._api_download_file_git(relative_path)
+                            if resp.ok:
+                                with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                                    output.write(resp.content)
+                        return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                                           closefd, opener=project_root_opener)
 
         else:
-            return self.__open(file, mode, *args, **kwargs, opener=opener)
+            return self.__open(file, mode, buffering, encoding, errors, newline,
+                               closefd, opener)
 
-    def stat(self, path: Union[str, bytes, PathLike], *, dir_fd=None, follow_symlinks=True):
+    def os_open(self, path, flags, mode=0o777, *, dir_fd=None):
+        """
+        os.open is supposed to be lower level, but it's still being used by e.g. Pathlib
+        We're trying to wrap around it here, by parsing flags and calling the higher-level open
+        Caveats: list of flags being handled is not exhaustive + mode doesn't work
+                 (because we lose them when passing to builtin open)
+        WARNING: DO NOT patch actual os.open with it, because the builtin uses os.open.
+                 This is only for the purposes of patching pathlib.open in Python 3.9 and below.
+                 Since Python 3.10 pathlib uses io.open, and in Python 3.11 they removed the accessor completely
+        """
+        if dir_fd is not None:   # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
+            logger.debug("fs.os_open - NotImplemented")
+            raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
+        try:
+            open_mode = "r"
+            # Write modes - calling in append mode,
+            # This way we create the intermediate folders if file doesn't exist, but the folder it's in does
+            # Append so we don't truncate the file
+            if not (flags & os.O_RDONLY):
+                open_mode = "a"
+            logger.debug("fs.os_open - trying to materialize path")
+            self.open(path, mode=open_mode).close()
+            logger.debug("fs.os_open - successfully materialized path")
+        except FileNotFoundError:
+            logger.debug("fs.os_open - failed to materialize path, os.open will throw")
+        return os.open(path, flags, mode, dir_fd=dir_fd)
+
+    def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
             path = os.fsdecode(path)
         if dir_fd is not None or not follow_symlinks:
@@ -337,7 +383,7 @@ class DagsHubFilesystem:
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path: Union[str, bytes, PathLike, int]):
+    def chdir(self, path):
         if type(path) is bytes:
             path = os.fsdecode(path)
         relative_path = self._relative_path(path)
@@ -356,7 +402,7 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path: Union[str, bytes, PathLike, int] = '.'):
+    def listdir(self, path='.'):
         # listdir needs to return results for bytes path arg also in bytes
         is_bytes_path_arg = type(path) is bytes
         if is_bytes_path_arg:
@@ -401,7 +447,7 @@ class DagsHubFilesystem:
             return self.__listdir(path)
 
     @wrapreturn(dagshub_ScandirIterator)
-    def scandir(self, path: Union[str, bytes, PathLike, int] = '.'):
+    def scandir(self, path='.'):
         # scandir needs to return name and path as bytes, if entry arg is bytes
         is_bytes_path_arg = type(path) is bytes
         if is_bytes_path_arg:
@@ -453,21 +499,39 @@ class DagsHubFilesystem:
                 'scandir': os.scandir,
                 'chdir': os.chdir,
             }
-        io.open = builtins.open = _pathlib.open = self.open
-        os.stat = _pathlib.stat = self.stat
-        os.listdir = _pathlib.listdir = self.listdir
-        os.scandir = _pathlib.scandir = self.scandir
+            if PRE_PYTHON3_11:
+                self.__class__.__unpatched["pathlib_open"] = _pathlib.open
+        io.open = builtins.open = self.open
+        os.stat = self.stat
+        os.listdir = self.listdir
+        os.scandir = self.scandir
         os.chdir = self.chdir
+        if PRE_PYTHON3_11:
+            if sys.version_info.minor == 10:
+                # Python 3.10 - pathlib uses io.open
+                _pathlib.open = self.open
+            else:
+                # Python <=3.9 - pathlib uses os.open
+                _pathlib.open = self.os_open
+            _pathlib.stat = self.stat
+            _pathlib.listdir = self.listdir
+            _pathlib.scandir = self.scandir
+
         self.__class__.hooked_instance = self
 
     @classmethod
     def uninstall_hooks(cls):
         if hasattr(cls, f'_{cls.__name__}__unpatched'):
             io.open = builtins.open = cls.__unpatched['open']
-            os.stat = _pathlib.stat = cls.__unpatched['stat']
-            os.listdir = _pathlib.listdir = cls.__unpatched['listdir']
-            os.scandir = _pathlib.scandir = cls.__unpatched['scandir']
+            os.stat = cls.__unpatched['stat']
+            os.listdir = cls.__unpatched['listdir']
+            os.scandir = cls.__unpatched['scandir']
             os.chdir = cls.__unpatched['chdir']
+            if PRE_PYTHON3_11:
+                _pathlib.open = cls.__unpatched['pathlib_open']
+                _pathlib.stat = cls.__unpatched['stat']
+                _pathlib.listdir = cls.__unpatched['listdir']
+                _pathlib.scandir = cls.__unpatched['scandir']
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:
