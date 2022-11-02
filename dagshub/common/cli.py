@@ -19,9 +19,6 @@ def cli(ctx, host):
 @click.argument("project_root", default=".")
 @click.option("--repo_url", help="URL of the repo hosted on DagsHub")
 @click.option("--branch", help="Repository's branch")
-@click.option("--username", help="User's username")
-@click.option("--password", help="User's password")
-@click.option("--token", help="Long lasting user token")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option(
     "--debug", default=False, type=bool, help="Run fuse in foreground"
@@ -70,15 +67,6 @@ def validate_repo(ctx, param, value):
     return tuple(parts)
 
 
-def validate_user(ctx, param, value):
-    if value is None:
-        return None, None
-    parts = value.split(":")
-    if len(parts) != 2:
-        raise click.BadParameter("user needs to be in the format <username>:<password>")
-    return tuple(parts)
-
-
 def to_log_level(verbosity):
     if verbosity == 0:
         return logging.WARN
@@ -94,12 +82,7 @@ def to_log_level(verbosity):
 @click.argument("target")
 @click.option("-m", "--message", help="Commit message for the upload")
 @click.option("-b", "--branch", help="Branch to upload the file to")
-@click.option("-u", "--user", callback=validate_user, help="Username and password in the format '<user>:<password>'."
-                                                           "This option is not recommended, instead leave this empty "
-                                                           "to use oauth or specify --token to use an existing "
-                                                           "user token.")
 @click.option("--update", is_flag=True, help="Force update an existing file")
-@click.option("--token", help="Authenticate using an existing user token")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.pass_context
 def upload(ctx,
@@ -107,9 +90,7 @@ def upload(ctx,
            target,
            repo,
            message,
-           user,
            branch,
-           token,
            verbose,
            update,
            **kwargs):
@@ -123,8 +104,7 @@ def upload(ctx,
     logger.setLevel(to_log_level(verbose))
 
     owner, repo_name = repo
-    username, password = user
-    repo = Repo(owner=owner, name=repo_name, username=username, password=password, token=token, branch=branch)
+    repo = Repo(owner=owner, name=repo_name, branch=branch)
     repo.upload(file=filename, path=target, commit_message=message, force=update)
 
 
