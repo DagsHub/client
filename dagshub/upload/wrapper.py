@@ -18,7 +18,6 @@ ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
-
 def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
@@ -84,9 +83,6 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     repo = res.json()
     return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token, branch="main")
 
-def clean_directory_name(directory: str):
-    return os.path.normpath(directory)
-
 class Repo:
     def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
         self.owner = owner
@@ -99,9 +95,9 @@ class Repo:
         self.branch = branch
 
         if self.branch is None:
-            logger.info("Branch wasn't provided. Fetching default branch...")
+            logger.debug("Branch wasn't provided. Fetching default branch...")
             self._set_default_branch()
-        logger.info(f"Set branch: {self.branch}")
+        logger.debug(f"Set branch: {self.branch}")
 
     def upload(self, file: Union[str, IOBase], commit_message=DEFAULT_COMMIT_MESSAGE, path=None, **kwargs):
         file_for_upload = DataSet.get_file(file, path)
@@ -132,6 +128,7 @@ class Repo:
 
         if force:
             data["last_commit"] = self._get_last_commit()
+        logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
         res = requests.put(
             self.get_request_url(directory_path),
             data,
@@ -155,7 +152,7 @@ class Repo:
             logger.debug(f"Response ({res.status_code})\n")
 
         if res.status_code == 200:
-            print("Upload finished successfully!")
+            logger.warning("Upload finished successfully!")
 
     @property
     def auth(self):
@@ -201,7 +198,7 @@ class DataSet:
     def __init__(self, repo: Repo, directory: str):
         self.files = {}
         self.repo = repo
-        self.directory = clean_directory_name(directory)
+        self.directory = self._clean_directory_name(directory)
         self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
@@ -210,6 +207,10 @@ class DataSet:
             if path in self.files:
                 logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
             self.files[path] = (path, file)
+
+    @staticmethod
+    def _clean_directory_name(directory: str):
+        return os.path.normpath(directory)
 
     @staticmethod
     def get_file(file: Union[str, IOBase], path=None):
