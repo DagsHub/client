@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
-        reponame=reponame
-    )))
+        reponame=reponame,
+    )), auth=auth)
     return res.json().get('default_branch')
 
 
@@ -152,14 +152,12 @@ class Repo:
         import dagshub.auth
         from dagshub.auth.token_auth import HTTPBearerAuth
 
-        username = self.username or config.username
-        password = self.password or config.password
-        if username is not None and password is not None:
-            return username, password
+        if self.username is not None and self.password is not None:
+            return self.username, self.password
         try:
             token = self.token or dagshub.auth.get_token(code_input_timeout=0)
         except dagshub.auth.OauthNonInteractiveShellException:
-            logger.debug("Failed to perform OAuth in a non interactive shell")
+            logger.warning("Failed to perform OAuth in a non interactive shell")
         if token is not None:
             return HTTPBearerAuth(token)
 
