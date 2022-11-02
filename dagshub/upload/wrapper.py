@@ -32,6 +32,11 @@ def get_default_branch(src_url, owner, reponame, auth):
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
+    if template == "":
+        template = "none"
+
+    import dagshub.auth
+    from dagshub.auth.token_auth import HTTPBearerAuth
 
     username = config.username
     password = config.password
@@ -45,12 +50,8 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     if auth is None:
         raise RuntimeError("You can't create a repository without being authenticated.")
 
-    if license is None and readme is None and template is None and gitignores is None:
-        raise RuntimeError(
-            "Creating an empty repository is not supported. "
-            "Please choose a valid gitignore, license, readme, or project template. "
-            "You can see the list of options here: https://dagshub.com/repo/create . "
-            "Our template options are 'cookiecutter-dagshub-dvc' or 'notebook-template' .")
+    if (license != "" or readme != "" or gitignores != "") and template == "none":
+        template = "custom"
 
     data = {
         "name": repo_name,
