@@ -271,6 +271,7 @@ class DagsHubFilesystem:
                     return self.__open(relative_path, mode, buffering, encoding, errors, newline,
                                        closefd, opener=project_root_opener)
                 except FileNotFoundError as err:
+                    # Open for reading - try to download the file
                     if "r" in mode:
                         resp = self._api_download_file_git(relative_path)
                         if resp.ok:
@@ -292,6 +293,12 @@ class DagsHubFilesystem:
                             _ = self.stat(self.project_root / relative_path.parent)
                         except FileNotFoundError:
                             raise err
+                        # Try to download the file if we're in append modes
+                        if "a" in mode or "+" in mode:
+                            resp = self._api_download_file_git(relative_path)
+                            if resp.ok:
+                                with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                                    output.write(resp.content)
                         return self.__open(relative_path, mode, buffering, encoding, errors, newline,
                                            closefd, opener=project_root_opener)
 
@@ -312,8 +319,12 @@ class DagsHubFilesystem:
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
         try:
+            open_mode = "r"
+            # Write modes - calling in append mode, so we create the folders if file doesn't exist, but not truncate it
+            if not (flags & os.O_RDONLY):
+                open_mode = "a"
             logger.debug("fs.os_open - trying to materialize path")
-            self.open(path).close()
+            self.open(path, mode=open_mode).close()
             logger.debug("fs.os_open - successfully materialized path")
         except FileNotFoundError:
             logger.debug("fs.os_open - failed to materialize path, os.open will throw")
