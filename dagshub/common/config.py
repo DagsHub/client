@@ -1,6 +1,8 @@
 import appdirs
 import os
 from urllib.parse import urlparse
+import dagshub.version
+import requests.utils
 
 HOST_KEY = "DAGSHUB_CLIENT_HOST"
 DEFAULT_HOST = "https://dagshub.com"
@@ -25,3 +27,5 @@ cache_location = os.environ.get(
 token = os.environ.get(DAGSHUB_USER_TOKEN_KEY)
 username = os.environ.get(DAGSHUB_USERNAME_KEY)
 password = os.environ.get(DAGSHUB_PASSWORD_KEY)
+custom_user_agent_suffix = f" dagshub-client-python/{dagshub.version.__version__}"
+requests_headers = {"user-agent": requests.utils.default_user_agent() + custom_user_agent_suffix}

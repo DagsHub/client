@@ -71,7 +71,9 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     res = requests.post(
         urllib.parse.urljoin(config.host, url),
         data,
-        auth=auth)
+        auth=auth,
+        headers=config.requests_headers
+    )
 
     if res.status_code != HTTPStatus.CREATED:
         logger.error(f"Response ({res.status_code}):\n"

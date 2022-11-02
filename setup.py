@@ -1,11 +1,12 @@
 import setuptools
+import dagshub.version
 
 with open("README.md", "r", encoding="utf8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="dagshub",
-    version="0.1.99-alpha",
+    version=dagshub.version.__version__,
     author="DagsHub",
     author_email="contact@dagshub.com",
     description="DagsHub client libraries",

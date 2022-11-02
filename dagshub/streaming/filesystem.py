@@ -481,10 +481,11 @@ class DagsHubFilesystem:
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
         return requests.get(f'{self.content_api_url}/{path}', auth=self.auth,
-                            params={'include_size': 'true'} if include_size else {})
+                            params={'include_size': 'true'} if include_size else {},
+                            headers=config.requests_headers)
 
     def _api_download_file_git(self, path: str):
-        return requests.get(f'{self.raw_api_url}/{path}', auth=self.auth)
+        return requests.get(f'{self.raw_api_url}/{path}', auth=self.auth, headers=config.requests_headers)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
