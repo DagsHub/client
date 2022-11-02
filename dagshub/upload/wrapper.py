@@ -18,6 +18,7 @@ ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
+
 def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
@@ -82,6 +83,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
 
     repo = res.json()
     return Repo(owner=repo["owner"]["login"], name=repo["name"], token=token, branch="main")
+
 
 class Repo:
     def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
