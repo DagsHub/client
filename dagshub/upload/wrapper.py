@@ -8,6 +8,9 @@ from typing import Union
 from io import IOBase
 from dagshub.common import config
 from http import HTTPStatus
+import dagshub.auth
+from dagshub.auth.token_auth import HTTPBearerAuth
+from requests.auth import HTTPBasicAuth
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -29,8 +32,6 @@ def get_default_branch(src_url, owner, reponame, auth):
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template=""):
-    import dagshub.auth
-    from dagshub.auth.token_auth import HTTPBearerAuth
 
     token = config.token or dagshub.auth.get_token(code_input_timeout=0)
     if token is not None:
@@ -153,7 +154,7 @@ class Repo:
         from dagshub.auth.token_auth import HTTPBearerAuth
 
         if self.username is not None and self.password is not None:
-            return self.username, self.password
+            return HTTPBasicAuth(self.username, self.password)
         token = self.token or dagshub.auth.get_token(code_input_timeout=0)
         return HTTPBearerAuth(token)
 
