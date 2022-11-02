@@ -32,6 +32,19 @@ def get_default_branch(src_url, owner, reponame, auth):
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
+    """
+    Creates a repo for the current logged in user or the organization passed as an argument
+    :param repo_name Name of the repository to be created
+    :param is_org Flag to indicate the repository has to be attached to an organization
+    :param org_name Organization name to attach the repository to
+    :param description Description for the repostiroy
+    :param private Flag to indicate the repository is going to be private
+    :param gitignores Which gitignore template to use
+    :param license Which license file to use
+    :param readme Readme file to upload
+    :param template It indicates which project template to use, options are: none, custom, notebook-template,
+    cookiecutter-dagshub-dvc
+    """
     if template == "":
         template = "none"
 
