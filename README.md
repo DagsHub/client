@@ -64,10 +64,9 @@ require authentication. After running `dagshub login` you can use data streaming
 authentication info. You can also provide a non-temporary token by using the `--token` flag.
 
 ### Automagic Configuration
-All the supported ways to use DDA should normally automatically detect the configuration needed, including:
-* The Git/DVC project in the current working directory
-* The DagsHub repository URL to stream files from
-* The Username and Token to use for streaming files from DagsHub
+Parts of DDA will try to pick up configuration required to communicate with DagsHub. For example, Data Streaming will use the configuration of your git repository to get the branch you're currently working on and your authentication username and password.
+
+OAuth token acquired via `dagshub login` is cached locally, so you don't need to log in every time you run your scripts.
 
 If you need to override the automatically detected configuration, use the following environment variables and options in
 the CLI:
@@ -79,7 +78,7 @@ the CLI:
 
 Or provide the relevant arguments to the Python entrypoints:
 
-* `repo_url=`
+* `repo_url=` (For Data Streaming)
 * `username=`
 * `password=`
 * `token=`
@@ -190,9 +189,6 @@ dagshub upload <repo_owner>/<repo_name> <local_file_path> <path_in_remote>
 --help              Show this message and exit.
 ```
 
-> **Note** **Important**
-> For uploading to private repositories, you must use the `--branch BRANCH_NAME` option.
-
 ### Python API Upload
 
 You can use the DagsHub client to upload files directly from your Python code to your DagsHub repo, **using both Git &
@@ -211,9 +207,6 @@ repo.upload(file="<local_file_path>", path="<path_in_remote>", versioning=”dvc
 ```
 
 This will upload a single file to DagsHub, which will be tracked by DVC.
-
-> **Note** **Important**
-> For uploading to private repositories, you must use the `branch=BRANCH_NAME` option.
 
 You can also upload multiple files with the Python client, by using:
 ```python
