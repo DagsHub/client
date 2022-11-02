@@ -1,5 +1,10 @@
 [![DagsHub Client](dagshub_github.png)](https://dagshub.com)
 
+<div align="center">
+    <h3>🚀 Launching <a href="#data-streaming">Streaming</a> and <a href="#data-streaming">Upload</a> of DVC versioned Data 🚀</h3>
+</div>
+<br/>
+
 [![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=master)](https://github.com/DAGsHub/client/actions/workflows/python-package.yml)
 [![pip](https://img.shields.io/pypi/v/dagshub.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/dagshub)
 [![License](https://img.shields.io/pypi/l/dagshub)](/LICENSE)
