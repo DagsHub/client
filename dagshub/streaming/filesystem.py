@@ -289,7 +289,7 @@ class DagsHubFilesystem:
                     # and then let the user write to file
                     else:
                         try:
-                            # Using the fact that stat creates tracked dirs
+                            # Using the fact that stat creates tracked dirs (but still throws on nonexistent dirs)
                             _ = self.stat(self.project_root / relative_path.parent)
                         except FileNotFoundError:
                             raise err
@@ -312,10 +312,11 @@ class DagsHubFilesystem:
         We're trying to wrap around it here, by parsing flags and calling the higher-level open
         Caveats: list of flags being handled is not exhaustive + mode doesn't work
                  (because we lose them when passing to builtin open)
-        WARNING: DO NOT patch actual os.open, because the builtin uses os.open.
-                 This is only for the purposes of patching pathlib.open
+        WARNING: DO NOT patch actual os.open with it, because the builtin uses os.open.
+                 This is only for the purposes of patching pathlib.open in Python 3.9 and below.
+                 Since Python 3.10 pathlib uses io.open, and in Python 3.11 they removed the accessor completely
         """
-        if dir_fd is not None:
+        if dir_fd is not None:   # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
         try:
