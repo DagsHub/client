@@ -170,6 +170,18 @@ class Repo:
     def directory(self, path):
         return DataSet(self, path)
 
+    def upload_directory(self, remote_path, local_path, glob_exclude=""):
+        ds = self.directory(local_path)
+        for root, dirs, files in os.walk(local_path):
+            if len(files) > 0:
+                for filename in files:
+                    rel_file_path = os.path.join(root, filename)
+                    ds.add(file=rel_file_path, path=remote_path)
+                commit_message = "Commit data points in folder %s" % root
+                print(commit_message)
+                print(ds.files)
+                ds.commit(commit_message, versioning="dvc")
+
     def get_request_url(self, directory):
         return urllib.parse.urljoin(self.src_url, CONTENT_UPLOAD_URL.format(
             owner=self.owner,
