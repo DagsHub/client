@@ -4,6 +4,7 @@ import requests
 import urllib
 import os
 import logging
+import fnmatch
 from typing import Union
 from io import IOBase
 from dagshub.common import config
@@ -211,9 +212,12 @@ class DataSet:
                 for filename in files:
                     rel_file_path = os.path.join(root, filename)
                     rel_remote_file_path = rel_file_path.replace(local_path, "")
-                    self.add(file=rel_file_path, path=rel_remote_file_path)
-                commit_message = "Commit data points in folder %s" % root
-                self.commit(commit_message, versioning="dvc")
+                    if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
+                        self.add(file=rel_file_path, path=rel_remote_file_path)
+
+                if len(self.files) > 0:
+                    commit_message = "Commit data points in folder %s" % root
+                    self.commit(commit_message, versioning="dvc")
 
     @staticmethod
     def _clean_directory_name(directory: str):
