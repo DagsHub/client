@@ -21,12 +21,14 @@ ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
+s = requests.Session()
+s.headers.update(config.requests_headers)
 
 def get_default_branch(src_url, owner, reponame, auth):
-    res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
+    res = s.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
         reponame=reponame,
-    )), auth=auth, headers=config.requests_headers)
+    )), auth=auth)
     return res.json().get('default_branch')
 
 
@@ -70,11 +72,10 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
             orgname=org_name,
         )
 
-    res = requests.post(
+    res = s.post(
         urllib.parse.urljoin(config.host, url),
         data,
-        auth=auth,
-        headers=config.requests_headers
+        auth=auth
     )
 
     if res.status_code != HTTPStatus.CREATED:
@@ -135,12 +136,12 @@ class Repo:
         if force:
             data["last_commit"] = self._get_last_commit()
         logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
-        res = requests.put(
+        res = s.put(
             self.get_request_url(directory_path),
             data,
             files=[("files", file) for file in files],
-            auth=self.auth,
-            headers=config.requests_headers)
+            auth=self.auth
+    )
         self._log_upload_details(data, res, files)
 
     def _log_upload_details(self, data, res, files):
@@ -245,7 +246,7 @@ class DataSet:
     def _get_last_commit(self):
         api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
         api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
-        res = requests.get(api_url, headers=config.requests_headers)
+        res = s.get(api_url)
         if res.status_code == HTTPStatus.OK:
             content = res.json()
             try:
