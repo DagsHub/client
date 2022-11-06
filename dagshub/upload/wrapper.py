@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 s = requests.Session()
 s.headers.update(config.requests_headers)
 
+
 def get_default_branch(src_url, owner, reponame, auth):
     res = s.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
@@ -141,7 +142,7 @@ class Repo:
             data,
             files=[("files", file) for file in files],
             auth=self.auth
-    )
+        )
         self._log_upload_details(data, res, files)
 
     def _log_upload_details(self, data, res, files):
