@@ -70,7 +70,7 @@ The easiest way to start using DagsHub is via the Python Hooks method. To do thi
     ```
 3. That’s it! You now have streaming access to all your project files.
 
-🤩Check out this To see an example of this that actually runs, check out the Colab below:
+**🤩 Check out this colab to see an example of this Data Streaming work end to end:**
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1CtBmcDtZnxZKVIhNvPagX-8UFWHZ5HAg?usp=sharing)
 
