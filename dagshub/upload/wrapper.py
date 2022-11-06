@@ -26,7 +26,7 @@ def get_default_branch(src_url, owner, reponame, auth):
     res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
         owner=owner,
         reponame=reponame,
-    )), auth=auth)
+    )), auth=auth, headers=config.requests_headers)
     return res.json().get('default_branch')
 
 
@@ -139,7 +139,8 @@ class Repo:
             self.get_request_url(directory_path),
             data,
             files=[("files", file) for file in files],
-            auth=self.auth)
+            auth=self.auth,
+            headers=config.requests_headers)
         self._log_upload_details(data, res, files)
 
     def _log_upload_details(self, data, res, files):
@@ -244,7 +245,7 @@ class DataSet:
     def _get_last_commit(self):
         api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
         api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
-        res = requests.get(api_url)
+        res = requests.get(api_url, headers=config.requests_headers)
         if res.status_code == HTTPStatus.OK:
             content = res.json()
             try:
