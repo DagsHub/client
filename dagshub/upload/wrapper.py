@@ -31,6 +31,13 @@ def get_default_branch(src_url, owner, reponame, auth):
     return res.json().get('default_branch')
 
 
+def create_dataset(repo_name, local_path, glob_exclude="", is_org=False, org_name="", private=False):
+    repo = create_repo(repo_name, is_org=is_org, org_name=org_name, private=private)
+    dir = repo.directory(repo_name)
+    dir.add_dir(local_path, glob_exclude)
+    return repo
+
+
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
     if template == "":
