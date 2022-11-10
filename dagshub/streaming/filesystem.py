@@ -13,7 +13,7 @@ from os.path import ismount
 from pathlib import Path
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
-from dagshub.common import config
+from dagshub.common import config, helpers
 import logging
 import requests
 
@@ -153,17 +153,22 @@ class DagsHubFilesystem:
         if self.user_specified_branch:
             branch = self.user_specified_branch
         else:
-            with open(self.project_root / ".git/HEAD") as head_file:
-                head = head_file.readline().strip()
-            if head.startswith("ref"):
-                branch = head.split("/")[-1]
-            else:
-                # contents of HEAD is the revision - check that this commit exists on remote
-                if self.is_commit_on_remote(head):
-                    return head
+            try:
+                with open(self.project_root / ".git/HEAD") as head_file:
+                    head = head_file.readline().strip()
+                if head.startswith("ref"):
+                    branch = head.split("/")[-1]
                 else:
-                    raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
-                                       f"Please push your changes to the remote or checkout a tracked branch.")
+                    # contents of HEAD is the revision - check that this commit exists on remote
+                    if self.is_commit_on_remote(head):
+                        return head
+                    else:
+                        raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
+                                           f"Please push your changes to the remote or checkout a tracked branch.")
+            except:
+                print("FETCHING DEFAULT BRANCH...")
+                owner, reponame = self.parsed_repo_url.path.split("/")[1:]
+                branch = helpers.get_default_branch(owner, reponame, self.auth)
         return self.get_remote_branch_head(branch)
 
     @property
