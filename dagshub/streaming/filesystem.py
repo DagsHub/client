@@ -146,6 +146,7 @@ class DagsHubFilesystem:
         """
         Gets current revision on repo:
         - If User specified a branch, returns HEAD of that brunch on the remote
+        - If branch wasn't detected, returns HEAD of default branch in the speficied remote.
         - If HEAD is a branch, tries to find a dagshub remote associated with it and get its HEAD
         - If HEAD is a commit revision, checks that the commit exists on DagsHub
         """
