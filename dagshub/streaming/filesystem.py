@@ -167,7 +167,7 @@ class DagsHubFilesystem:
                                            f"Please push your changes to the remote or checkout a tracked branch.")
 
             except FileNotFoundError:
-                logger.debug("Couldn't get branch info from local git repository, "+
+                logger.debug("Couldn't get branch info from local git repository, " +
                              "fetching default branch from the remote...")
                 owner, reponame = self.parsed_repo_url.path.split("/")[1:]
                 branch = helpers.get_default_branch(owner, reponame, self.auth)
