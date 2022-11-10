@@ -166,10 +166,10 @@ class DagsHubFilesystem:
                         raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
                                            f"Please push your changes to the remote or checkout a tracked branch.")
             except FileNotFoundError:
-                logger.warn("No branch was specified, fetching default branch...")
+                logger.debug("Couldn't get branch info from local git repository, fetching default branch from the remote...")
                 owner, reponame = self.parsed_repo_url.path.split("/")[1:]
                 branch = helpers.get_default_branch(owner, reponame, self.auth)
-                logger.warn(f'Set default branch: "{branch}"')
+                logger.debug(f'Set default branch: "{branch}"')
         return self.get_remote_branch_head(branch)
 
     @property
