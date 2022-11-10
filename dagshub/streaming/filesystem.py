@@ -165,6 +165,7 @@ class DagsHubFilesystem:
                     else:
                         raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
                                            f"Please push your changes to the remote or checkout a tracked branch.")
+
             except FileNotFoundError:
                 logger.warn("No branch was specified, fetching default branch...")
                 owner, reponame = self.parsed_repo_url.path.split("/")[1:]

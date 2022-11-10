@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 s = requests.Session()
 s.headers.update(config.requests_headers)
 
+
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
     if template == "":
@@ -173,7 +174,7 @@ class Repo:
 
     def _set_default_branch(self):
         try:
-            self.branch = helpers.get_default_branch(self.owner, self.name, self.auth)
+            self.branch = helpers.get_default_branch(self.owner, self.name, self.auth, self.src_url)
         except Exception:
             raise RuntimeError(
                 "Failed to get default branch for repository. "
