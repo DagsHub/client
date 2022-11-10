@@ -6,7 +6,7 @@ import os
 import logging
 from typing import Union
 from io import IOBase
-from dagshub.common import config
+from dagshub.common import config, helpers
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
@@ -14,7 +14,6 @@ from requests.auth import HTTPBasicAuth
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
-REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
@@ -23,14 +22,6 @@ logger = logging.getLogger(__name__)
 
 s = requests.Session()
 s.headers.update(config.requests_headers)
-
-
-def get_default_branch(src_url, owner, reponame, auth):
-    res = s.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
-        owner=owner,
-        reponame=reponame,
-    )), auth=auth)
-    return res.json().get('default_branch')
 
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
@@ -183,7 +174,7 @@ class Repo:
 
     def _set_default_branch(self):
         try:
-            self.branch = get_default_branch(self.src_url, self.owner, self.name, self.auth)
+            self.branch = helpers.get_default_branch(self.owner, self.name, self.auth, self.src_url)
         except Exception:
             raise RuntimeError(
                 "Failed to get default branch for repository. "

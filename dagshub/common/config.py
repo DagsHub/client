@@ -29,3 +29,4 @@ username = os.environ.get(DAGSHUB_USERNAME_KEY)
 password = os.environ.get(DAGSHUB_PASSWORD_KEY)
 custom_user_agent_suffix = f" dagshub-client-python/{__version__}"
 requests_headers = {"user-agent": requests.utils.default_user_agent() + custom_user_agent_suffix}
+REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
