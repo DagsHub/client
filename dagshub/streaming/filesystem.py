@@ -250,7 +250,7 @@ class DagsHubFilesystem:
         str_path = str(relative_path)
         if "/site-packages/" in str_path:
             return True
-        return str_path.startswith(('.git/', '.dvc/'))
+        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
 
     def _special_file(self):
         # TODO Include more information in this file
