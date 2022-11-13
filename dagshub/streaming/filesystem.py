@@ -254,8 +254,12 @@ class DagsHubFilesystem:
         except ValueError:
             return None
 
-    def _passthrough_path(self, relative_path: PathLike):
-        return str(relative_path).startswith(('.git/', '.dvc/'))
+    @staticmethod
+    def _passthrough_path(relative_path: PathLike):
+        str_path = str(relative_path)
+        if "/site-packages/" in str_path:
+            return True
+        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
 
     def _special_file(self):
         # TODO Include more information in this file
