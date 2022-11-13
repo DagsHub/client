@@ -32,6 +32,17 @@ def get_default_branch(src_url, owner, reponame, auth):
 
 
 def create_dataset(repo_name, local_path, glob_exclude="", is_org=False, org_name="", private=False):
+    """
+    Create a new repository on DagsHub and upload an entire dataset to it
+
+    :param repo_name: Name of the repository to be created
+    :param local_path: local path where the dataset to upload is located
+    :param glob_exclude: regex to exclude certain files from the upload process
+    :param is_org: Flag to indicate the repository has to be attached to an organization
+    :param org_name: Organization name to attach the repository to (if "is_org" is true)
+    :param private: Flag to indicate the repository is going to be private
+    :return: Repo object of the repository created
+    """
     repo = create_repo(repo_name, is_org=is_org, org_name=org_name, private=private)
     dir = repo.directory(repo_name)
     dir.add_dir(local_path, glob_exclude)
@@ -40,6 +51,21 @@ def create_dataset(repo_name, local_path, glob_exclude="", is_org=False, org_nam
 
 def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
+    """
+    Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
+
+    :param repo_name: Name of the repository to be created
+    :param is_org: Flag to indicate the repository has to be attached to an organization
+    :param org_name: Organization name to attach the repository to (if "is_org" is true)
+    :param description: Description for the repository
+    :param private: Flag to indicate the repository is going to be private
+    :param gitignores: Which gitignore template(s) to use (comma separated string)
+    :param license: Which license file to use
+    :param readme: Readme file path to upload
+    :param template: Which project template to use, options are: none, custom, notebook-template,
+    cookiecutter-dagshub-dvc. To learn more, check out https://dagshub.com/docs/feature_guide/project_templates/
+    :return: Repo object of the repository created
+    """
     if template == "":
         template = "none"
 
@@ -51,7 +77,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     if username is not None and password is not None:
         auth = username, password
     else:
-        token = config.token or dagshub.auth.get_token()
+        token = config.token or dagshub.auth.get_token(code_input_timeout=0)
         if token is not None:
             auth = HTTPBearerAuth(token)
 
@@ -214,6 +240,12 @@ class DataSet:
             self.files[path] = (path, file)
 
     def add_dir(self, local_path, glob_exclude=""):
+        """
+        Add an entire directory to a DagsHub repository, so that it is tracked by DVC
+
+        :param local_path: local path where the dataset to upload is located
+        :param glob_exclude: regex to exclude certain files from the upload process
+        """
         for root, dirs, files in os.walk(local_path):
             if len(files) > 0:
                 for filename in files:
