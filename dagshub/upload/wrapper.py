@@ -31,32 +31,30 @@ def get_default_branch(src_url, owner, reponame, auth):
     return res.json().get('default_branch')
 
 
-def create_dataset(repo_name, local_path, glob_exclude="", is_org=False, org_name="", private=False):
+def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
     """
     Create a new repository on DagsHub and upload an entire dataset to it
 
     :param repo_name: Name of the repository to be created
     :param local_path: local path where the dataset to upload is located
     :param glob_exclude: regex to exclude certain files from the upload process
-    :param is_org: Flag to indicate the repository has to be attached to an organization
-    :param org_name: Organization name to attach the repository to (if "is_org" is true)
+    :param org_name: Organization name to be the repository owner
     :param private: Flag to indicate the repository is going to be private
     :return: Repo object of the repository created
     """
-    repo = create_repo(repo_name, is_org=is_org, org_name=org_name, private=private)
+    repo = create_repo(repo_name, org_name=org_name, private=private)
     dir = repo.directory(repo_name)
     dir.add_dir(local_path, glob_exclude)
     return repo
 
 
-def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
+def create_repo(repo_name, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
     """
     Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
 
     :param repo_name: Name of the repository to be created
-    :param is_org: Flag to indicate the repository has to be attached to an organization
-    :param org_name: Organization name to attach the repository to (if "is_org" is true)
+    :param org_name: Organization name to be the repository owner
     :param description: Description for the repository
     :param private: Flag to indicate the repository is going to be private
     :param gitignores: Which gitignore template(s) to use (comma separated string)
@@ -99,7 +97,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     }
 
     url = REPO_CREATE_URL
-    if is_org is True:
+    if org_name and not org_name.isspace():
         url = ORG_REPO_CREATE_URL.format(
             orgname=org_name,
         )
@@ -253,7 +251,7 @@ class DataSet:
                     rel_remote_file_path = rel_file_path.replace(local_path, "")
                     if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
                         self.add(file=rel_file_path, path=rel_remote_file_path)
-                        if len(self.files) > 50:
+                        if len(self.files) > 49:
                             commit_message = "Commit data points in folder %s" % root
                             self.commit(commit_message, versioning="dvc")
 
