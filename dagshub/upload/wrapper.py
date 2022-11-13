@@ -4,6 +4,7 @@ import requests
 import urllib
 import os
 import logging
+import fnmatch
 from typing import Union
 from io import IOBase
 from dagshub.common import config, helpers
@@ -24,8 +25,39 @@ s = requests.Session()
 s.headers.update(config.requests_headers)
 
 
-def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
+def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
+    """
+    Create a new repository on DagsHub and upload an entire dataset to it
+
+    :param repo_name: Name of the repository to be created
+    :param local_path: local path where the dataset to upload is located
+    :param glob_exclude: regex to exclude certain files from the upload process
+    :param org_name: Organization name to be the repository owner
+    :param private: Flag to indicate the repository is going to be private
+    :return: Repo object of the repository created
+    """
+    repo = create_repo(repo_name, org_name=org_name, private=private)
+    dir = repo.directory(repo_name)
+    dir.add_dir(local_path, glob_exclude)
+    return repo
+
+
+def create_repo(repo_name, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
+    """
+    Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
+
+    :param repo_name: Name of the repository to be created
+    :param org_name: Organization name to be the repository owner
+    :param description: Description for the repository
+    :param private: Flag to indicate the repository is going to be private
+    :param gitignores: Which gitignore template(s) to use (comma separated string)
+    :param license: Which license file to use
+    :param readme: Readme file path to upload
+    :param template: Which project template to use, options are: none, custom, notebook-template,
+    cookiecutter-dagshub-dvc. To learn more, check out https://dagshub.com/docs/feature_guide/project_templates/
+    :return: Repo object of the repository created
+    """
     if template == "":
         template = "none"
 
@@ -37,7 +69,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     if username is not None and password is not None:
         auth = username, password
     else:
-        token = config.token or dagshub.auth.get_token()
+        token = config.token or dagshub.auth.get_token(code_input_timeout=0)
         if token is not None:
             auth = HTTPBearerAuth(token)
 
@@ -59,7 +91,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     }
 
     url = REPO_CREATE_URL
-    if is_org is True:
+    if org_name and not org_name.isspace():
         url = ORG_REPO_CREATE_URL.format(
             orgname=org_name,
         )
@@ -198,6 +230,34 @@ class DataSet:
             if path in self.files:
                 logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
             self.files[path] = (path, file)
+
+    def add_dir(self, local_path, glob_exclude=""):
+        """
+        Add an entire directory to a DagsHub repository, so that it is tracked by DVC
+
+        :param local_path: local path where the dataset to upload is located
+        :param glob_exclude: regex to exclude certain files from the upload process
+        """
+        file_counter = 0
+
+        for root, dirs, files in os.walk(local_path):
+            if len(files) > 0:
+                for filename in files:
+                    rel_file_path = os.path.join(root, filename)
+                    rel_remote_file_path = rel_file_path.replace(local_path, "")
+                    if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
+                        self.add(file=rel_file_path, path=rel_remote_file_path)
+                        if len(self.files) > 49:
+                            file_counter += len(self.files)
+                            commit_message = "Commit data points in folder %s" % root
+                            self.commit(commit_message, versioning="dvc")
+
+                if len(self.files) > 0:
+                    file_counter += len(self.files)
+                    commit_message = "Commit data points in folder %s" % root
+                    self.commit(commit_message, versioning="dvc")
+
+        logger.warning("Directory upload complete, uploaded %s files" % file_counter)
 
     @staticmethod
     def _clean_directory_name(directory: str):
