@@ -244,6 +244,8 @@ class DataSet:
         :param local_path: local path where the dataset to upload is located
         :param glob_exclude: regex to exclude certain files from the upload process
         """
+        file_counter = 0
+
         for root, dirs, files in os.walk(local_path):
             if len(files) > 0:
                 for filename in files:
@@ -252,12 +254,16 @@ class DataSet:
                     if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
                         self.add(file=rel_file_path, path=rel_remote_file_path)
                         if len(self.files) > 49:
+                            file_counter += len(self.files)
                             commit_message = "Commit data points in folder %s" % root
                             self.commit(commit_message, versioning="dvc")
 
                 if len(self.files) > 0:
+                    file_counter += len(self.files)
                     commit_message = "Commit data points in folder %s" % root
                     self.commit(commit_message, versioning="dvc")
+
+        logger.warning("Directory upload complete, uploaded %s files" % file_counter)
 
     @staticmethod
     def _clean_directory_name(directory: str):
