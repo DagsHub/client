@@ -253,6 +253,9 @@ class DataSet:
                     rel_remote_file_path = rel_file_path.replace(local_path, "")
                     if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
                         self.add(file=rel_file_path, path=rel_remote_file_path)
+                        if len(self.files) > 50:
+                            commit_message = "Commit data points in folder %s" % root
+                            self.commit(commit_message, versioning="dvc")
 
                 if len(self.files) > 0:
                     commit_message = "Commit data points in folder %s" % root
