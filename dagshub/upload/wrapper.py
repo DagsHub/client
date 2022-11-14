@@ -29,12 +29,12 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     """
     Create a new repository on DagsHub and upload an entire dataset to it
 
-    :param repo_name: Name of the repository to be created
-    :param local_path: local path where the dataset to upload is located
-    :param glob_exclude: regex to exclude certain files from the upload process
-    :param org_name: Organization name to be the repository owner
-    :param private: Flag to indicate the repository is going to be private
-    :return: Repo object of the repository created
+    :param repo_name (str): Name of the repository to be created
+    :param local_path (str): local path where the dataset to upload is located
+    :param glob_exclude (str): regex to exclude certain files from the upload process
+    :param org_name (str): Organization name to be the repository owner
+    :param private (bool): Flag to indicate the repository is going to be private
+    :return : Repo object of the repository created
     """
     repo = create_repo(repo_name, org_name=org_name, private=private)
     dir = repo.directory(repo_name)
@@ -47,14 +47,14 @@ def create_repo(repo_name, org_name="", description="", private=False, auto_init
     """
     Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
 
-    :param repo_name: Name of the repository to be created
-    :param org_name: Organization name to be the repository owner
-    :param description: Description for the repository
-    :param private: Flag to indicate the repository is going to be private
-    :param gitignores: Which gitignore template(s) to use (comma separated string)
-    :param license: Which license file to use
-    :param readme: Readme file path to upload
-    :param template: Which project template to use, options are: none, custom, notebook-template,
+    :param repo_name (str): Name of the repository to be created
+    :param org_name (str): Organization name to be the repository owner
+    :param description (str): Description for the repository
+    :param private (bool): Flag to indicate the repository is going to be private
+    :param gitignores (str): Which gitignore template(s) to use (comma separated string)
+    :param license (str): Which license file to use
+    :param readme (str): Readme file path to upload
+    :param template (str): Which project template to use, options are: none, custom, notebook-template,
     cookiecutter-dagshub-dvc. To learn more, check out https://dagshub.com/docs/feature_guide/project_templates/
     :return: Repo object of the repository created
     """
@@ -116,6 +116,18 @@ def create_repo(repo_name, org_name="", description="", private=False, auto_init
 
 class Repo:
     def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
+     """
+    Repo class constructor. If branch is not provided, then default branch is taken.
+
+     :param owner (str): Store the username of the user who owns this repository
+     :param name (str): Identify the repository
+     :param username (str): Set the username to none if it is not provided
+     :param password (str): Set the password to none if it is not provided
+     :param token (str): Set the token
+     :param branch (str): Set the branch to the default branch
+     :return: The object of the class
+     
+     """    
         self.owner = owner
         self.name = name
         self.src_url = config.host
@@ -135,14 +147,12 @@ class Repo:
         The upload function is used to upload files to the repository.
         It takes a file as an argument and returns the url of that file.
         
-        Args:
-            file:Union[str: Pass a file name or an actual file object
-            IOBase]: Specify the file to be uploaded
-            commit_message[str]: Specify a commit message for the upload
-            path[str]: Specify the path of the file
-            **kwargs: Pass in any additional parameters that are needed for the upload function
-        Returns:
-            A dictionary containing the file_id, commit_message and path of the uploaded file
+        
+        :param file (str): Specify the file to be uploaded
+        :param commit_message (str): Specify a commit message
+        :param path (str): Specify the path to upload the file to
+        :param **kwargs: Pass in any additional parameters that are required for the upload function
+        :return: A dictionary containing the file_id, commit_message and path of the uploaded file
         
         """
         file_for_upload = DataSet.get_file(file, path)
@@ -156,22 +166,21 @@ class Repo:
                      new_branch=None,
                      last_commit=None,
                      force=False):
-        """
-        The upload_files function uploads a list of files to the specified directory.
-        
-
-        Args:
-            
-            files[list(str)]: list of file paths that will be uploaded to the repository
-            directory_path[str]: Specify the directory that you want to upload files to
-            commit_message[str]: Pass a commit message to the upload_files function
-            versioning[str]: Specify the versioning system to use
-            new_branch[str]: Create a new branch
-            last_commit[str]: Force the upload of files even if they have not changed
-            force[bool]: Force the upload of files that are already in the repo
-        Returns:
-            A response object
-        """
+       """
+       The upload_files function uploads a list of files to the specified directory.
+       
+       
+       :param files (list(str)): Pass the files that are to be uploaded
+       :param directory_path (str): Indicate the path of the directory in which we want to upload our files
+       :param commit_message (str): Set the commit message
+       :param versioning (str): Determine whether the files are uploaded to a new branch or not
+       :param new_branch (str): Create a new branch
+       :param last_commit (str): Tell the server that we want to upload a file without committing it
+       :param force (bool): Force the upload of a file even if it is already present on the server
+       :return: The response object from the request
+       
+       """
+       
 
         data = {
             "commit_choice": "direct",
@@ -203,15 +212,15 @@ class Repo:
         The _log_upload_details function logs the request URL, data, and files.
         It then logs the response status code and content. If the response is not 200(OK), it will log an error message.
         
-        Args:
-            data[str]: Pass the data that will be uploaded to the server
-            res[dict]: Store the response from the server
-            files[list(str)]: Pass the files that are going to be uploaded
         
-        Returns:
-            The request url, the data sent to the server and the files uploaded
+        
+        :param data (str): Pass the data that will be uploaded to the server
+        :param res (dict): Store the response from the server
+        :param files (list(str)): Pass the files that are going to be uploaded
+        :return: The request url, the data sent to the server and the files uploaded
         
         """
+        
         logger.debug(f"Request URL: {res.request.url}\n"
                      f"Data:\n{json.dumps(data, indent=4)}\n"
                      f"Files:\n{json.dumps(list(map(str, files)), indent=4)}")
@@ -233,10 +242,9 @@ class Repo:
     def auth(self):
         """
         The auth function is used to authenticate the user with the dagshub API.It takes in a username and password, or token as arguments. If both are provided, it will use the username and password combination to
-         get a token from dagshub's authentication server. Otherwise, if only a token is provided it will be used for authentication.
+                 get a token from dagshub's authentication server. Otherwise, if only a token is provided it will be used for authentication.
         
-        Returns:
-            The httpbasicauth object
+        :return: The httpbasicauth object
         
         """
         if self.username is not None and self.password is not None:
@@ -245,6 +253,14 @@ class Repo:
         return HTTPBearerAuth(token)
 
     def directory(self, path):
+        """
+        The directory function returns a DataSet object that represents the directory at the given path.
+        
+        
+        :param path (str): Specify the directory that contains all of the images and labels
+        :return: A dataset object that represents the directory at the given path
+        
+        """
         """
         The directory function returns a DataSet object that represents the directory at the given path.
         
@@ -259,14 +275,11 @@ class Repo:
 
     def get_request_url(self, directory):
         """
-        The get_request_url function returns the URL for uploading a file to GitHub.
+        The get_request_url function returns the URL for uploading a file to DagsHub.
         
-        Args:
-            directory[str]: the path to a directory within this repo on GitHub.For example, if you have created your repo in such a 
+        :param directory (str): the path to a directory within this repo on GitHub.For example, if you have created your repo in such a 
             way that it has two directories named data and models, then you could pass one of these strings into this function as an argument.
-        
-        Returns:
-            The url of the request to be made
+        :return: The url for uploading a file 
         
         """
         return urllib.parse.urljoin(self.src_url, CONTENT_UPLOAD_URL.format(
@@ -277,15 +290,14 @@ class Repo:
         ))
 
     def _set_default_branch(self):
+       
         """
         The _set_default_branch function is used to set the default branch for a repository.
-        It first tries to get the default branch from GitHub, but if it fails, then an error message is raised.
+        It first tries to get the default branch from DagsHub, but if it fails, then an error message is raised.
         
-        
-        Returns:
-            The branch name of the repository
-        
+        :return: The branch name of the repository   
         """
+
         try:
             self.branch = helpers.get_default_branch(self.owner, self.name, self.auth, self.src_url)
         except Exception:
@@ -298,45 +310,40 @@ class Repo:
         """
         The full_name function returns the full name of a repository.
         
-        Returns:
-            The concatenation of the owner and name attributes
+        
+        :return: The full name of a repository
         
         """
+  
         return f"{self.owner}/{self.name}"
 
 
 class DataSet:
     def __init__(self, repo: Repo, directory: str):
         """
-        The __init__ function is called when a new instance of the class is created.
-        It initializes all of the variables and sets them to their default values.
         
-        Args:
-            repo[Repo object]: Pass a Repo object
-            directory[str]: Specify the directory of the repository
-        
-        Returns:
-            A dictionary of files
+        :param repo (Repo object): Pass a repo object
+        :param directory (str): Specify the directory of the repository
+        :return: A DataSet object
         
         """
+
         self.files = {}
         self.repo = repo
         self.directory = self._clean_directory_name(directory)
         self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
+        """
+        The add function adds a file to the list of files that will be uploaded.
+        
+        
+        :param file (str): Specify the file to be uploaded
+        :param path (str): Specify the path to upload the file
+        :return: Nothing
         
         """
-        The add function adds a file to the list of files that will be uploaded.          
         
-        Args:
-            file[str]: Name of the file
-            path[str]: Specify path to upload the file
-        
-        Returns:
-            The function returns nothing.
-        
-        """
         path, file = self.get_file(file, path)
         if file is not None:
             if path in self.files:
@@ -345,11 +352,16 @@ class DataSet:
 
     def add_dir(self, local_path, glob_exclude=""):
         """
-        Add an entire directory to a DagsHub repository, so that it is tracked by DVC
-
-        :param local_path: local path where the dataset to upload is located
-        :param glob_exclude: regex to exclude certain files from the upload process
+        The add_dir function adds an entire directory to a DagsHub repository.It does this by iterating through all the files in the given directory and uploading them one-by-one.
+        The function also commits all of these changes at once, so as not to overload the API with requests.
+        
+        
+        :param local_path  (str): Specify the local path where the dataset to upload is located
+        :param glob_exclude (str): Exclude certain files from the upload process
+        :return: None
+        
         """
+       
         file_counter = 0
 
         for root, dirs, files in os.walk(local_path):
@@ -379,13 +391,11 @@ class DataSet:
         If there are any other characters in the string, they will be ignored and only alphanumeric characters (a-zA-Z0-9) 
         will be kept.
         
-        Args:
-            directory[str]: Specify the directory that will be cleaned
-        
-        Returns:
-            The directory name with the path separator normalized to a forward slash
+        :param directory (str): Specify the directory that will be cleaned
+        :return: The normalized path of the directory(The directory name with the path separator normalized to a forward slash)
         
         """
+       
         return os.path.normpath(directory)
 
     @staticmethod
@@ -395,12 +405,13 @@ class DataSet:
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
         the file. This function also handles exceptions such as when you try to pass in a directory instead of a file.
         
-        file[str]: Name of the file 
-        path[str]: Specify the path of the file
-        Returns:
-            A tuple of the path and a file object
+        :param file (str):Union[str: Specify the file that you want to upload
+        :param IOBase]: Handle both file paths and file objects
+        :param path (str): Specify the path of the file
+        :return: A tuple of the path and a file object
         
         """
+  
         try:
             # if path is not provided, fall back to the file name
             if path is None:
@@ -426,31 +437,25 @@ class DataSet:
     def _reset_dataset(self):
         """
         The _reset_dataset function clears the files attribute of a Dataset object.
-        
-        
-        
-        Returns:
-            The empty list
-        
+      
+        :return: The empty list    
         """
+       
         self.files.clear()
 
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
         """
         The commit function is used to commit the files in the dataset.
-        It takes a commit message as an argument, which can be set to None if no message is required.
+        It takes a commit message as an argument, if no argument is passed then it return default commit message "Upload files using DagsHub client".
         The function returns nothing.
         
-        Args:
-
-            commit_message[str]: Pass a commit message to the upload_files function
-            *args: Pass a non-keyworded, variable-length argument list
-            **kwargs: Pass additional parameters to the function
         
-        Returns:
-            The commit_message
-        
+        :param commit_message (str): Set the commit message
+        :param *args: Pass a non-keyworded, variable-length argument list to the function
+        :param **kwargs: Pass additional parameters to the function
+        :return: The commit_message  
         """
+      
         file_list = list(self.files.values())
         self.repo.upload_files(file_list, self.directory, commit_message=commit_message, *args, **kwargs)
         self._reset_dataset()
@@ -460,10 +465,7 @@ class DataSet:
         The _get_last_commit function returns the last commit sha for a given branch.
         It is used to check if there are any new commits in the repo since we last ran our dag.
         
-        
-        Returns:
-            The commit sha for the branch of the repo
-        
+        :return: The commit id of the last commit for the branch 
         """
         api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
         api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
