@@ -13,7 +13,7 @@ from os.path import ismount
 from pathlib import Path
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
-from dagshub.common import config
+from dagshub.common import config, helpers
 import logging
 import requests
 
@@ -146,6 +146,7 @@ class DagsHubFilesystem:
         """
         Gets current revision on repo:
         - If User specified a branch, returns HEAD of that brunch on the remote
+        - If branch wasn't detected, returns HEAD of default branch in the speficied remote.
         - If HEAD is a branch, tries to find a dagshub remote associated with it and get its HEAD
         - If HEAD is a commit revision, checks that the commit exists on DagsHub
         """
@@ -153,17 +154,25 @@ class DagsHubFilesystem:
         if self.user_specified_branch:
             branch = self.user_specified_branch
         else:
-            with open(self.project_root / ".git/HEAD") as head_file:
-                head = head_file.readline().strip()
-            if head.startswith("ref"):
-                branch = head.split("/")[-1]
-            else:
-                # contents of HEAD is the revision - check that this commit exists on remote
-                if self.is_commit_on_remote(head):
-                    return head
+            try:
+                with open(self.project_root / ".git/HEAD") as head_file:
+                    head = head_file.readline().strip()
+                if head.startswith("ref"):
+                    branch = head.split("/")[-1]
                 else:
-                    raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
-                                       f"Please push your changes to the remote or checkout a tracked branch.")
+                    # contents of HEAD is the revision - check that this commit exists on remote
+                    if self.is_commit_on_remote(head):
+                        return head
+                    else:
+                        raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
+                                           f"Please push your changes to the remote or checkout a tracked branch.")
+
+            except FileNotFoundError:
+                logger.debug("Couldn't get branch info from local git repository, " +
+                             "fetching default branch from the remote...")
+                owner, reponame = self.parsed_repo_url.path.split("/")[1:]
+                branch = helpers.get_default_branch(owner, reponame, self.auth)
+                logger.debug(f'Set default branch: "{branch}"')
         return self.get_remote_branch_head(branch)
 
     @property
@@ -245,8 +254,12 @@ class DagsHubFilesystem:
         except ValueError:
             return None
 
-    def _passthrough_path(self, relative_path: PathLike):
-        return str(relative_path).startswith(('.git/', '.dvc/'))
+    @staticmethod
+    def _passthrough_path(relative_path: PathLike):
+        str_path = str(relative_path)
+        if "/site-packages/" in str_path:
+            return True
+        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
 
     def _special_file(self):
         # TODO Include more information in this file
@@ -319,18 +332,19 @@ class DagsHubFilesystem:
         if dir_fd is not None:   # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
-        try:
-            open_mode = "r"
-            # Write modes - calling in append mode,
-            # This way we create the intermediate folders if file doesn't exist, but the folder it's in does
-            # Append so we don't truncate the file
-            if not (flags & os.O_RDONLY):
-                open_mode = "a"
-            logger.debug("fs.os_open - trying to materialize path")
-            self.open(path, mode=open_mode).close()
-            logger.debug("fs.os_open - successfully materialized path")
-        except FileNotFoundError:
-            logger.debug("fs.os_open - failed to materialize path, os.open will throw")
+        if self._relative_path(path):
+            try:
+                open_mode = "r"
+                # Write modes - calling in append mode,
+                # This way we create the intermediate folders if file doesn't exist, but the folder it's in does
+                # Append so we don't truncate the file
+                if not (flags & os.O_RDONLY):
+                    open_mode = "a"
+                logger.debug("fs.os_open - trying to materialize path")
+                self.open(path, mode=open_mode).close()
+                logger.debug("fs.os_open - successfully materialized path")
+            except FileNotFoundError:
+                logger.debug("fs.os_open - failed to materialize path, os.open will throw")
         return os.open(path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):

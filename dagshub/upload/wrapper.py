@@ -4,9 +4,10 @@ import requests
 import urllib
 import os
 import logging
+import fnmatch
 from typing import Union
 from io import IOBase
-from dagshub.common import config
+from dagshub.common import config, helpers
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
@@ -14,53 +15,48 @@ from requests.auth import HTTPBasicAuth
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
-REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
+s = requests.Session()
+s.headers.update(config.requests_headers)
 
-def get_default_branch(src_url, owner, reponame, auth):
+
+def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
     """
-    The get_default_branch function takes in a source URL, owner name and repo name.
-    It then uses the GitHub API to get the default branch of that repo.
-    
-    Args:
-        src_url[str]: Construct the url for the api call
-        owner[str]: Specify the owner of the repo
-        reponame[str]: Construct the url to request
-        auth[str]: Authenticate the request
-    Returns:
-        The default branch for a repository
+    Create a new repository on DagsHub and upload an entire dataset to it
+
+    :param repo_name: Name of the repository to be created
+    :param local_path: local path where the dataset to upload is located
+    :param glob_exclude: regex to exclude certain files from the upload process
+    :param org_name: Organization name to be the repository owner
+    :param private: Flag to indicate the repository is going to be private
+    :return: Repo object of the repository created
     """
-    res = requests.get(urllib.parse.urljoin(src_url, REPO_INFO_URL.format(
-        owner=owner,
-        reponame=reponame,
-    )), auth=auth)
-    return res.json().get('default_branch')
+    repo = create_repo(repo_name, org_name=org_name, private=private)
+    dir = repo.directory(repo_name)
+    dir.add_dir(local_path, glob_exclude)
+    return repo
 
 
-def create_repo(repo_name, is_org=False, org_name="", description="", private=False, auto_init=False,
+def create_repo(repo_name, org_name="", description="", private=False, auto_init=False,
                 gitignores="Python", license="", readme="", template="custom"):
     """
-    The create_repo function creates a new repository on GitHub account.
-    
-    Args:
-        repo_name[str]: Name of the repository to be created
-        is_org[bool]: Create a repo in the user's account
-        org_name[bool]: Pass the name of organization reposiotry if is_org = True
-        description[str]: Provide the description for the repository
-        private[bool]: [by default] creates a public repository. To 
-        auto_init[str]: [by default] Create a repository that is not initialized with a readme
-        gitignores[str]: Specify the language of the gitignore file that will be used
-        license[str]: Specify the license of the repository
-        readme[str]: Set the readme
-        template[str]: Create a repository with custom files
-    Returns:
-        A repo object
-    
+    Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
+
+    :param repo_name: Name of the repository to be created
+    :param org_name: Organization name to be the repository owner
+    :param description: Description for the repository
+    :param private: Flag to indicate the repository is going to be private
+    :param gitignores: Which gitignore template(s) to use (comma separated string)
+    :param license: Which license file to use
+    :param readme: Readme file path to upload
+    :param template: Which project template to use, options are: none, custom, notebook-template,
+    cookiecutter-dagshub-dvc. To learn more, check out https://dagshub.com/docs/feature_guide/project_templates/
+    :return: Repo object of the repository created
     """
     if template == "":
         template = "none"
@@ -73,7 +69,7 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     if username is not None and password is not None:
         auth = username, password
     else:
-        token = config.token or dagshub.auth.get_token()
+        token = config.token or dagshub.auth.get_token(code_input_timeout=0)
         if token is not None:
             auth = HTTPBearerAuth(token)
 
@@ -95,16 +91,15 @@ def create_repo(repo_name, is_org=False, org_name="", description="", private=Fa
     }
 
     url = REPO_CREATE_URL
-    if is_org is True:
+    if org_name and not org_name.isspace():
         url = ORG_REPO_CREATE_URL.format(
             orgname=org_name,
         )
 
-    res = requests.post(
+    res = s.post(
         urllib.parse.urljoin(config.host, url),
         data,
-        auth=auth,
-        headers=config.requests_headers
+        auth=auth
     )
 
     if res.status_code != HTTPStatus.CREATED:
@@ -195,11 +190,12 @@ class Repo:
         if force:
             data["last_commit"] = self._get_last_commit()
         logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
-        res = requests.put(
+        res = s.put(
             self.get_request_url(directory_path),
             data,
             files=[("files", file) for file in files],
-            auth=self.auth)
+            auth=self.auth
+        )
         self._log_upload_details(data, res, files)
 
     def _log_upload_details(self, data, res, files):
@@ -291,7 +287,7 @@ class Repo:
         
         """
         try:
-            self.branch = get_default_branch(self.src_url, self.owner, self.name, self.auth)
+            self.branch = helpers.get_default_branch(self.owner, self.name, self.auth, self.src_url)
         except Exception:
             raise RuntimeError(
                 "Failed to get default branch for repository. "
@@ -346,6 +342,34 @@ class DataSet:
             if path in self.files:
                 logger.warning(f"File already staged for upload on path \"{path}\". Overwriting")
             self.files[path] = (path, file)
+
+    def add_dir(self, local_path, glob_exclude=""):
+        """
+        Add an entire directory to a DagsHub repository, so that it is tracked by DVC
+
+        :param local_path: local path where the dataset to upload is located
+        :param glob_exclude: regex to exclude certain files from the upload process
+        """
+        file_counter = 0
+
+        for root, dirs, files in os.walk(local_path):
+            if len(files) > 0:
+                for filename in files:
+                    rel_file_path = os.path.join(root, filename)
+                    rel_remote_file_path = rel_file_path.replace(local_path, "")
+                    if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
+                        self.add(file=rel_file_path, path=rel_remote_file_path)
+                        if len(self.files) > 49:
+                            file_counter += len(self.files)
+                            commit_message = "Commit data points in folder %s" % root
+                            self.commit(commit_message, versioning="dvc")
+
+                if len(self.files) > 0:
+                    file_counter += len(self.files)
+                    commit_message = "Commit data points in folder %s" % root
+                    self.commit(commit_message, versioning="dvc")
+
+        logger.warning("Directory upload complete, uploaded %s files" % file_counter)
 
     @staticmethod
     def _clean_directory_name(directory: str):
@@ -443,7 +467,7 @@ class DataSet:
         """
         api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
         api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
-        res = requests.get(api_url)
+        res = s.get(api_url)
         if res.status_code == HTTPStatus.OK:
             content = res.json()
             try:
