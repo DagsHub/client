@@ -116,8 +116,9 @@ def create_repo(repo_name, org_name="", description="", private=False, auto_init
 
 class Repo:
     def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
-     """
-    Repo class constructor. If branch is not provided, then default branch is taken.
+
+        """
+     Repo class constructor. If branch is not provided, then default branch is taken.
 
      :param owner (str): Store the username of the user who owns this repository
      :param name (str): Identify the repository
@@ -166,21 +167,21 @@ class Repo:
                      new_branch=None,
                      last_commit=None,
                      force=False):
-       """
-       The upload_files function uploads a list of files to the specified directory.
-       
-       
-       :param files (list(str)): Pass the files that are to be uploaded
-       :param directory_path (str): Indicate the path of the directory in which we want to upload our files
-       :param commit_message (str): Set the commit message
-       :param versioning (str): Determine whether the files are uploaded to a new branch or not
-       :param new_branch (str): Create a new branch
-       :param last_commit (str): Tell the server that we want to upload a file without committing it
-       :param force (bool): Force the upload of a file even if it is already present on the server
-       :return: The response object from the request
-       
-       """
-       
+        """
+        The upload_files function uploads a list of files to the specified directory.
+        
+        
+        :param files (list(str)): Pass the files that are to be uploaded
+        :param directory_path (str): Indicate the path of the directory in which we want to upload our files
+        :param commit_message (str): Set the commit message
+        :param versioning (str): Determine whether the files are uploaded to a new branch or not
+        :param new_branch (str): Create a new branch
+        :param last_commit (str): Tell the server that we want to upload a file without committing it
+        :param force (bool): Force the upload of a file even if it is already present on the server
+        :return: The response object from the request
+        
+        """
+        
 
         data = {
             "commit_choice": "direct",
