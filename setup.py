@@ -40,7 +40,9 @@ setuptools.setup(
         "fusepy>=3",
         "appdirs>=1.4.4",
         "pytimedinput>=2.0.1",
-        "click>=8.0.4"],
+        "click>=8.0.4",
+        "httpx>=0.22.0",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
