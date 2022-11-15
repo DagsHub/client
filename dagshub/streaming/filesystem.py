@@ -134,7 +134,7 @@ class DagsHubFilesystem:
         self.password = password or config.password
         self.token = token or config.token
 
-        self.http_client = httpx.Client(auth=self.auth)
+        self.http_client = httpx.Client(auth=self.auth, timeout=None)
 
         response = self._api_listdir('')
         if response.status_code < 400:
