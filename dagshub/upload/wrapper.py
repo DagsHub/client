@@ -268,7 +268,7 @@ class Repo:
         """
         The get_request_url function returns the URL for uploading a file to DagsHub.
         
-        :param directory (str): the path to a directory within this repo on GitHub.For example, if you have created your repo in such a 
+        :param directory (str): the path to a directory within this repo on DagsHub. For example, if you have created your repo in such a 
             way that it has two directories named data and models, then you could pass one of these strings into this function as an argument.
         :return: The url for uploading a file 
         
