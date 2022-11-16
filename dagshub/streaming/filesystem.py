@@ -514,8 +514,8 @@ class DagsHubFilesystem:
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
         return self.http_get(f'{self.content_api_url}/{path}',
-                         params={'include_size': 'true'} if include_size else {},
-                         headers=config.requests_headers)
+                             params={'include_size': 'true'} if include_size else {},
+                             headers=config.requests_headers)
 
     def _api_download_file_git(self, path: str):
         return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
