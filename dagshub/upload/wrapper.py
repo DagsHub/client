@@ -394,7 +394,7 @@ class DataSet:
         """
         The get_file function is a helper function that takes in either a string or an IOBase object and returns
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
-        the file. This function also handles exceptions such as when you try to pass in a directory instead of a file.
+        the file.
         
         :param file (str):Union[str: Specify the file that you want to upload
         :param IOBase]: Handle both file paths and file objects
