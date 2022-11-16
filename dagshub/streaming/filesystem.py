@@ -75,6 +75,22 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
+    """
+    A DagsHub-repo aware filesystem class
+
+    :param project_root: Path to the git repository with the repo.
+        If None, we look up the filesystem from the current dir until we find a git repo
+    :param repo_url: URL to the DagsHub repository.
+        If None, URL is received from the git configuration
+    :param branch: Explicitly sets a branch/commit revision to work with
+        If None, branch is received from the git configuration
+    :param username: DagsHub username
+    :param password: DagsHub password
+    :param token: DagsHub API token (as an alternative login variant to username/password)
+    :param timeout: Timeout in seconds for HTTP requests.
+        Influences all requests except for file download, which has no timeout
+    """
+
     __slots__ = ('project_root',
                  'project_root_fd',
                  'dvc_remote_url',
@@ -617,9 +633,28 @@ def install_hooks(project_root: Optional[PathLike] = None,
                   branch: Optional[str] = None,
                   username: Optional[str] = None,
                   password: Optional[str] = None,
+                  token: Optional[str] = None,
                   timeout: Optional[int] = None):
+    """
+    Monkey patches builtin Python functions to make them DagsHub-repo aware.
+    Patched functions are: `open()`, `os.listdir()`, `os.scandir()`, `os.stat()` + pathlib's functions that use them
+
+    This is equivalent to creating a `DagsHubFilesystem` object and calling its `install_hooks()` method
+
+    :param project_root: Path to the git repository with the repo.
+        If None, we look up the filesystem from the current dir until we find a git repo
+    :param repo_url: URL to the DagsHub repository.
+        If None, URL is received from the git configuration
+    :param branch: Explicitly sets a branch/commit revision to work with
+        If None, branch is received from the git configuration
+    :param username: DagsHub username
+    :param password: DagsHub password
+    :param token: DagsHub API token (as an alternative login variant to username/password)
+    :param timeout: Timeout in seconds for HTTP requests.
+        Influences all requests except for file download, which has no timeout
+    """
     fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
-                           password=password, timeout=timeout)
+                           password=password, token=token, timeout=timeout)
     fs.install_hooks()
 
 
