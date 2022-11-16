@@ -242,7 +242,7 @@ class Repo:
     @property
     def auth(self):
         """
-        The auth function is used to authenticate the user with the dagshub API.It takes in a username and password, or token as arguments. If both are provided, it will use the username and password combination to
+        The auth function is used to authenticate the user with the dagshub API. It takes in a username and password, or token as arguments. If both are provided, it will use the username and password combination to
                  get a token from dagshub's authentication server. Otherwise, if only a token is provided it will be used for authentication.
         
         :return: The httpbasicauth object
