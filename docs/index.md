@@ -63,7 +63,7 @@ future uses.
 
 Supported ways to enable the DagsHub Streaming include:
 1. [Magical Python Hooks](#python-hooks)
-2. [Mounted Filesystem - Experimental](#mounted-filesystem)
+2. [Mounted Filesystem - Experimental](#mounted-filesystem---experimental)
 3. [Non-magical API](#non-magical-api)
 
 ### Python Hooks
