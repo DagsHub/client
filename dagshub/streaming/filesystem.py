@@ -85,7 +85,6 @@ class DagsHubFilesystem:
                  'password',
                  'dagshub_remotes',
                  'token',
-                 # 'http_client',
                  '__weakref__')
 
     def __init__(self,
@@ -133,8 +132,6 @@ class DagsHubFilesystem:
         self.username = username or config.username
         self.password = password or config.password
         self.token = token or config.token
-
-        # self.http_client = httpx.Client(auth=self.auth, timeout=None, follow_redirects=True)
 
         response = self._api_listdir('')
         if response.status_code < 400:
