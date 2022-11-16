@@ -16,6 +16,7 @@ TOKENS_CACHE_SCHEMA_VERSION = "1"
 DAGSHUB_USER_TOKEN_KEY = "DAGSHUB_USER_TOKEN"
 DAGSHUB_USERNAME_KEY = "DAGSHUB_USERNAME"
 DAGSHUB_PASSWORD_KEY = "DAGSHUB_PASSWORD"
+HTTP_TIMEOUT_KEY = "DAGSHUB_HTTP_TIMEOUT"
 
 parsed_host = urlparse(os.environ.get(HOST_KEY, DEFAULT_HOST))
 hostname = parsed_host.hostname
@@ -29,4 +30,5 @@ username = os.environ.get(DAGSHUB_USERNAME_KEY)
 password = os.environ.get(DAGSHUB_PASSWORD_KEY)
 custom_user_agent_suffix = f" dagshub-client-python/{__version__}"
 requests_headers = {"user-agent": requests.utils.default_user_agent() + custom_user_agent_suffix}
+http_timeout = os.environ.get(HTTP_TIMEOUT_KEY, 30)
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"

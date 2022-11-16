@@ -85,6 +85,7 @@ class DagsHubFilesystem:
                  'password',
                  'dagshub_remotes',
                  'token',
+                 'timeout',
                  '__weakref__')
 
     def __init__(self,
@@ -94,6 +95,7 @@ class DagsHubFilesystem:
                  username: Optional[str] = None,
                  password: Optional[str] = None,
                  token: Optional[str] = None,
+                 timeout: Optional[int] = None,
                  _project_root_fd: Optional[int] = None):
 
         # Find root directory of Git project
@@ -132,6 +134,7 @@ class DagsHubFilesystem:
         self.username = username or config.username
         self.password = password or config.password
         self.token = token or config.token
+        self.timeout = timeout or config.http_timeout
 
         response = self._api_listdir('')
         if response.status_code < 400:
@@ -185,12 +188,12 @@ class DagsHubFilesystem:
 
     def is_commit_on_remote(self, sha1):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
-        resp = httpx.get(url, auth=self.auth, timeout=None, follow_redirects=True)
+        resp = self.http_get(url)
         return resp.status_code == 200
 
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
-        resp = httpx.get(url, auth=self.auth, timeout=None, follow_redirects=True)
+        resp = self.http_get(url)
         if resp.status_code != 200:
             raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
                                f"Response body: {resp.content}")
@@ -494,15 +497,24 @@ class DagsHubFilesystem:
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
-        return httpx.get(f'{self.content_api_url}/{path}',
-                         auth=self.auth, timeout=None, follow_redirects=True,
+        return self.http_get(f'{self.content_api_url}/{path}',
                          params={'include_size': 'true'} if include_size else {},
                          headers=config.requests_headers)
 
     def _api_download_file_git(self, path: str):
-        return httpx.get(f'{self.raw_api_url}/{path}',
-                         auth=self.auth, timeout=None, follow_redirects=True,
-                         headers=config.requests_headers)
+        return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
+
+    def http_get(self, path: str, **kwargs):
+        mixin_args = {
+            "auth": self.auth,
+            "timeout": self.timeout,
+            "follow_redirects": True
+        }
+        # Set only if it's not set previously
+        for arg in mixin_args:
+            if arg not in kwargs:
+                kwargs[arg] = mixin_args[arg]
+        return httpx.get(path, **kwargs)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
@@ -604,9 +616,10 @@ def install_hooks(project_root: Optional[PathLike] = None,
                   repo_url: Optional[str] = None,
                   branch: Optional[str] = None,
                   username: Optional[str] = None,
-                  password: Optional[str] = None):
+                  password: Optional[str] = None,
+                  timeout: Optional[int] = None):
     fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
-                           password=password)
+                           password=password, timeout=timeout)
     fs.install_hooks()
 
 
