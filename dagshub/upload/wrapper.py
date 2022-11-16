@@ -118,7 +118,7 @@ class Repo:
     def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
 
         """
-     Repo class constructor. If branch is not provided, then default branch is taken.
+     Repo class constructor. If branch is not provided, then default branch is used.
 
      :param owner (str): Store the username of the user who owns this repository
      :param name (str): Identify the repository
