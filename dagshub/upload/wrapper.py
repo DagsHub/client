@@ -262,16 +262,6 @@ class Repo:
         :return: A dataset object that represents the directory at the given path
         
         """
-        """
-        The directory function returns a DataSet object that represents the directory at the given path.
-        
-        Args:
-            path[str]: Specify the directory that contains all of the images and labels
-       
-        Returns:
-            A dataset object
-        
-        """
         return DataSet(self, path)
 
     def get_request_url(self, directory):
