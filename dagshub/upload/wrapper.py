@@ -146,14 +146,14 @@ class Repo:
     def upload(self, file: Union[str, IOBase], commit_message=DEFAULT_COMMIT_MESSAGE, path=None, **kwargs):
         """
         The upload function is used to upload files to the repository.
-        It takes a file as an argument and returns the url of that file.
+        It takes a file as an argument and logs the response status code and content.
         
         
         :param file (str): Specify the file to be uploaded
         :param commit_message (str): Specify a commit message
         :param path (str): Specify the path to upload the file to
         :param **kwargs: Pass in any additional parameters that are required for the upload function
-        :return: A dictionary containing the file_id, commit_message and path of the uploaded file
+        :return: None
         
         """
         file_for_upload = DataSet.get_file(file, path)
