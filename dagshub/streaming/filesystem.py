@@ -85,7 +85,7 @@ class DagsHubFilesystem:
                  'password',
                  'dagshub_remotes',
                  'token',
-                 'http_client',
+                 # 'http_client',
                  '__weakref__')
 
     def __init__(self,
@@ -134,7 +134,7 @@ class DagsHubFilesystem:
         self.password = password or config.password
         self.token = token or config.token
 
-        self.http_client = httpx.Client(auth=self.auth, timeout=None, follow_redirects=True)
+        # self.http_client = httpx.Client(auth=self.auth, timeout=None, follow_redirects=True)
 
         response = self._api_listdir('')
         if response.status_code < 400:
@@ -188,12 +188,12 @@ class DagsHubFilesystem:
 
     def is_commit_on_remote(self, sha1):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
-        resp = self.http_client.get(url)
+        resp = httpx.get(url, auth=self.auth, timeout=None, follow_redirects=True)
         return resp.status_code == 200
 
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
-        resp = self.http_client.get(url)
+        resp = httpx.get(url, auth=self.auth, timeout=None, follow_redirects=True)
         if resp.status_code != 200:
             raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
                                f"Response body: {resp.content}")
@@ -497,12 +497,15 @@ class DagsHubFilesystem:
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
-        return self.http_client.get(f'{self.content_api_url}/{path}',
-                                    params={'include_size': 'true'} if include_size else {},
-                                    headers=config.requests_headers)
+        return httpx.get(f'{self.content_api_url}/{path}',
+                         auth=self.auth, timeout=None, follow_redirects=True,
+                         params={'include_size': 'true'} if include_size else {},
+                         headers=config.requests_headers)
 
     def _api_download_file_git(self, path: str):
-        return self.http_client.get(f'{self.raw_api_url}/{path}', headers=config.requests_headers)
+        return httpx.get(f'{self.raw_api_url}/{path}',
+                         auth=self.auth, timeout=None, follow_redirects=True,
+                         headers=config.requests_headers)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
