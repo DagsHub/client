@@ -258,7 +258,7 @@ class Repo:
         The directory function returns a DataSet object that represents the directory at the given path.
         
         
-        :param path (str): Specify the directory that contains all of the images and labels
+        :param path (str): Specify the directory that will contain the data. This directory is the "root" of the dataset.
         :return: A dataset object that represents the directory at the given path
         
         """
