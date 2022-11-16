@@ -299,7 +299,7 @@ class Repo:
     @property
     def full_name(self):
         """
-        The full_name function returns the full name of a repository.
+        The full_name function returns the full name of a repository, meaning: "<owner>/<repo>"
         
         
         :return: The full name of a repository
