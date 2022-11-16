@@ -9,7 +9,7 @@ def get_default_branch(owner, reponame, auth, host=config.host):
     
     :param owner(str): Specify the owner of the repository
     :param reponame (str): Specify the name of the repository
-    :param auth (str): Authenticate the user with github
+    :param auth: Authentication object or a (username, password) tuple
     :param host (str): Specify the host to be used
     :return: The default branch of the given repository
     """
