@@ -4,6 +4,7 @@ import pytest
 import respx
 
 from httpx import Response
+from respx import MockRouter
 
 import dagshub.streaming
 
@@ -26,6 +27,19 @@ def current_revision(dagshub_repo):
 @pytest.fixture
 def repopath(repouser, reponame):
     return f"{repouser}/{reponame}"
+
+
+@pytest.fixture
+def api_list_path(repopath, current_revision):
+    return f"/api/v1/repos/{repopath}/content/{current_revision}"
+
+
+@pytest.fixture
+def api_raw_path(repopath, current_revision):
+    return f"/api/v1/repos/{repopath}/raw/{current_revision}"
+
+
+BASE_REGEX = r"/api/v1/repos/\w+/\w+"
 
 
 @pytest.fixture
@@ -122,15 +136,17 @@ def api_lookup(current_revision):
         ),
     }
 
-    base_regex = r"/api/v1/repos/\w+/\w+"
-
     endpoints = {
-        "branch": rf"{base_regex}/branches/\w+",
-        "branches": rf"{base_regex}/branches",
-        "list": rf"{base_regex}/content/\w+/.*",
+        "branch": rf"{BASE_REGEX}/branches/\w+",
+        "branches": rf"{BASE_REGEX}/branches",
+        "list_root": rf"{BASE_REGEX}/content/",
     }
 
-    return {endpoints[k]: responses.get(k) for k in endpoints}
+    return {k: (endpoints[k], responses.get(k)) for k in endpoints}
+
+
+def add_file(mock_api: MockRouter):
+    mock_api.add()
 
 
 @pytest.fixture
@@ -138,8 +154,11 @@ def mock_api(api_lookup):
     with respx.mock(
         base_url="https://dagshub.com", assert_all_called=False
     ) as respx_mock:
-        for endpoint_regex, return_value in api_lookup.items():
-            respx_mock.get(url__regex=endpoint_regex).mock(return_value)
+        for route_name, endpoint_regex_return_value in api_lookup.items():
+            endpoint_regex, return_value = endpoint_regex_return_value
+            respx_mock.route(name=route_name, url__regex=endpoint_regex).mock(
+                return_value
+            )
         yield respx_mock
 
 
@@ -160,7 +179,7 @@ def dagshub_repo(git_repo, repopath):
 
 
 @pytest.fixture
-def install_hooks(dagshub_repo):
+def repo_with_hooks(dagshub_repo):
     dagshub.streaming.install_hooks()
-    yield
+    yield dagshub_repo
     dagshub.streaming.uninstall_hooks()

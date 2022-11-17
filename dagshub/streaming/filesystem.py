@@ -521,7 +521,11 @@ class DagsHubFilesystem:
         return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
 
     def http_get(self, path: str, **kwargs):
-        return http_request("GET", path, auth=self.auth, timeout=self.timeout, **kwargs)
+        timeout = self.timeout
+        if "timeout" in kwargs:
+            timeout = kwargs["timeout"]
+            del(kwargs["timeout"])
+        return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
