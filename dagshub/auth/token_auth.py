@@ -1,11 +1,16 @@
-from requests.auth import AuthBase
+import typing
+from httpx import Request, Response, Auth
 
 
-class HTTPBearerAuth(AuthBase):
+class HTTPBearerAuth(Auth):
     """Attaches HTTP Bearer Authorization to the given Request object."""
 
     def __init__(self, token):
         self.token = token
+
+    def auth_flow(self, request: Request) -> typing.Generator[Request, Response, None]:
+        request.headers["Authorization"] = f"Bearer {self.token}"
+        yield request
 
     def __eq__(self, other):
         return all([

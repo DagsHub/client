@@ -1,17 +1,16 @@
 import json
 
-import requests
 import urllib
 import os
 import logging
 import fnmatch
 from typing import Union
 from io import IOBase
+import httpx
 from dagshub.common import config, helpers
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from requests.auth import HTTPBasicAuth
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -21,7 +20,9 @@ ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 logger = logging.getLogger(__name__)
 
-s = requests.Session()
+s = httpx.Client()
+s.timeout = config.http_timeout
+s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
 
@@ -98,7 +99,7 @@ def create_repo(repo_name, org_name="", description="", private=False, auto_init
 
     res = s.post(
         urllib.parse.urljoin(config.host, url),
-        data,
+        data=data,
         auth=auth
     )
 
@@ -162,9 +163,10 @@ class Repo:
         logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
         res = s.put(
             self.get_request_url(directory_path),
-            data,
+            data=data,
             files=[("files", file) for file in files],
-            auth=self.auth
+            auth=self.auth,
+            timeout=None
         )
         self._log_upload_details(data, res, files)
 
@@ -189,7 +191,7 @@ class Repo:
     @property
     def auth(self):
         if self.username is not None and self.password is not None:
-            return HTTPBasicAuth(self.username, self.password)
+            return httpx.BasicAuth(self.username, self.password)
         token = self.token or dagshub.auth.get_token(code_input_timeout=0)
         return HTTPBearerAuth(token)
 
@@ -298,7 +300,7 @@ class DataSet:
     def _get_last_commit(self):
         api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
         api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
-        res = s.get(api_url)
+        res = s.get(api_url, auth=self.repo.auth)
         if res.status_code == HTTPStatus.OK:
             content = res.json()
             try:

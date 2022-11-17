@@ -36,7 +36,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "PyYAML>=5",
-        "requests>=2",
         "fusepy>=3",
         "appdirs>=1.4.4",
         "pytimedinput>=2.0.1",
