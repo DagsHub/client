@@ -74,7 +74,7 @@ def oauth_flow(
 #     state = uuid.uuid4()
 #     host = host.strip("/")
 #     dagshub_url = urllib.parse.urljoin(host, "login/oauth")
-#     link_prompt = f"Go to {dagshub_url}/authorize?state={state}&client_id={client_id} and paste the code back in here."
+#     link_prompt = f"Go to {dagshub_url}/authorize?state={state}&client_id={client_id} and paste the code back in here"
 #     code_prompt = "Code:"
 #     if code_input_timeout <= 0:
 #         print(link_prompt)
