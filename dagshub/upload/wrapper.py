@@ -178,7 +178,7 @@ class Repo:
         :param new_branch (str): Create a new branch
         :param last_commit (str): Tell the server that we want to upload a file without committing it
         :param force (bool): Force the upload of a file even if it is already present on the server
-        :return: The response object from the request
+        :return: None
         
         """
         
