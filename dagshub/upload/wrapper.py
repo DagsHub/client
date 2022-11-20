@@ -444,7 +444,7 @@ class DataSet:
         :param commit_message (str): Set the commit message
         :param *args: Pass a non-keyworded, variable-length argument list to the function
         :param **kwargs: Pass additional parameters to the function
-        :return: Nothing
+        :return: None
         """
       
         file_list = list(self.files.values())
