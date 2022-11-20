@@ -1,3 +1,5 @@
+import os.path
+
 from httpx import Response
 from respx import MockRouter, Route
 
@@ -13,7 +15,7 @@ class MockApi(MockRouter):
 
         self._endpoints, self._responses = self._default_endpoints_and_responses()
         route_dict = {
-            k: (self._endpoints[k], self._responses.get(k)) for k in self._endpoints
+            k: (self._endpoints[k], self._responses[k]) for k in self._endpoints
         }
         for route_name in route_dict:
             endpoint_regex, return_value = route_dict[route_name]
@@ -39,7 +41,7 @@ class MockApi(MockRouter):
         endpoints = {
             "branch": rf"{BASE_REGEX}/branches/\w+",
             "branches": rf"{BASE_REGEX}/branches",
-            "list_root": rf"{BASE_REGEX}/content/",
+            "list_root": rf"{BASE_REGEX}/content/{self.current_revision}/$",
         }
 
         responses = {
@@ -95,7 +97,7 @@ class MockApi(MockRouter):
                     }
                 ],
             ),
-            "list": Response(
+            "list_root": Response(
                 200,
                 json=[
                     {
@@ -137,6 +139,31 @@ class MockApi(MockRouter):
         return endpoints, responses
 
     def add_file(self, path, content="aaa", status=200) -> Route:
+        """
+        Add a file to the api (only accessible via the raw endpoint)
+        """
         route = self.route(url=f"{self.api_raw_path}/{path}")
         route.mock(Response(status, content=content))
         return route
+
+    def add_dir(self, path, contents=[], status=200) -> Route:
+        """
+        Add a directory to the api (only accessible via the content endpoint)
+        We don't keep a tree of added dirs, so it's not dynamic
+        """
+        route = self.route(url=f"{self.api_list_path}/{path}")
+        content = [
+            self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
+        ]
+        route.mock(Response(status, json=content))
+        return route
+
+    def generate_list_entry(self, path, type="file"):
+        return {
+            "path": path,
+            "type": type,
+            "size": 0,
+            "hash": "8586da76f372efa83d832a9d0e664817.dir",
+            "versioning": "dvc",
+            "download_url": f"https://dagshub.com/{self.repopath}/raw/{self.current_revision}/{path}",
+        }
