@@ -22,8 +22,12 @@ class MockApi(MockRouter):
             self.route(name=route_name, url__regex=endpoint_regex).mock(return_value)
 
     @property
-    def repopath(self):
+    def repourlpath(self):
         return f"{self.user}/{self.reponame}"
+
+    @property
+    def repophysicalpath(self):
+        return str(self.git_repo.workspace)
 
     @property
     def current_revision(self):
@@ -31,11 +35,11 @@ class MockApi(MockRouter):
 
     @property
     def api_list_path(self):
-        return f"/api/v1/repos/{self.repopath}/content/{self.current_revision}"
+        return f"/api/v1/repos/{self.repourlpath}/content/{self.current_revision}"
 
     @property
     def api_raw_path(self):
-        return f"/api/v1/repos/{self.repopath}/raw/{self.current_revision}"
+        return f"/api/v1/repos/{self.repourlpath}/raw/{self.current_revision}"
 
     def _default_endpoints_and_responses(self):
         endpoints = {
@@ -165,5 +169,5 @@ class MockApi(MockRouter):
             "size": 0,
             "hash": "8586da76f372efa83d832a9d0e664817.dir",
             "versioning": "dvc",
-            "download_url": f"https://dagshub.com/{self.repopath}/raw/{self.current_revision}/{path}",
+            "download_url": f"https://dagshub.com/{self.repourlpath}/raw/{self.current_revision}/{path}",
         }

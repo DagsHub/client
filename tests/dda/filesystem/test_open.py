@@ -40,7 +40,7 @@ def test_open_for_write(mock_api, repo_with_hooks):
 def test_nested_open_for_write(mock_api, repo_with_hooks):
     content = "adfasdf"
     path = "aaaa/bbb/new_file.txt"
-    mock_api.add_dir("aaaa", contents=[("bbb", "dir")], status=203)
+    mock_api.add_dir("aaaa", contents=[("bbb", "dir")])
     mock_api.add_dir("aaaa/bbb")
     with open(path, "w") as f:
         f.write(content)
