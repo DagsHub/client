@@ -218,7 +218,7 @@ class Repo:
         :param data (str): Pass the data that will be uploaded to the server
         :param res (dict): Store the response from the server
         :param files (list(str)): Pass the files that are going to be uploaded
-        :return: The request url, the data sent to the server and the files uploaded
+        :return: None
         
         """
         
