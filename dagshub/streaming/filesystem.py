@@ -524,7 +524,7 @@ class DagsHubFilesystem:
         timeout = self.timeout
         if "timeout" in kwargs:
             timeout = kwargs["timeout"]
-            del(kwargs["timeout"])
+            del kwargs["timeout"]
         return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
     def install_hooks(self):
