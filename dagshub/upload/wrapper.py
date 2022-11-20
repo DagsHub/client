@@ -429,7 +429,7 @@ class DataSet:
         """
         The _reset_dataset function clears the files attribute of a Dataset object.
       
-        :return: Nothing
+        :return: None
         """
        
         self.files.clear()
