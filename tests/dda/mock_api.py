@@ -31,7 +31,11 @@ class MockApi(MockRouter):
 
     @property
     def current_revision(self):
-        return self.git_repo.api.heads.main.commit.hexsha
+        heads = self.git_repo.api.heads
+        if "main" in heads:
+            return heads.main.commit.hexsha
+        else:
+            return heads.master.commit.hexsha
 
     @property
     def api_list_path(self):
