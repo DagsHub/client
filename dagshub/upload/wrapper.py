@@ -286,7 +286,7 @@ class Repo:
         The _set_default_branch function is used to set the default branch for a repository.
         It first tries to get the default branch from DagsHub. If it fails, an error message is raised.
         
-        :return: The branch name of the repository   
+        :return: None
         """
 
         try:
