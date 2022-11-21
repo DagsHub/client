@@ -528,13 +528,6 @@ class DagsHubFilesystem:
             del kwargs["timeout"]
         return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
-    @staticmethod
-    def _wrap_strfunc(strfunc):
-        @functools.wraps(strfunc)
-        def wrapped(pathobj, *args):
-            return strfunc(str(pathobj), *args)
-        return staticmethod(wrapped)
-
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
             # TODO: DRY this dictionary. i.e. __open() links cls.__open
@@ -559,9 +552,6 @@ class DagsHubFilesystem:
             if sys.version_info.minor == 10:
                 # Python 3.10 - pathlib uses io.open
                 _pathlib.open = self.open
-            elif sys.version_info.minor == 6:
-                # Python 3.6 - weird strfunc wrapping
-                _pathlib.open = self._wrap_strfunc(self.os_open)
             else:
                 # Python <=3.9 - pathlib uses os.open
                 _pathlib.open = self.os_open
