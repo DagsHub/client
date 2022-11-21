@@ -32,15 +32,17 @@ def test_scandir(scandir_mock, cwd, path):
     os.mkdir(relpath)
     open(os.path.join(relpath, "a.txt"), "w").close()
     fs = dagshub.streaming.DagsHubFilesystem()
-    with pytest.MonkeyPatch.context() as mp:
-        mp.chdir(cwd)
-        expected = scandir_to_dict(os.scandir(path))
-        fs.install_hooks()
-        actual = scandir_to_dict(os.scandir(path))
+    try:
+        with pytest.MonkeyPatch.context() as mp:
+            mp.chdir(cwd)
+            expected = scandir_to_dict(os.scandir(path))
+            fs.install_hooks()
+            actual = scandir_to_dict(os.scandir(path))
+            assert "b.txt" in actual
+            del actual["b.txt"]
+            assert expected == actual
+    finally:
         fs.uninstall_hooks()
-        assert "b.txt" in actual
-        del actual["b.txt"]
-        assert expected == actual
 
 
 def test_abspath(scandir_mock):
