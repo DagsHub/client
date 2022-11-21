@@ -5,11 +5,6 @@ import urllib
 import uuid
 from dagshub.common import config
 import concurrent.futures
-# import getpass
-# import sys
-# import pytimedinput
-
-# CODE_INPUT_TIMEOUT = 60
 logger = logging.getLogger(__name__)
 
 
