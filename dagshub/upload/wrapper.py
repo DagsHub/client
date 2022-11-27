@@ -262,8 +262,11 @@ class Repo:
     @property
     def auth(self):
         """
-        The auth function is used to authenticate the user with the dagshub API. It takes in a username and password, or token as arguments. If both are provided, it will use the username and password combination to
-                 get a token from dagshub's authentication server. Otherwise, if only a token is provided it will be used for authentication.
+        The auth function is used to authenticate the user with the dagshub API.
+            It takes in a username and password, or token as arguments. If both are provided,
+            it will use the username and password combination to
+            get a token from dagshub's authentication server.
+            Otherwise, if only a token is provided it will be used for authentication.
 
         :return: The HTTPAuth object
 
@@ -278,7 +281,8 @@ class Repo:
         The directory function returns a DataSet object that represents the directory at the given path.
 
 
-        :param path (str): Specify the directory that will contain the data. This directory is the "root" of the dataset.
+        :param path (str): Specify the directory that will contain the data.
+                           This directory is the "root" of the dataset.
         :return: A dataset object that represents the directory at the given path
 
         """
@@ -288,8 +292,10 @@ class Repo:
         """
         The get_request_url function returns the URL for uploading a file to DagsHub.
 
-        :param directory (str): the path to a directory within this repo on DagsHub. For example, if you have created your repo in such a
-            way that it has two directories named data and models, then you could pass one of these strings into this function as an argument.
+        :param directory (str): the path to a directory within this repo on DagsHub.
+            For example, if you have created your repo in such a
+            way that it has two directories named data and models,
+            then you could pass one of these strings into this function as an argument.
         :return: The url for uploading a file
 
         """
@@ -371,7 +377,8 @@ class DataSet:
 
     def add_dir(self, local_path, glob_exclude=""):
         """
-        The add_dir function adds an entire directory to a DagsHub repository.It does this by iterating through all the files in the given directory and uploading them one-by-one.
+        The add_dir function adds an entire directory to a DagsHub repository.
+        It does this by iterating through all the files in the given directory and uploading them one-by-one.
         The function also commits all of these changes at once, so as not to overload the API with requests.
 
 
@@ -408,13 +415,16 @@ class DataSet:
     @staticmethod
     def _clean_directory_name(directory: str):
         """
-        The _clean_directory_name function takes a directory name as an argument and returns the normalized path of that directory.
+        The _clean_directory_name function takes a directory name as an argument
+        and returns the normalized path of that directory.
         For example, if the input is ../../../ then it will return /. If the input is ./ then it will return ..
-        If there are any other characters in the string, they will be ignored and only alphanumeric characters (a-zA-Z0-9)
+        If there are any other characters in the string,
+        they will be ignored and only alphanumeric characters (a-zA-Z0-9)
         will be kept.
 
         :param directory (str): Specify the directory that will be cleaned
-        :return: The normalized path of the directory(The directory name with the path separator normalized to a forward slash)
+        :return: The normalized path of the directory
+                 (The directory name with the path separator normalized to a forward slash)
 
         """
 
@@ -473,7 +483,8 @@ class DataSet:
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
         """
         The commit function is used to commit the files in the dataset.
-        It takes a commit message as an argument, if no argument is passed then it return default commit message "Upload files using DagsHub client".
+        It takes a commit message as an argument,
+            if no argument is passed then it return default commit message "Upload files using DagsHub client".
         The function returns nothing.
 
 
