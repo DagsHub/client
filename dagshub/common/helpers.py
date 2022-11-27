@@ -1,11 +1,11 @@
 import httpx
 
-from dagshub.common import config, helpers
+from dagshub.common import config
 import urllib
 
 
 def get_default_branch(owner, reponame, auth, host=config.host):
-    res = helpers.http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
+    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
         owner=owner,
         reponame=reponame,
     )), auth=auth)

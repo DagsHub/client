@@ -43,6 +43,7 @@ def oauth_flow(
         if timed_out:
             raise RuntimeError("Timed out input of OAuth code")
     res = http_request(
+        "POST",
         f"{dagshub_url}/access_token",
         data={"client_id": client_id, "code": code, "state": state},
     )
