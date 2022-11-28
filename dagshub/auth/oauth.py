@@ -4,11 +4,10 @@ from typing import Optional, Dict
 import logging
 
 import pytimedinput
-import requests
 import urllib
 import uuid
 from dagshub.common import config
-
+from dagshub.common.helpers import http_request
 
 CODE_INPUT_TIMEOUT = 60
 
@@ -43,7 +42,8 @@ def oauth_flow(
         )
         if timed_out:
             raise RuntimeError("Timed out input of OAuth code")
-    res = requests.post(
+    res = http_request(
+        "POST",
         f"{dagshub_url}/access_token",
         data={"client_id": client_id, "code": code, "state": state},
     )

@@ -15,7 +15,7 @@ from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
 from dagshub.common import config, helpers
 import logging
-import httpx
+from dagshub.common.helpers import http_request
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -521,16 +521,11 @@ class DagsHubFilesystem:
         return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
 
     def http_get(self, path: str, **kwargs):
-        mixin_args = {
-            "auth": self.auth,
-            "timeout": self.timeout,
-            "follow_redirects": True
-        }
-        # Set only if it's not set previously
-        for arg in mixin_args:
-            if arg not in kwargs:
-                kwargs[arg] = mixin_args[arg]
-        return httpx.get(path, **kwargs)
+        timeout = self.timeout
+        if "timeout" in kwargs:
+            timeout = kwargs["timeout"]
+            del kwargs["timeout"]
+        return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):

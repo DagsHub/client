@@ -1,2 +1,5 @@
-setuptools==65.5.1
-pytest==7.2.0
+setuptools
+pytest
+respx
+pytest-git
+pytest-env

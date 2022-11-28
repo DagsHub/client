@@ -36,7 +36,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "PyYAML>=5",
-        "requests>=2",
         "fusepy>=3",
         "appdirs>=1.4.4",
         "pytimedinput>=2.0.1",
@@ -48,7 +47,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     entry_points={
         "console_scripts": [
             "dagshub = dagshub.common.cli:cli"
