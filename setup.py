@@ -41,6 +41,7 @@ setuptools.setup(
         "pytimedinput>=2.0.1",
         "click>=8.0.4",
         "httpx>=0.22.0",
+        "requests>=2.27.1"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
