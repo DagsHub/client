@@ -13,9 +13,9 @@ from os.path import ismount
 from pathlib import Path
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
-from dagshub.common import config
+from dagshub.common import config, helpers
 import logging
-import requests
+from dagshub.common.helpers import http_request
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -75,6 +75,22 @@ SPECIAL_FILE = Path('.dagshub-streaming')
 
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
+    """
+    A DagsHub-repo aware filesystem class
+
+    :param project_root: Path to the git repository with the repo.
+        If None, we look up the filesystem from the current dir until we find a git repo
+    :param repo_url: URL to the DagsHub repository.
+        If None, URL is received from the git configuration
+    :param branch: Explicitly sets a branch/commit revision to work with
+        If None, branch is received from the git configuration
+    :param username: DagsHub username
+    :param password: DagsHub password
+    :param token: DagsHub API token (as an alternative login variant to username/password)
+    :param timeout: Timeout in seconds for HTTP requests.
+        Influences all requests except for file download, which has no timeout
+    """
+
     __slots__ = ('project_root',
                  'project_root_fd',
                  'dvc_remote_url',
@@ -85,6 +101,7 @@ class DagsHubFilesystem:
                  'password',
                  'dagshub_remotes',
                  'token',
+                 'timeout',
                  '__weakref__')
 
     def __init__(self,
@@ -94,6 +111,7 @@ class DagsHubFilesystem:
                  username: Optional[str] = None,
                  password: Optional[str] = None,
                  token: Optional[str] = None,
+                 timeout: Optional[int] = None,
                  _project_root_fd: Optional[int] = None):
 
         # Find root directory of Git project
@@ -132,9 +150,10 @@ class DagsHubFilesystem:
         self.username = username or config.username
         self.password = password or config.password
         self.token = token or config.token
+        self.timeout = timeout or config.http_timeout
 
         response = self._api_listdir('')
-        if response.ok:
+        if response.status_code < 400:
             pass
         else:
             # TODO: Check .dvc/config{,.local} for credentials
@@ -146,6 +165,7 @@ class DagsHubFilesystem:
         """
         Gets current revision on repo:
         - If User specified a branch, returns HEAD of that brunch on the remote
+        - If branch wasn't detected, returns HEAD of default branch in the speficied remote.
         - If HEAD is a branch, tries to find a dagshub remote associated with it and get its HEAD
         - If HEAD is a commit revision, checks that the commit exists on DagsHub
         """
@@ -153,17 +173,25 @@ class DagsHubFilesystem:
         if self.user_specified_branch:
             branch = self.user_specified_branch
         else:
-            with open(self.project_root / ".git/HEAD") as head_file:
-                head = head_file.readline().strip()
-            if head.startswith("ref"):
-                branch = head.split("/")[-1]
-            else:
-                # contents of HEAD is the revision - check that this commit exists on remote
-                if self.is_commit_on_remote(head):
-                    return head
+            try:
+                with open(self.project_root / ".git/HEAD") as head_file:
+                    head = head_file.readline().strip()
+                if head.startswith("ref"):
+                    branch = head.split("/")[-1]
                 else:
-                    raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
-                                       f"Please push your changes to the remote or checkout a tracked branch.")
+                    # contents of HEAD is the revision - check that this commit exists on remote
+                    if self.is_commit_on_remote(head):
+                        return head
+                    else:
+                        raise RuntimeError(f"Current HEAD ({head}) doesn't exist on the remote. "
+                                           f"Please push your changes to the remote or checkout a tracked branch.")
+
+            except FileNotFoundError:
+                logger.debug("Couldn't get branch info from local git repository, " +
+                             "fetching default branch from the remote...")
+                owner, reponame = self.parsed_repo_url.path.split("/")[1:]
+                branch = helpers.get_default_branch(owner, reponame, self.auth)
+                logger.debug(f'Set default branch: "{branch}"')
         return self.get_remote_branch_head(branch)
 
     @property
@@ -176,19 +204,19 @@ class DagsHubFilesystem:
 
     def is_commit_on_remote(self, sha1):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
-        resp = requests.get(url, auth=self.auth)
+        resp = self.http_get(url)
         return resp.status_code == 200
 
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
-        resp = requests.get(url, auth=self.auth)
+        resp = self.http_get(url)
         if resp.status_code != 200:
             raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
                                f"Response body: {resp.content}")
         return resp.json()["commit"]["id"]
 
     def get_api_url(self, path):
-        return self.parsed_repo_url._replace(path=path).geturl()
+        return str(self.parsed_repo_url._replace(path=path).geturl())
 
     @property
     def auth(self):
@@ -245,8 +273,12 @@ class DagsHubFilesystem:
         except ValueError:
             return None
 
-    def _passthrough_path(self, relative_path: PathLike):
-        return str(relative_path).startswith(('.git/', '.dvc/'))
+    @staticmethod
+    def _passthrough_path(relative_path: PathLike):
+        str_path = str(relative_path)
+        if "/site-packages/" in str_path:
+            return True
+        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
 
     def _special_file(self):
         # TODO Include more information in this file
@@ -274,7 +306,7 @@ class DagsHubFilesystem:
                     # Open for reading - try to download the file
                     if "r" in mode:
                         resp = self._api_download_file_git(relative_path)
-                        if resp.ok:
+                        if resp.status_code < 400:
                             self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
                             # TODO: Handle symlinks
                             with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
@@ -296,7 +328,7 @@ class DagsHubFilesystem:
                         # Try to download the file if we're in append modes
                         if "a" in mode or "+" in mode:
                             resp = self._api_download_file_git(relative_path)
-                            if resp.ok:
+                            if resp.status_code < 400:
                                 with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
                                     output.write(resp.content)
                         return self.__open(relative_path, mode, buffering, encoding, errors, newline,
@@ -319,18 +351,19 @@ class DagsHubFilesystem:
         if dir_fd is not None:   # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
-        try:
-            open_mode = "r"
-            # Write modes - calling in append mode,
-            # This way we create the intermediate folders if file doesn't exist, but the folder it's in does
-            # Append so we don't truncate the file
-            if not (flags & os.O_RDONLY):
-                open_mode = "a"
-            logger.debug("fs.os_open - trying to materialize path")
-            self.open(path, mode=open_mode).close()
-            logger.debug("fs.os_open - successfully materialized path")
-        except FileNotFoundError:
-            logger.debug("fs.os_open - failed to materialize path, os.open will throw")
+        if self._relative_path(path):
+            try:
+                open_mode = "r"
+                # Write modes - calling in append mode,
+                # This way we create the intermediate folders if file doesn't exist, but the folder it's in does
+                # Append so we don't truncate the file
+                if not (flags & os.O_RDONLY):
+                    open_mode = "a"
+                logger.debug("fs.os_open - trying to materialize path")
+                self.open(path, mode=open_mode).close()
+                logger.debug("fs.os_open - successfully materialized path")
+            except FileNotFoundError:
+                logger.debug("fs.os_open - failed to materialize path, os.open will throw")
         return os.open(path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
@@ -394,7 +427,7 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 resp = self._api_listdir(relative_path)
                 # FIXME: if path is file, return FileNotFound instead of the listdir error
-                if resp.ok:
+                if resp.status_code < 400:
                     self._mkdirs(relative_path, dir_fd=self.project_root_fd)
                     self.__chdir(abspath)
                 else:
@@ -425,7 +458,7 @@ class DagsHubFilesystem:
                 if relative_path == Path():
                     dircontents.add(SPECIAL_FILE.name)
                 resp = self._api_listdir(relative_path)
-                if resp.ok:
+                if resp.status_code < 400:
                     dircontents.update(Path(f['path']).name for f in resp.json())
                     self.remote_tree[str(relative_path)] = {
                         Path(f["path"]).name: f["type"]
@@ -469,7 +502,7 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 pass
             resp = self._api_listdir(relative_path)
-            if resp.ok:
+            if resp.status_code < 400:
                 for f in resp.json():
                     name = Path(f['path']).name
                     if name not in local_filenames:
@@ -480,11 +513,19 @@ class DagsHubFilesystem:
 
     @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
-        return requests.get(f'{self.content_api_url}/{path}', auth=self.auth,
-                            params={'include_size': 'true'} if include_size else {})
+        return self.http_get(f'{self.content_api_url}/{path}',
+                             params={'include_size': 'true'} if include_size else {},
+                             headers=config.requests_headers)
 
     def _api_download_file_git(self, path: str):
-        return requests.get(f'{self.raw_api_url}/{path}', auth=self.auth)
+        return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
+
+    def http_get(self, path: str, **kwargs):
+        timeout = self.timeout
+        if "timeout" in kwargs:
+            timeout = kwargs["timeout"]
+            del kwargs["timeout"]
+        return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
     def install_hooks(self):
         if not hasattr(self.__class__, f'_{self.__class__.__name__}__unpatched'):
@@ -586,9 +627,29 @@ def install_hooks(project_root: Optional[PathLike] = None,
                   repo_url: Optional[str] = None,
                   branch: Optional[str] = None,
                   username: Optional[str] = None,
-                  password: Optional[str] = None):
+                  password: Optional[str] = None,
+                  token: Optional[str] = None,
+                  timeout: Optional[int] = None):
+    """
+    Monkey patches builtin Python functions to make them DagsHub-repo aware.
+    Patched functions are: `open()`, `os.listdir()`, `os.scandir()`, `os.stat()` + pathlib's functions that use them
+
+    This is equivalent to creating a `DagsHubFilesystem` object and calling its `install_hooks()` method
+
+    :param project_root: Path to the git repository with the repo.
+        If None, we look up the filesystem from the current dir until we find a git repo
+    :param repo_url: URL to the DagsHub repository.
+        If None, URL is received from the git configuration
+    :param branch: Explicitly sets a branch/commit revision to work with
+        If None, branch is received from the git configuration
+    :param username: DagsHub username
+    :param password: DagsHub password
+    :param token: DagsHub API token (as an alternative login variant to username/password)
+    :param timeout: Timeout in seconds for HTTP requests.
+        Influences all requests except for file download, which has no timeout
+    """
     fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
-                           password=password)
+                           password=password, token=token, timeout=timeout)
     fs.install_hooks()
 
 
