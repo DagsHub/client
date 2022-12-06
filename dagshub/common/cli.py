@@ -1,10 +1,19 @@
+import os
 import sys
+from http import HTTPStatus
+
 import click
 
 import dagshub.auth
 from dagshub.common import config
 import dagshub.common.logging
 import logging
+import git
+
+from dagshub.common.config import DEFAULT_HOST
+from dagshub.common.helpers import http_request
+from dagshub.upload import create_repo
+from dagshub.upload.wrapper import DEFAULT_COMMIT_MESSAGE
 
 
 @click.group()
@@ -105,8 +114,77 @@ def upload(ctx,
 
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
-    repo.upload(file=filename, path=target, commit_message=message, force=update)
+    try:
+        repo.upload(file=filename, path=target, commit_message=message, force=update)
+    except RuntimeError as re:
+        # if uploaded filename already exists but update is False, a strange error message will appear
+        # since gogs tries to check last commit in this case
+        if "invalid last_commit" in str(re):
+            raise RuntimeError('Verify that the uploaded file is new') from re
+        else:
+            raise re
 
 
-if __name__ == "__main__":
-    cli()
+@cli.command()
+@click.argument("repo", callback=validate_repo)
+@click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
+@click.option("-c", "--clone", is_flag=True,  help="Clone repository locally")
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+def repo_create(
+                repo,
+                upload_data,
+                clone,
+                verbose):
+    """
+    repo_create
+    example:  dagshub repo-create sdafni.yd/yuvtutorial14 -u "http://0.0.0.0:8080/index.html" --checkout
+    """
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
+
+    owner, repo_name = repo
+    INITIAL_DATA_FILE_NAME = 'repo_created_initial_data'
+
+    #
+    # create the repo in dagshub
+    #
+    repo = create_repo(repo_name)
+    logger.info(f"Created repo: {DEFAULT_HOST}/{owner}/{repo_name}.git")
+
+    if clone:
+        #
+        # clone locally
+        #
+        git.Git(repo_name).clone(f"{DEFAULT_HOST}/{owner}/{repo_name}.git")
+        logger.info(f"Cloned repo to folder {repo_name}")
+
+    if upload_data:
+        #
+        # get data file,
+        # if repo was cloned - copy the file to local location, commit and push to repo.
+        # if not - upload using gogs api, and delete the local copy
+        #
+        res = http_request("GET", upload_data)
+        if res.status_code != HTTPStatus.OK:
+            raise RuntimeError(f"Could not get file from source (response: {res.status_code}), repo created")
+
+        with open(INITIAL_DATA_FILE_NAME, 'w+') as fh:
+            fh.write(res.text)
+
+        if clone:
+            os.rename(INITIAL_DATA_FILE_NAME, f"{repo_name}/{INITIAL_DATA_FILE_NAME}")
+            local_repo = git.Repo(repo_name)
+            local_repo.git.add('--all')
+            local_repo.git.commit('-m', DEFAULT_COMMIT_MESSAGE)
+            origin = local_repo.remote(name='origin')
+            origin.push()
+            logger.info(f"Data file named {INITIAL_DATA_FILE_NAME} committed and pushed to repo")
+        else:
+            repo.upload(file=INITIAL_DATA_FILE_NAME)
+            os.remove(INITIAL_DATA_FILE_NAME)
+            logger.info(f"Data file named {INITIAL_DATA_FILE_NAME} uploaded to repo")
+
+
+
+
+

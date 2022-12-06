@@ -252,7 +252,7 @@ class Repo:
             content = res.content.decode("utf-8")
 
         if res.status_code != HTTPStatus.OK:
-            logger.error(f"Response ({res.status_code}):\n" f"{content}")
+            raise RuntimeError(f"Response ({res.status_code}):\n" f"{content}")
         else:
             logger.debug(f"Response ({res.status_code})\n")
 
@@ -339,6 +339,27 @@ class Repo:
         """
 
         return f"{self.owner}/{self.name}"
+
+
+
+    def _get_last_commit(self):
+        """
+        The _get_last_commit function returns the last commit sha for a given branch.
+        It is used to check if there are any new commits in the repo since we last ran our dag.
+
+        :return: The commit id of the last commit for the branch
+        """
+        api_path = f"api/v1/repos/{self.full_name}/branches/{self.branch}"
+        api_url = urllib.parse.urljoin(self.src_url, api_path)
+        res = s.get(api_url, auth=self.auth)
+        if res.status_code == HTTPStatus.OK:
+            content = res.json()
+            try:
+                return content["commit"]["id"]
+            except KeyError:
+                logger.error(f"Cannot get commit sha for branch '{self.branch}'")
+        return ""
+
 
 
 class DataSet:
@@ -499,21 +520,3 @@ class DataSet:
             file_list, self.directory, commit_message=commit_message, *args, **kwargs
         )
         self._reset_dataset()
-
-    def _get_last_commit(self):
-        """
-        The _get_last_commit function returns the last commit sha for a given branch.
-        It is used to check if there are any new commits in the repo since we last ran our dag.
-
-        :return: The commit id of the last commit for the branch
-        """
-        api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
-        api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
-        res = s.get(api_url, auth=self.repo.auth)
-        if res.status_code == HTTPStatus.OK:
-            content = res.json()
-            try:
-                return content["commit"]["id"]
-            except KeyError:
-                logger.error(f"Cannot get commit sha for branch '{self.repo.branch}'")
-        return ""
