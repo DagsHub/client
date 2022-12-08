@@ -18,6 +18,7 @@ DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
+DEFAULT_DATA_DIR_NAME = 'data'
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -26,19 +27,23 @@ s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
 
-def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
+def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False, repo=None, data_dir=DEFAULT_DATA_DIR_NAME):
     """
-    Create a new repository on DagsHub and upload an entire dataset to it
+    Create a new repository on DagsHub (or get an existing repo) and upload an entire dataset to it
 
     :param repo_name (str): Name of the repository to be created
     :param local_path (str): local path where the dataset to upload is located
     :param glob_exclude (str): regex to exclude certain files from the upload process
     :param org_name (str): Organization name to be the repository owner
     :param private (bool): Flag to indicate the repository is going to be private
+    :param repo_name (Reop): a previously created repository
+    :param data_dir (str): name of data directory that will be created inside repo
     :return : Repo object of the repository created
     """
-    repo = create_repo(repo_name, org_name=org_name, private=private)
-    dir = repo.directory(repo_name)
+    if not repo:
+        repo = create_repo(repo_name, org_name=org_name, private=private)
+
+    dir = repo.directory(data_dir)
     dir.add_dir(local_path, glob_exclude)
     return repo
 
@@ -53,6 +58,7 @@ def create_repo(
     license="",
     readme="",
     template="custom",
+    host=""
 ):
     """
     Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
@@ -73,6 +79,8 @@ def create_repo(
 
     import dagshub.auth
     from dagshub.auth.token_auth import HTTPBearerAuth
+
+    host = host or config.host
 
     username = config.username
     password = config.password
@@ -106,7 +114,7 @@ def create_repo(
             orgname=org_name,
         )
 
-    res = s.post(urllib.parse.urljoin(config.host, url), data=data, auth=auth)
+    res = s.post(urllib.parse.urljoin(host, url), data=data, auth=auth)
 
     if res.status_code != HTTPStatus.CREATED:
         logger.error(f"Response ({res.status_code}):\n" f"{res.content}")
@@ -217,6 +225,7 @@ class Repo:
 
         if force:
             data["last_commit"] = self._get_last_commit()
+
         logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
         res = s.put(
             self.get_request_url(directory_path),
