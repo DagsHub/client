@@ -1,8 +1,11 @@
+import hashlib
+import random
 from typing import Optional, Dict
 import logging
-import requests
 import urllib
 import uuid
+
+import httpx
 from dagshub.common import config
 
 logger = logging.getLogger(__name__)
@@ -17,27 +20,28 @@ def oauth_flow(
     dagshub_url = urllib.parse.urljoin(host, "login/oauth")
     client_id = client_id or config.client_id
     state = uuid.uuid4()
-    middle_man_uuid = uuid.uuid4()
+    middle_man_request_id = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
 
     link_prompt = f"Go to {dagshub_url}/authorize?state={state}&client_id={client_id}" \
-                  f"&middleman_uuid={middle_man_uuid} to authorize the client."
+                  f"&middleman_request_id={middle_man_request_id} to authorize the client."
     print(link_prompt)
 
-    res = requests.post(
+    res = httpx.post(
         f"{dagshub_url}/middleman",
-        data={"uuid": middle_man_uuid},
+        data={"request_id": middle_man_request_id}, timeout=None
     )
 
     if res.status_code != 200:
         raise Exception(
             f"Error while getting OAuth code: HTTP {res.status_code}, Body: {res.json()}"
         )
-    code = res.json()["Code"]
+    code = res.json()
 
-    res = requests.post(
+    res = httpx.post(
         f"{dagshub_url}/access_token",
-        data={"client_id": client_id, "code": code, "state": state},
+        data={"client_id": client_id, "code": code, "state": state}, timeout=None
     )
+
     if res.status_code != 200:
         raise Exception(
             f"Error while getting OAuth token: HTTP {res.status_code}, Body: {res.json()}"
