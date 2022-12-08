@@ -173,6 +173,8 @@ def create(ctx,
         with open(downloaded_file_name, 'wb') as fh:
             fh.write(res.content)
 
+        logger.info(f"Downloaded and saved {downloaded_file_name}")
+
         # extract to data dir or move there
         if zipfile.is_zipfile(downloaded_file_name):
             with zipfile.ZipFile(downloaded_file_name, 'r') as zip_ref:
@@ -196,6 +198,7 @@ def create(ctx,
         # now the local repo resembles the remote but with copy of data
         if upload_data:
             os.rename(new_data_dir, f"{repo.name}/{new_data_dir}")
+            logger.info(f"{new_data_dir} moved to {repo.name}/{new_data_dir}")
 
     # clean tmp file if exists
     if os.path.exists(downloaded_file_name):
