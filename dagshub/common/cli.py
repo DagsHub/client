@@ -153,11 +153,6 @@ def create(ctx,
     logger.setLevel(to_log_level(verbose))
 
     tmp_dir = f"tmp_{uuid.uuid4().hex}"
-    new_data_dir = DEFAULT_DATA_DIR_NAME
-
-    # clean tmp dir if exists from previous run
-    if os.path.exists(tmp_dir):
-        shutil.rmtree(tmp_dir)
 
     os.makedirs(tmp_dir)
 
@@ -193,7 +188,7 @@ def create(ctx,
             os.rename(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
 
         # upload data dir as DVC to repo
-        add_dataset_to_repo(repo, tmp_dir, new_data_dir)
+        add_dataset_to_repo(repo, tmp_dir, DEFAULT_DATA_DIR_NAME)
         logger.info("Data uploaded to repo")
 
     if clone:
@@ -204,12 +199,14 @@ def create(ctx,
         # move the data to it,
         # now the local repo resembles the remote but with copy of data
         if upload_data:
-            os.rename(tmp_dir, f"{repo.name}/{new_data_dir}")
-            logger.info(f"files moved to {repo.name}/{new_data_dir}")
+            os.rename(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
+            logger.info(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}")
 
-    # clean tmp file if exists
+    # clean tmp file/dir if exists
     if os.path.exists(downloaded_file_name):
         os.remove(downloaded_file_name)
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
 
 
 if __name__ == "__main__":
