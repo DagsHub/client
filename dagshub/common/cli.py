@@ -139,8 +139,10 @@ def create(ctx,
            verbose):
     """
     create a repo and upload data
-    example 1:  dagshub repo-create mytutorial -u "http://example.com/data.csv" --clone\n
-    example 2:  dagshub --host "https://www.dagshub.com" repo-create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
+    example 1:  dagshub repo-create mytutorial -u "http://example.com/data.csv" --clone
+
+    example 2:  dagshub --host "https://www.dagshub.com"
+    repo-create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
     """
 
     logger = logging.getLogger()
