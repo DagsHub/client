@@ -27,10 +27,15 @@ s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
 
-def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False, repo=None, data_dir=DEFAULT_DATA_DIR_NAME):
+def create_dataset(repo_name,
+                   local_path,
+                   glob_exclude="",
+                   org_name="",
+                   private=False,
+                   repo=None,
+                   data_dir=DEFAULT_DATA_DIR_NAME):
     """
     Create a new repository on DagsHub (or get an existing repo) and upload an entire dataset to it
-
     :param repo_name (str): Name of the repository to be created
     :param local_path (str): local path where the dataset to upload is located
     :param glob_exclude (str): regex to exclude certain files from the upload process
@@ -204,7 +209,6 @@ class Repo:
         :param last_commit (str): Tell the server that we want to upload a file without committing it
         :param force (bool): Force the upload of a file even if it is already present on the server
         :return: None
-
         """
 
         data = {
@@ -349,8 +353,6 @@ class Repo:
 
         return f"{self.owner}/{self.name}"
 
-
-
     def _get_last_commit(self):
         """
         The _get_last_commit function returns the last commit sha for a given branch.
@@ -368,7 +370,6 @@ class Repo:
             except KeyError:
                 logger.error(f"Cannot get commit sha for branch '{self.branch}'")
         return ""
-
 
 
 class DataSet:

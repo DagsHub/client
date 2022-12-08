@@ -187,7 +187,7 @@ def create(ctx,
 
         # upload data dir as DVC to repo
         create_dataset(repo.name, new_data_dir, repo=repo)
-        logger.info(f"Data uploaded to repo")
+        logger.info("Data uploaded to repo")
 
     if clone:
         # make local repo
@@ -207,4 +207,3 @@ def create(ctx,
 
 if __name__ == "__main__":
     cli()
-
