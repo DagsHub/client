@@ -1,5 +1,7 @@
 import os
 import sys
+import uuid
+
 import click
 import logging
 import git
@@ -14,7 +16,7 @@ from dagshub.common import config
 import dagshub.common.logging
 from dagshub.common.helpers import http_request
 from dagshub.upload import create_repo
-from dagshub.upload.wrapper import create_dataset, DEFAULT_DATA_DIR_NAME
+from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
 @click.group()
@@ -138,9 +140,11 @@ def create(ctx,
            clone,
            verbose):
     """
-    create a repo and upload data
-    example 1:  dagshub repo-create mytutorial -u "http://example.com/data.csv" --clone
-
+    create a repo and:\n
+    optional- upload files to 'data' dir,
+     .zip and .tar files are extracted, other formats copied as is.
+    optional- clone repo locally.\n
+    example 1:  dagshub repo-create mytutorial -u "http://example.com/data.csv" --clone\n
     example 2:  dagshub --host "https://www.dagshub.com"
     repo-create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
     """
@@ -148,13 +152,14 @@ def create(ctx,
     logger = logging.getLogger()
     logger.setLevel(to_log_level(verbose))
 
+    tmp_dir = f"tmp_{uuid.uuid4().hex}"
     new_data_dir = DEFAULT_DATA_DIR_NAME
 
     # clean tmp dir if exists from previous run
-    if os.path.exists(new_data_dir):
-        shutil.rmtree(new_data_dir)
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
 
-    os.makedirs(new_data_dir)
+    os.makedirs(tmp_dir)
 
     # override default host if provided by --host
     host = ctx.obj["host"]
@@ -180,15 +185,15 @@ def create(ctx,
         # extract to data dir or move there
         if zipfile.is_zipfile(downloaded_file_name):
             with zipfile.ZipFile(downloaded_file_name, 'r') as zip_ref:
-                zip_ref.extractall(new_data_dir)
+                zip_ref.extractall(tmp_dir)
         elif tarfile.is_tarfile(downloaded_file_name):
             with tarfile.TarFile(downloaded_file_name, 'r') as tar_ref:
-                tar_ref.extractall(new_data_dir)
+                tar_ref.extractall(tmp_dir)
         else:
-            os.rename(downloaded_file_name, f"{new_data_dir}/{downloaded_file_name}")
+            os.rename(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
 
         # upload data dir as DVC to repo
-        create_dataset(repo.name, new_data_dir, repo=repo)
+        add_dataset_to_repo(repo, tmp_dir, new_data_dir)
         logger.info("Data uploaded to repo")
 
     if clone:
@@ -199,8 +204,8 @@ def create(ctx,
         # move the data to it,
         # now the local repo resembles the remote but with copy of data
         if upload_data:
-            os.rename(new_data_dir, f"{repo.name}/{new_data_dir}")
-            logger.info(f"{new_data_dir} moved to {repo.name}/{new_data_dir}")
+            os.rename(tmp_dir, f"{repo.name}/{new_data_dir}")
+            logger.info(f"files moved to {repo.name}/{new_data_dir}")
 
     # clean tmp file if exists
     if os.path.exists(downloaded_file_name):

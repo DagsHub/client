@@ -27,13 +27,24 @@ s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
 
-def create_dataset(repo_name,
-                   local_path,
-                   glob_exclude="",
-                   org_name="",
-                   private=False,
-                   repo=None,
-                   data_dir=DEFAULT_DATA_DIR_NAME):
+def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
+    """
+    Create a new repository on DagsHub and upload an entire dataset to it
+    :param repo_name (str): Name of the repository to be created
+    :param local_path (str): local path where the dataset to upload is located
+    :param glob_exclude (str): regex to exclude certain files from the upload process
+    :param org_name (str): Organization name to be the repository owner
+    :param private (bool): Flag to indicate the repository is going to be private
+    :return : Repo object of the repository created
+    """
+    repo = create_repo(repo_name, org_name=org_name, private=private)
+    dir = repo.directory(repo_name)
+    dir.add_dir(local_path, glob_exclude)
+    return repo
+
+def add_dataset_to_repo(repo,
+                        local_path,
+                        data_dir=DEFAULT_DATA_DIR_NAME):
     """
     Create a new repository on DagsHub (or get an existing repo) and upload an entire dataset to it
     :param repo_name (str): Name of the repository to be created
@@ -45,12 +56,8 @@ def create_dataset(repo_name,
     :param data_dir (str): name of data directory that will be created inside repo
     :return : Repo object of the repository created
     """
-    if not repo:
-        repo = create_repo(repo_name, org_name=org_name, private=private)
-
     dir = repo.directory(data_dir)
-    dir.add_dir(local_path, glob_exclude)
-    return repo
+    dir.add_dir(local_path)
 
 
 def create_repo(
