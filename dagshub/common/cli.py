@@ -1,11 +1,10 @@
 import os
 import sys
-import uuid
+import tempfile
 
 import click
 import logging
 import git
-import shutil
 import zipfile
 import tarfile
 from http import HTTPStatus
@@ -152,61 +151,57 @@ def create(ctx,
     logger = logging.getLogger()
     logger.setLevel(to_log_level(verbose))
 
-    tmp_dir = f"tmp_{uuid.uuid4().hex}"
+    with tempfile.TemporaryDirectory() as tmp_dir:
 
-    os.makedirs(tmp_dir)
+        # override default host if provided by --host
+        host = ctx.obj["host"]
 
-    # override default host if provided by --host
-    host = ctx.obj["host"]
+        # create remote repo
+        repo = create_repo(repo_name, host=host)
+        logger.info(f"Created repo: {host}/{repo.owner}/{repo.name}.git")
 
-    # create remote repo
-    repo = create_repo(repo_name, host=host)
-    logger.info(f"Created repo: {host}/{repo.owner}/{repo.name}.git")
-
-    if upload_data:
-        # get the data
-        res = http_request("GET", upload_data)
-        if res.status_code != HTTPStatus.OK:
-            raise RuntimeError(f"Could not get file from source (response: {res.status_code}), repo created")
-
-        downloaded_file_name = os.path.basename(urlparse(upload_data).path)
-
-        # save to disk
-        with open(downloaded_file_name, 'wb') as fh:
-            fh.write(res.content)
-
-        logger.info(f"Downloaded and saved {downloaded_file_name}")
-
-        # extract to data dir or move there
-        if zipfile.is_zipfile(downloaded_file_name):
-            with zipfile.ZipFile(downloaded_file_name, 'r') as zip_ref:
-                zip_ref.extractall(tmp_dir)
-        elif tarfile.is_tarfile(downloaded_file_name):
-            with tarfile.TarFile(downloaded_file_name, 'r') as tar_ref:
-                tar_ref.extractall(tmp_dir)
-        else:
-            os.rename(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
-
-        # upload data dir as DVC to repo
-        add_dataset_to_repo(repo, tmp_dir, DEFAULT_DATA_DIR_NAME)
-        logger.info("Data uploaded to repo")
-
-    if clone:
-        # make local repo
-        git.Git(repo.name).clone(f"{host}/{repo.owner}/{repo.name}.git")
-        logger.info(f"Cloned repo to folder {repo.name}")
-
-        # move the data to it,
-        # now the local repo resembles the remote but with copy of data
         if upload_data:
-            os.rename(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
-            logger.info(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}")
+            # get the data
+            res = http_request("GET", upload_data)
+            if res.status_code != HTTPStatus.OK:
+                raise RuntimeError(f"Could not get file from source (response: {res.status_code}), repo created")
+
+            downloaded_file_name = os.path.basename(urlparse(upload_data).path)
+
+            # save to disk
+            with open(downloaded_file_name, 'wb') as fh:
+                fh.write(res.content)
+
+            logger.info(f"Downloaded and saved {downloaded_file_name}")
+
+            # extract to data dir or move there
+            if zipfile.is_zipfile(downloaded_file_name):
+                with zipfile.ZipFile(downloaded_file_name, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+            elif tarfile.is_tarfile(downloaded_file_name):
+                with tarfile.TarFile(downloaded_file_name, 'r') as tar_ref:
+                    tar_ref.extractall(tmp_dir)
+            else:
+                os.rename(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
+
+            # upload data dir as DVC to repo
+            add_dataset_to_repo(repo, tmp_dir, DEFAULT_DATA_DIR_NAME)
+            logger.info("Data uploaded to repo")
+
+        if clone:
+            # make local repo
+            git.Git(repo.name).clone(f"{host}/{repo.owner}/{repo.name}.git")
+            logger.info(f"Cloned repo to folder {repo.name}")
+
+            # move the data to it,
+            # now the local repo resembles the remote but with copy of data
+            if upload_data:
+                os.rename(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
+                logger.info(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}")
 
     # clean tmp file/dir if exists
     if os.path.exists(downloaded_file_name):
         os.remove(downloaded_file_name)
-    if os.path.exists(tmp_dir):
-        shutil.rmtree(tmp_dir)
 
 
 if __name__ == "__main__":
