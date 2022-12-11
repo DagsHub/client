@@ -1,10 +1,21 @@
+import os
 import sys
+import tempfile
+
 import click
+import logging
+import git
+import zipfile
+import tarfile
+from http import HTTPStatus
+from urllib.parse import urlparse
 
 import dagshub.auth
 from dagshub.common import config
 import dagshub.common.logging
-import logging
+from dagshub.common.helpers import http_request
+from dagshub.upload import create_repo
+from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
 @click.group()
@@ -106,6 +117,91 @@ def upload(ctx,
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
     repo.upload(file=filename, path=target, commit_message=message, force=update)
+
+
+@cli.group()
+def repo():
+    """
+    Operations on repo: currently only 'create'
+    """
+    pass
+
+
+@repo.command()
+@click.argument("repo_name")
+@click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
+@click.option("-c", "--clone", is_flag=True,  help="Clone repository locally")
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+@click.pass_context
+def create(ctx,
+           repo_name,
+           upload_data,
+           clone,
+           verbose):
+    """
+    create a repo and:\n
+    optional- upload files to 'data' dir,
+     .zip and .tar files are extracted, other formats copied as is.
+    optional- clone repo locally.\n
+    example 1:  dagshub repo-create mytutorial -u "http://example.com/data.csv" --clone\n
+    example 2:  dagshub --host "https://www.dagshub.com"
+    repo-create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
+    """
+
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+
+        # override default host if provided by --host
+        host = ctx.obj["host"]
+
+        # create remote repo
+        repo = create_repo(repo_name, host=host)
+        logger.info(f"Created repo: {host}/{repo.owner}/{repo.name}.git")
+
+        if upload_data:
+            # get the data
+            res = http_request("GET", upload_data)
+            if res.status_code != HTTPStatus.OK:
+                raise RuntimeError(f"Could not get file from source (response: {res.status_code}), repo created")
+
+            downloaded_file_name = os.path.basename(urlparse(upload_data).path)
+
+            # save to disk
+            with open(downloaded_file_name, 'wb') as fh:
+                fh.write(res.content)
+
+            logger.info(f"Downloaded and saved {downloaded_file_name}")
+
+            # extract to data dir or move there
+            if zipfile.is_zipfile(downloaded_file_name):
+                with zipfile.ZipFile(downloaded_file_name, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+            elif tarfile.is_tarfile(downloaded_file_name):
+                with tarfile.TarFile(downloaded_file_name, 'r') as tar_ref:
+                    tar_ref.extractall(tmp_dir)
+            else:
+                os.rename(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
+
+            # upload data dir as DVC to repo
+            add_dataset_to_repo(repo, tmp_dir, DEFAULT_DATA_DIR_NAME)
+            logger.info("Data uploaded to repo")
+
+        if clone:
+            # make local repo
+            git.Git(repo.name).clone(f"{host}/{repo.owner}/{repo.name}.git")
+            logger.info(f"Cloned repo to folder {repo.name}")
+
+            # move the data to it,
+            # now the local repo resembles the remote but with copy of data
+            if upload_data:
+                os.rename(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
+                logger.info(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}")
+
+    # clean tmp file/dir if exists
+    if os.path.exists(downloaded_file_name):
+        os.remove(downloaded_file_name)
 
 
 if __name__ == "__main__":
