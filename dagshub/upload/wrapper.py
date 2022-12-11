@@ -18,6 +18,7 @@ DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
+DEFAULT_DATA_DIR_NAME = 'data'
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -29,7 +30,6 @@ s.headers.update(config.requests_headers)
 def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
     """
     Create a new repository on DagsHub and upload an entire dataset to it
-
     :param repo_name (str): Name of the repository to be created
     :param local_path (str): local path where the dataset to upload is located
     :param glob_exclude (str): regex to exclude certain files from the upload process
@@ -43,6 +43,19 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     return repo
 
 
+def add_dataset_to_repo(repo,
+                        local_path,
+                        data_dir=DEFAULT_DATA_DIR_NAME):
+    """
+    Given a repository created on dagshub - upload an entire dataset to it
+    :param reo (Reop): repository created beforehand
+    :param local_path (str): local path where the dataset to upload is located
+    :param data_dir (str): name of data directory that will be created inside repo
+    """
+    dir = repo.directory(data_dir)
+    dir.add_dir(local_path)
+
+
 def create_repo(
     repo_name,
     org_name="",
@@ -53,6 +66,7 @@ def create_repo(
     license="",
     readme="",
     template="custom",
+    host=""
 ):
     """
     Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
@@ -73,6 +87,8 @@ def create_repo(
 
     import dagshub.auth
     from dagshub.auth.token_auth import HTTPBearerAuth
+
+    host = host or config.host
 
     username = config.username
     password = config.password
@@ -106,7 +122,7 @@ def create_repo(
             orgname=org_name,
         )
 
-    res = s.post(urllib.parse.urljoin(config.host, url), data=data, auth=auth)
+    res = s.post(urllib.parse.urljoin(host, url), data=data, auth=auth)
 
     if res.status_code != HTTPStatus.CREATED:
         logger.error(f"Response ({res.status_code}):\n" f"{res.content}")
@@ -196,7 +212,6 @@ class Repo:
         :param last_commit (str): Tell the server that we want to upload a file without committing it
         :param force (bool): Force the upload of a file even if it is already present on the server
         :return: None
-
         """
 
         data = {
@@ -217,6 +232,7 @@ class Repo:
 
         if force:
             data["last_commit"] = self._get_last_commit()
+
         logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
         res = s.put(
             self.get_request_url(directory_path),
@@ -252,7 +268,7 @@ class Repo:
             content = res.content.decode("utf-8")
 
         if res.status_code != HTTPStatus.OK:
-            logger.error(f"Response ({res.status_code}):\n" f"{content}")
+            raise RuntimeError(f"Response ({res.status_code}):\n" f"{content}")
         else:
             logger.debug(f"Response ({res.status_code})\n")
 
@@ -339,6 +355,24 @@ class Repo:
         """
 
         return f"{self.owner}/{self.name}"
+
+    def _get_last_commit(self):
+        """
+        The _get_last_commit function returns the last commit sha for a given branch.
+        It is used to check if there are any new commits in the repo since we last ran our dag.
+
+        :return: The commit id of the last commit for the branch
+        """
+        api_path = f"api/v1/repos/{self.full_name}/branches/{self.branch}"
+        api_url = urllib.parse.urljoin(self.src_url, api_path)
+        res = s.get(api_url, auth=self.auth)
+        if res.status_code == HTTPStatus.OK:
+            content = res.json()
+            try:
+                return content["commit"]["id"]
+            except KeyError:
+                logger.error(f"Cannot get commit sha for branch '{self.branch}'")
+        return ""
 
 
 class DataSet:
@@ -499,21 +533,3 @@ class DataSet:
             file_list, self.directory, commit_message=commit_message, *args, **kwargs
         )
         self._reset_dataset()
-
-    def _get_last_commit(self):
-        """
-        The _get_last_commit function returns the last commit sha for a given branch.
-        It is used to check if there are any new commits in the repo since we last ran our dag.
-
-        :return: The commit id of the last commit for the branch
-        """
-        api_path = f"api/v1/repos/{self.repo.full_name}/branches/{self.repo.branch}"
-        api_url = urllib.parse.urljoin(self.repo.src_url, api_path)
-        res = s.get(api_url, auth=self.repo.auth)
-        if res.status_code == HTTPStatus.OK:
-            content = res.json()
-            try:
-                return content["commit"]["id"]
-            except KeyError:
-                logger.error(f"Cannot get commit sha for branch '{self.repo.branch}'")
-        return ""
