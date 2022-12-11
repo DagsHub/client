@@ -38,7 +38,6 @@ setuptools.setup(
         "PyYAML>=5",
         "fusepy>=3",
         "appdirs>=1.4.4",
-        "pytimedinput>=2.0.1",
         "click>=8.0.4",
         "httpx>=0.22.0"
     ],

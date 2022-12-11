@@ -227,7 +227,7 @@ class DagsHubFilesystem:
             return self.username, self.password
 
         try:
-            token = self.token or dagshub.auth.get_token(code_input_timeout=0)
+            token = self.token or dagshub.auth.get_token()
         except dagshub.auth.OauthNonInteractiveShellException:
             logger.debug("Failed to perform OAuth in a non interactive shell")
         if token is not None:

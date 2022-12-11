@@ -1,9 +1,9 @@
 import hashlib
+import sys
 from typing import Optional, Dict
 import logging
 import urllib
 import uuid
-
 import httpx
 from dagshub.common import config
 
@@ -14,6 +14,12 @@ def oauth_flow(
     host: str,
     client_id: Optional[str] = None
 ) -> Dict:
+
+    if not sys.__stdin__.isatty():
+        raise OauthNonInteractiveShellException(
+            "Can't perform OAuth in a non-interactive shell. "
+            "Please get a token using this command in a shell: dagshub login"
+        )
 
     host = host.strip("/")
     dagshub_url = urllib.parse.urljoin(host, "login/oauth")
@@ -38,7 +44,7 @@ def oauth_flow(
 
     res = httpx.post(
         f"{dagshub_url}/access_token",
-        data={"client_id": client_id, "code": code, "state": state}, timeout=None
+        data={"client_id": client_id, "code": code, "state": state}
     )
 
     if res.status_code != 200:
