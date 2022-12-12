@@ -38,11 +38,11 @@ __This client library is meant to help you get started quickly with DagsHub__. I
 Direct Data Access (DDA), a component to let you stream and upload your data.
 
 For more details on the different functions of the client, check out the docs segments:
-1. [Installation & Setup](docs/index.md#installation-and-setup)
-2. [Data Streaming](docs/index.md#data-streaming)
-3. [Data Upload](docs/index.md#data-upload)
-4. [Experiment Tracking](docs/index.md#experiment-tracking-logger)
-    1. [Autologging](docs/index.md#autologging-integrations-with-ml-frameworks)
+1. [Installation & Setup](https://github.com/DagsHub/client/blob/master/docs/index.md#installation-and-setup)
+2. [Data Streaming](https://github.com/DagsHub/client/blob/master/docs/index.md#data-streaming)
+3. [Data Upload](https://github.com/DagsHub/client/blob/master/docs/index.md#data-upload)
+4. [Experiment Tracking](https://github.com/DagsHub/client/blob/master/docs/index.md#experiment-tracking-logger)
+    1. [Autologging](https://github.com/DagsHub/client/blob/master/docs/index.md#autologging-integrations-with-ml-frameworks)
 
 Some functionality is supported only in Python.
 
