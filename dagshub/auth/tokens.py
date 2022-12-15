@@ -124,5 +124,5 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 
 def add_oauth_token(host: Optional[str] = None, **kwargs):
     host = host or config.host
-    token = oauth.oauth_flow(host, code_input_timeout=0)
+    token = oauth.oauth_flow(host)
     _get_token_storage(**kwargs).add_token(token, host)

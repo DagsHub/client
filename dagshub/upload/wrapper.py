@@ -95,7 +95,7 @@ def create_repo(
     if username is not None and password is not None:
         auth = username, password
     else:
-        token = config.token or dagshub.auth.get_token(code_input_timeout=0)
+        token = config.token or dagshub.auth.get_token()
         if token is not None:
             auth = HTTPBearerAuth(token)
 
@@ -289,7 +289,7 @@ class Repo:
         """
         if self.username is not None and self.password is not None:
             return httpx.BasicAuth(self.username, self.password)
-        token = self.token or dagshub.auth.get_token(code_input_timeout=0)
+        token = self.token or dagshub.auth.get_token()
         return HTTPBearerAuth(token)
 
     def directory(self, path):
