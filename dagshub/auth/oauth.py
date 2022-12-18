@@ -1,5 +1,4 @@
 import hashlib
-import sys
 from typing import Optional, Dict
 import logging
 import urllib
