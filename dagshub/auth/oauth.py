@@ -15,12 +15,6 @@ def oauth_flow(
     client_id: Optional[str] = None
 ) -> Dict:
 
-    if not sys.__stdin__.isatty():
-        raise OauthNonInteractiveShellException(
-            "Can't perform OAuth in a non-interactive shell. "
-            "Please get a token using this command in a shell: dagshub login"
-        )
-
     host = host.strip("/")
     dagshub_url = urllib.parse.urljoin(host, "login/oauth")
     client_id = client_id or config.client_id
