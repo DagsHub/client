@@ -109,7 +109,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
     chown = os.chown
 
     def create(self, path, mode):
-        return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        return self.fs.__open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
 
     def flush(self, path, fh):
         return os.fsync(fh)
@@ -129,7 +129,6 @@ class DagsHubFUSE(LoggingMixIn, Operations):
     listxattr = None
     mkdir = os.mkdir
     mknod = os.mknod
-    open = os.open
 
     def rename(self, old, new):
         return os.rename(old, self.root + new)
@@ -146,7 +145,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return os.symlink(source, target)
 
     def truncate(self, path, length, fh=None):
-        with open(path, 'r+') as f:
+        with self.fs.__open(path, 'r+') as f:
             f.truncate(length)
 
     unlink = os.unlink
