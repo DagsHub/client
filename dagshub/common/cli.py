@@ -51,7 +51,6 @@ def mount(ctx, verbose, **kwargs):
         sys.tracebacklimit = 0
     mount(**kwargs)
 
-
 @cli.command()
 @click.option("--token", help="Login using a specified token")
 @click.option("--host", help="DagsHub instance to which you want to login")

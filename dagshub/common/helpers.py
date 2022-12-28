@@ -1,8 +1,11 @@
 import httpx
 
+from ..upload.wrapper import create_repo
 from dagshub.common import config
+from pathlib import Path
+import shutil
 import urllib
-
+import os
 
 def get_default_branch(owner, reponame, auth, host=config.host):
     """
@@ -31,3 +34,39 @@ def http_request(method, url, **kwargs):
         if arg not in kwargs:
             kwargs[arg] = mixin_args[arg]
     return httpx.request(method, url, **kwargs)
+
+def init(repo_name, repo_owner, host='https://dagshub.com/'):
+    import dagshub.auth
+    from dagshub.auth.token_auth import HTTPBearerAuth
+
+    username = config.username
+    password = config.password
+    if username is not None and password is not None:
+        auth = username, password
+    else:
+        token = config.token or dagshub.auth.get_token()
+        if token is not None:
+            auth = token, token
+            bearer = HTTPBearerAuth(token)
+    uri = urllib.parse.urljoin(host, repo_owner, repo_name)
+
+    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
+        owner=repo_owner,
+        reponame=repo_name)), auth=bearer or auth)
+    if res.getcode() == 404: create_repo(repo_name, repo_owner)
+
+    # MLFlow environment variables
+    os.environ['MLFLOW_TRACKING_URI'] = f'{uri}.mlflow'
+    os.environ['MLFLOW_TRACKING_USERNAME'] = auth[0]
+    os.environ['MLFLOW_TRACKING_PASSWORD'] = auth[1]
+
+    # DVC
+    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
+        owner=repo_owner,
+        reponame=repo_name)), auth=bearer or auth)
+    conf_path = Path(__file__).parent.parent.as_posix(), 'etc', 'config'),
+    shutil.copyfile(os.path.join(Path(__file__).parent.parent.as_posix(), 'etc', 'config.template'), conf_path)
+
+    with open(conf_path, 'a') as conf: conf.write(f'[\'remote "{remote}"\']\n    url = {uri}.dvc')
+
+    print('Repository initialized!')
