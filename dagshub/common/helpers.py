@@ -49,7 +49,7 @@ def init(repo_name, repo_owner, host=config.DEFAULT_HOST):
         if token is not None:
             auth = token, token
             bearer = HTTPBearerAuth(token)
-    uri = urllib.parse.urljoin(host, repo_owner, repo_name)
+    uri = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
 
     res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
         owner=repo_owner,
