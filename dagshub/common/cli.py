@@ -7,14 +7,17 @@ import logging
 import git
 import zipfile
 import tarfile
+from pathlib import Path
+from os.path import exists
 from http import HTTPStatus
 from urllib.parse import urlparse
 
 import dagshub.auth
-from dagshub.common import config
 import dagshub.common.logging
-from dagshub.common.helpers import http_request
+from dagshub.common import config
 from dagshub.upload import create_repo
+from dagshub.common.helpers import http_request
+from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
@@ -50,6 +53,77 @@ def mount(ctx, verbose, **kwargs):
         # Hide tracebacks of errors, display only error message
         sys.tracebacklimit = 0
     mount(**kwargs)
+
+@cli.command()
+@click.option("--repo_name", help="Login using a specified token")
+@click.option("--repo_owner", help="DagsHub instance to which you want to login")
+@click.option("--host", default=config.DEFAULT_HOST, help="Login using a specified token")
+@click.option("--mlflow", default=True, is_flag=True, help="Login using a specified token")
+@click.option("--dvc", default=False, is_flag=True, help="DagsHub instance to which you want to login")
+@click.pass_context
+def init(ctx, repo_name, repo_owner, host, mlflow, dvc):
+    _init(repo_name, repo_owner, host, mlflow, dvc)
+
+def _init(repo_name, repo_owner, host=config.DEFAULT_HOST,
+         mlflow=True, dvc=False):
+    from ..upload.wrapper import create_repo
+    import urllib
+
+    username = config.username
+    password = config.password
+    if username is not None and password is not None:
+        auth = username, password
+    else:
+        token = config.token or dagshub.auth.get_token()
+        if token is not None:
+            auth = token, token
+            bearer = HTTPBearerAuth(token)
+    uri = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
+
+    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
+        owner=repo_owner,
+        reponame=repo_name)), auth=bearer or auth)
+    if res.status_code == 404: create_repo(repo_name)
+
+    if mlflow:
+        os.environ['MLFLOW_TRACKING_URI'] = f'{uri}.mlflow'
+        os.environ['MLFLOW_TRACKING_USERNAME'] = auth[0]
+        os.environ['MLFLOW_TRACKING_PASSWORD'] = auth[1]
+
+    if dvc:
+        root = Path(os.path.abspath('.'))
+        while not (root / '.git').is_dir():
+            if ismount(root):
+                raise ValueError('No git project found! (stopped at mountpoint {root})')
+            root = root / '..'
+
+        remote = 'origin'
+        flag = exists(root / '.dvc' / 'config')
+        Path(root / '.dvc').mkdir(parents=True, exist_ok=True)
+        with open(root / '.dvc' / 'config', 'a+') as cfg, open(root / '.dvc' / 'config.local', 'a+') as cfg_local:
+            if not flag: cfg.write(config.CONFIG_CORE)
+            else: 
+                cfg.seek(0)
+                flag = False
+
+            lines = iter(cfg.readlines()) 
+            for line in lines:
+                if remote in line: 
+                    if host in next(lines):
+                        flag = True
+                        break
+                    else: 
+                        remote = 'dagshub'
+                        flag = False
+
+            if not flag:
+                cfg.write(config.CONFIG_REMOTE.format(remote=remote, url=uri))
+                cfg_local.write(config.CONFIG_LOCAL.format(remote=remote, token=auth[1]))
+                print(f'Added new remote "{remote}" with url = {uri}')
+        if not exists(root / '.dvc' / '.gitignore'): 
+            with open(root / '.dvc' / '.gitignore', 'w') as ign: ign.write(config.CONFIG_GITIGNORE) 
+
+    print('Repository initialized!')
 
 @cli.command()
 @click.option("--token", help="Login using a specified token")

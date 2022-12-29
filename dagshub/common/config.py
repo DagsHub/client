@@ -32,3 +32,9 @@ custom_user_agent_suffix = f" dagshub-client-python/{__version__}"
 requests_headers = {"user-agent": USER_AGENT + custom_user_agent_suffix}
 http_timeout = os.environ.get(HTTP_TIMEOUT_KEY, 30)
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
+
+# DVC config templates
+CONFIG_CORE = "[core]\n    autostage = true\n    analytics = false\n"
+CONFIG_REMOTE = "['remote \"{remote}\"']\n    url = {url}.dvc\n"
+CONFIG_LOCAL = "['remote \"{remote}\"']\n    auth = basic\n    user = {token}\n    password = {token}\n"
+CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"

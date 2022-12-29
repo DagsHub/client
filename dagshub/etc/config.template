@@ -1,5 +1,0 @@
-[core]
-	analytics = false
-	autostage = true
-['remote "origin"']
-	url = something
