@@ -63,7 +63,7 @@ def mount(ctx, verbose, **kwargs):
 @click.option("--dvc", default=False, is_flag=True, help="Set up DVC with DagsHub remote")
 @click.pass_context
 def init(ctx, repo_name, repo_owner, url, host, mlflow, dvc):
-    _init(repo_name, repo_owner, url, repo_root, host, mlflow, dvc)
+    _init(repo_name, repo_owner, url, host, mlflow, dvc)
 
 def _init(repo_name=None, repo_owner=None, url=None, root=None,
          host=config.DEFAULT_HOST, mlflow=True, dvc=False):
@@ -79,7 +79,7 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
     if not url: 
         if repo_name is not Noen and repo_owner is not None: url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}') 
         else:
-            with open(repo_root / '.git' / 'config', 'r') as cfg:
+            with open(root / '.git' / 'config', 'r') as cfg:
                 for line in cfg.readlines():
                     if host in line:
                         url = line.split()[-1][:-4]
