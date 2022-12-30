@@ -84,7 +84,7 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
                     if host in line:
                         url = line.split()[-1][:-4]
                         break
-    else: if url[-4] == '.': url = url[:-4]
+    elif url[-4] == '.': url = url[:-4]
 
     if not (repo_name and repo_owner): 
         splitter = lambda x: (x[-1], x[-2])
