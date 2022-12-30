@@ -91,7 +91,7 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
         url = url[:-4]
 
     if not (repo_name and repo_owner):
-        splitter = lambda x: (x[-1], x[-2])
+        splitter = lambda x: (x[-1], x[-2]) # noqa E721
         repo_name, repo_owner = splitter(url.split('/'))
 
     if None in [repo_name, repo_owner, url]:
