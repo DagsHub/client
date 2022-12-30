@@ -16,8 +16,8 @@ import dagshub.auth
 import dagshub.common.logging
 from dagshub.common import config
 from dagshub.upload import create_repo
-from dagshub.common.helpers import http_request
 from dagshub.auth.token_auth import HTTPBearerAuth
+from dagshub.common.helpers import http_request, get_project_root
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
@@ -55,20 +55,44 @@ def mount(ctx, verbose, **kwargs):
     mount(**kwargs)
 
 @cli.command()
-@click.option("--repo_name", help="Login using a specified token")
-@click.option("--repo_owner", help="DagsHub instance to which you want to login")
-@click.option("--host", default=config.DEFAULT_HOST, help="Login using a specified token")
-@click.option("--mlflow", default=True, is_flag=True, help="Login using a specified token")
-@click.option("--dvc", default=False, is_flag=True, help="DagsHub instance to which you want to login")
+@click.option("--repo_name", help="The repository name to set up")
+@click.option("--repo_owner", help="The organization under which the repository needs to be set up")
+@click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
+@click.option("--host", default=config.DEFAULT_HOST, help="DagsHub instance to which you want to login")
+@click.option("--mlflow", default=True, is_flag=True, help="Set up MLFlow environment with DagsHub remote")
+@click.option("--dvc", default=False, is_flag=True, help="Set up DVC with DagsHub remote")
 @click.pass_context
-def init(ctx, repo_name, repo_owner, host, mlflow, dvc):
-    _init(repo_name, repo_owner, host, mlflow, dvc)
+def init(ctx, repo_name, repo_owner, url, host, mlflow, dvc):
+    _init(repo_name, repo_owner, url, repo_root, host, mlflow, dvc)
 
-def _init(repo_name, repo_owner, host=config.DEFAULT_HOST,
-         mlflow=True, dvc=False):
+def _init(repo_name=None, repo_owner=None, url=None, root=None,
+         host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     from ..upload.wrapper import create_repo
     import urllib
 
+    ## Setup required variables
+    root = root or get_project_root(Path(os.path.abspath('.')))
+
+    if url and (repo_name or repo_owner):
+        repo_name, repo_owner = None, None
+
+    if not url: 
+        if repo_name is not Noen and repo_owner is not None: url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}') 
+        else:
+            with open(repo_root / '.git' / 'config', 'r') as cfg:
+                for line in cfg.readlines():
+                    if host in line:
+                        url = line.split()[-1][:-4]
+                        break
+    else: if url[-4] == '.': url = url[:-4]
+
+    if not (repo_name and repo_owner): 
+        splitter = lambda x: (x[-1], x[-2])
+        repo_name, repo_owner = splitter(url.split('/'))
+
+    if None in [repo_name, repo_owner, url]: raise ValueError('Host not found; please specify the remote url with --url')
+
+    ## Setup authentication
     username = config.username
     password = config.password
     if username is not None and password is not None:
@@ -78,25 +102,21 @@ def _init(repo_name, repo_owner, host=config.DEFAULT_HOST,
         if token is not None:
             auth = token, token
             bearer = HTTPBearerAuth(token)
-    uri = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
 
+    ## Configure repository
     res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
         owner=repo_owner,
         reponame=repo_name)), auth=bearer or auth)
     if res.status_code == 404: create_repo(repo_name)
 
+    ## Configure MLFlow
     if mlflow:
-        os.environ['MLFLOW_TRACKING_URI'] = f'{uri}.mlflow'
+        os.environ['MLFLOW_TRACKING_URI'] = f'{url}.mlflow'
         os.environ['MLFLOW_TRACKING_USERNAME'] = auth[0]
         os.environ['MLFLOW_TRACKING_PASSWORD'] = auth[1]
 
+    ## Configure DVC
     if dvc:
-        root = Path(os.path.abspath('.'))
-        while not (root / '.git').is_dir():
-            if ismount(root):
-                raise ValueError('No git project found! (stopped at mountpoint {root})')
-            root = root / '..'
-
         remote = 'origin'
         flag = exists(root / '.dvc' / 'config')
         Path(root / '.dvc').mkdir(parents=True, exist_ok=True)
@@ -117,9 +137,10 @@ def _init(repo_name, repo_owner, host=config.DEFAULT_HOST,
                         flag = False
 
             if not flag:
-                cfg.write(config.CONFIG_REMOTE.format(remote=remote, url=uri))
+                cfg.write(config.CONFIG_REMOTE.format(remote=remote, url=url))
                 cfg_local.write(config.CONFIG_LOCAL.format(remote=remote, token=auth[1]))
-                print(f'Added new remote "{remote}" with url = {uri}')
+                print(f'Added new remote "{remote}" with url = {url}')
+
         if not exists(root / '.dvc' / '.gitignore'): 
             with open(root / '.dvc' / '.gitignore', 'w') as ign: ign.write(config.CONFIG_GITIGNORE) 
 

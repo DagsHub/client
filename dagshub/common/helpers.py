@@ -1,6 +1,7 @@
 import httpx
 
 from dagshub.common import config
+from os.path import ismount
 from pathlib import Path
 import tempfile
 import shutil
@@ -34,3 +35,10 @@ def http_request(method, url, **kwargs):
         if arg not in kwargs:
             kwargs[arg] = mixin_args[arg]
     return httpx.request(method, url, **kwargs)
+
+def get_project_root(root):
+    while not (root / '.git').is_dir():
+        if ismount(root):
+            raise ValueError('No git project found! (stopped at mountpoint {root})')
+        root = root / '..'
+    return root
