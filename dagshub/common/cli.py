@@ -54,6 +54,7 @@ def mount(ctx, verbose, **kwargs):
         sys.tracebacklimit = 0
     mount(**kwargs)
 
+
 @cli.command()
 @click.option("--repo_name", help="The repository name to set up")
 @click.option("--repo_owner", help="The organization under which the repository needs to be set up")
@@ -65,34 +66,38 @@ def mount(ctx, verbose, **kwargs):
 def init(ctx, repo_name, repo_owner, url, host, mlflow, dvc):
     _init(repo_name, repo_owner, url, host, mlflow, dvc)
 
+
 def _init(repo_name=None, repo_owner=None, url=None, root=None,
-         host=config.DEFAULT_HOST, mlflow=True, dvc=False):
+          host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     from ..upload.wrapper import create_repo
     import urllib
 
-    ## Setup required variables
+    # Setup required variables
     root = root or get_project_root(Path(os.path.abspath('.')))
 
     if url and (repo_name or repo_owner):
         repo_name, repo_owner = None, None
 
-    if not url: 
-        if repo_name is not Noen and repo_owner is not None: url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}') 
+    if not url:
+        if repo_name is not None and repo_owner is not None:
+            url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
         else:
             with open(root / '.git' / 'config', 'r') as cfg:
                 for line in cfg.readlines():
                     if host in line:
                         url = line.split()[-1][:-4]
                         break
-    elif url[-4] == '.': url = url[:-4]
+    elif url[-4] == '.':
+        url = url[:-4]
 
-    if not (repo_name and repo_owner): 
+    if not (repo_name and repo_owner):
         splitter = lambda x: (x[-1], x[-2])
         repo_name, repo_owner = splitter(url.split('/'))
 
-    if None in [repo_name, repo_owner, url]: raise ValueError('Host not found; please specify the remote url with --url')
+    if None in [repo_name, repo_owner, url]:
+        raise ValueError('Host not found; please specify the remote url with --url')
 
-    ## Setup authentication
+    # Setup authentication
     username = config.username
     password = config.password
     if username is not None and password is not None:
@@ -103,36 +108,38 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
             auth = token, token
             bearer = HTTPBearerAuth(token)
 
-    ## Configure repository
+    # Configure repository
     res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
         owner=repo_owner,
         reponame=repo_name)), auth=bearer or auth)
-    if res.status_code == 404: create_repo(repo_name)
+    if res.status_code == 404:
+        create_repo(repo_name)
 
-    ## Configure MLFlow
+    # Configure MLFlow
     if mlflow:
         os.environ['MLFLOW_TRACKING_URI'] = f'{url}.mlflow'
         os.environ['MLFLOW_TRACKING_USERNAME'] = auth[0]
         os.environ['MLFLOW_TRACKING_PASSWORD'] = auth[1]
 
-    ## Configure DVC
+    # Configure DVC
     if dvc:
         remote = 'origin'
         flag = exists(root / '.dvc' / 'config')
         Path(root / '.dvc').mkdir(parents=True, exist_ok=True)
         with open(root / '.dvc' / 'config', 'a+') as cfg, open(root / '.dvc' / 'config.local', 'a+') as cfg_local:
-            if not flag: cfg.write(config.CONFIG_CORE)
-            else: 
+            if not flag:
+                cfg.write(config.CONFIG_CORE)
+            else:
                 cfg.seek(0)
                 flag = False
 
-            lines = iter(cfg.readlines()) 
+            lines = iter(cfg.readlines())
             for line in lines:
-                if remote in line: 
+                if remote in line:
                     if host in next(lines):
                         flag = True
                         break
-                    else: 
+                    else:
                         remote = 'dagshub'
                         flag = False
 
@@ -141,10 +148,12 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
                 cfg_local.write(config.CONFIG_LOCAL.format(remote=remote, token=auth[1]))
                 print(f'Added new remote "{remote}" with url = {url}')
 
-        if not exists(root / '.dvc' / '.gitignore'): 
-            with open(root / '.dvc' / '.gitignore', 'w') as ign: ign.write(config.CONFIG_GITIGNORE) 
+        if not exists(root / '.dvc' / '.gitignore'):
+            with open(root / '.dvc' / '.gitignore', 'w') as ign:
+                ign.write(config.CONFIG_GITIGNORE)
 
     print('Repository initialized!')
+
 
 @cli.command()
 @click.option("--token", help="Login using a specified token")

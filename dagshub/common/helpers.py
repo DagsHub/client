@@ -2,11 +2,8 @@ import httpx
 
 from dagshub.common import config
 from os.path import ismount
-from pathlib import Path
-import tempfile
-import shutil
 import urllib
-import os
+
 
 def get_default_branch(owner, reponame, auth, host=config.host):
     """
@@ -35,6 +32,7 @@ def http_request(method, url, **kwargs):
         if arg not in kwargs:
             kwargs[arg] = mixin_args[arg]
     return httpx.request(method, url, **kwargs)
+
 
 def get_project_root(root):
     while not (root / '.git').is_dir():
