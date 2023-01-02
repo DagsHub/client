@@ -37,7 +37,7 @@ def oauth_flow(
 
     res = httpx.post(
         f"{dagshub_url}/access_token",
-        data={"client_id": client_id, "code": code, "state": state}
+        data={"client_id": client_id, "code": code, "state": str(state)}
     )
 
     if res.status_code != 200:
