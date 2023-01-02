@@ -7,8 +7,6 @@ import logging
 import git
 import zipfile
 import tarfile
-from pathlib import Path
-from os.path import exists
 from http import HTTPStatus
 from urllib.parse import urlparse
 
@@ -16,8 +14,7 @@ import dagshub.auth
 import dagshub.common.logging
 from dagshub.common import config
 from dagshub.upload import create_repo
-from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common.helpers import http_request, get_project_root
+from dagshub.common.helpers import http_request, _init
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
@@ -60,99 +57,10 @@ def mount(ctx, verbose, **kwargs):
 @click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
 @click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
 @click.option("--host", default=config.DEFAULT_HOST, help="DagsHub instance to which you want to login")
-@click.option("--mlflow", default=True, is_flag=True, help="Set up MLFlow environment with DagsHub remote")
 @click.option("--dvc", default=False, is_flag=True, help="Set up DVC with DagsHub remote")
 @click.pass_context
-def init(ctx, repo_name, repo_owner, url, host, mlflow, dvc):
-    _init(repo_name, repo_owner, url, host, mlflow, dvc)
-
-
-def _init(repo_name=None, repo_owner=None, url=None, root=None,
-          host=config.DEFAULT_HOST, mlflow=True, dvc=False):
-    from ..upload.wrapper import create_repo
-    import urllib
-
-    # Setup required variables
-    root = root or get_project_root(Path(os.path.abspath('.')))
-
-    if url and (repo_name or repo_owner):
-        repo_name, repo_owner = None, None
-
-    if not url:
-        if repo_name is not None and repo_owner is not None:
-            url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
-        else:
-            with open(root / '.git' / 'config', 'r') as cfg:
-                for line in cfg.readlines():
-                    if host in line:
-                        url = line.split()[-1][:-4]
-                        break
-    elif url[-4] == '.':
-        url = url[:-4]
-
-    if not (repo_name and repo_owner):
-        splitter = lambda x: (x[-1], x[-2]) # noqa E721
-        repo_name, repo_owner = splitter(url.split('/'))
-
-    if None in [repo_name, repo_owner, url]:
-        raise ValueError('Could not parse repository owner and name. Make sure you specify either a link to the repository with --url or a pair of --repo-owner and --repo-name').
-
-    # Setup authentication
-    username = config.username
-    password = config.password
-    if username is not None and password is not None:
-        auth = username, password
-    else:
-        token = config.token or dagshub.auth.get_token()
-        if token is not None:
-            auth = token, token
-            bearer = HTTPBearerAuth(token)
-
-    # Configure repository
-    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
-        owner=repo_owner,
-        reponame=repo_name)), auth=bearer or auth)
-    if res.status_code == 404:
-        create_repo(repo_name)
-
-    # Configure MLFlow
-    if mlflow:
-        os.environ['MLFLOW_TRACKING_URI'] = f'{url}.mlflow'
-        os.environ['MLFLOW_TRACKING_USERNAME'] = auth[0]
-        os.environ['MLFLOW_TRACKING_PASSWORD'] = auth[1]
-
-    # Configure DVC
-    if dvc:
-        remote = 'origin'
-        flag = exists(root / '.dvc' / 'config')
-        Path(root / '.dvc').mkdir(parents=True, exist_ok=True)
-        with open(root / '.dvc' / 'config', 'a+') as cfg, open(root / '.dvc' / 'config.local', 'a+') as cfg_local:
-            if not flag:
-                cfg.write(config.CONFIG_CORE)
-            else:
-                cfg.seek(0)
-                flag = False
-
-            lines = iter(cfg.readlines())
-            for line in lines:
-                if remote in line:
-                    if host in next(lines):
-                        flag = True
-                        break
-                    else:
-                        remote = 'dagshub'
-                        flag = False
-
-            if not flag:
-                cfg.write(config.CONFIG_REMOTE.format(remote=remote, url=url))
-                cfg_local.write(config.CONFIG_LOCAL.format(remote=remote, token=auth[1]))
-                print(f'Added new remote "{remote}" with url = {url}')
-
-        if not exists(root / '.dvc' / '.gitignore'):
-            with open(root / '.dvc' / '.gitignore', 'w') as ign:
-                ign.write(config.CONFIG_GITIGNORE)
-
-    print('Repository initialized!')
+def init(ctx, repo_name, repo_owner, url, host, dvc):
+    _init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=dvc)
 
 
 @cli.command()
