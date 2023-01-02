@@ -57,7 +57,7 @@ def mount(ctx, verbose, **kwargs):
 
 @cli.command()
 @click.option("--repo_name", help="The repository name to set up")
-@click.option("--repo_owner", help="The organization under which the repository needs to be set up")
+@click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
 @click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
 @click.option("--host", default=config.DEFAULT_HOST, help="DagsHub instance to which you want to login")
 @click.option("--mlflow", default=True, is_flag=True, help="Set up MLFlow environment with DagsHub remote")
