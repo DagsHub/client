@@ -95,7 +95,7 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
         repo_name, repo_owner = splitter(url.split('/'))
 
     if None in [repo_name, repo_owner, url]:
-        raise ValueError('Host not found; please specify the remote url with --url')
+        raise ValueError('Could not parse repository owner and name. Make sure you specify either a link to the repository with --url or a pair of --repo-owner and --repo-name').
 
     # Setup authentication
     username = config.username
