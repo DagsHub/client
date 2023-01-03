@@ -50,7 +50,7 @@ def get_project_root(root):
     return Path(root)
 
 
-def _init(repo_name=None, repo_owner=None, url=None, root=None,
+def init(repo_name=None, repo_owner=None, url=None, root=None,
           host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     # Setup required variables
     root = None
@@ -75,6 +75,7 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
                     url = remote.url[:-4]
     if not url:
         print('No host remote found! Please specify the remote using the url variable, or --url argument.')
+        return
     elif url[-4] == '.':
         url = url[:-4]
 

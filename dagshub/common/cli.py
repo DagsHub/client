@@ -14,7 +14,7 @@ import dagshub.auth
 import dagshub.common.logging
 from dagshub.common import config
 from dagshub.upload import create_repo
-from dagshub.common.helpers import http_request, _init
+from dagshub.common.helpers import http_request, init
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
@@ -51,16 +51,19 @@ def mount(ctx, verbose, **kwargs):
         sys.tracebacklimit = 0
     mount(**kwargs)
 
+@cli.group()
+@click.pass_context
+def setup(ctx):
+    pass
 
-@cli.command()
+@setup.command("dvc")
 @click.option("--repo_name", help="The repository name to set up")
 @click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
 @click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
 @click.option("--host", default=config.DEFAULT_HOST, help="DagsHub instance to which you want to login")
-@click.option("--dvc", default=False, is_flag=True, help="Set up DVC with DagsHub remote")
 @click.pass_context
-def init(ctx, repo_name, repo_owner, url, host, dvc):
-    _init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=dvc)
+def setup_dvc(ctx, repo_name, repo_owner, url, host):
+    init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=True)
 
 
 @cli.command()
