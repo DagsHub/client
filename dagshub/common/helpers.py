@@ -2,10 +2,9 @@ import httpx
 
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.upload.wrapper import create_repo
+from os.path import ismount, exists
 from dagshub.auth import get_token
 from dagshub.common import config
-from os.path import exists
-from os.path import ismount
 from pathlib import Path
 import configparser
 import urllib
@@ -54,7 +53,15 @@ def get_project_root(root):
 def _init(repo_name=None, repo_owner=None, url=None, root=None,
           host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     # Setup required variables
-    root = root or get_project_root(Path(os.path.abspath('.')))
+    root = None
+    try:
+        root = root or get_project_root(Path(os.path.abspath('.')))
+        if not exists(root / '.git'):
+            raise ValueError('No git project found!')
+    except ValueError:
+        print('No git project found! (stopped at mountpoint {root}). \
+               Please run this command in a git repository.')
+        return
 
     if url and (repo_name or repo_owner):
         repo_name, repo_owner = None, None
@@ -66,6 +73,8 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
             for remote in git.Repo(root).remotes:
                 if host in remote.url:
                     url = remote.url[:-4]
+    if not url:
+        print('No host remote found! Please specify the remote using the url variable, or --url argument.')
     elif url[-4] == '.':
         url = url[:-4]
 
@@ -74,19 +83,19 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
         repo_name, repo_owner = splitter(url.split('/'))
 
     if None in [repo_name, repo_owner, url]:
-        raise ValueError('Could not parse repository owner and name. Make sure you specify either a link \
-                to the repository with --url or a pair of --repo-owner and --repo-name')
+        print('Could not parse repository owner and name. Make sure you specify either a link \
+               to the repository with --url or a pair of --repo-owner and --repo-name')
+        return
 
     # Setup authentication
-    username = config.username
-    password = config.password
-    if username is not None and password is not None:
-        auth = username, password
+    bearer = None
+    token = config.token or get_token()
+    if token is not None:
+        auth = token, token
+        bearer = HTTPBearerAuth(token)
     else:
-        token = config.token or get_token()
-        if token is not None:
-            auth = token, token
-            bearer = HTTPBearerAuth(token)
+        print('Token not found! Please specify it by exporting environment variable \'DAGSHUB_USER_TOKEN\'')
+        return
 
     # Configure repository
     res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
@@ -111,9 +120,6 @@ def _init(repo_name=None, repo_owner=None, url=None, root=None,
         dvc_config.read(root / '.dvc' / 'config')
         dvc_config_local.read(root / '.dvc' / 'config.local')
 
-        if 'core' not in dvc_config.sections():
-            dvc_config['core'] = {'analytics': False,
-                                  'autostage': True}
         for section in dvc_config.sections():
             if 'url' in dvc_config[section] and host in dvc_config[section]['url']:
                 write = False
