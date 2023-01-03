@@ -53,15 +53,10 @@ def get_project_root(root):
 def init(repo_name=None, repo_owner=None, url=None, root=None,
          host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     # Setup required variables
-    root = None
-    try:
-        root = root or get_project_root(Path(os.path.abspath('.')))
-        if not exists(root / '.git'):
-            raise ValueError('No git project found!')
-    except ValueError:
-        print('No git project found! (stopped at mountpoint {root}). \
-               Please run this command in a git repository.')
-        return
+    root = root or get_project_root(Path(os.path.abspath('.')))
+    if not exists(root / '.git'):
+        raise ValueError('No git project found! (stopped at mountpoint {root}). \
+                          Please run this command in a git repository.')
 
     if url and (repo_name or repo_owner):
         repo_name, repo_owner = None, None
@@ -74,8 +69,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
                 if host in remote.url:
                     url = remote.url[:-4]
     if not url:
-        print('No host remote found! Please specify the remote using the url variable, or --url argument.')
-        return
+        raise ValueError('No host remote found! Please specify the remote using the url variable, or --url argument.')
     elif url[-4] == '.':
         url = url[:-4]
 
@@ -84,19 +78,13 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
         repo_name, repo_owner = splitter(url.split('/'))
 
     if None in [repo_name, repo_owner, url]:
-        print('Could not parse repository owner and name. Make sure you specify either a link \
-               to the repository with --url or a pair of --repo-owner and --repo-name')
-        return
+        raise ValueError('Could not parse repository owner and name. Make sure you specify either a link \
+                          to the repository with --url or a pair of --repo-owner and --repo-name')
 
     # Setup authentication
     bearer = None
     token = config.token or get_token()
-    if token is not None:
-        auth = token, token
-        bearer = HTTPBearerAuth(token)
-    else:
-        print('Token not found! Please specify it by exporting environment variable \'DAGSHUB_USER_TOKEN\'')
-        return
+    bearer = HTTPBearerAuth(token)
 
     # Configure repository
     res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
