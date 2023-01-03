@@ -51,10 +51,12 @@ def mount(ctx, verbose, **kwargs):
         sys.tracebacklimit = 0
     mount(**kwargs)
 
+
 @cli.group()
 @click.pass_context
 def setup(ctx):
     pass
+
 
 @setup.command("dvc")
 @click.option("--repo_name", help="The repository name to set up")

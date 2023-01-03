@@ -51,7 +51,7 @@ def get_project_root(root):
 
 
 def init(repo_name=None, repo_owner=None, url=None, root=None,
-          host=config.DEFAULT_HOST, mlflow=True, dvc=False):
+         host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     # Setup required variables
     root = None
     try:
