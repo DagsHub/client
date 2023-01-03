@@ -89,15 +89,15 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
     # Configure repository
     res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
         owner=repo_owner,
-        reponame=repo_name)), auth=bearer or auth)
+        reponame=repo_name)), auth=bearer)
     if res.status_code == 404:
         create_repo(repo_name)
 
     # Configure MLFlow
     if mlflow:
         os.environ['MLFLOW_TRACKING_URI'] = f'{url}.mlflow'
-        os.environ['MLFLOW_TRACKING_USERNAME'] = auth[0]
-        os.environ['MLFLOW_TRACKING_PASSWORD'] = auth[1]
+        os.environ['MLFLOW_TRACKING_USERNAME'] = token
+        os.environ['MLFLOW_TRACKING_PASSWORD'] = token
 
     # Configure DVC
     if dvc:
