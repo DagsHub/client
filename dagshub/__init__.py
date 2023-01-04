@@ -1,4 +1,4 @@
-__version__ = "0.2.9"
+__version__ = "0.2.9v2"
 from .logger import DAGsHubLogger, dagshub_logger
 from .common.helpers import init
 

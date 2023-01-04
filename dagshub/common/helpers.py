@@ -53,10 +53,11 @@ def get_project_root(root):
 def init(repo_name=None, repo_owner=None, url=None, root=None,
          host=config.DEFAULT_HOST, mlflow=True, dvc=False):
     # Setup required variables
-    root = root or get_project_root(Path(os.path.abspath('.')))
-    if not exists(root / '.git'):
-        raise ValueError('No git project found! (stopped at mountpoint {root}). \
-                          Please run this command in a git repository.')
+    if dvc:
+        root = root or get_project_root(Path(os.path.abspath('.')))
+        if not exists(root / '.git'):
+            raise ValueError('No git project found! (stopped at mountpoint {root}). \
+                              Please run this command in a git repository.')
 
     if url and (repo_name or repo_owner):
         repo_name, repo_owner = None, None
@@ -64,7 +65,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
     if not url:
         if repo_name is not None and repo_owner is not None:
             url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
-        else:
+        elif dvc:
             for remote in git.Repo(root).remotes:
                 if host in remote.url:
                     url = remote.url[:-4]
