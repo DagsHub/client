@@ -9,13 +9,12 @@ from contextlib import contextmanager
 from functools import partial, wraps, lru_cache
 from multiprocessing import AuthenticationError
 from os import PathLike
-from os.path import ismount
 from pathlib import Path
 from typing import Optional, TypeVar, Union, Dict, Set
 from urllib.parse import urlparse
 from dagshub.common import config, helpers
 import logging
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, get_project_root
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -116,11 +115,7 @@ class DagsHubFilesystem:
 
         # Find root directory of Git project
         if not project_root:
-            self.project_root = Path(os.path.abspath('.'))
-            while not (self.project_root / '.git').is_dir():
-                if ismount(self.project_root):
-                    raise ValueError('No git project found! (stopped at mountpoint {self.project_root})')
-                self.project_root = self.project_root / '..'
+            self.project_root = get_project_root(Path(os.path.abspath('.')))
         else:
             self.project_root = Path(os.path.abspath(project_root))
         del project_root
