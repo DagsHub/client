@@ -465,7 +465,6 @@ class DataSet:
 
         return posixpath.normpath(directory)
 
-
     @staticmethod
     def get_file(file: Union[str, IOBase], path=None):
         """
