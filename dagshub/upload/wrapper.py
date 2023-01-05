@@ -1,4 +1,5 @@
 import json
+import posixpath
 
 import urllib
 import os
@@ -427,7 +428,7 @@ class DataSet:
         for root, dirs, files in os.walk(local_path):
             if len(files) > 0:
                 for filename in files:
-                    rel_file_path = os.posixpath.join(root, filename)
+                    rel_file_path = posixpath.join(root, filename)
                     rel_remote_file_path = rel_file_path.replace(local_path, "")
                     if (
                         glob_exclude == ""
@@ -462,7 +463,7 @@ class DataSet:
 
         """
 
-        return os.posixpath.normpath(directory)
+        return posixpath.normpath(directory)
 
 
     @staticmethod
@@ -483,8 +484,8 @@ class DataSet:
             # if path is not provided, fall back to the file name
             if path is None:
                 try:
-                    path = os.posixpath.basename(
-                        os.posixpath.normpath(file if type(file) is str else file.name)
+                    path = posixpath.basename(
+                        posixpath.normpath(file if type(file) is str else file.name)
                     )
                 except Exception:
                     raise RuntimeError(
