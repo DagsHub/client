@@ -427,7 +427,7 @@ class DataSet:
         for root, dirs, files in os.walk(local_path):
             if len(files) > 0:
                 for filename in files:
-                    rel_file_path = os.path.join(root, filename)
+                    rel_file_path = os.posixpath.join(root, filename)
                     rel_remote_file_path = rel_file_path.replace(local_path, "")
                     if (
                         glob_exclude == ""
@@ -462,7 +462,8 @@ class DataSet:
 
         """
 
-        return os.path.normpath(directory)
+        return os.posixpath.normpath(directory)
+
 
     @staticmethod
     def get_file(file: Union[str, IOBase], path=None):
@@ -482,8 +483,8 @@ class DataSet:
             # if path is not provided, fall back to the file name
             if path is None:
                 try:
-                    path = os.path.basename(
-                        os.path.normpath(file if type(file) is str else file.name)
+                    path = os.posixpath.basename(
+                        os.posixpath.normpath(file if type(file) is str else file.name)
                     )
                 except Exception:
                     raise RuntimeError(
