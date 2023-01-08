@@ -85,7 +85,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
             dvc_config[f'\'remote "{remote}"\''] = {'url': f'{url}.dvc'}
 
             with open(root / '.dvc' / 'config', 'w') as config_file, \
-                open(root / '.dvc' / 'config.local', 'w') as config_local_file:
+                 open(root / '.dvc' / 'config.local', 'w') as config_local_file:
                 dvc_config.write(config_file)
                 dvc_config_local.write(config_local_file)
                 print(f'Added new remote "{remote}" with url = {url}')

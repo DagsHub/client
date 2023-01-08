@@ -9,6 +9,7 @@ from dagshub.common import config
 
 default_logger = logging.getLogger("dagshub")
 
+
 def get_default_branch(owner, reponame, auth, host=config.host):
     """
     The get_default_branch function returns the default branch of a given repository.
@@ -47,9 +48,9 @@ def get_project_root(root):
     return Path(root)
 
 
-def log_message(msg, logger = None):
+def log_message(msg, logger=None):
     """
-    Logs message to the info of the logger + prints, unless the printing was suppresed
+    Logs message to the info of the logger + prints, unless the printing was suppressed
     """
     if not config.quiet:
         print(msg)
