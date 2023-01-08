@@ -1,3 +1,4 @@
+import logging
 import httpx
 
 from dagshub.auth.token_auth import HTTPBearerAuth
@@ -11,6 +12,7 @@ import urllib
 import git
 import os
 
+default_logger = logging.getLogger("dagshub")
 
 def get_default_branch(owner, reponame, auth, host=config.host):
     """
@@ -48,6 +50,16 @@ def get_project_root(root):
                              Please run this command in a git repository.')
         root = root / '..'
     return Path(root)
+
+
+def log_message(msg, logger = None):
+    """
+    Logs message to the info of the logger + prints, unless the printing was suppresed
+    """
+    if not config.quiet:
+        print(msg)
+    logger = logger or default_logger
+    logger.info(msg)
 
 
 def init(repo_name=None, repo_owner=None, url=None, root=None,

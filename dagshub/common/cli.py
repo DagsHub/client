@@ -13,17 +13,18 @@ from urllib.parse import urlparse
 import dagshub.auth
 import dagshub.common.logging
 from dagshub.common import config
-from dagshub.upload import create_repo
-from dagshub.common.helpers import http_request, init
+from dagshub.upload import create_repo, Repo
+from dagshub.common.helpers import http_request, init, log_message
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
 @click.group()
 @click.option("--host", default=config.host, help="Hostname of DagsHub instance")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
-def cli(ctx, host):
+def cli(ctx, host, quiet):
     dagshub.common.logging.init_logger()
-    ctx.obj = {"host": host.strip("/")}
+    ctx.obj = {"host": host.strip("/"), "quiet": quiet}
 
 
 @cli.command()
@@ -34,14 +35,16 @@ def cli(ctx, host):
 @click.option(
     "--debug", default=False, type=bool, help="Run fuse in foreground"
 )
-# todo: add log level
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
-def mount(ctx, verbose, **kwargs):
+def mount(ctx, verbose, quiet, **kwargs):
     """
     Mount a DagsHub Storage folder via FUSE
     """
     # Since pyfuse can crash on init-time, import it here instead of up top
     from dagshub.streaming import mount
+
+    config.quiet = ctx.obj["quiet"] or quiet
 
     logger = logging.getLogger()
     logger.setLevel(to_log_level(verbose))
@@ -63,22 +66,27 @@ def setup(ctx):
 @click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
 @click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
 @click.option("--host", default=config.DEFAULT_HOST, help="DagsHub instance to which you want to login")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
-def setup_dvc(ctx, repo_name, repo_owner, url, host):
+def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
+    host = host or ctx.obj["host"]
+    config.quiet = quiet or ctx.obj["quiet"]
     init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=True)
 
 
 @cli.command()
 @click.option("--token", help="Login using a specified token")
 @click.option("--host", help="DagsHub instance to which you want to login")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
-def login(ctx, token, host):
+def login(ctx, token, host, quiet):
     """
     Initiate an Oauth authentication process. This process will generate and cache a short-lived token in your
     local machine, to allow you to perform actions that require authentication. After running `dagshub login` you can
     use data streaming and upload files without providing authentication info.
     """
     host = host or ctx.obj["host"]
+    config.quiet = quiet or ctx.obj["quiet"]
     if token is not None:
         dagshub.auth.add_app_token(token, host)
         print("Token added successfully")
@@ -111,6 +119,8 @@ def to_log_level(verbosity):
 @click.option("-b", "--branch", help="Branch to upload the file to")
 @click.option("--update", is_flag=True, help="Force update an existing file")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.option("--host", help="DagsHub instance to which you want to login")
 @click.pass_context
 def upload(ctx,
            filename,
@@ -120,13 +130,17 @@ def upload(ctx,
            branch,
            verbose,
            update,
+           quiet,
+           host,
            **kwargs):
     """
     Upload FILENAME to REPO at location TARGET.
     REPO should be of the form <owner>/<repo-name>, i.e nirbarazida/yolov6.
     TARGET should include the full path inside the repo, including the filename itself.
     """
-    from dagshub.upload import Repo
+    config.host = host or ctx.obj["host"] or config.host
+    config.quiet = quiet or ctx.obj["quiet"]
+
     logger = logging.getLogger()
     logger.setLevel(to_log_level(verbose))
 
@@ -148,12 +162,14 @@ def repo():
 @click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
 @click.option("-c", "--clone", is_flag=True,  help="Clone repository locally")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def create(ctx,
            repo_name,
            upload_data,
            clone,
-           verbose):
+           verbose,
+           quiet):
     """
     create a repo and:\n
     optional- upload files to 'data' dir,
@@ -163,6 +179,8 @@ def create(ctx,
     example 2:  dagshub --host "https://www.dagshub.com"
     repo-create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
     """
+
+    config.quiet = quiet or ctx.obj["quiet"]
 
     logger = logging.getLogger()
     logger.setLevel(to_log_level(verbose))
@@ -174,7 +192,7 @@ def create(ctx,
 
         # create remote repo
         repo = create_repo(repo_name, host=host)
-        logger.info(f"Created repo: {host}/{repo.owner}/{repo.name}.git")
+        log_message(f"Created repo: {host}/{repo.owner}/{repo.name}.git", logger)
 
         if upload_data:
             # get the data
@@ -188,7 +206,7 @@ def create(ctx,
             with open(downloaded_file_name, 'wb') as fh:
                 fh.write(res.content)
 
-            logger.info(f"Downloaded and saved {downloaded_file_name}")
+            log_message(f"Downloaded and saved {downloaded_file_name}", logger)
 
             # extract to data dir or move there
             if zipfile.is_zipfile(downloaded_file_name):
@@ -202,18 +220,18 @@ def create(ctx,
 
             # upload data dir as DVC to repo
             add_dataset_to_repo(repo, tmp_dir, DEFAULT_DATA_DIR_NAME)
-            logger.info("Data uploaded to repo")
+            log_message("Data uploaded to repo", logger)
 
         if clone:
             # make local repo
             git.Git(repo.name).clone(f"{host}/{repo.owner}/{repo.name}.git")
-            logger.info(f"Cloned repo to folder {repo.name}")
+            log_message(f"Cloned repo to folder {repo.name}", logger)
 
             # move the data to it,
             # now the local repo resembles the remote but with copy of data
             if upload_data:
                 os.rename(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
-                logger.info(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}")
+                log_message(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger)
 
     # clean tmp file/dir if exists
     if os.path.exists(downloaded_file_name):

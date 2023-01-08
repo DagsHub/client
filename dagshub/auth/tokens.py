@@ -44,7 +44,7 @@ class TokenStorage:
             if len(non_expired_tokens) > 0:
                 token = non_expired_tokens[0]
             else:
-                logger.info(
+                logger.debug(
                     f"No valid tokens found for host '{host}'. Authenticating with OAuth"
                 )
                 token = oauth.oauth_flow(host, **kwargs)

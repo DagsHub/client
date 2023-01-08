@@ -11,6 +11,7 @@ from dagshub.common import config, helpers
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
+from dagshub.common.helpers import log_message
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -233,7 +234,7 @@ class Repo:
         if force:
             data["last_commit"] = self._get_last_commit()
 
-        logger.warning(f'Uploading {len(files)} files to "{self.full_name}"...')
+        log_message(f'Uploading {len(files)} files to "{self.full_name}"...', logger)
         res = s.put(
             self.get_request_url(directory_path),
             data=data,
@@ -273,7 +274,7 @@ class Repo:
             logger.debug(f"Response ({res.status_code})\n")
 
         if res.status_code == 200:
-            logger.warning("Upload finished successfully!")
+            log_message("Upload finished successfully!", logger)
 
     @property
     def auth(self):
@@ -404,8 +405,8 @@ class DataSet:
         path, file = self.get_file(file, path)
         if file is not None:
             if path in self.files:
-                logger.warning(
-                    f'File already staged for upload on path "{path}". Overwriting'
+                log_message(
+                    f'File already staged for upload on path "{path}". Overwriting', logger
                 )
             self.files[path] = (path, file)
 
@@ -444,7 +445,7 @@ class DataSet:
                     commit_message = "Commit data points in folder %s" % root
                     self.commit(commit_message, versioning="dvc")
 
-        logger.warning("Directory upload complete, uploaded %s files" % file_counter)
+        log_message(f"Directory upload complete, uploaded {file_counter} files", logger)
 
     @staticmethod
     def _clean_directory_name(directory: str):
