@@ -9,7 +9,7 @@ import git
 from dagshub.auth import get_token
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.common.helpers import get_project_root, http_request
+from dagshub.common.helpers import get_project_root, http_request, log_message
 from dagshub.upload import create_repo
 
 
@@ -88,10 +88,10 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
                  open(root / '.dvc' / 'config.local', 'w') as config_local_file:
                 dvc_config.write(config_file)
                 dvc_config_local.write(config_local_file)
-                print(f'Added new remote "{remote}" with url = {url}')
+                log_message(f'Added new remote "{remote}" with url = {url}')
 
         if not exists(root / '.dvc' / '.gitignore'):
             with open(root / '.dvc' / '.gitignore', 'w') as config_gitignore:
                 config_gitignore.write(config.CONFIG_GITIGNORE)
 
-    print('Repository initialized!')
+    log_message('Repository initialized!')
