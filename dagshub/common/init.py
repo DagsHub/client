@@ -14,7 +14,7 @@ from dagshub.upload import create_repo
 
 
 def init(repo_name=None, repo_owner=None, url=None, root=None,
-         host=config.DEFAULT_HOST, mlflow=True, dvc=False):
+         host=config.host, mlflow=True, dvc=False):
     # Setup required variables
     if dvc:
         root = root or get_project_root(Path(os.path.abspath('.')))
