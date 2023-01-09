@@ -17,6 +17,7 @@ DAGSHUB_USER_TOKEN_KEY = "DAGSHUB_USER_TOKEN"
 DAGSHUB_USERNAME_KEY = "DAGSHUB_USERNAME"
 DAGSHUB_PASSWORD_KEY = "DAGSHUB_PASSWORD"
 HTTP_TIMEOUT_KEY = "DAGSHUB_HTTP_TIMEOUT"
+DAGSHUB_QUIET_KEY = "DAGSHUB_QUIET"
 
 parsed_host = urlparse(os.environ.get(HOST_KEY, DEFAULT_HOST))
 hostname = parsed_host.hostname
@@ -32,6 +33,8 @@ custom_user_agent_suffix = f" dagshub-client-python/{__version__}"
 requests_headers = {"user-agent": USER_AGENT + custom_user_agent_suffix}
 http_timeout = os.environ.get(HTTP_TIMEOUT_KEY, 30)
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
+
+quiet = bool(os.environ.get(DAGSHUB_QUIET_KEY, False))
 
 # DVC config templates
 CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"
