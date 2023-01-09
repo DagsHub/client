@@ -176,9 +176,9 @@ def create(ctx,
     optional- upload files to 'data' dir,
      .zip and .tar files are extracted, other formats copied as is.
     optional- clone repo locally.\n
-    example 1:  dagshub repo-create mytutorial -u "http://example.com/data.csv" --clone\n
+    example 1:  dagshub repo create mytutorial -u "http://example.com/data.csv" --clone\n
     example 2:  dagshub --host "https://www.dagshub.com"
-    repo-create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
+                    repo create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
     """
 
     config.quiet = quiet or ctx.obj["quiet"]
@@ -235,7 +235,7 @@ def create(ctx,
                 log_message(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger)
 
     # clean tmp file/dir if exists
-    if os.path.exists(downloaded_file_name):
+    if upload_data and os.path.exists(downloaded_file_name):
         os.remove(downloaded_file_name)
 
 
