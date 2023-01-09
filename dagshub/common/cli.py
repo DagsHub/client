@@ -12,9 +12,10 @@ from urllib.parse import urlparse
 
 import dagshub.auth
 import dagshub.common.logging
+from dagshub import init
 from dagshub.common import config
 from dagshub.upload import create_repo, Repo
-from dagshub.common.helpers import http_request, init, log_message
+from dagshub.common.helpers import http_request, log_message
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
