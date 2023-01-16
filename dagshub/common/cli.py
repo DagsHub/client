@@ -9,6 +9,7 @@ import zipfile
 import tarfile
 from http import HTTPStatus
 from urllib.parse import urlparse
+from rich import print
 
 import dagshub.auth
 import dagshub.common.logging
@@ -90,10 +91,10 @@ def login(ctx, token, host, quiet):
     config.quiet = quiet or ctx.obj["quiet"]
     if token is not None:
         dagshub.auth.add_app_token(token, host)
-        print("Token added successfully")
+        print(":white_check_mark: Token added successfully")
     else:
         dagshub.auth.add_oauth_token(host)
-        print("OAuth token added")
+        print(":white_check_mark: OAuth token added")
 
 
 def validate_repo(ctx, param, value):

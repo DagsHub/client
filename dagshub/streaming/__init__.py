@@ -1,3 +1,4 @@
+from rich import print
 from .filesystem import DagsHubFilesystem, install_hooks, uninstall_hooks
 
 try:

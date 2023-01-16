@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 
 from dagshub.common import config
+from rich import print
 
 default_logger = logging.getLogger("dagshub")
 

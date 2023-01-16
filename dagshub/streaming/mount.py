@@ -8,6 +8,7 @@ from os import PathLike
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+from rich import print
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
