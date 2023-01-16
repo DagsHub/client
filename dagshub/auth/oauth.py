@@ -4,13 +4,9 @@ import logging
 import urllib
 import uuid
 import httpx
-import rich.align
-import rich.padding
-import rich.status
 import webbrowser
 
-from dagshub.common import config
-from rich import print
+from dagshub.common import config, rich_console
 
 logger = logging.getLogger(__name__)
 
@@ -20,23 +16,26 @@ def oauth_flow(
     client_id: Optional[str] = None
 ) -> Dict:
 
-    with rich.status.Status("Waiting for authorization:"):
-        host = host.strip("/")
-        dagshub_url = urllib.parse.urljoin(host, "login/oauth")
-        client_id = client_id or config.client_id
-        state = uuid.uuid4()
-        middle_man_request_id = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
-        auth_link = f"{dagshub_url}/authorize?state={state}&client_id={client_id}" \
-                    f"&middleman_request_id={middle_man_request_id}"
+    host = host.strip("/")
+    dagshub_url = urllib.parse.urljoin(host, "login/oauth")
+    client_id = client_id or config.client_id
+    state = uuid.uuid4()
+    middle_man_request_id = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+    auth_link = f"{dagshub_url}/authorize?state={state}&client_id={client_id}" \
+                f"&middleman_request_id={middle_man_request_id}"
 
-        webbrowser.open(auth_link)
+    webbrowser.open(auth_link)
 
-        print(rich.align.Align("[bold]:exclamation::exclamation::exclamation: AUTHORIZATION REQUIRED "
-                               ":exclamation::exclamation::exclamation:[/bold]", "center"))
-        link_prompt = rich.padding.Padding(f"Authorize the client by going to the following link:\n"
-                                           f"[link={auth_link}]{auth_link}[/link]", (2, 4))
-        print(link_prompt)
+    rich_console.print("[bold]:exclamation::exclamation::exclamation: AUTHORIZATION REQUIRED "
+                  ":exclamation::exclamation::exclamation:[/bold]", justify="center")
+    # Doing raw prints here because the rich syntax breaks in colab
+    # Printing them line by line, because the link has to be its own print in order for Colab parser to correctly parse
+    # the whole link
+    print("\n\nOpen the following link in your browser to authorize the client:")
+    print(auth_link)
+    print("\n")
 
+    with rich_console.status("Waiting for authorization"):
         res = httpx.post(
             f"{dagshub_url}/middleman",
             data={"request_id": middle_man_request_id}, timeout=None
