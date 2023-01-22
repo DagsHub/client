@@ -41,6 +41,7 @@ setuptools.setup(
         "click>=8.0.4",
         "httpx==0.22.0",
         "GitPython>=3.1.29",
+        "rich[jupyter]~=13.1.0",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

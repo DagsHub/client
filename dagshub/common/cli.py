@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import dagshub.auth
 import dagshub.common.logging
 from dagshub import init
-from dagshub.common import config
+from dagshub.common import config, rich_console
 from dagshub.upload import create_repo, Repo
 from dagshub.common.helpers import http_request, log_message
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
@@ -90,10 +90,10 @@ def login(ctx, token, host, quiet):
     config.quiet = quiet or ctx.obj["quiet"]
     if token is not None:
         dagshub.auth.add_app_token(token, host)
-        print("Token added successfully")
+        rich_console.print(":white_check_mark: Token added successfully")
     else:
         dagshub.auth.add_oauth_token(host)
-        print("OAuth token added")
+        rich_console.print(":white_check_mark: OAuth token added")
 
 
 def validate_repo(ctx, param, value):

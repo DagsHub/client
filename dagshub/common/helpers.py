@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from dagshub.common import config
+from dagshub.common import config, rich_console
 
 default_logger = logging.getLogger("dagshub")
 
@@ -53,6 +53,6 @@ def log_message(msg, logger=None):
     Logs message to the info of the logger + prints, unless the printing was suppressed
     """
     if not config.quiet:
-        print(msg)
+        rich_console.print(msg)
     logger = logger or default_logger
     logger.info(msg)

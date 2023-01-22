@@ -4,7 +4,9 @@ import logging
 import urllib
 import uuid
 import httpx
-from dagshub.common import config
+import webbrowser
+
+from dagshub.common import config, rich_console
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +21,25 @@ def oauth_flow(
     client_id = client_id or config.client_id
     state = uuid.uuid4()
     middle_man_request_id = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+    auth_link = f"{dagshub_url}/authorize?state={state}&client_id={client_id}" \
+                f"&middleman_request_id={middle_man_request_id}"
 
-    link_prompt = f"Go to {dagshub_url}/authorize?state={state}&client_id={client_id}" \
-                  f"&middleman_request_id={middle_man_request_id} to authorize the client."
-    print(link_prompt)
+    webbrowser.open(auth_link)
 
-    res = httpx.post(
-        f"{dagshub_url}/middleman",
-        data={"request_id": middle_man_request_id}, timeout=None
-    )
+    rich_console.print("[bold]:exclamation::exclamation::exclamation: AUTHORIZATION REQUIRED "
+                       ":exclamation::exclamation::exclamation:[/bold]", justify="center")
+    # Doing raw prints here because the rich syntax breaks in colab
+    # Printing them line by line, because the link has to be its own print in order for Colab parser to correctly parse
+    # the whole link
+    print("\n\nOpen the following link in your browser to authorize the client:")
+    print(auth_link)
+    print("\n")
+
+    with rich_console.status("Waiting for authorization"):
+        res = httpx.post(
+            f"{dagshub_url}/middleman",
+            data={"request_id": middle_man_request_id}, timeout=None
+        )
 
     if res.status_code != 200:
         raise Exception(

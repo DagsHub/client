@@ -8,6 +8,7 @@ from os import PathLike
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+from dagshub.common import rich_console
 
 from .filesystem import SPECIAL_FILE, DagsHubFilesystem
 
@@ -115,7 +116,7 @@ def mount(debug=False,
     logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
                        password=password, token=token)
-    print(
+    rich_console.print(
         f'Mounting DagsHubFUSE filesystem at {fuse.fs.project_root}\n'
         f'Run `cd .` in any existing terminals to utilize mounted FS.')
     FUSE(fuse, str(fuse.fs.project_root), foreground=debug, nonempty=True)
