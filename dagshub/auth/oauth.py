@@ -27,7 +27,7 @@ def oauth_flow(
     webbrowser.open(auth_link)
 
     rich_console.print("[bold]:exclamation::exclamation::exclamation: AUTHORIZATION REQUIRED "
-                  ":exclamation::exclamation::exclamation:[/bold]", justify="center")
+                       ":exclamation::exclamation::exclamation:[/bold]", justify="center")
     # Doing raw prints here because the rich syntax breaks in colab
     # Printing them line by line, because the link has to be its own print in order for Colab parser to correctly parse
     # the whole link
