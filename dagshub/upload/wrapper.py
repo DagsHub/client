@@ -235,7 +235,7 @@ class Repo:
         if force:
             data["last_commit"] = self._get_last_commit()
 
-        log_message(f'Uploading {len(files)} files to "{self.full_name}"...', logger)
+        log_message(f'Uploading files ({len(files)}) to "{self.full_name}"...', logger)
         res = s.put(
             self.get_request_url(directory_path),
             data=data,
