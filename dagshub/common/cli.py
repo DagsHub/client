@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+import shutil
 
 import click
 import logging
@@ -231,7 +232,7 @@ def create(ctx,
                 with tarfile.TarFile(downloaded_file_name, 'r') as tar_ref:
                     tar_ref.extractall(tmp_dir)
             else:
-                os.rename(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
+                shutil.move(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
 
             # upload data dir as DVC to repo
             add_dataset_to_repo(repo, tmp_dir, DEFAULT_DATA_DIR_NAME)
@@ -245,7 +246,7 @@ def create(ctx,
             # move the data to it,
             # now the local repo resembles the remote but with copy of data
             if upload_data:
-                os.rename(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
+                shutil.move(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
                 log_message(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger)
 
     # clean tmp file/dir if exists
