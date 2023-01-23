@@ -172,9 +172,9 @@ class Repo:
 
     def upload(
         self,
-        file: Union[str, IOBase],
+        local_path: Union[str, IOBase],
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        path=None,
+        remote_path=None,
         **kwargs,
     ):
         """
@@ -189,8 +189,12 @@ class Repo:
         :return: None
 
         """
-        file_for_upload = DataSet.get_file(file, path)
-        self.upload_files([file_for_upload], commit_message=commit_message, **kwargs)
+        if os.path.isdir(local_path):
+            dir_to_upload = self.directory(remote_path)
+            dir_to_upload.add_dir(local_path)
+        else:
+            file_to_upload = DataSet.get_file(local_path, remote_path)
+            self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
     def upload_files(
         self,

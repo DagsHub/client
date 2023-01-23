@@ -154,7 +154,7 @@ def upload(ctx,
 
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
-    repo.upload(file=filename, path=target, commit_message=message, force=update)
+    repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update)
 
 
 @cli.command()
