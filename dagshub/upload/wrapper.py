@@ -8,7 +8,9 @@ import fnmatch
 from typing import Union
 from io import IOBase
 import httpx
-from dagshub.common import config, helpers
+import rich.progress
+
+from dagshub.common import config, helpers, rich_console
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
@@ -430,25 +432,36 @@ class DataSet:
 
         file_counter = 0
 
-        for root, dirs, files in os.walk(local_path):
-            if commit_message is None:
-                commit_message = f"Commit data points in folder {root}"
-            if len(files) > 0:
-                for filename in files:
-                    rel_file_path = posixpath.join(root, filename)
-                    rel_remote_file_path = rel_file_path.replace(local_path, "")
-                    if (
-                        glob_exclude == ""
-                        or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
-                    ):
-                        self.add(file=rel_file_path, path=rel_remote_file_path)
-                        if len(self.files) > 49:
-                            file_counter += len(self.files)
-                            self.commit(commit_message, versioning="dvc")
+        progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
+                                          console=rich_console, transient=True, disable=config.quiet)
+        total_task = progress.add_task(f"Uploading files...")
 
-                if len(self.files) > 0:
-                    file_counter += len(self.files)
-                    self.commit(commit_message, versioning="dvc")
+        with progress:
+            for root, dirs, files in os.walk(local_path):
+                folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
+
+                if commit_message is None:
+                    commit_message = f"Commit data points in folder {root}"
+
+                if len(files) > 0:
+                    for filename in files:
+                        rel_file_path = posixpath.join(root, filename)
+                        rel_remote_file_path = rel_file_path.replace(local_path, "")
+                        if (
+                            glob_exclude == ""
+                            or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
+                        ):
+                            self.add(file=rel_file_path, path=rel_remote_file_path)
+                            if len(self.files) > 49:
+                                file_counter += len(self.files)
+                                self.commit(commit_message, versioning="dvc")
+                                progress.update(folder_task, advance=len(self.files))
+                                progress.update(total_task, completed=file_counter)
+                    if len(self.files) > 0:
+                        file_counter += len(self.files)
+                        self.commit(commit_message, versioning="dvc")
+                        progress.update(total_task, completed=file_counter)
+                progress.remove_task(folder_task)
 
         log_message(f"Directory upload complete, uploaded {file_counter} files", logger)
 
