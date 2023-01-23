@@ -41,7 +41,7 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     """
     repo = create_repo(repo_name, org_name=org_name, private=private)
     dir = repo.directory(repo_name)
-    dir.add_dir(local_path, glob_exclude)
+    dir.add_dir(local_path, glob_exclude, commit_message="Initial dataset commit")
     return repo
 
 
@@ -55,7 +55,7 @@ def add_dataset_to_repo(repo,
     :param data_dir (str): name of data directory that will be created inside repo
     """
     dir = repo.directory(data_dir)
-    dir.add_dir(local_path)
+    dir.add_dir(local_path, commit_message="Initial dataset commit")
 
 
 def create_repo(
@@ -191,7 +191,7 @@ class Repo:
         """
         if os.path.isdir(local_path):
             dir_to_upload = self.directory(remote_path)
-            dir_to_upload.add_dir(local_path)
+            dir_to_upload.add_dir(local_path, commit_message=commit_message)
         else:
             file_to_upload = DataSet.get_file(local_path, remote_path)
             self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
@@ -415,7 +415,7 @@ class DataSet:
                 )
             self.files[path] = (path, file)
 
-    def add_dir(self, local_path, glob_exclude=""):
+    def add_dir(self, local_path, glob_exclude="", commit_message=None):
         """
         The add_dir function adds an entire directory to a DagsHub repository.
         It does this by iterating through all the files in the given directory and uploading them one-by-one.
@@ -431,6 +431,8 @@ class DataSet:
         file_counter = 0
 
         for root, dirs, files in os.walk(local_path):
+            if commit_message is None:
+                commit_message = f"Commit data points in folder {root}"
             if len(files) > 0:
                 for filename in files:
                     rel_file_path = posixpath.join(root, filename)
@@ -442,12 +444,10 @@ class DataSet:
                         self.add(file=rel_file_path, path=rel_remote_file_path)
                         if len(self.files) > 49:
                             file_counter += len(self.files)
-                            commit_message = "Commit data points in folder %s" % root
                             self.commit(commit_message, versioning="dvc")
 
                 if len(self.files) > 0:
                     file_counter += len(self.files)
-                    commit_message = "Commit data points in folder %s" % root
                     self.commit(commit_message, versioning="dvc")
 
         log_message(f"Directory upload complete, uploaded {file_counter} files", logger)
