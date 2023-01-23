@@ -26,7 +26,7 @@ from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 @click.pass_context
 def cli(ctx, host, quiet):
     dagshub.common.logging.init_logger()
-    ctx.obj = {"host": host.strip("/"), "quiet": quiet}
+    ctx.obj = {"host": host.strip("/"), "quiet": quiet or config.quiet}
 
 
 @cli.command()
