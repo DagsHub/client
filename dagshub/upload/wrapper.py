@@ -434,7 +434,7 @@ class DataSet:
 
         progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
                                           console=rich_console, transient=True, disable=config.quiet)
-        total_task = progress.add_task(f"Uploading files...")
+        total_task = progress.add_task("Uploading files...")
 
         with progress:
             for root, dirs, files in os.walk(local_path):
