@@ -170,7 +170,8 @@ from dagshub.upload import Repo
 repo = Repo("<repo_owner>", "<repo_name>")  # Optional: username, password, token, branch
 
 # Upload a single file to a repository in one line
-repo.upload(file="<local_file_path>", path="<path_in_remote>", versioning=”dvc”)  # Optional: versioning, new_branch, commit_message
+repo.upload(local_path="<local_file_path>", remote_path="<path_in_remote>",
+            versioning=”dvc”)  # Optional: versioning, new_branch, commit_message
 ```
 
 This will upload a single file to DagsHub, which will be tracked by DVC.

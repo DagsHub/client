@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 import dagshub.auth
 import dagshub.common.logging
-from dagshub import init
+from dagshub import init, __version__
 from dagshub.common import config, rich_console
 from dagshub.upload import create_repo, Repo
 from dagshub.common.helpers import http_request, log_message
@@ -26,7 +26,7 @@ from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 @click.pass_context
 def cli(ctx, host, quiet):
     dagshub.common.logging.init_logger()
-    ctx.obj = {"host": host.strip("/"), "quiet": quiet}
+    ctx.obj = {"host": host.strip("/"), "quiet": quiet or config.quiet}
 
 
 @cli.command()
@@ -60,6 +60,9 @@ def mount(ctx, verbose, quiet, **kwargs):
 @cli.group()
 @click.pass_context
 def setup(ctx):
+    """
+    Initialize additional functionality in the current repository
+    """
     pass
 
 
@@ -71,6 +74,9 @@ def setup(ctx):
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
+    """
+    Initialize dvc
+    """
     host = host or ctx.obj["host"]
     config.quiet = quiet or ctx.obj["quiet"]
     init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=True)
@@ -148,7 +154,15 @@ def upload(ctx,
 
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
-    repo.upload(file=filename, path=target, commit_message=message, force=update)
+    repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update)
+
+
+@cli.command()
+def version():
+    """
+    Prints the current installed version of the DagsHub client
+    """
+    print(__version__)
 
 
 @cli.group()

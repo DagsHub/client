@@ -8,7 +8,9 @@ import fnmatch
 from typing import Union
 from io import IOBase
 import httpx
-from dagshub.common import config, helpers
+import rich.progress
+
+from dagshub.common import config, helpers, rich_console
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
@@ -17,6 +19,7 @@ from dagshub.common.helpers import log_message
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
+DEFAULT_DATASET_COMMIT_MESSAGE = "Initial dataset commit"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
@@ -41,7 +44,7 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     """
     repo = create_repo(repo_name, org_name=org_name, private=private)
     dir = repo.directory(repo_name)
-    dir.add_dir(local_path, glob_exclude)
+    dir.add_dir(local_path, glob_exclude, commit_message=DEFAULT_DATASET_COMMIT_MESSAGE)
     return repo
 
 
@@ -55,7 +58,7 @@ def add_dataset_to_repo(repo,
     :param data_dir (str): name of data directory that will be created inside repo
     """
     dir = repo.directory(data_dir)
-    dir.add_dir(local_path)
+    dir.add_dir(local_path, commit_message=DEFAULT_DATASET_COMMIT_MESSAGE)
 
 
 def create_repo(
@@ -172,9 +175,9 @@ class Repo:
 
     def upload(
         self,
-        file: Union[str, IOBase],
+        local_path: Union[str, IOBase],
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        path=None,
+        remote_path=None,
         **kwargs,
     ):
         """
@@ -189,8 +192,12 @@ class Repo:
         :return: None
 
         """
-        file_for_upload = DataSet.get_file(file, path)
-        self.upload_files([file_for_upload], commit_message=commit_message, **kwargs)
+        if os.path.isdir(local_path):
+            dir_to_upload = self.directory(remote_path)
+            dir_to_upload.add_dir(local_path, commit_message=commit_message)
+        else:
+            file_to_upload = DataSet.get_file(local_path, remote_path)
+            self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
     def upload_files(
         self,
@@ -235,7 +242,7 @@ class Repo:
         if force:
             data["last_commit"] = self._get_last_commit()
 
-        log_message(f'Uploading {len(files)} files to "{self.full_name}"...', logger)
+        log_message(f'Uploading files ({len(files)}) to "{self.full_name}"...', logger)
         res = s.put(
             self.get_request_url(directory_path),
             data=data,
@@ -411,7 +418,7 @@ class DataSet:
                 )
             self.files[path] = (path, file)
 
-    def add_dir(self, local_path, glob_exclude=""):
+    def add_dir(self, local_path, glob_exclude="", commit_message=None):
         """
         The add_dir function adds an entire directory to a DagsHub repository.
         It does this by iterating through all the files in the given directory and uploading them one-by-one.
@@ -426,25 +433,36 @@ class DataSet:
 
         file_counter = 0
 
-        for root, dirs, files in os.walk(local_path):
-            if len(files) > 0:
-                for filename in files:
-                    rel_file_path = posixpath.join(root, filename)
-                    rel_remote_file_path = rel_file_path.replace(local_path, "")
-                    if (
-                        glob_exclude == ""
-                        or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
-                    ):
-                        self.add(file=rel_file_path, path=rel_remote_file_path)
-                        if len(self.files) > 49:
-                            file_counter += len(self.files)
-                            commit_message = "Commit data points in folder %s" % root
-                            self.commit(commit_message, versioning="dvc")
+        progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
+                                          console=rich_console, transient=True, disable=config.quiet)
+        total_task = progress.add_task("Uploading files...")
 
-                if len(self.files) > 0:
-                    file_counter += len(self.files)
-                    commit_message = "Commit data points in folder %s" % root
-                    self.commit(commit_message, versioning="dvc")
+        with progress:
+            for root, dirs, files in os.walk(local_path):
+                folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
+
+                if commit_message is None:
+                    commit_message = f"Commit data points in folder {root}"
+
+                if len(files) > 0:
+                    for filename in files:
+                        rel_file_path = posixpath.join(root, filename)
+                        rel_remote_file_path = rel_file_path.replace(local_path, "")
+                        if (
+                            glob_exclude == ""
+                            or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
+                        ):
+                            self.add(file=rel_file_path, path=rel_remote_file_path)
+                            if len(self.files) > 49:
+                                file_counter += len(self.files)
+                                self.commit(commit_message, versioning="dvc")
+                                progress.update(folder_task, advance=len(self.files))
+                                progress.update(total_task, completed=file_counter)
+                    if len(self.files) > 0:
+                        file_counter += len(self.files)
+                        self.commit(commit_message, versioning="dvc")
+                        progress.update(total_task, completed=file_counter)
+                progress.remove_task(folder_task)
 
         log_message(f"Directory upload complete, uploaded {file_counter} files", logger)
 
