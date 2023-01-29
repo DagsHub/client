@@ -1,4 +1,3 @@
-import functools
 from dataclasses import dataclass
 
 import httpx
@@ -18,9 +17,9 @@ class GenericAPIErrorContent:
 _error_lookup = {}
 
 
-def _error_name(error: str):
+def register_upload_api_error(error_value: str):
     def decorator(cls):
-        _error_lookup[error] = cls
+        _error_lookup[error_value] = cls
 
         def __init__(self, details: str):
             self.details = details
@@ -29,32 +28,32 @@ def _error_name(error: str):
     return decorator
 
 
-@_error_name("missing last_commit")
+@register_upload_api_error(error_value="missing last_commit")
 class UpdateNotAllowedError(Exception):
     pass
 
 
-@_error_name("invalid last_commit")
+@register_upload_api_error(error_value="invalid last_commit")
 class InvalidLastCommitError(Exception):
     pass
 
 
-@_error_name("versioning conflict")
+@register_upload_api_error(error_value="versioning conflict")
 class VersioningConflictError(Exception):
     pass
 
 
-@_error_name("edit pipeline unsupported")
+@register_upload_api_error(error_value="edit pipeline unsupported")
 class UnsupportedStageContainerFileError(Exception):
     pass
 
 
-@_error_name("path conflict")
+@register_upload_api_error(error_value="path conflict")
 class PathConflictError(Exception):
     pass
 
 
-@_error_name("server error")
+@register_upload_api_error(error_value="server error")
 class InternalServerErrorError(Exception):
     pass
 
@@ -68,7 +67,7 @@ class DagsHubAPIError(Exception):
         self.message = message
 
 
-def determine_error(response: httpx.Response) -> Exception:
+def determine_upload_api_error(response: httpx.Response) -> Exception:
     try:
         json_content = response.json()
     except Exception as e:

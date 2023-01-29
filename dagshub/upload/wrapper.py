@@ -14,7 +14,7 @@ from dagshub.common import config, helpers, rich_console
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.upload.errors import determine_error
+from dagshub.upload.errors import determine_upload_api_error
 from dagshub.common.helpers import log_message
 
 # todo: handle api urls in common package
@@ -274,7 +274,7 @@ class Repo:
         )
 
         if res.status_code != HTTPStatus.OK:
-            raise determine_error(res)
+            raise determine_upload_api_error(res)
         else:
             log_message("Upload finished successfully!", logger)
 
@@ -440,7 +440,7 @@ class DataSet:
                 if commit_message is None:
                     commit_message = upload_kwargs.get("commit_message", f"Commit data points in folder {root}")
                 if "commit_message" in upload_kwargs:
-                    del(upload_kwargs["commit_message"])
+                    del upload_kwargs["commit_message"]
 
                 if len(files) > 0:
                     for filename in files:
