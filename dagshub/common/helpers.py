@@ -36,6 +36,10 @@ def http_request(method, url, **kwargs):
     for arg in mixin_args:
         if arg not in kwargs:
             kwargs[arg] = mixin_args[arg]
+    # Add the config headers to the headers being sent out
+    headers = kwargs.get("headers", {})
+    headers.update(config.requests_headers)
+    kwargs["headers"] = headers
     return httpx.request(method, url, **kwargs)
 
 

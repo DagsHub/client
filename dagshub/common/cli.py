@@ -17,6 +17,7 @@ from dagshub import init, __version__
 from dagshub.common import config, rich_console
 from dagshub.upload import create_repo, Repo
 from dagshub.common.helpers import http_request, log_message
+from dagshub.upload.errors import UpdateNotAllowedError
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
@@ -125,7 +126,7 @@ def to_log_level(verbosity):
 @click.argument("target")
 @click.option("-m", "--message", help="Commit message for the upload")
 @click.option("-b", "--branch", help="Branch to upload the file to")
-@click.option("--update", is_flag=True, help="Force update an existing file")
+@click.option("--update", is_flag=True, help="Force update existing files/directories")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
@@ -154,7 +155,11 @@ def upload(ctx,
 
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
-    repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update)
+    try:
+        repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update)
+    except UpdateNotAllowedError:
+        log_message(":warning: You're trying to update existing files! :warning:\n"
+                    "If you want to do that, retry with --update to force the update", logger)
 
 
 @cli.command()

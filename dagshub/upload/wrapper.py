@@ -14,6 +14,7 @@ from dagshub.common import config, helpers, rich_console
 from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
+from dagshub.upload.errors import determine_upload_api_error
 from dagshub.common.helpers import log_message
 
 # todo: handle api urls in common package
@@ -194,7 +195,7 @@ class Repo:
         """
         if os.path.isdir(local_path):
             dir_to_upload = self.directory(remote_path)
-            dir_to_upload.add_dir(local_path, commit_message=commit_message)
+            dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
         else:
             file_to_upload = DataSet.get_file(local_path, remote_path)
             self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
@@ -255,7 +256,7 @@ class Repo:
     def _log_upload_details(self, data, res, files):
         """
         The _log_upload_details function logs the request URL, data, and files.
-        It then logs the response status code and content. If the response is not 200(OK), it will log an error message.
+        It then logs the response status code and content. If the response is not 200(OK), it raises an error.
 
 
 
@@ -271,17 +272,10 @@ class Repo:
             f"Data:\n{json.dumps(data, indent=4)}\n"
             f"Files:\n{json.dumps(list(map(str, files)), indent=4)}"
         )
-        try:
-            content = json.dumps(res.json(), indent=4)
-        except Exception:
-            content = res.content.decode("utf-8")
 
         if res.status_code != HTTPStatus.OK:
-            raise RuntimeError(f"Response ({res.status_code}):\n" f"{content}")
+            raise determine_upload_api_error(res)
         else:
-            logger.debug(f"Response ({res.status_code})\n")
-
-        if res.status_code == 200:
             log_message("Upload finished successfully!", logger)
 
     @property
@@ -418,15 +412,17 @@ class DataSet:
                 )
             self.files[path] = (path, file)
 
-    def add_dir(self, local_path, glob_exclude="", commit_message=None):
+    def add_dir(self, local_path, glob_exclude="", commit_message=None, **upload_kwargs):
         """
-        The add_dir function adds an entire directory to a DagsHub repository.
+        The add_dir function adds an entire dvc directory to a DagsHub repository.
         It does this by iterating through all the files in the given directory and uploading them one-by-one.
         The function also commits all of these changes at once, so as not to overload the API with requests.
 
 
         :param local_path  (str): Specify the local path where the dataset to upload is located
         :param glob_exclude (str): Exclude certain files from the upload process
+        :param commit_message (str): Commit message
+        :param upload_kwargs (dict): kwargs that are passed to the uploading function
         :return: None
 
         """
@@ -442,7 +438,9 @@ class DataSet:
                 folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
 
                 if commit_message is None:
-                    commit_message = f"Commit data points in folder {root}"
+                    commit_message = upload_kwargs.get("commit_message", f"Commit data points in folder {root}")
+                if "commit_message" in upload_kwargs:
+                    del upload_kwargs["commit_message"]
 
                 if len(files) > 0:
                     for filename in files:
@@ -455,12 +453,12 @@ class DataSet:
                             self.add(file=rel_file_path, path=rel_remote_file_path)
                             if len(self.files) > 49:
                                 file_counter += len(self.files)
-                                self.commit(commit_message, versioning="dvc")
+                                self.commit(commit_message, versioning="dvc", **upload_kwargs)
                                 progress.update(folder_task, advance=len(self.files))
                                 progress.update(total_task, completed=file_counter)
                     if len(self.files) > 0:
                         file_counter += len(self.files)
-                        self.commit(commit_message, versioning="dvc")
+                        self.commit(commit_message, versioning="dvc", **upload_kwargs)
                         progress.update(total_task, completed=file_counter)
                 progress.remove_task(folder_task)
 
