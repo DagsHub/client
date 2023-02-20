@@ -1,4 +1,4 @@
-setuptools
+setuptools==67.3.2
 pytest
 respx
 pytest-git
