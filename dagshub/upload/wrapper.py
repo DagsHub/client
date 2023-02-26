@@ -467,7 +467,7 @@ class DataSet:
         return posixpath.normpath(directory)
 
     @staticmethod
-    def get_file(file: Union[str, IOBase], path: os.PathLike=None) -> Tuple[os.PathLike, BinaryIO]:
+    def get_file(file: Union[str, IOBase], path: os.PathLike = None) -> Tuple[os.PathLike, BinaryIO]:
         """
         The get_file function is a helper function that takes in either a string or an IOBase object and returns
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of

@@ -47,7 +47,7 @@ class MockApi(MockRouter):
 
     def _default_endpoints_and_responses(self):
         endpoints = {
-            "repo": rf"{BASE_REGEX}/?",
+            "repo": rf"/api/v1/repos/{self.repourlpath}/?$",
             "branch": rf"{BASE_REGEX}/branches/\w+",
             "branches": rf"{BASE_REGEX}/branches",
             "list_root": rf"{BASE_REGEX}/content/{self.current_revision}/$",
@@ -67,7 +67,8 @@ class MockApi(MockRouter):
                     },
                     "name": self.reponame,
                     "full_name": self.repourlpath,
-                    "description": "Open Source Data Science (OSDS) Monocular Depth Estimation – Turn 2d photos into 3d photos – show your grandma the awesome results.",
+                    "description": "Open Source Data Science (OSDS) Monocular Depth Estimation "
+                    "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
                     "private": False,
                     "fork": False,
                     "parent": None,
@@ -200,10 +201,17 @@ class MockApi(MockRouter):
         route.mock(Response(status, json=content))
         return route
 
-    def generate_list_entry(self, path, type="file"):
+    def enable_uploads(self):
+        route = self.put(
+            name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/main/.*"
+        )
+        route.mock(Response(200))
+        return route
+
+    def generate_list_entry(self, path, entry_type="file"):
         return {
             "path": path,
-            "type": type,
+            "type": entry_type,
             "size": 0,
             "hash": "8586da76f372efa83d832a9d0e664817.dir",
             "versioning": "dvc",
