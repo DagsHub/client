@@ -47,12 +47,46 @@ class MockApi(MockRouter):
 
     def _default_endpoints_and_responses(self):
         endpoints = {
+            "repo": rf"{BASE_REGEX}/?",
             "branch": rf"{BASE_REGEX}/branches/\w+",
             "branches": rf"{BASE_REGEX}/branches",
             "list_root": rf"{BASE_REGEX}/content/{self.current_revision}/$",
         }
 
         responses = {
+            "repo": Response(
+                200,
+                json={
+                    "id": 713,
+                    "owner": {
+                        "id": 736,
+                        "login": self.user,
+                        "full_name": self.user,
+                        "avatar_url": "https://dagshub.com/avatars/736",
+                        "username": self.user,
+                    },
+                    "name": self.reponame,
+                    "full_name": self.repourlpath,
+                    "description": "Open Source Data Science (OSDS) Monocular Depth Estimation – Turn 2d photos into 3d photos – show your grandma the awesome results.",
+                    "private": False,
+                    "fork": False,
+                    "parent": None,
+                    "empty": False,
+                    "mirror": False,
+                    "size": 19987456,
+                    "html_url": f"https://dagshub.com/{self.repourlpath}",
+                    "clone_url": f"https://dagshub.com/{self.repourlpath}.git",
+                    "website": "",
+                    "stars_count": 12,
+                    "forks_count": 25,
+                    "watchers_count": 5,
+                    "open_issues_count": 6,
+                    "default_branch": "main",
+                    "created_at": "2020-08-02T15:19:07Z",
+                    "updated_at": "2023-02-01T16:06:44Z",
+                    "permissions": {"admin": False, "push": False, "pull": False},
+                },
+            ),
             "branch": Response(
                 200,
                 json={
