@@ -10,8 +10,11 @@ from functools import partial, wraps, lru_cache
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
-from typing import Optional, TypeVar, Union, Dict, Set
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple
 from urllib.parse import urlparse
+
+from httpx import Response
+
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
@@ -54,21 +57,6 @@ class dagshub_ScandirIterator:
         return self
 
 
-def cache_by_path(func):
-    cache = {}
-
-    @wraps(func)
-    def wrapper(self, path: str, include_size: bool = False):
-        if not include_size and (path, True) in cache:
-            cache[path, False] = cache[path, True]
-        if (path, include_size) not in cache:
-            cache[path, include_size] = func(self, path, include_size)
-        return cache[path, include_size]
-
-    wrapper.cache = cache
-    return wrapper
-
-
 SPECIAL_FILE = Path('.dagshub-streaming')
 
 
@@ -101,6 +89,7 @@ class DagsHubFilesystem:
                  'dagshub_remotes',
                  'token',
                  'timeout',
+                 '_listdir_cache',
                  '__weakref__')
 
     def __init__(self,
@@ -146,6 +135,8 @@ class DagsHubFilesystem:
         self.password = password or config.password
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
+
+        self._listdir_cache: Dict[Tuple[str, bool], Response] = {}
 
         response = self._api_listdir('')
         if response.status_code < 400:
@@ -506,11 +497,23 @@ class DagsHubFilesystem:
             for entry in self.__scandir(path):
                 yield entry
 
-    @cache_by_path
     def _api_listdir(self, path: str, include_size: bool = False):
-        return self.http_get(f'{self.content_api_url}/{path}',
-                             params={'include_size': 'true'} if include_size else {},
-                             headers=config.requests_headers)
+        response, hit = self._check_listdir_cache(path, include_size)
+        if hit:
+            return response
+        response = self.http_get(f'{self.content_api_url}/{path}',
+                                 params={'include_size': 'true'} if include_size else {},
+                                 headers=config.requests_headers)
+        self._listdir_cache[(path, include_size)] = response
+        return response
+
+    def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[Response], bool]:
+        # If we already have a response with side included, return that
+        if (path, True) in self._listdir_cache and not include_size:
+            self._listdir_cache[(path, False)] = self._listdir_cache[(path, True)]
+        if (path, include_size) in self._listdir_cache:
+            return self._listdir_cache[(path, include_size)], True
+        return None, False
 
     def _api_download_file_git(self, path: str):
         return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
