@@ -136,7 +136,7 @@ def upload(ctx,
            host,
            **kwargs):
     """
-    Upload FILENAME to REPO at location TARGET.
+    Upload FILENAME to REPO at location TARGET [Unlike git push, we upload your data to DagsHub once and don't sync the repo state]
     REPO should be of the form <owner>/<repo-name>, i.e nirbarazida/yolov6.
     TARGET should include the full path inside the repo, including the filename itself.
     """
