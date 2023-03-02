@@ -42,8 +42,8 @@ def http_request(method, url, **kwargs):
 def get_project_root(root):
     while not (root / '.git').is_dir():
         if ismount(root):
-            raise ValueError('No git project found! (stopped at mountpoint {root}). \
-                             Please run this command in a git repository.')
+            raise ValueError(f"No git project found! (stopped at mountpoint {root}). \
+                               Please run this command in a git repository.")
         root = root / '..'
     return Path(root)
 
