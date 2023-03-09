@@ -5,7 +5,7 @@ import urllib
 import os
 import logging
 import fnmatch
-from typing import Union
+from typing import Union, Tuple, BinaryIO, Dict
 from io import IOBase
 import httpx
 import rich.progress
@@ -388,7 +388,7 @@ class DataSet:
 
         """
 
-        self.files = {}
+        self.files: Dict[os.PathLike, Tuple[os.PathLike, BinaryIO]] = {}
         self.repo = repo
         self.directory = self._clean_directory_name(directory)
         self.request_url = self.repo.get_request_url(directory)
@@ -483,15 +483,14 @@ class DataSet:
         return posixpath.normpath(directory)
 
     @staticmethod
-    def get_file(file: Union[str, IOBase], path=None):
+    def get_file(file: Union[str, IOBase], path: os.PathLike = None) -> Tuple[os.PathLike, BinaryIO]:
         """
         The get_file function is a helper function that takes in either a string or an IOBase object and returns
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
         the file.
 
-        :param file (str):Union[str: Specify the file that you want to upload
-        :param IOBase]: Handle both file paths and file objects
-        :param path (str): Specify the path of the file
+        :param file (Union[str, IOBase]): File to upload
+        :param path (str): Desired path of the file in the repository
         :return: A tuple of the path and a file object
 
         """
@@ -521,7 +520,7 @@ class DataSet:
 
         except Exception as e:
             logger.error(e)
-            raise e
+            raise
 
     def _reset_dataset(self):
         """
@@ -529,7 +528,11 @@ class DataSet:
 
         :return: None
         """
-
+        for f in self.files.values():
+            try:
+                f[1].close()
+            except Exception as e:
+                logger.warning(f"Error closing file {f[0]}: {e}")
         self.files.clear()
 
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
