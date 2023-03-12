@@ -3,8 +3,6 @@ import os.path
 from httpx import Response
 from respx import MockRouter, Route
 
-BASE_REGEX = r"/api/v1/repos/\w+/\w+"
-
 
 class MockApi(MockRouter):
     def __init__(self, git_repo, user="user", reponame="repo", *args, **kwargs):
@@ -26,6 +24,10 @@ class MockApi(MockRouter):
         return f"{self.user}/{self.reponame}"
 
     @property
+    def repoapipath(self):
+        return f"/api/v1/repos/{self.repourlpath}"
+
+    @property
     def repophysicalpath(self):
         return str(self.git_repo.workspace)
 
@@ -39,18 +41,19 @@ class MockApi(MockRouter):
 
     @property
     def api_list_path(self):
-        return f"/api/v1/repos/{self.repourlpath}/content/{self.current_revision}"
+        return f"{self.repoapipath}/content/{self.current_revision}"
 
     @property
     def api_raw_path(self):
-        return f"/api/v1/repos/{self.repourlpath}/raw/{self.current_revision}"
+        return f"{self.repoapipath}/raw/{self.current_revision}"
 
     def _default_endpoints_and_responses(self):
         endpoints = {
-            "repo": rf"/api/v1/repos/{self.repourlpath}/?$",
-            "branch": rf"{BASE_REGEX}/branches/\w+",
-            "branches": rf"{BASE_REGEX}/branches",
-            "list_root": rf"{BASE_REGEX}/content/{self.current_revision}/$",
+            "repo": rf"{self.repoapipath}/?$",
+            "branch": rf"{self.repoapipath}/branches/\w+",
+            "branches": rf"{self.repoapipath}/branches",
+            "list_root": rf"{self.repoapipath}/content/{self.current_revision}/$",
+            "storages": rf"{self.repoapipath}/storage/?$"
         }
 
         responses = {
@@ -68,7 +71,7 @@ class MockApi(MockRouter):
                     "name": self.reponame,
                     "full_name": self.repourlpath,
                     "description": "Open Source Data Science (OSDS) Monocular Depth Estimation "
-                    "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
+                                   "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
                     "private": False,
                     "fork": False,
                     "parent": None,
@@ -177,6 +180,16 @@ class MockApi(MockRouter):
                     },
                 ],
             ),
+            "storages": Response(
+                200,
+                json=[
+                    {
+                        "name": "storage-bucket/prefix",
+                        "protocol": "s3",
+                        "list_path": f"{self.repoapipath}/storage/content/s3/storage-bucket/prefix"
+                    }
+                ]
+            )
         }
 
         return endpoints, responses

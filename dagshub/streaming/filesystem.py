@@ -10,7 +10,7 @@ from functools import partial, wraps, lru_cache
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
-from typing import Optional, TypeVar, Union, Dict, Set, Tuple
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List
 from urllib.parse import urlparse
 
 from httpx import Response
@@ -18,6 +18,7 @@ from httpx import Response
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
+from dagshub.streaming.dataclasses import Storage
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -90,6 +91,7 @@ class DagsHubFilesystem:
                  'token',
                  'timeout',
                  '_listdir_cache',
+                 '_storages',
                  '__weakref__')
 
     def __init__(self,
@@ -145,6 +147,9 @@ class DagsHubFilesystem:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
+        self._storages = self._api_storages()
+        print(self._storages)
+
     @property
     @lru_cache(maxsize=None)
     def _current_revision(self) -> str:
@@ -187,6 +192,19 @@ class DagsHubFilesystem:
     @property
     def raw_api_url(self):
         return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
+
+    @property
+    def storage_api_url(self):
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/storage")
+
+    @property
+    def storage_content_api_url(self):
+        return f"{self.storage_api_url}/content"
+
+
+    @property
+    def storage_raw_api_url(self):
+        return f"{self.storage_api_url}/raw"
 
     def is_commit_on_remote(self, sha1):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
@@ -506,6 +524,18 @@ class DagsHubFilesystem:
                                  headers=config.requests_headers)
         self._listdir_cache[(path, include_size)] = response
         return response
+
+    def _api_storages(self) -> List[Storage]:
+        response = self.http_get(self.storage_api_url)
+        res = []
+        if response.status_code >= 400:
+            logger.warning(f"Got HTTP code {response.status_code} while getting storages. Content: {response.content}")
+            logger.warning("Storages are unavailable")
+            return res
+        for a in response.json():
+            res.append(Storage(**a))
+
+        return res
 
     def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[Response], bool]:
         # If we already have a response with side included, return that
