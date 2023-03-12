@@ -153,6 +153,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "dvc",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                     {
                         "path": "b.txt",
@@ -161,6 +162,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "dvc",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                     {
                         "path": "c.txt",
@@ -169,6 +171,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "dvc",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                     {
                         "path": "a.txt.dvc",
@@ -177,6 +180,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "git",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                 ],
             ),
@@ -229,4 +233,5 @@ class MockApi(MockRouter):
             "hash": "8586da76f372efa83d832a9d0e664817.dir",
             "versioning": "dvc",
             "download_url": f"https://dagshub.com/{self.repourlpath}/raw/{self.current_revision}/{path}",
+            "content_url": f"https://dagshub.com/{self.repourlpath}/content/{self.current_revision}/{path}",
         }

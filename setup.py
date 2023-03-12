@@ -1,3 +1,4 @@
+import sys
 import setuptools
 import os.path
 
@@ -23,6 +24,23 @@ def get_version(rel_path: str) -> str:
 with open("README.md", "r", encoding="utf8") as fh:
     long_description = fh.read()
 
+install_requires=[
+    "PyYAML>=5",
+    "fusepy>=3",
+    "appdirs>=1.4.4",
+    "click>=8.0.4",
+    "httpx==0.22.0",
+    "GitPython>=3.1.29",
+    "rich[jupyter]~=13.1.0",
+    "dacite~=1.8.0",
+]
+
+# Polyfills for Python 3.7
+if sys.version_info.major == 3 and sys.version_info.minor == 7:
+    install_requires += [
+        "typing-extensions~=4.5.0",
+        "cached-property==1.5.2"
+    ]
 
 setuptools.setup(
     name="dagshub",
@@ -34,15 +52,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/DagsHub/client",
     packages=setuptools.find_packages(),
-    install_requires=[
-        "PyYAML>=5",
-        "fusepy>=3",
-        "appdirs>=1.4.4",
-        "click>=8.0.4",
-        "httpx==0.22.0",
-        "GitPython>=3.1.29",
-        "rich[jupyter]~=13.1.0",
-    ],
+    install_requires=install_requires,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

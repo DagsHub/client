@@ -1,6 +1,8 @@
+import os.path
+
 import pytest
 from pathlib import Path
-from dagshub.streaming import DagsHubFilesystem
+from dagshub.streaming.dataclasses import DagshubPath, DagshubPathType
 
 
 @pytest.mark.parametrize(
@@ -18,6 +20,6 @@ from dagshub.streaming import DagsHubFilesystem
     ],
 )
 def test_passthrough_path(path, expected):
-    path = Path(path)
-    actual = DagsHubFilesystem._passthrough_path(path)
+    path = DagshubPath(Path(os.path.abspath(path)), Path(path))
+    actual = DagshubPathType.PASSTHROUGH_PATH in path.path_type
     assert actual == expected
