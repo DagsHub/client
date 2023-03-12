@@ -18,7 +18,7 @@ from httpx import Response
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
-from dagshub.streaming.dataclasses import Storage
+from dagshub.streaming.dataclasses import StorageAPIResult, ContentAPIResult
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -138,12 +138,10 @@ class DagsHubFilesystem:
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
 
-        self._listdir_cache: Dict[Tuple[str, bool], Response] = {}
+        self._listdir_cache: Dict[Tuple[str, bool], Optional[List[ContentAPIResult]]] = {}
 
         response = self._api_listdir('')
-        if response.status_code < 400:
-            pass
-        else:
+        if response is None:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
@@ -200,7 +198,6 @@ class DagsHubFilesystem:
     @property
     def storage_content_api_url(self):
         return f"{self.storage_api_url}/content"
-
 
     @property
     def storage_raw_api_url(self):
@@ -352,7 +349,7 @@ class DagsHubFilesystem:
                  This is only for the purposes of patching pathlib.open in Python 3.9 and below.
                  Since Python 3.10 pathlib uses io.open, and in Python 3.11 they removed the accessor completely
         """
-        if dir_fd is not None:   # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
+        if dir_fd is not None:  # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
         if self._relative_path(path):
@@ -431,7 +428,7 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 resp = self._api_listdir(relative_path)
                 # FIXME: if path is file, return FileNotFound instead of the listdir error
-                if resp.status_code < 400:
+                if resp is not None:
                     self._mkdirs(relative_path, dir_fd=self.project_root_fd)
                     self.__chdir(abspath)
                 else:
@@ -462,11 +459,11 @@ class DagsHubFilesystem:
                 if relative_path == Path():
                     dircontents.add(SPECIAL_FILE.name)
                 resp = self._api_listdir(relative_path)
-                if resp.status_code < 400:
-                    dircontents.update(Path(f['path']).name for f in resp.json())
+                if resp is not None:
+                    dircontents.update(Path(f.path).name for f in resp)
                     self.remote_tree[str(relative_path)] = {
-                        Path(f["path"]).name: f["type"]
-                        for f in resp.json()
+                        Path(f.path).name: f.type
+                        for f in resp
                     }
                     res = list(dircontents)
                     if is_bytes_path_arg:
@@ -506,38 +503,38 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 pass
             resp = self._api_listdir(relative_path)
-            if resp.status_code < 400:
-                for f in resp.json():
-                    name = Path(f['path']).name
+            if resp is not None:
+                for f in resp:
+                    name = Path(f.path).name
                     if name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir', is_binary=is_bytes_path_arg)
+                        yield dagshub_DirEntry(self, path / name, f.type == 'dir', is_binary=is_bytes_path_arg)
         else:
             for entry in self.__scandir(path):
                 yield entry
 
-    def _api_listdir(self, path: str, include_size: bool = False):
+    def _api_listdir(self, path: Union[str, PathLike], include_size: bool = False) -> Optional[List[ContentAPIResult]]:
         response, hit = self._check_listdir_cache(path, include_size)
         if hit:
             return response
         response = self.http_get(f'{self.content_api_url}/{path}',
                                  params={'include_size': 'true'} if include_size else {},
                                  headers=config.requests_headers)
-        self._listdir_cache[(path, include_size)] = response
-        return response
+        if response.status_code >= 400:
+            logger.debug(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+            return None
+        res = [ContentAPIResult(**a) for a in response.json()]
+        self._listdir_cache[(path, include_size)] = res
+        return res
 
-    def _api_storages(self) -> List[Storage]:
+    def _api_storages(self) -> List[StorageAPIResult]:
         response = self.http_get(self.storage_api_url)
-        res = []
         if response.status_code >= 400:
             logger.warning(f"Got HTTP code {response.status_code} while getting storages. Content: {response.content}")
             logger.warning("Storages are unavailable")
-            return res
-        for a in response.json():
-            res.append(Storage(**a))
+            return []
+        return [StorageAPIResult(**a) for a in response.json()]
 
-        return res
-
-    def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[Response], bool]:
+    def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[List[ContentAPIResult]], bool]:
         # If we already have a response with side included, return that
         if (path, True) in self._listdir_cache and not include_size:
             self._listdir_cache[(path, False)] = self._listdir_cache[(path, True)]
