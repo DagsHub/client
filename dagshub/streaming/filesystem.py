@@ -148,7 +148,6 @@ class DagsHubFilesystem:
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
         self._storages = self._api_storages()
-        print(self._storages)
 
     @property
     @lru_cache(maxsize=None)
@@ -269,10 +268,10 @@ class DagsHubFilesystem:
             return DagshubPath(None, None)
         abspath = Path(os.path.abspath(file))
         try:
-            rel = abspath.relative_to(os.path.abspath(self.project_root))
-            if str(rel).startswith("<"):
+            relpath = abspath.relative_to(os.path.abspath(self.project_root))
+            if str(relpath).startswith("<"):
                 return DagshubPath(abspath, None)
-            return DagshubPath(abspath, rel)
+            return DagshubPath(abspath, relpath)
         except ValueError:
             return DagshubPath(abspath, None)
 

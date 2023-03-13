@@ -33,7 +33,7 @@ class ContentAPIEntry:
     # Possible values: git, dvc, bucket
     versioning: str
     download_url: str
-    content_url: str
+    content_url: Optional[str]  # TODO: remove Optional once content_url is exposed in API
 
 
 class DagshubPathType(Flag):
@@ -71,11 +71,11 @@ class DagshubPath:
             res |= DagshubPathType.PASSTHROUGH_PATH
         return res
 
-    @property
+    @cached_property
     def name(self):
         return self.absolute_path.name
 
-    @property
+    @cached_property
     def is_in_repo(self):
         return not (DagshubPathType.OUT_OF_REPO in self.path_type or DagshubPathType.UNKNOWN in self.path_type)
 
