@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import auto, Flag
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 try:
     from typing import Literal
@@ -44,18 +44,33 @@ class DagshubPathType(Flag):
     PASSTHROUGH_PATH = auto()
 
 
+storage_schemas = ["s3:/", "gs:/"]
+
 @dataclass
 class DagshubPath:
     """
     Class for handling any path used inside the virtual filesystem
 
     Attributes:
+        fs (DagsHubFilesystem): Filesystem from which this path is assigned
         absolute_path (Path): Absolute path in the system
         relative_path (Optional[Path]): Path relative to the root of the encapsulating FileSystem.
                                         If None, path is outside the FS
     """
+    # TODO: this couples this class hard to the fs, need to decouple later
+    fs: Any # Actual type is DagsHubFilesystem, but imports are wonky
     absolute_path: Optional[Path]
     relative_path: Optional[Path]
+
+    def __post_init__(self):
+        # Handle storage paths - translate s3:/bla-bla to .dagshub/storage/s3/bla-bla
+        if self.relative_path is not None:
+            str_path = self.relative_path.as_posix()
+            for storage_schema in storage_schemas:
+                if str_path.startswith(storage_schema):
+                    str_path = str_path[len(f"{storage_schema}"):]
+                    self.relative_path = Path(".dagshub/storage") / storage_schema[:-2] / str_path
+                    self.absolute_path = self.fs.project_root / self.relative_path
 
     @cached_property
     def path_type(self):

@@ -6,7 +6,7 @@ import subprocess
 import sys
 from configparser import ConfigParser
 from contextlib import contextmanager
-from functools import partial, wraps, lru_cache
+from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
@@ -24,6 +24,11 @@ from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, Dags
 PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
 if PRE_PYTHON3_11:
     from pathlib import _NormalAccessor as _pathlib  # noqa: E402
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
@@ -77,22 +82,6 @@ class DagsHubFilesystem:
     :param timeout: Timeout in seconds for HTTP requests.
         Influences all requests except for file download, which has no timeout
     """
-
-    __slots__ = ('project_root',
-                 'project_root_fd',
-                 'dvc_remote_url',
-                 'user_specified_branch',
-                 'parsed_repo_url',
-                 'remote_tree',
-                 'username',
-                 'password',
-                 'dagshub_remotes',
-                 'token',
-                 'timeout',
-                 '_listdir_cache',
-                 '_storages',
-                 '_dotfolder',
-                 '__weakref__')
 
     def __init__(self,
                  project_root: Optional[PathLike] = None,
@@ -149,8 +138,7 @@ class DagsHubFilesystem:
 
         self._storages = self._api_storages()
 
-    @property
-    @lru_cache(maxsize=None)
+    @cached_property
     def _current_revision(self) -> str:
         """
         Gets current revision on repo:
@@ -263,17 +251,17 @@ class DagsHubFilesystem:
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
         if isinstance(file, int):
-            return DagshubPath(None, None)
+            return DagshubPath(self, None, None)
         if file == "":
-            return DagshubPath(None, None)
+            return DagshubPath(self, None, None)
         abspath = Path(os.path.abspath(file))
         try:
             relpath = abspath.relative_to(os.path.abspath(self.project_root))
             if str(relpath).startswith("<"):
-                return DagshubPath(abspath, None)
-            return DagshubPath(abspath, relpath)
+                return DagshubPath(self, abspath, None)
+            return DagshubPath(self, abspath, relpath)
         except ValueError:
-            return DagshubPath(abspath, None)
+            return DagshubPath(self, abspath, None)
 
 
     def _special_file(self):
@@ -357,11 +345,11 @@ class DagsHubFilesystem:
                 if not (flags & os.O_RDONLY):
                     open_mode = "a"
                 logger.debug("fs.os_open - trying to materialize path")
-                self.open(path, mode=open_mode).close()
+                self.open(path.relative_path, mode=open_mode).close()
                 logger.debug("fs.os_open - successfully materialized path")
             except FileNotFoundError:
                 logger.debug("fs.os_open - failed to materialize path, os.open will throw")
-        return os.open(path, flags, mode, dir_fd=dir_fd)
+        return os.open(path.relative_path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
