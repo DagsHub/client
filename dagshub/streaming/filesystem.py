@@ -477,20 +477,15 @@ class DagsHubFilesystem:
             path = Path(str_path)
             local_filenames = set()
             try:
-                if parsed_path.relative_path == Path():
-                    if SPECIAL_FILE.name not in local_filenames:
-                        yield dagshub_DirEntry(self, self.project_root / SPECIAL_FILE,
-                                               is_directory=False, is_binary=is_bytes_path_arg)
-                    if self._dotfolder.name not in local_filenames:
-                        yield dagshub_DirEntry(self, self._dotfolder,
-                                               is_directory=True, is_binary=is_bytes_path_arg)
-                elif self._dotfolder in parsed_path.relative_path.resolve().parents:
-                    print("RELATIVE PATH")
                 for direntry in self.__scandir(path):
                     local_filenames.add(direntry.name)
                     yield direntry
             except FileNotFoundError:
                 pass
+            for special_entry in self._get_special_paths(parsed_path, path, is_bytes_path_arg):
+                if special_entry.path not in local_filenames:
+                    yield special_entry
+            # Mix in the results from the API
             resp = self._api_listdir(parsed_path.relative_path)
             if resp is not None:
                 for f in resp:
@@ -500,6 +495,30 @@ class DagsHubFilesystem:
         else:
             for entry in self.__scandir(path):
                 yield entry
+
+    def _get_special_paths(self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool) -> Set["dagshub_DirEntry"]:
+        def generate_entry(path, is_directory):
+            if isinstance(path, str):
+                path = Path(path)
+            return dagshub_DirEntry(self, relative_to / path,
+                                    is_directory=is_directory, is_binary=is_binary)
+        has_storages = len(self._storages) > 0
+        res = set()
+        str_path = dh_path.relative_path.as_posix()
+        if str_path == ".":
+            res.add(generate_entry(SPECIAL_FILE, False))
+            if has_storages:
+                res.add(generate_entry(".dagshub", True))
+        elif str_path.startswith(".dagshub") and has_storages:
+            storage_paths = [s.path_in_mount for s in self._storages]
+            for sp in storage_paths:
+                try:
+                    relpath = sp.relative_to(dh_path.relative_path)
+                    if relpath != Path():
+                        res.add(generate_entry(relpath.parts[0], True))
+                except ValueError:
+                    continue
+        return res
 
     def _api_listdir(self, path: Union[str, PathLike], include_size: bool = False) -> Optional[List[ContentAPIEntry]]:
         response, hit = self._check_listdir_cache(path, include_size)

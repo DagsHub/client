@@ -23,6 +23,10 @@ class StorageAPIEntry:
     def full_path(self):
         return f"{self.protocol}/{self.name}"
 
+    @property
+    def path_in_mount(self) -> Path:
+        return Path(".dagshub/storage") / self.protocol / self.name
+
 @dataclass
 class ContentAPIEntry:
     path: str
