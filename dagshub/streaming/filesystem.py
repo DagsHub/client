@@ -131,7 +131,8 @@ class DagsHubFilesystem:
 
         self._dotfolder = self.project_root / ".dagshub"
 
-        response = self._api_listdir('')
+        # Check that the repo is accessible by accessing the content root
+        response = self._api_listdir(DagshubPath(self, self.project_root, Path()))
         if response is None:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
@@ -263,7 +264,6 @@ class DagsHubFilesystem:
         except ValueError:
             return DagshubPath(self, abspath, None)
 
-
     def _special_file(self):
         # TODO Include more information in this file
         return b'v0\n'
@@ -289,7 +289,7 @@ class DagsHubFilesystem:
                 except FileNotFoundError as err:
                     # Open for reading - try to download the file
                     if "r" in mode:
-                        resp = self._api_download_file_git(path.relative_path)
+                        resp = self._api_download_file_git(path)
                         if resp.status_code < 400:
                             self._mkdirs(path.relative_path.parent, dir_fd=self.project_root_fd)
                             # TODO: Handle symlinks
@@ -409,7 +409,7 @@ class DagsHubFilesystem:
             try:
                 self.__chdir(parsed_path.absolute_path)
             except FileNotFoundError:
-                resp = self._api_listdir(parsed_path.relative_path)
+                resp = self._api_listdir(parsed_path)
                 # FIXME: if path is file, return FileNotFound instead of the listdir error
                 if resp is not None:
                     self._mkdirs(parsed_path.relative_path, dir_fd=self.project_root_fd)
@@ -439,10 +439,9 @@ class DagsHubFilesystem:
                         dircontents.update(self.__listdir(fd))
                 except FileNotFoundError as e:
                     error = e
-                if parsed_path.relative_path == Path():
-                    dircontents.add(SPECIAL_FILE.name)
-                    dircontents.add(self._dotfolder.name)
-                resp = self._api_listdir(parsed_path.relative_path)
+                dircontents.update(
+                    special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
+                resp = self._api_listdir(parsed_path)
                 if resp is not None:
                     dircontents.update(Path(f.path).name for f in resp)
                     self.remote_tree[str(parsed_path.relative_path)] = {
@@ -486,7 +485,7 @@ class DagsHubFilesystem:
                 if special_entry.path not in local_filenames:
                     yield special_entry
             # Mix in the results from the API
-            resp = self._api_listdir(parsed_path.relative_path)
+            resp = self._api_listdir(parsed_path)
             if resp is not None:
                 for f in resp:
                     name = Path(f.path).name
@@ -496,12 +495,14 @@ class DagsHubFilesystem:
             for entry in self.__scandir(path):
                 yield entry
 
-    def _get_special_paths(self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool) -> Set["dagshub_DirEntry"]:
+    def _get_special_paths(self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool) -> Set[
+        "dagshub_DirEntry"]:
         def generate_entry(path, is_directory):
             if isinstance(path, str):
                 path = Path(path)
             return dagshub_DirEntry(self, relative_to / path,
                                     is_directory=is_directory, is_binary=is_binary)
+
         has_storages = len(self._storages) > 0
         res = set()
         str_path = dh_path.relative_path.as_posix()
@@ -520,11 +521,11 @@ class DagsHubFilesystem:
                     continue
         return res
 
-    def _api_listdir(self, path: Union[str, PathLike], include_size: bool = False) -> Optional[List[ContentAPIEntry]]:
-        response, hit = self._check_listdir_cache(path, include_size)
+    def _api_listdir(self, path: DagshubPath, include_size: bool = False) -> Optional[List[ContentAPIEntry]]:
+        response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
         if hit:
             return response
-        response = self.http_get(f'{self.content_api_url}/{path}',
+        response = self.http_get(path.content_url,
                                  params={'include_size': 'true'} if include_size else {},
                                  headers=config.requests_headers)
         if response.status_code >= 400:
@@ -537,7 +538,7 @@ class DagsHubFilesystem:
             if entry.type == "storage":
                 continue
             res.append(entry)
-        self._listdir_cache[(path, include_size)] = res
+        self._listdir_cache[(path.relative_path.as_posix(), include_size)] = res
         return res
 
     def _api_storages(self) -> List[StorageAPIEntry]:
@@ -556,8 +557,8 @@ class DagsHubFilesystem:
             return self._listdir_cache[(path, include_size)], True
         return None, False
 
-    def _api_download_file_git(self, path: str):
-        return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
+    def _api_download_file_git(self, path: DagshubPath):
+        return self.http_get(path.raw_url, headers=config.requests_headers, timeout=None)
 
     def http_get(self, path: str, **kwargs):
         timeout = self.timeout

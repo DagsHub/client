@@ -19,11 +19,11 @@ class StorageAPIEntry:
     protocol: str
     list_path: str
 
-    @property
+    @cached_property
     def full_path(self):
         return f"{self.protocol}/{self.name}"
 
-    @property
+    @cached_property
     def path_in_mount(self) -> Path:
         return Path(".dagshub/storage") / self.protocol / self.name
 
@@ -97,6 +97,29 @@ class DagshubPath:
     @cached_property
     def is_in_repo(self):
         return not (DagshubPathType.OUT_OF_REPO in self.path_type or DagshubPathType.UNKNOWN in self.path_type)
+
+    @property
+    def content_url(self):
+        if not self.is_in_repo:
+            raise RuntimeError(f"Can't access path {self.absolute_path} outside of repo")
+        str_path = self.relative_path.as_posix()
+        if DagshubPathType.STORAGE_PATH in self.path_type:
+            path_to_access = str_path[len(".dagshub/storage/"):]
+            return f"{self.fs.storage_content_api_url}/{path_to_access}"
+        return f"{self.fs.content_api_url}/{str_path}"
+
+
+    @property
+    def raw_url(self):
+        if not self.is_in_repo:
+            raise RuntimeError(f"Can't access path {self.absolute_path} outside of repo")
+        str_path = self.relative_path.as_posix()
+        if DagshubPathType.STORAGE_PATH in self.path_type:
+            path_to_access = str_path[len(".dagshub/storage/"):]
+            return f"{self.fs.storage_raw_api_url}/{path_to_access}"
+        return f"{self.fs.raw_api_url}/{str_path}"
+
+
 
     def _is_storage_path(self):
         return self.relative_path.as_posix().startswith(".dagshub/storage")

@@ -1,9 +1,9 @@
 import pytest
-import dagshub
+from dagshub.streaming import install_hooks, uninstall_hooks
 
 
 @pytest.fixture
 def repo_with_hooks(dagshub_repo):
-    dagshub.streaming.install_hooks()
+    install_hooks()
     yield dagshub_repo
-    dagshub.streaming.uninstall_hooks()
+    uninstall_hooks()

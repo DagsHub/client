@@ -24,8 +24,16 @@ def test_open_nested_path(mock_api, repo_with_hooks):
     mock_api.add_file(path, content)
     with open(path, "rb") as f:
         assert f.read() == content
-    print(os.path.dirname(path))
     assert os.path.exists(os.path.dirname(path))
+
+def test_open_nested_storage(mock_api, repo_with_hooks):
+    path = "nested/path/a.txt"
+    content = b"Hello, streaming world!"
+    mock_api.add_file(path, content, is_storage=True)
+    actual_path = f".dagshub/storage/s3/{mock_api.storage_bucket_path}/{path}"
+    with open(actual_path, "rb") as f:
+        assert f.read() == content
+    assert os.path.exists(os.path.dirname(actual_path))
 
 
 def test_open_for_write(mock_api, repo_with_hooks):

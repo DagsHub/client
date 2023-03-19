@@ -11,6 +11,8 @@ class MockApi(MockRouter):
         self.reponame = reponame
         self.git_repo = git_repo
 
+        self.storage_bucket_path = "storage-bucket/prefix"
+
         self._endpoints, self._responses = self._default_endpoints_and_responses()
         route_dict = {
             k: (self._endpoints[k], self._responses[k]) for k in self._endpoints
@@ -46,6 +48,14 @@ class MockApi(MockRouter):
     @property
     def api_raw_path(self):
         return f"{self.repoapipath}/raw/{self.current_revision}"
+
+    @property
+    def api_storage_list_path(self):
+        return f"{self.repoapipath}/storage/content/s3/{self.storage_bucket_path}"
+
+    @property
+    def api_storage_raw_path(self):
+        return f"{self.repoapipath}/storage/raw/s3/{self.storage_bucket_path}"
 
     def _default_endpoints_and_responses(self):
         endpoints = {
@@ -188,9 +198,9 @@ class MockApi(MockRouter):
                 200,
                 json=[
                     {
-                        "name": "storage-bucket/prefix",
+                        "name": self.storage_bucket_path,
                         "protocol": "s3",
-                        "list_path": f"{self.repoapipath}/storage/content/s3/storage-bucket/prefix"
+                        "list_path": f"{self.repoapipath}/storage/content/s3/{self.storage_bucket_path}"
                     }
                 ]
             )
@@ -198,29 +208,35 @@ class MockApi(MockRouter):
 
         return endpoints, responses
 
-    def add_file(self, path, content="aaa", status=200) -> Route:
+    def add_file(self, path, content="aaa", status=200, is_storage=False) -> Route:
         """
         Add a file to the api (only accessible via the raw endpoint)
         """
-        route = self.route(url=f"{self.api_raw_path}/{path}")
+        if is_storage:
+            route = self.route(url=f"{self.api_storage_raw_path}/{path}")
+        else:
+            route = self.route(url=f"{self.api_raw_path}/{path}")
         route.mock(Response(status, content=content))
         return route
 
-    def add_dir(self, path, contents=[], status=200) -> Route:
+    def add_dir(self, path, contents=[], status=200, is_storage=False) -> Route:
         """
         Add a directory to the api (only accessible via the content endpoint)
         We don't keep a tree of added dirs, so it's not dynamic
         """
-        route = self.route(url=f"{self.api_list_path}/{path}")
+        if is_storage:
+            route = self.route(url=f"{self.api_storage_list_path}/{path}")
+        else:
+            route = self.route(url=f"{self.api_list_path}/{path}")
         content = [
             self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
         ]
         route.mock(Response(status, json=content))
         return route
 
-    def enable_uploads(self):
+    def enable_uploads(self, branch="main"):
         route = self.put(
-            name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/main/.*"
+            name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/{branch}/.*"
         )
         route.mock(Response(200))
         return route
