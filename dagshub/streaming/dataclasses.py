@@ -13,6 +13,7 @@ try:
 except ImportError:
     from cached_property import cached_property
 
+
 @dataclass
 class StorageAPIEntry:
     name: str
@@ -26,6 +27,7 @@ class StorageAPIEntry:
     @cached_property
     def path_in_mount(self) -> Path:
         return Path(".dagshub/storage") / self.protocol / self.name
+
 
 @dataclass
 class ContentAPIEntry:
@@ -50,6 +52,7 @@ class DagshubPathType(Flag):
 
 storage_schemas = ["s3:/", "gs:/"]
 
+
 @dataclass
 class DagshubPath:
     """
@@ -62,7 +65,7 @@ class DagshubPath:
                                         If None, path is outside the FS
     """
     # TODO: this couples this class hard to the fs, need to decouple later
-    fs: Any # Actual type is DagsHubFilesystem, but imports are wonky
+    fs: Any  # Actual type is DagsHubFilesystem, but imports are wonky
     absolute_path: Optional[Path]
     relative_path: Optional[Path]
 
@@ -108,7 +111,6 @@ class DagshubPath:
             return f"{self.fs.storage_content_api_url}/{path_to_access}"
         return f"{self.fs.content_api_url}/{str_path}"
 
-
     @property
     def raw_url(self):
         if not self.is_in_repo:
@@ -119,8 +121,6 @@ class DagshubPath:
             return f"{self.fs.storage_raw_api_url}/{path_to_access}"
         return f"{self.fs.raw_api_url}/{str_path}"
 
-
-
     def _is_storage_path(self):
         return self.relative_path.as_posix().startswith(".dagshub/storage")
 
@@ -129,4 +129,3 @@ class DagshubPath:
         if "/site-packages/" in str_path:
             return True
         return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
-

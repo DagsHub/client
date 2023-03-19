@@ -30,6 +30,7 @@ def test_listdir_includes_local_files(mock_api, repo_with_hooks):
         actual = os.listdir(".")
         assert set(expected) == set(actual)
 
+
 def test_has_storage_bucket_paths(mock_api, repo_with_hooks):
     bucket_path = mock_api.storage_bucket_path
     bucket_path_elems = bucket_path.split("/")
@@ -54,6 +55,7 @@ def test_lists_bucket_folder(mock_api, repo_with_hooks):
     actual = os.listdir(f".dagshub/storage/s3/{mock_api.storage_bucket_path}/{path}")
     expected = [f[0] for f in files]
     assert set(actual) == set(expected)
+
 
 def test_binary(mock_api, repo_with_hooks):
     files = [("a.txt", "file"), ("b.txt", "file"), ("dir1", "dir")]

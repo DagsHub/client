@@ -472,7 +472,7 @@ class DagsHubFilesystem:
         else:
             str_path = path
         parsed_path = self._parse_path(str_path)
-        if parsed_path.is_in_repo and not DagshubPathType.PASSTHROUGH_PATH in parsed_path.path_type:
+        if parsed_path.is_in_repo and DagshubPathType.PASSTHROUGH_PATH not in parsed_path.path_type:
             path = Path(str_path)
             local_filenames = set()
             try:
@@ -495,8 +495,8 @@ class DagsHubFilesystem:
             for entry in self.__scandir(path):
                 yield entry
 
-    def _get_special_paths(self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool) -> Set[
-        "dagshub_DirEntry"]:
+    def _get_special_paths(self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool) -> \
+        Set["dagshub_DirEntry"]:
         def generate_entry(path, is_directory):
             if isinstance(path, str):
                 path = Path(path)

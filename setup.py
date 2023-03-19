@@ -24,7 +24,7 @@ def get_version(rel_path: str) -> str:
 with open("README.md", "r", encoding="utf8") as fh:
     long_description = fh.read()
 
-install_requires=[
+install_requires = [
     "PyYAML>=5",
     "fusepy>=3",
     "appdirs>=1.4.4",

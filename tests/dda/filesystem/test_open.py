@@ -26,6 +26,7 @@ def test_open_nested_path(mock_api, repo_with_hooks):
         assert f.read() == content
     assert os.path.exists(os.path.dirname(path))
 
+
 def test_open_nested_storage(mock_api, repo_with_hooks):
     path = "nested/path/a.txt"
     content = b"Hello, streaming world!"
