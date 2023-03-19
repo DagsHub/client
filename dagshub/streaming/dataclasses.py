@@ -4,11 +4,6 @@ from pathlib import Path
 from typing import Optional, Any
 
 try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
-
-try:
     from functools import cached_property
 except ImportError:
     from cached_property import cached_property

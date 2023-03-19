@@ -495,8 +495,9 @@ class DagsHubFilesystem:
             for entry in self.__scandir(path):
                 yield entry
 
-    def _get_special_paths(self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool) -> \
-        Set["dagshub_DirEntry"]:
+    def _get_special_paths(
+        self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool
+    ) -> Set["dagshub_DirEntry"]:
         def generate_entry(path, is_directory):
             if isinstance(path, str):
                 path = Path(path)

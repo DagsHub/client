@@ -38,7 +38,6 @@ install_requires = [
 # Polyfills for Python 3.7
 if sys.version_info.major == 3 and sys.version_info.minor == 7:
     install_requires += [
-        "typing-extensions~=4.5.0",
         "cached-property==1.5.2"
     ]
 
