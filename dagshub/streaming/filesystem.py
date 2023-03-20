@@ -129,8 +129,6 @@ class DagsHubFilesystem:
 
         self._listdir_cache: Dict[Tuple[str, bool], Optional[List[ContentAPIEntry]]] = {}
 
-        self._dotfolder = self.project_root / ".dagshub"
-
         # Check that the repo is accessible by accessing the content root
         response = self._api_listdir(DagshubPath(self, self.project_root, Path()))
         if response is None:
