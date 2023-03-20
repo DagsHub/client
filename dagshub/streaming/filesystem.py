@@ -18,6 +18,7 @@ from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
 from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath, DagshubPathType
+from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -83,8 +84,11 @@ class DagsHubFilesystem:
         Influences all requests except for file download, which has no timeout
     """
 
+    # Keyed by combination of Path where it's mounted + "user/repo"
+    already_mounted_filesystems: Dict[Tuple[Path, str], 'DagsHubFilesystem'] = {}
+
     def __init__(self,
-                 project_root: Optional[PathLike] = None,
+                 project_root: Optional['PathLike | str'] = None,
                  repo_url: Optional[str] = None,
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
@@ -128,6 +132,8 @@ class DagsHubFilesystem:
         self.timeout = timeout or config.http_timeout
 
         self._listdir_cache: Dict[Tuple[str, bool], Optional[List[ContentAPIEntry]]] = {}
+
+        self.check_project_root_use()
 
         # Check that the repo is accessible by accessing the content root
         response = self._api_listdir(DagshubPath(self, self.project_root, Path()))
@@ -196,6 +202,17 @@ class DagsHubFilesystem:
         resp = self.http_get(url)
         return resp.status_code == 200
 
+    def check_project_root_use(self):
+        """
+        Checks that there's no other filesystem being mounted at the current project root
+        If there is one, throw an error
+        """
+        key = (self.project_root, self.parsed_repo_url.path)
+        f = DagsHubFilesystem.already_mounted_filesystems.get(key, None)
+        if f is not None and f._current_revision != self._current_revision:
+            raise FilesystemAlreadyMountedError(self.project_root, f._current_revision)
+        DagsHubFilesystem.already_mounted_filesystems[key] = self
+
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
         resp = self.http_get(url)
@@ -247,6 +264,13 @@ class DagsHubFilesystem:
 
     def __del__(self):
         os.close(self.project_root_fd)
+        self.cleanup()
+
+    def cleanup(self):
+        # Remove from map of mounted filesystems
+        key = (self.project_root, self.parsed_repo_url.path)
+        if key in DagsHubFilesystem.already_mounted_filesystems:
+            del(DagsHubFilesystem.already_mounted_filesystems[key])
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
         if isinstance(file, int):
