@@ -2,9 +2,11 @@ from pathlib import Path
 
 
 class FilesystemAlreadyMountedError(Exception):
-    def __init__(self, path: Path, revision: str):
+    def __init__(self, path: Path, repo: str, revision: str):
         self.path = path
+        self.repo = repo
         self.revision = revision
 
     def __str__(self):
-        return f"Filesystem bound to revision \"{self.revision}\" is already mounted at path {self.path.absolute()}"
+        return f"There is already a filesystem mounted at path {self.path.absolute()} ({self.repo} revision {self.revision})" \
+               f"\ndel() the filesystem object in use if you want to switch the mounted filesystem"

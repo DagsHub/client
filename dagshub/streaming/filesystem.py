@@ -84,8 +84,8 @@ class DagsHubFilesystem:
         Influences all requests except for file download, which has no timeout
     """
 
-    # Keyed by combination of Path where it's mounted + "user/repo"
-    already_mounted_filesystems: Dict[Tuple[Path, str], 'DagsHubFilesystem'] = {}
+    already_mounted_filesystems: Dict[Path, 'DagsHubFilesystem'] = {}
+    hooked_instance: Optional['DagsHubFilesystem'] = None
 
     def __init__(self,
                  project_root: Optional['PathLike | str'] = None,
@@ -207,11 +207,18 @@ class DagsHubFilesystem:
         Checks that there's no other filesystem being mounted at the current project root
         If there is one, throw an error
         """
-        key = (self.project_root, self.parsed_repo_url.path)
-        f = DagsHubFilesystem.already_mounted_filesystems.get(key, None)
-        if f is not None and f._current_revision != self._current_revision:
-            raise FilesystemAlreadyMountedError(self.project_root, f._current_revision)
-        DagsHubFilesystem.already_mounted_filesystems[key] = self
+
+        def is_subpath(a: Path, b: Path) -> bool:
+            # Checks if either a or b are subpaths of each other
+            a_str = a.as_posix()
+            b_str = b.as_posix()
+            return a_str.startswith(b_str) or b_str.startswith(a_str)
+
+        for p, f in DagsHubFilesystem.already_mounted_filesystems.items():
+            if is_subpath(p, self.project_root):
+                raise FilesystemAlreadyMountedError(self.project_root, f.parsed_repo_url.path[1:], f._current_revision)
+
+        DagsHubFilesystem.already_mounted_filesystems[self.project_root] = self
 
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
@@ -268,9 +275,8 @@ class DagsHubFilesystem:
 
     def cleanup(self):
         # Remove from map of mounted filesystems
-        key = (self.project_root, self.parsed_repo_url.path)
-        if key in DagsHubFilesystem.already_mounted_filesystems:
-            del(DagsHubFilesystem.already_mounted_filesystems[key])
+        if self.project_root in DagsHubFilesystem.already_mounted_filesystems:
+            DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
         if isinstance(file, int):
@@ -621,7 +627,7 @@ class DagsHubFilesystem:
             _pathlib.listdir = self.listdir
             _pathlib.scandir = self.scandir
 
-        self.__class__.hooked_instance = self
+        DagsHubFilesystem.hooked_instance = self
 
     @classmethod
     def uninstall_hooks(cls):
@@ -636,6 +642,9 @@ class DagsHubFilesystem:
                 _pathlib.stat = cls.__unpatched['stat']
                 _pathlib.listdir = cls.__unpatched['listdir']
                 _pathlib.scandir = cls.__unpatched['scandir']
+        if DagsHubFilesystem.hooked_instance is not None:
+            DagsHubFilesystem.hooked_instance.cleanup()
+            DagsHubFilesystem.hooked_instance = None
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:
