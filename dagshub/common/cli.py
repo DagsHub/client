@@ -13,10 +13,11 @@ from urllib.parse import urlparse
 
 import dagshub.auth
 import dagshub.common.logging
-from dagshub import init
+from dagshub import init, __version__
 from dagshub.common import config, rich_console
 from dagshub.upload import create_repo, Repo
 from dagshub.common.helpers import http_request, log_message
+from dagshub.upload.errors import UpdateNotAllowedError
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
 
@@ -26,7 +27,7 @@ from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 @click.pass_context
 def cli(ctx, host, quiet):
     dagshub.common.logging.init_logger()
-    ctx.obj = {"host": host.strip("/"), "quiet": quiet}
+    ctx.obj = {"host": host.strip("/"), "quiet": quiet or config.quiet}
 
 
 @cli.command()
@@ -60,6 +61,9 @@ def mount(ctx, verbose, quiet, **kwargs):
 @cli.group()
 @click.pass_context
 def setup(ctx):
+    """
+    Initialize additional functionality in the current repository
+    """
     pass
 
 
@@ -71,6 +75,9 @@ def setup(ctx):
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
+    """
+    Initialize dvc
+    """
     host = host or ctx.obj["host"]
     config.quiet = quiet or ctx.obj["quiet"]
     init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=True)
@@ -119,7 +126,7 @@ def to_log_level(verbosity):
 @click.argument("target")
 @click.option("-m", "--message", help="Commit message for the upload")
 @click.option("-b", "--branch", help="Branch to upload the file to")
-@click.option("--update", is_flag=True, help="Force update an existing file")
+@click.option("--update", is_flag=True, help="Force update existing files/directories")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
@@ -149,7 +156,19 @@ def upload(ctx,
 
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
-    repo.upload(file=filename, path=target, commit_message=message, force=update)
+    try:
+        repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update)
+    except UpdateNotAllowedError:
+        log_message(":warning: You're trying to update existing files! :warning:\n"
+                    "If you want to do that, retry with --update to force the update", logger)
+
+
+@cli.command()
+def version():
+    """
+    Prints the current installed version of the DagsHub client
+    """
+    print(__version__)
 
 
 @cli.group()

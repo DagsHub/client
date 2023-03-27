@@ -17,7 +17,7 @@ import dacite
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
-from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath, DagshubPathType
+from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath
 from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
@@ -131,7 +131,7 @@ class DagsHubFilesystem:
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
 
-        self._listdir_cache: Dict[Tuple[str, bool], Optional[List[ContentAPIEntry]]] = {}
+        self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
 
         self.check_project_root_use()
 
@@ -305,7 +305,7 @@ class DagsHubFilesystem:
             if opener is not None:
                 raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
-            if DagshubPathType.PASSTHROUGH_PATH in path.path_type:
+            if path.is_passthrough_path:
                 return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                    closefd, opener=project_root_opener)
             elif path.relative_path == SPECIAL_FILE:
@@ -389,7 +389,7 @@ class DagsHubFilesystem:
         # todo: remove False
         if parsed_path.is_in_repo:
             logger.debug("fs.stat - is relative path")
-            if DagshubPathType.PASSTHROUGH_PATH in parsed_path.path_type:
+            if parsed_path.is_passthrough_path:
                 return self.__stat(parsed_path.relative_path, dir_fd=self.project_root_fd)
             elif parsed_path.relative_path == SPECIAL_FILE:
                 return dagshub_stat_result(self, path, is_directory=False, custom_size=len(self._special_file()))
@@ -456,7 +456,7 @@ class DagsHubFilesystem:
             str_path = path
         parsed_path = self._parse_path(str_path)
         if parsed_path.is_in_repo:
-            if DagshubPathType.PASSTHROUGH_PATH in parsed_path.path_type:
+            if parsed_path.is_passthrough_path:
                 with self._open_fd(parsed_path.relative_path) as fd:
                     return self.__listdir(fd)
             else:
@@ -500,7 +500,7 @@ class DagsHubFilesystem:
         else:
             str_path = path
         parsed_path = self._parse_path(str_path)
-        if parsed_path.is_in_repo and DagshubPathType.PASSTHROUGH_PATH not in parsed_path.path_type:
+        if parsed_path.is_in_repo and not parsed_path.is_passthrough_path:
             path = Path(str_path)
             local_filenames = set()
             try:
@@ -554,7 +554,7 @@ class DagsHubFilesystem:
         response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
         if hit:
             return response
-        response = self.http_get(path.content_url,
+        response = self.http_get(self._content_url_for_path(path),
                                  params={'include_size': 'true'} if include_size else {},
                                  headers=config.requests_headers)
         if response.status_code >= 400:
@@ -567,7 +567,7 @@ class DagsHubFilesystem:
             if entry.type == "storage":
                 continue
             res.append(entry)
-        self._listdir_cache[(path.relative_path.as_posix(), include_size)] = res
+        self._listdir_cache[path.relative_path.as_posix()] = (res, include_size)
         return res
 
     def _api_storages(self) -> List[StorageAPIEntry]:
@@ -576,18 +576,37 @@ class DagsHubFilesystem:
             logger.warning(f"Got HTTP code {response.status_code} while getting storages. Content: {response.content}")
             logger.warning("Storages are unavailable")
             return []
-        return [dacite.from_dict(StorageAPIEntry, a) for a in response.json()]
+        return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in response.json()]
 
     def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[List[ContentAPIEntry]], bool]:
-        # If we already have a response with side included, return that
-        if (path, True) in self._listdir_cache and not include_size:
-            self._listdir_cache[(path, False)] = self._listdir_cache[(path, True)]
-        if (path, include_size) in self._listdir_cache:
-            return self._listdir_cache[(path, include_size)], True
+        # Checks that path has a pre-cached response
+        # If include_size is True, but only a response without size is cached, that's a cache miss
+        if path in self._listdir_cache:
+            cache_val, with_size = self._listdir_cache[path]
+            if not include_size or (include_size and with_size):
+                return cache_val, True
         return None, False
 
+    def _content_url_for_path(self, path: DagshubPath):
+        if not path.is_in_repo:
+            raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
+        str_path = path.relative_path.as_posix()
+        if path.is_storage_path:
+            path_to_access = str_path[len(".dagshub/storage/"):]
+            return f"{self.storage_content_api_url}/{path_to_access}"
+        return f"{self.content_api_url}/{str_path}"
+
+    def _raw_url_for_path(self, path: DagshubPath):
+        if not path.is_in_repo:
+            raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
+        str_path = path.relative_path.as_posix()
+        if path.is_storage_path:
+            path_to_access = str_path[len(".dagshub/storage/"):]
+            return f"{self.storage_raw_api_url}/{path_to_access}"
+        return f"{self.raw_api_url}/{str_path}"
+
     def _api_download_file_git(self, path: DagshubPath):
-        return self.http_get(path.raw_url, headers=config.requests_headers, timeout=None)
+        return self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)
 
     def http_get(self, path: str, **kwargs):
         timeout = self.timeout
