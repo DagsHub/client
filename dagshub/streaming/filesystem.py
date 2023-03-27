@@ -6,21 +6,29 @@ import subprocess
 import sys
 from configparser import ConfigParser
 from contextlib import contextmanager
-from functools import partial, wraps, lru_cache
+from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
-from typing import Optional, TypeVar, Union, Dict, Set
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List
 from urllib.parse import urlparse
+import dacite
+
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
+from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
 PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
 if PRE_PYTHON3_11:
     from pathlib import _NormalAccessor as _pathlib  # noqa: E402
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
@@ -54,22 +62,7 @@ class dagshub_ScandirIterator:
         return self
 
 
-def cache_by_path(func):
-    cache = {}
-
-    @wraps(func)
-    def wrapper(self, path: str, include_size: bool = False):
-        if not include_size and (path, True) in cache:
-            cache[path, False] = cache[path, True]
-        if (path, include_size) not in cache:
-            cache[path, include_size] = func(self, path, include_size)
-        return cache[path, include_size]
-
-    wrapper.cache = cache
-    return wrapper
-
-
-SPECIAL_FILE = Path('.dagshub-streaming')
+SPECIAL_FILE = Path(".dagshub-streaming")
 
 
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
@@ -89,19 +82,6 @@ class DagsHubFilesystem:
     :param timeout: Timeout in seconds for HTTP requests.
         Influences all requests except for file download, which has no timeout
     """
-
-    __slots__ = ('project_root',
-                 'project_root_fd',
-                 'dvc_remote_url',
-                 'user_specified_branch',
-                 'parsed_repo_url',
-                 'remote_tree',
-                 'username',
-                 'password',
-                 'dagshub_remotes',
-                 'token',
-                 'timeout',
-                 '__weakref__')
 
     def __init__(self,
                  project_root: Optional[PathLike] = None,
@@ -147,15 +127,17 @@ class DagsHubFilesystem:
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
 
-        response = self._api_listdir('')
-        if response.status_code < 400:
-            pass
-        else:
+        self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
+
+        # Check that the repo is accessible by accessing the content root
+        response = self._api_listdir(DagshubPath(self, self.project_root, Path()))
+        if response is None:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
-    @property
-    @lru_cache(maxsize=None)
+        self._storages = self._api_storages()
+
+    @cached_property
     def _current_revision(self) -> str:
         """
         Gets current revision on repo:
@@ -196,6 +178,18 @@ class DagsHubFilesystem:
     @property
     def raw_api_url(self):
         return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
+
+    @property
+    def storage_api_url(self):
+        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/storage")
+
+    @property
+    def storage_content_api_url(self):
+        return f"{self.storage_api_url}/content"
+
+    @property
+    def storage_raw_api_url(self):
+        return f"{self.storage_api_url}/raw"
 
     def is_commit_on_remote(self, sha1):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
@@ -254,26 +248,19 @@ class DagsHubFilesystem:
     def __del__(self):
         os.close(self.project_root_fd)
 
-    def _relative_path(self, file: Union[str, PathLike, int]):
+    def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
         if isinstance(file, int):
-            return None
+            return DagshubPath(self, None, None)
         if file == "":
-            return None
-        path = os.path.abspath(file)
+            return DagshubPath(self, None, None)
+        abspath = Path(os.path.abspath(file))
         try:
-            rel = Path(path).relative_to(os.path.abspath(self.project_root))
-            if str(rel).startswith("<"):
-                return None
-            return rel
+            relpath = abspath.relative_to(os.path.abspath(self.project_root))
+            if str(relpath).startswith("<"):
+                return DagshubPath(self, abspath, None)
+            return DagshubPath(self, abspath, relpath)
         except ValueError:
-            return None
-
-    @staticmethod
-    def _passthrough_path(relative_path: PathLike):
-        str_path = str(relative_path)
-        if "/site-packages/" in str_path:
-            return True
-        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
+            return DagshubPath(self, abspath, None)
 
     def _special_file(self):
         # TODO Include more information in this file
@@ -283,50 +270,50 @@ class DagsHubFilesystem:
              errors=None, newline=None, closefd=True, opener=None):
         if type(file) is bytes:
             file = os.fsdecode(file)
-        relative_path = self._relative_path(file)
-        if relative_path:
+        path = self._parse_path(file)
+        if path.is_in_repo:
             if opener is not None:
                 raise NotImplementedError('DagsHub\'s patched open() does not support custom openers')
             project_root_opener = partial(os.open, dir_fd=self.project_root_fd)
-            if self._passthrough_path(relative_path):
-                return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+            if path.is_passthrough_path:
+                return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                    closefd, opener=project_root_opener)
-            elif relative_path == SPECIAL_FILE:
+            elif path.relative_path == SPECIAL_FILE:
                 return io.BytesIO(self._special_file())
             else:
                 try:
-                    return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                    return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                        closefd, opener=project_root_opener)
                 except FileNotFoundError as err:
                     # Open for reading - try to download the file
                     if "r" in mode:
-                        resp = self._api_download_file_git(relative_path)
+                        resp = self._api_download_file_git(path)
                         if resp.status_code < 400:
-                            self._mkdirs(relative_path.parent, dir_fd=self.project_root_fd)
+                            self._mkdirs(path.relative_path.parent, dir_fd=self.project_root_fd)
                             # TODO: Handle symlinks
-                            with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                            with self.__open(path.relative_path, 'wb', opener=project_root_opener) as output:
                                 output.write(resp.content)
-                            return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                            return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                                closefd, opener=project_root_opener)
                         else:
                             # TODO: After API no longer 500s on FileNotFounds
                             #       check status code and only return FileNotFound on 404s
-                            raise FileNotFoundError(f'Error finding {relative_path} in repo or on DagsHub')
+                            raise FileNotFoundError(f'Error finding {path.relative_path} in repo or on DagsHub')
                     # Write modes - make sure that the folder is a tracked folder (create if doesn't exist on disk),
                     # and then let the user write to file
                     else:
                         try:
                             # Using the fact that stat creates tracked dirs (but still throws on nonexistent dirs)
-                            _ = self.stat(self.project_root / relative_path.parent)
+                            _ = self.stat(self.project_root / path.relative_path.parent)
                         except FileNotFoundError:
                             raise err
                         # Try to download the file if we're in append modes
                         if "a" in mode or "+" in mode:
-                            resp = self._api_download_file_git(relative_path)
+                            resp = self._api_download_file_git(path.relative_path.as_posix())
                             if resp.status_code < 400:
-                                with self.__open(relative_path, 'wb', opener=project_root_opener) as output:
+                                with self.__open(path.relative_path, 'wb', opener=project_root_opener) as output:
                                     output.write(resp.content)
-                        return self.__open(relative_path, mode, buffering, encoding, errors, newline,
+                        return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                            closefd, opener=project_root_opener)
 
         else:
@@ -343,10 +330,11 @@ class DagsHubFilesystem:
                  This is only for the purposes of patching pathlib.open in Python 3.9 and below.
                  Since Python 3.10 pathlib uses io.open, and in Python 3.11 they removed the accessor completely
         """
-        if dir_fd is not None:   # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
+        if dir_fd is not None:  # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched os.open() (for pathlib only) does not support dir_fd')
-        if self._relative_path(path):
+        path = self._parse_path(path)
+        if path.is_in_repo:
             try:
                 open_mode = "r"
                 # Write modes - calling in append mode,
@@ -355,11 +343,11 @@ class DagsHubFilesystem:
                 if not (flags & os.O_RDONLY):
                     open_mode = "a"
                 logger.debug("fs.os_open - trying to materialize path")
-                self.open(path, mode=open_mode).close()
+                self.open(path.relative_path, mode=open_mode).close()
                 logger.debug("fs.os_open - successfully materialized path")
             except FileNotFoundError:
                 logger.debug("fs.os_open - failed to materialize path, os.open will throw")
-        return os.open(path, flags, mode, dir_fd=dir_fd)
+        return os.open(path.relative_path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         if type(path) is bytes:
@@ -367,22 +355,22 @@ class DagsHubFilesystem:
         if dir_fd is not None or not follow_symlinks:
             logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError('DagsHub\'s patched stat() does not support dir_fd or follow_symlinks')
-        relative_path = self._relative_path(path)
+        parsed_path = self._parse_path(path)
         # todo: remove False
-        if relative_path:
+        if parsed_path.is_in_repo:
             logger.debug("fs.stat - is relative path")
-            if self._passthrough_path(relative_path):
-                return self.__stat(relative_path, dir_fd=self.project_root_fd)
-            elif relative_path == SPECIAL_FILE:
+            if parsed_path.is_passthrough_path:
+                return self.__stat(parsed_path.relative_path, dir_fd=self.project_root_fd)
+            elif parsed_path.relative_path == SPECIAL_FILE:
                 return dagshub_stat_result(self, path, is_directory=False, custom_size=len(self._special_file()))
             else:
                 try:
                     logger.debug(f"fs.stat - calling __stat - relative_path: {path}, dir_fd: {self.project_root_fd}")
-                    return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                    return self.__stat(parsed_path.relative_path, dir_fd=self.project_root_fd)
                 except FileNotFoundError as err:
                     logger.debug("fs.stat - FileNotFoundError")
                     logger.debug(f"remote_tree: {self.remote_tree}")
-                    parent_path = relative_path.parent
+                    parent_path = parsed_path.relative_path.parent
                     if str(parent_path) not in self.remote_tree:
                         try:
                             # Run listdir to update cache
@@ -396,17 +384,17 @@ class DagsHubFilesystem:
                     if cached_remote_parent_tree is None:
                         raise err
 
-                    filetype = cached_remote_parent_tree.get(relative_path.name)
+                    filetype = cached_remote_parent_tree.get(parsed_path.name)
                     if filetype is None:
                         raise err
 
                     if filetype == "file":
                         return dagshub_stat_result(self, path, is_directory=False)
                     elif filetype == "dir":
-                        self._mkdirs(relative_path, dir_fd=self.project_root_fd)
-                        return self.__stat(relative_path, dir_fd=self.project_root_fd)
+                        self._mkdirs(parsed_path.relative_path, dir_fd=self.project_root_fd)
+                        return self.__stat(parsed_path.relative_path, dir_fd=self.project_root_fd)
                     else:
-                        raise RuntimeError(f"Unknown file type {filetype} for path {str(relative_path)}")
+                        raise RuntimeError(f"Unknown file type {filetype} for path {str(parsed_path)}")
 
         else:
             return self.__stat(path, follow_symlinks=follow_symlinks)
@@ -414,17 +402,16 @@ class DagsHubFilesystem:
     def chdir(self, path):
         if type(path) is bytes:
             path = os.fsdecode(path)
-        relative_path = self._relative_path(path)
-        if relative_path:
-            abspath = os.path.join(self.project_root, relative_path)
+        parsed_path = self._parse_path(path)
+        if parsed_path.is_in_repo:
             try:
-                self.__chdir(abspath)
+                self.__chdir(parsed_path.absolute_path)
             except FileNotFoundError:
-                resp = self._api_listdir(relative_path)
+                resp = self._api_listdir(parsed_path)
                 # FIXME: if path is file, return FileNotFound instead of the listdir error
-                if resp.status_code < 400:
-                    self._mkdirs(relative_path, dir_fd=self.project_root_fd)
-                    self.__chdir(abspath)
+                if resp is not None:
+                    self._mkdirs(parsed_path.relative_path, dir_fd=self.project_root_fd)
+                    self.__chdir(parsed_path.absolute_path)
                 else:
                     raise
         else:
@@ -437,27 +424,27 @@ class DagsHubFilesystem:
             str_path = os.fsdecode(path)
         else:
             str_path = path
-        relative_path = self._relative_path(str_path)
-        if relative_path:
-            if self._passthrough_path(relative_path):
-                with self._open_fd(relative_path) as fd:
+        parsed_path = self._parse_path(str_path)
+        if parsed_path.is_in_repo:
+            if parsed_path.is_passthrough_path:
+                with self._open_fd(parsed_path.relative_path) as fd:
                     return self.__listdir(fd)
             else:
                 dircontents: Set[str] = set()
                 error = None
                 try:
-                    with self._open_fd(relative_path) as fd:
+                    with self._open_fd(parsed_path.relative_path) as fd:
                         dircontents.update(self.__listdir(fd))
                 except FileNotFoundError as e:
                     error = e
-                if relative_path == Path():
-                    dircontents.add(SPECIAL_FILE.name)
-                resp = self._api_listdir(relative_path)
-                if resp.status_code < 400:
-                    dircontents.update(Path(f['path']).name for f in resp.json())
-                    self.remote_tree[str(relative_path)] = {
-                        Path(f["path"]).name: f["type"]
-                        for f in resp.json()
+                dircontents.update(
+                    special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
+                resp = self._api_listdir(parsed_path)
+                if resp is not None:
+                    dircontents.update(Path(f.path).name for f in resp)
+                    self.remote_tree[str(parsed_path.relative_path)] = {
+                        Path(f.path).name: f.type
+                        for f in resp
                     }
                     res = list(dircontents)
                     if is_bytes_path_arg:
@@ -482,38 +469,114 @@ class DagsHubFilesystem:
             str_path = os.fsdecode(path)
         else:
             str_path = path
-        relative_path = self._relative_path(str_path)
-        if relative_path and not self._passthrough_path(relative_path):
+        parsed_path = self._parse_path(str_path)
+        if parsed_path.is_in_repo and not parsed_path.is_passthrough_path:
             path = Path(str_path)
             local_filenames = set()
             try:
                 for direntry in self.__scandir(path):
                     local_filenames.add(direntry.name)
                     yield direntry
-                if relative_path == Path():
-                    if SPECIAL_FILE.name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / SPECIAL_FILE,
-                                               is_directory=False, is_binary=is_bytes_path_arg)
             except FileNotFoundError:
                 pass
-            resp = self._api_listdir(relative_path)
-            if resp.status_code < 400:
-                for f in resp.json():
-                    name = Path(f['path']).name
+            for special_entry in self._get_special_paths(parsed_path, path, is_bytes_path_arg):
+                if special_entry.path not in local_filenames:
+                    yield special_entry
+            # Mix in the results from the API
+            resp = self._api_listdir(parsed_path)
+            if resp is not None:
+                for f in resp:
+                    name = Path(f.path).name
                     if name not in local_filenames:
-                        yield dagshub_DirEntry(self, path / name, f['type'] == 'dir', is_binary=is_bytes_path_arg)
+                        yield dagshub_DirEntry(self, path / name, f.type == 'dir', is_binary=is_bytes_path_arg)
         else:
             for entry in self.__scandir(path):
                 yield entry
 
-    @cache_by_path
-    def _api_listdir(self, path: str, include_size: bool = False):
-        return self.http_get(f'{self.content_api_url}/{path}',
-                             params={'include_size': 'true'} if include_size else {},
-                             headers=config.requests_headers)
+    def _get_special_paths(
+        self, dh_path: DagshubPath, relative_to: PathLike, is_binary: bool
+    ) -> Set["dagshub_DirEntry"]:
+        def generate_entry(path, is_directory):
+            if isinstance(path, str):
+                path = Path(path)
+            return dagshub_DirEntry(self, relative_to / path,
+                                    is_directory=is_directory, is_binary=is_binary)
 
-    def _api_download_file_git(self, path: str):
-        return self.http_get(f'{self.raw_api_url}/{path}', headers=config.requests_headers, timeout=None)
+        has_storages = len(self._storages) > 0
+        res = set()
+        str_path = dh_path.relative_path.as_posix()
+        if str_path == ".":
+            res.add(generate_entry(SPECIAL_FILE, False))
+            if has_storages:
+                res.add(generate_entry(".dagshub", True))
+        elif str_path.startswith(".dagshub") and has_storages:
+            storage_paths = [s.path_in_mount for s in self._storages]
+            for sp in storage_paths:
+                try:
+                    relpath = sp.relative_to(dh_path.relative_path)
+                    if relpath != Path():
+                        res.add(generate_entry(relpath.parts[0], True))
+                except ValueError:
+                    continue
+        return res
+
+    def _api_listdir(self, path: DagshubPath, include_size: bool = False) -> Optional[List[ContentAPIEntry]]:
+        response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
+        if hit:
+            return response
+        response = self.http_get(self._content_url_for_path(path),
+                                 params={'include_size': 'true'} if include_size else {},
+                                 headers=config.requests_headers)
+        if response.status_code >= 400:
+            logger.debug(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+            return None
+        res = []
+        for entry_raw in response.json():
+            entry = dacite.from_dict(ContentAPIEntry, entry_raw)
+            # Ignore storage root entries, we handle them separately in a different place
+            if entry.type == "storage":
+                continue
+            res.append(entry)
+        self._listdir_cache[path.relative_path.as_posix()] = (res, include_size)
+        return res
+
+    def _api_storages(self) -> List[StorageAPIEntry]:
+        response = self.http_get(self.storage_api_url)
+        if response.status_code >= 400:
+            logger.warning(f"Got HTTP code {response.status_code} while getting storages. Content: {response.content}")
+            logger.warning("Storages are unavailable")
+            return []
+        return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in response.json()]
+
+    def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[List[ContentAPIEntry]], bool]:
+        # Checks that path has a pre-cached response
+        # If include_size is True, but only a response without size is cached, that's a cache miss
+        if path in self._listdir_cache:
+            cache_val, with_size = self._listdir_cache[path]
+            if not include_size or (include_size and with_size):
+                return cache_val, True
+        return None, False
+
+    def _content_url_for_path(self, path: DagshubPath):
+        if not path.is_in_repo:
+            raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
+        str_path = path.relative_path.as_posix()
+        if path.is_storage_path:
+            path_to_access = str_path[len(".dagshub/storage/"):]
+            return f"{self.storage_content_api_url}/{path_to_access}"
+        return f"{self.content_api_url}/{str_path}"
+
+    def _raw_url_for_path(self, path: DagshubPath):
+        if not path.is_in_repo:
+            raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
+        str_path = path.relative_path.as_posix()
+        if path.is_storage_path:
+            path_to_access = str_path[len(".dagshub/storage/"):]
+            return f"{self.storage_raw_api_url}/{path_to_access}"
+        return f"{self.raw_api_url}/{str_path}"
+
+    def _api_download_file_git(self, path: DagshubPath):
+        return self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)
 
     def http_get(self, path: str, **kwargs):
         timeout = self.timeout

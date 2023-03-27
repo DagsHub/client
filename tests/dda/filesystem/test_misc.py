@@ -1,6 +1,9 @@
+import os.path
+from unittest.mock import MagicMock
+
 import pytest
 from pathlib import Path
-from dagshub.streaming import DagsHubFilesystem
+from dagshub.streaming.dataclasses import DagshubPath
 
 
 @pytest.mark.parametrize(
@@ -18,6 +21,7 @@ from dagshub.streaming import DagsHubFilesystem
     ],
 )
 def test_passthrough_path(path, expected):
-    path = Path(path)
-    actual = DagsHubFilesystem._passthrough_path(path)
+    fs_mock = MagicMock()
+    path = DagshubPath(fs_mock, Path(os.path.abspath(path)), Path(path))
+    actual = path.is_passthrough_path
     assert actual == expected

@@ -143,7 +143,8 @@ def upload(ctx,
            host,
            **kwargs):
     """
-    Upload FILENAME to REPO at location TARGET.
+    Upload FILENAME to REPO at location TARGET
+    [Unlike git push, we upload your data to DagsHub once and don't sync the repo state]
     REPO should be of the form <owner>/<repo-name>, i.e nirbarazida/yolov6.
     TARGET should include the full path inside the repo, including the filename itself.
     """
@@ -181,7 +182,7 @@ def repo():
 @repo.command()
 @click.argument("repo_name")
 @click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
-@click.option("-c", "--clone", is_flag=True,  help="Clone repository locally")
+@click.option("-c", "--clone", is_flag=True, help="Clone repository locally")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context

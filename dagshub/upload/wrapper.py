@@ -391,7 +391,6 @@ class DataSet:
         self.files: Dict[os.PathLike, Tuple[os.PathLike, BinaryIO]] = {}
         self.repo = repo
         self.directory = self._clean_directory_name(directory)
-        self.request_url = self.repo.get_request_url(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
         """

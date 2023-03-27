@@ -19,8 +19,8 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
     if dvc:
         root = root or get_project_root(Path(os.path.abspath('.')))
         if not exists(root / '.git'):
-            raise ValueError('No git project found! (stopped at mountpoint {root}). \
-                              Please run this command in a git repository.')
+            raise ValueError(f'No git project found! (stopped at mountpoint {root}). \
+                               Please run this command in a git repository.')
 
     if url and (repo_name or repo_owner):
         repo_name, repo_owner = None, None

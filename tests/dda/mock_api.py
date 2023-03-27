@@ -3,8 +3,6 @@ import os.path
 from httpx import Response
 from respx import MockRouter, Route
 
-BASE_REGEX = r"/api/v1/repos/\w+/\w+"
-
 
 class MockApi(MockRouter):
     def __init__(self, git_repo, user="user", reponame="repo", *args, **kwargs):
@@ -12,6 +10,8 @@ class MockApi(MockRouter):
         self.user = user
         self.reponame = reponame
         self.git_repo = git_repo
+
+        self.storage_bucket_path = "storage-bucket/prefix"
 
         self._endpoints, self._responses = self._default_endpoints_and_responses()
         route_dict = {
@@ -24,6 +24,10 @@ class MockApi(MockRouter):
     @property
     def repourlpath(self):
         return f"{self.user}/{self.reponame}"
+
+    @property
+    def repoapipath(self):
+        return f"/api/v1/repos/{self.repourlpath}"
 
     @property
     def repophysicalpath(self):
@@ -39,18 +43,27 @@ class MockApi(MockRouter):
 
     @property
     def api_list_path(self):
-        return f"/api/v1/repos/{self.repourlpath}/content/{self.current_revision}"
+        return f"{self.repoapipath}/content/{self.current_revision}"
 
     @property
     def api_raw_path(self):
-        return f"/api/v1/repos/{self.repourlpath}/raw/{self.current_revision}"
+        return f"{self.repoapipath}/raw/{self.current_revision}"
+
+    @property
+    def api_storage_list_path(self):
+        return f"{self.repoapipath}/storage/content/s3/{self.storage_bucket_path}"
+
+    @property
+    def api_storage_raw_path(self):
+        return f"{self.repoapipath}/storage/raw/s3/{self.storage_bucket_path}"
 
     def _default_endpoints_and_responses(self):
         endpoints = {
-            "repo": rf"/api/v1/repos/{self.repourlpath}/?$",
-            "branch": rf"{BASE_REGEX}/branches/\w+",
-            "branches": rf"{BASE_REGEX}/branches",
-            "list_root": rf"{BASE_REGEX}/content/{self.current_revision}/$",
+            "repo": rf"{self.repoapipath}/?$",
+            "branch": rf"{self.repoapipath}/branches/\w+",
+            "branches": rf"{self.repoapipath}/branches",
+            "list_root": rf"{self.repoapipath}/content/{self.current_revision}/$",
+            "storages": rf"{self.repoapipath}/storage/?$"
         }
 
         responses = {
@@ -68,7 +81,7 @@ class MockApi(MockRouter):
                     "name": self.reponame,
                     "full_name": self.repourlpath,
                     "description": "Open Source Data Science (OSDS) Monocular Depth Estimation "
-                    "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
+                                   "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
                     "private": False,
                     "fork": False,
                     "parent": None,
@@ -150,6 +163,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "dvc",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                     {
                         "path": "b.txt",
@@ -158,6 +172,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "dvc",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                     {
                         "path": "c.txt",
@@ -166,6 +181,7 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "dvc",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                     {
                         "path": "a.txt.dvc",
@@ -174,36 +190,53 @@ class MockApi(MockRouter):
                         "hash": "some_hash",
                         "versioning": "git",
                         "download_url": "some_url",
+                        "content_url": "some_url",
                     },
                 ],
             ),
+            "storages": Response(
+                200,
+                json=[
+                    {
+                        "name": self.storage_bucket_path,
+                        "protocol": "s3",
+                        "list_path": f"{self.repoapipath}/storage/content/s3/{self.storage_bucket_path}"
+                    }
+                ]
+            )
         }
 
         return endpoints, responses
 
-    def add_file(self, path, content="aaa", status=200) -> Route:
+    def add_file(self, path, content="aaa", status=200, is_storage=False) -> Route:
         """
         Add a file to the api (only accessible via the raw endpoint)
         """
-        route = self.route(url=f"{self.api_raw_path}/{path}")
+        if is_storage:
+            route = self.route(url=f"{self.api_storage_raw_path}/{path}")
+        else:
+            route = self.route(url=f"{self.api_raw_path}/{path}")
         route.mock(Response(status, content=content))
         return route
 
-    def add_dir(self, path, contents=[], status=200) -> Route:
+    def add_dir(self, path, contents=[], status=200, is_storage=False) -> Route:
         """
         Add a directory to the api (only accessible via the content endpoint)
         We don't keep a tree of added dirs, so it's not dynamic
         """
-        route = self.route(url=f"{self.api_list_path}/{path}")
+        if is_storage:
+            route = self.route(url=f"{self.api_storage_list_path}/{path}")
+        else:
+            route = self.route(url=f"{self.api_list_path}/{path}")
         content = [
             self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
         ]
         route.mock(Response(status, json=content))
         return route
 
-    def enable_uploads(self):
+    def enable_uploads(self, branch="main"):
         route = self.put(
-            name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/main/.*"
+            name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/{branch}/.*"
         )
         route.mock(Response(200))
         return route
@@ -216,4 +249,5 @@ class MockApi(MockRouter):
             "hash": "8586da76f372efa83d832a9d0e664817.dir",
             "versioning": "dvc",
             "download_url": f"https://dagshub.com/{self.repourlpath}/raw/{self.current_revision}/{path}",
+            "content_url": f"https://dagshub.com/{self.repourlpath}/content/{self.current_revision}/{path}",
         }
