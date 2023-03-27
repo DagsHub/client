@@ -8,5 +8,6 @@ class FilesystemAlreadyMountedError(Exception):
         self.revision = revision
 
     def __str__(self):
-        return f"There is already a filesystem mounted at path {self.path.absolute()} ({self.repo} revision {self.revision})" \
+        return f"There is already a filesystem mounted at path {self.path.absolute()} " \
+               f"({self.repo} revision {self.revision})" \
                f"\ndel() the filesystem object in use if you want to switch the mounted filesystem"
