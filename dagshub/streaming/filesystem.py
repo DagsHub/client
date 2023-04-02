@@ -17,7 +17,7 @@ import dacite
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
-from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath
+from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath, StorageContentAPIResult
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -524,19 +524,34 @@ class DagsHubFilesystem:
         response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
         if hit:
             return response
-        response = self.http_get(self._content_url_for_path(path),
-                                 params={'include_size': 'true'} if include_size else {},
-                                 headers=config.requests_headers)
+        params = {"include_size": "true"} if include_size else {}
+        url = self._content_url_for_path(path)
+        response = self.http_get(url, params=params, headers=config.requests_headers)
         if response.status_code >= 400:
-            logger.debug(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+            logger.warning(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
             return None
-        res = []
-        for entry_raw in response.json():
-            entry = dacite.from_dict(ContentAPIEntry, entry_raw)
-            # Ignore storage root entries, we handle them separately in a different place
-            if entry.type == "storage":
-                continue
-            res.append(entry)
+        res: List[ContentAPIEntry] = []
+        # Storage - token pagination, different return structure + if there's a token we do another request
+        if path.is_storage_path:
+            result = dacite.from_dict(StorageContentAPIResult, response.json())
+            res += result.entries
+            while result.next_token != "":
+                params["from_token"] = result.next_token
+                new_resp = self.http_get(url, params=params, headers=config.requests_headers)
+                if response.status_code >= 400:
+                    logger.warning(
+                        f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+                    return None
+                result = dacite.from_dict(StorageContentAPIResult, new_resp.json())
+                res += result.entries
+        else:
+            for entry_raw in response.json():
+                entry = dacite.from_dict(ContentAPIEntry, entry_raw)
+                # Ignore storage root entries, we handle them separately in a different place
+                if entry.type == "storage":
+                    continue
+                res.append(entry)
+
         self._listdir_cache[path.relative_path.as_posix()] = (res, include_size)
         return res
 

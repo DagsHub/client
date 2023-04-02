@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 try:
     from functools import cached_property
@@ -34,6 +34,13 @@ class ContentAPIEntry:
     versioning: str
     download_url: str
     content_url: Optional[str]  # TODO: remove Optional once content_url is exposed in API
+
+
+@dataclass
+class StorageContentAPIResult:
+    entries: List[ContentAPIEntry]
+    next_token: str
+    limit: int
 
 
 storage_schemas = ["s3", "gs"]

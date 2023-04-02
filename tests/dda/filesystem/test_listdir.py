@@ -51,10 +51,25 @@ def test_has_storage_bucket_paths(mock_api, repo_with_hooks):
 def test_lists_bucket_folder(mock_api, repo_with_hooks):
     files = [("a.txt", "file"), ("b.txt", "file"), ("dir1", "dir")]
     path = "testdir"
-    mock_api.add_dir(path, files, is_storage=True)
+    mock_api.add_storage_dir(path, files)
     actual = os.listdir(f".dagshub/storage/s3/{mock_api.storage_bucket_path}/{path}")
     expected = [f[0] for f in files]
     assert set(actual) == set(expected)
+
+
+def test_storage_pagination(mock_api, repo_with_hooks):
+    files1 = [("a.txt", "file"), ("b.txt", "file"), ("dir1", "dir")]
+    files2 = [("c.txt", "file")]
+    path = "testdir"
+    # Order is important, otherwise respx loops and returns the first result indefinitely
+    mock_api.add_storage_dir(path, files2, from_token="aaa")
+    mock_api.add_storage_dir(path, files1, next_token="aaa")
+
+    expected = [f[0] for f in files1 + files2]
+
+    actual = os.listdir(f".dagshub/storage/s3/{mock_api.storage_bucket_path}/{path}")
+    assert set(actual) == set(expected)
+
 
 
 def test_binary(mock_api, repo_with_hooks):
