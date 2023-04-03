@@ -29,10 +29,11 @@ install_requires = [
     "fusepy>=3",
     "appdirs>=1.4.4",
     "click>=8.0.4",
-    "httpx==0.22.0",
+    "httpx~=0.23.0",
     "GitPython>=3.1.29",
     "rich[jupyter]~=13.1.0",
     "dacite~=1.8.0",
+    "pydantic~=1.10.7",
 ]
 
 # Polyfills for Python 3.7
