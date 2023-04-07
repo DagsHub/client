@@ -18,6 +18,7 @@ from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
 from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath
+from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -83,8 +84,11 @@ class DagsHubFilesystem:
         Influences all requests except for file download, which has no timeout
     """
 
+    already_mounted_filesystems: Dict[Path, 'DagsHubFilesystem'] = {}
+    hooked_instance: Optional['DagsHubFilesystem'] = None
+
     def __init__(self,
-                 project_root: Optional[PathLike] = None,
+                 project_root: Optional['PathLike | str'] = None,
                  repo_url: Optional[str] = None,
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
@@ -128,6 +132,8 @@ class DagsHubFilesystem:
         self.timeout = timeout or config.http_timeout
 
         self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
+
+        self.check_project_root_use()
 
         # Check that the repo is accessible by accessing the content root
         response = self._api_listdir(DagshubPath(self, self.project_root, Path()))
@@ -196,6 +202,24 @@ class DagsHubFilesystem:
         resp = self.http_get(url)
         return resp.status_code == 200
 
+    def check_project_root_use(self):
+        """
+        Checks that there's no other filesystem being mounted at the current project root
+        If there is one, throw an error
+        """
+
+        def is_subpath(a: Path, b: Path) -> bool:
+            # Checks if either a or b are subpaths of each other
+            a_str = a.as_posix()
+            b_str = b.as_posix()
+            return a_str.startswith(b_str) or b_str.startswith(a_str)
+
+        for p, f in DagsHubFilesystem.already_mounted_filesystems.items():
+            if is_subpath(p, self.project_root):
+                raise FilesystemAlreadyMountedError(self.project_root, f.parsed_repo_url.path[1:], f._current_revision)
+
+        DagsHubFilesystem.already_mounted_filesystems[self.project_root] = self
+
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
         resp = self.http_get(url)
@@ -247,6 +271,12 @@ class DagsHubFilesystem:
 
     def __del__(self):
         os.close(self.project_root_fd)
+        self.cleanup()
+
+    def cleanup(self):
+        # Remove from map of mounted filesystems
+        if self.project_root in DagsHubFilesystem.already_mounted_filesystems:
+            DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
         if isinstance(file, int):
@@ -616,7 +646,7 @@ class DagsHubFilesystem:
             _pathlib.listdir = self.listdir
             _pathlib.scandir = self.scandir
 
-        self.__class__.hooked_instance = self
+        DagsHubFilesystem.hooked_instance = self
 
     @classmethod
     def uninstall_hooks(cls):
@@ -631,6 +661,9 @@ class DagsHubFilesystem:
                 _pathlib.stat = cls.__unpatched['stat']
                 _pathlib.listdir = cls.__unpatched['listdir']
                 _pathlib.scandir = cls.__unpatched['scandir']
+        if DagsHubFilesystem.hooked_instance is not None:
+            DagsHubFilesystem.hooked_instance.cleanup()
+            DagsHubFilesystem.hooked_instance = None
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:
