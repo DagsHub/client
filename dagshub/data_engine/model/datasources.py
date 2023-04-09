@@ -16,14 +16,16 @@ class DataSourceType(enum.Enum):
 
 @dataclass
 class DataSource:
+    id: str = field(init=False)
     source_type: DataSourceType
     repo: str
     path: str
     client: DataClient = field(init=False)
 
     def __post_init__(self):
+        self.id = "5"
         self.client = DataClient(self.repo)
-
+        # TODO: fetch source's ID
 
 
 def from_bucket(repo, bucket: str) -> Dataset:
