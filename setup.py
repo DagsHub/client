@@ -33,7 +33,6 @@ install_requires = [
     "GitPython>=3.1.29",
     "rich[jupyter]~=13.1.0",
     "dacite~=1.8.0",
-    "pydantic~=1.10.7",
     "gql-query-builder~=0.1.7",
     "gql[requests]",
     "dataclasses-json",
