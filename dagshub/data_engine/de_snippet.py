@@ -13,6 +13,7 @@ def get_dataset():
 def do_stuff():
     ds = get_dataset()
     new_ds = ds.and_query(name_eq="aaaa", has_squirrel_eq=True).or_query(img_size_gt=480)
+    ds.and_query(**{"some-number_lt": 2}).peek()
     res = new_ds.peek()
     print(res)
 

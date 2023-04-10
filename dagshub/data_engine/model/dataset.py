@@ -57,6 +57,9 @@ class Dataset:
         new_query = Query.from_query_params(self, param_operand, **query_params)
         return Dataset(datasource=self._source, query=self._ds_query.compose(new_query, query_operand))
 
+    def query(self, param_operand="and", **query_params):
+        return self.and_query(param_operand, **query_params)
+
     def and_query(self, param_operand="and", **query_params):
         return self._query("and", param_operand, **query_params)
 
@@ -77,6 +80,7 @@ class Dataset:
 
     def save_dataset(self):
         logger.info(f"Saving dataset")
+        raise NotImplementedError
 
 
 class MetadataContextManager:
