@@ -41,8 +41,8 @@ def add_more_metadata():
 
 def query():
     ds = get_dataset()
-    # res = ds.and_query(episode_eq=2).or_query(filename_contains="a").peek()
-    res = ds.or_query(episode_eq=2).peek()
+    res = ds.and_query(episode_eq=2).or_query(filename_contains="a").peek()
+    # res = ds.or_query(episode_eq=2).peek()
     print(res.dataframe)
 
 
