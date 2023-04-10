@@ -28,7 +28,7 @@ class DataSource:
         self.id = "1"
         self.client = DataClient(self.repo)
         datasource = self.client.create_datasource(self.name, self.path)
-        logging.debug(f"res: {res}")
+        logging.debug(f"res: {datasource}")
         self.id = datasource["id"]
 
 
