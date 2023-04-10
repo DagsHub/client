@@ -6,6 +6,7 @@ import gql
 from gql_query_builder import GqlQuery
 from graphene import Schema
 
+import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.data_engine.client.mock_graphql import Query
 from dagshub.data_engine.model.datapoints import DatapointCollection
@@ -24,7 +25,7 @@ class DataClient:
 
     def _init_client(self):
         url = f"https://data-preview.dagops.dagshub.com/api/v1/repos/{self.repo}/data-engine/graphql"
-        auth = HTTPBearerAuth("fb030ecb339b9e06b1fc405d97c61f018e206752")
+        auth = HTTPBearerAuth(dagshub.auth.get_token(host="https://data-preview.dagops.dagshub.com"))
         transport = RequestsHTTPTransport(url=url, auth=auth)
         client = gql.Client(transport=transport)
         return client
