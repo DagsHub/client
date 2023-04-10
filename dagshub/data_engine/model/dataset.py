@@ -1,13 +1,28 @@
+import json
 import logging
+from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+from dataclasses_json import dataclass_json
+
 from dagshub.data_engine.model.datapoints import DatapointCollection
-from dagshub.data_engine.model.query import Query
+from dagshub.data_engine.model.query import Query, _metadataTypeLookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass_json
+@dataclass
+class DataPointMetadataUpdateEntry(json.JSONEncoder):
+    url: str
+    key: str
+    value: str
+    valueType: str
+
 
 class Dataset:
 
@@ -49,10 +64,36 @@ class Dataset:
         return self._query("or", param_operand, **query_params)
 
     def peek(self):
-        return self._source.client.query(self)
+        return self._source.client.get_datapoints(self)
+
+    @contextmanager
+    def metadata_context(self) -> "MetadataContextManager":
+        ctx = MetadataContextManager(self)
+        yield ctx
+        self.source.client.add_metadata(self, ctx.get_metadata_entries())
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._ds_query}>"
 
     def save_dataset(self):
         logger.info(f"Saving dataset")
+
+
+class MetadataContextManager:
+    def __init__(self, dataset: Dataset):
+        self._dataset = dataset
+        self._metadata_entries: List[DataPointMetadataUpdateEntry] = []
+
+    def update_metadata(self, datapoints: List[str], metadata: Dict[str, Any]):
+        for dp in datapoints:
+            for k, v in metadata.items():
+                self._metadata_entries.append(DataPointMetadataUpdateEntry(
+                    url=dp,
+                    key=k,
+                    value=str(v),
+                    # todo: preliminary type check
+                    valueType=_metadataTypeLookup[type(v)]
+                ))
+
+    def get_metadata_entries(self):
+        return self._metadata_entries

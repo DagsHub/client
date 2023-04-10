@@ -10,6 +10,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_metadataTypeLookup = {
+    type(0): "INTEGER",
+    type(True): "BOOLEAN",
+    type(0.5): "FLOAT",
+    type("aaa"): "STRING",
+}
+
 
 @dataclass
 class FieldFilter:
@@ -21,7 +28,7 @@ class FieldFilter:
         return {
             "key": self.field,
             "value": self.val,
-            "valueType": type(self.val).__name__,
+            "valueType": _metadataTypeLookup[type(self.val)],
             "comparator": self.op.value,
         }
 

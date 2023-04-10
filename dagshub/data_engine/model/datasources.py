@@ -23,7 +23,8 @@ class DataSource:
     client: DataClient = field(init=False)
 
     def __post_init__(self):
-        self.id = "5"
+        # HARDCODED FOR NOW - later add init
+        self.id = "1"
         self.client = DataClient(self.repo)
         # TODO: fetch source's ID
 

@@ -35,6 +35,8 @@ install_requires = [
     "dacite~=1.8.0",
     "pydantic~=1.10.7",
     "gql-query-builder~=0.1.7",
+    "gql[requests]",
+    "dataclasses-json",
 ]
 
 # Polyfills for Python 3.7
