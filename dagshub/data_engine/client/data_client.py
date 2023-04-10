@@ -113,13 +113,13 @@ class DataClient:
         return self._query(dataset, 100, include_metadata)
 
     def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        logger.warning(f"Executing query: {query}")
+        logger.debug(f"Executing query: {query}")
         if params is not None:
-            logger.warning(f"Params: {params}")
+            logger.debug(f"Params: {params}")
         # TODO: what about params?
         q = gql.gql(query)
         resp = self.client.execute(q, variable_values=params)
-        logger.warning(f"Got result: {resp}")
+        logger.debug(f"Got result: {resp}")
         return resp
 
     def _query(self, dataset: Dataset, limit: int, include_metadata: bool):
