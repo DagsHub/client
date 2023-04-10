@@ -35,6 +35,7 @@ class PeekResult:
 
     @property
     def dataframe(self):
+        self.entries = list(sorted(self.entries, key=lambda a: a.name))
         metadata_keys = set()
         names = []
         for e in self.entries:
@@ -44,7 +45,7 @@ class PeekResult:
         res = pd.DataFrame({"name": names})
 
         for key in sorted(metadata_keys):
-            res[key] = [e.metadata.get(key) for e in sorted(self.entries, key=lambda a: a.name)]
+            res[key] = [e.metadata.get(key) for e in self.entries]
 
         return res
 
