@@ -9,11 +9,23 @@ from graphene import Schema
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.data_engine.client.mock_graphql import Query
-from dagshub.data_engine.model.datapoints import DatapointCollection
 from dagshub.data_engine.model.dataset import Dataset, DataPointMetadataUpdateEntry
 from gql.transport.requests import RequestsHTTPTransport
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Metadata:
+    key: str
+    value: Any
+
+
+@dataclass
+class PeekResult:
+    name: str
+    downloadUrl: str
+    metadata: List[Metadata]
 
 
 class DataClient:
@@ -58,7 +70,7 @@ class DataClient:
         return res
 
     def peek(self, dataset: Dataset):
-        return self._query(dataset, 10, True)
+        resp = self._query(dataset, 10, True)
 
     def get_datapoints(self, dataset: Dataset):
         return self._get_all(dataset, True)

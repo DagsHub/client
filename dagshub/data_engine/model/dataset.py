@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from dataclasses_json import dataclass_json
 
-from dagshub.data_engine.model.datapoints import DatapointCollection
 from dagshub.data_engine.model.query import Query, _metadataTypeLookup
 
 if TYPE_CHECKING:
@@ -31,8 +30,8 @@ class Dataset:
         if query is None:
             query = Query(self)
         self._ds_query = query
-        self._include_list: Optional[DatapointCollection] = None
-        self._exclude_list: Optional[DatapointCollection] = None
+        self._include_list: Optional[str] = None
+        self._exclude_list: Optional[str] = None
 
     @property
     def source(self):
