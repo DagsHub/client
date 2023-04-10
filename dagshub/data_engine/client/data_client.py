@@ -88,7 +88,7 @@ class DataClient:
             "url": url,
         }
         res = self._exec(q, params)
-        return res
+        return res["createDataSource"]
 
     def peek(self, dataset: Dataset) -> PeekResult:
         resp = self._query(dataset, 10, True)

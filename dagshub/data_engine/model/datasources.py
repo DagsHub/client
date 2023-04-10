@@ -20,17 +20,20 @@ class DataSource:
     source_type: DataSourceType
     repo: str
     path: str
+    name: str
     client: DataClient = field(init=False)
 
     def __post_init__(self):
         # HARDCODED FOR NOW - later add init
         self.id = "1"
         self.client = DataClient(self.repo)
-        # TODO: fetch source's ID
+        datasource = self.client.create_datasource(self.name, self.path)
+        logging.debug(f"res: {res}")
+        self.id = datasource["id"]
 
 
-def from_bucket(repo, bucket: str) -> Dataset:
-    return Dataset(DataSource(DataSourceType.BUCKET, repo, bucket))
+def from_bucket(name, repo, bucket_url: str) -> Dataset:
+    return Dataset(DataSource(DataSourceType.BUCKET, repo, bucket_url, name=name))
 
 
 def from_repo(repo, path: str, revision: str = "main") -> Dataset:
