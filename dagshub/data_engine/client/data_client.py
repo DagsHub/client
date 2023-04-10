@@ -43,7 +43,7 @@ class PeekResult:
 
         res = pd.DataFrame({"name": names})
 
-        for key in metadata_keys:
+        for key in sorted(metadata_keys):
             res[key] = [e.metadata.get(key) for e in self.entries]
 
         return res
