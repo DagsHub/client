@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Optional, List, Dict
 
+import pandas as pd
 import gql
 from gql_query_builder import GqlQuery
 from graphene import Schema
@@ -22,10 +23,30 @@ class Metadata:
 
 
 @dataclass
-class PeekResult:
+class PeekResultEntry:
     name: str
     downloadUrl: str
-    metadata: List[Metadata]
+    metadata: Dict[str, Any]
+
+
+@dataclass
+class PeekResult:
+    entries: List[PeekResultEntry]
+
+    @property
+    def dataframe(self):
+        metadata_keys = set()
+        names = []
+        for e in self.entries:
+            names.append(e.name)
+            metadata_keys.update(e.metadata.keys())
+
+        res = pd.DataFrame({"name": names})
+
+        for key in metadata_keys:
+            res[key] = [e.metadata.get(key) for e in self.entries]
+
+        return res
 
 
 class DataClient:
@@ -69,8 +90,20 @@ class DataClient:
         res = self._exec(q, params)
         return res
 
-    def peek(self, dataset: Dataset):
+    def peek(self, dataset: Dataset) -> PeekResult:
         resp = self._query(dataset, 10, True)
+        res = PeekResult([self.edge_to_peekresult(edge) for edge in resp["datasourceQuery"]["edges"]])
+        return res
+
+    def edge_to_peekresult(self, edge: Dict) -> PeekResultEntry:
+        res = PeekResultEntry(
+            name=edge["node"]["name"],
+            downloadUrl=edge["node"]["source"]["downloadUrl"],
+            metadata={}
+        )
+        for meta_dict in edge["node"]["metadata"]:
+            res.metadata[meta_dict["key"]] = meta_dict["value"]
+        return res
 
     def get_datapoints(self, dataset: Dataset):
         return self._get_all(dataset, True)
@@ -79,7 +112,7 @@ class DataClient:
         # Todo: use pagination here
         return self._query(dataset, 100, include_metadata)
 
-    def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> dict[str, Any]:
+    def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         logger.warning(f"Executing query: {query}")
         if params is not None:
             logger.warning(f"Params: {params}")

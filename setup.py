@@ -36,6 +36,7 @@ install_requires = [
     "gql-query-builder~=0.1.7",
     "gql[requests]",
     "dataclasses-json",
+    "pandas",
 ]
 
 # Polyfills for Python 3.7
