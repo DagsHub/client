@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Dict
 
 import gql
 from gql_query_builder import GqlQuery
@@ -79,7 +79,7 @@ class DataClient:
         # Todo: use pagination here
         return self._query(dataset, 100, include_metadata)
 
-    def _exec(self, query: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> dict[str, Any]:
         logger.warning(f"Executing query: {query}")
         if params is not None:
             logger.warning(f"Params: {params}")
