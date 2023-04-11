@@ -11,6 +11,7 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.data_engine.client.mock_graphql import Query
 from dagshub.data_engine.model.dataset import Dataset, DataPointMetadataUpdateEntry
 from gql.transport.requests import RequestsHTTPTransport
+import dagshub.common.config
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,8 @@ class DataClient:
         self.client = self._init_client()
 
     def _init_client(self):
-        url = f"https://data-preview.dagops.dagshub.com/api/v1/repos/{self.repo}/data-engine/graphql"
-        auth = HTTPBearerAuth(dagshub.auth.get_token(host="https://data-preview.dagops.dagshub.com"))
+        url = f"{dagshub.common.config.host}/api/v1/repos/{self.repo}/data-engine/graphql"
+        auth = HTTPBearerAuth(dagshub.auth.get_token())
         transport = RequestsHTTPTransport(url=url, auth=auth)
         client = gql.Client(transport=transport)
         return client
