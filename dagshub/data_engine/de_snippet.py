@@ -31,14 +31,25 @@ def add_metadata():
         ctx.update_metadata(files, {"episode": 2})
 
 
+def add_more_metadata():
+    ds = get_dataset()
+    with ds.metadata_context() as ctx:
+        ctx.update_metadata("file1", {"air_date": "2022-01-01"})
+        ctx.update_metadata("file2", {"air_date": "2022-01-08"})
+        ctx.update_metadata("file1", {"has_baby_yoda": True})
+
+
 def query():
     ds = get_dataset()
-    ds.and_query(episode_eq=2).or_query(filename_contains="a").peek()
+    res = ds.and_query(episode_eq=2).or_query(filename_contains="a").peek()
+    # res = ds.or_query(episode_eq=2).peek()
+    print(res.dataframe)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     query()
+    # add_more_metadata()
     # add_metadata()
     # create_datasource()
     # do_stuff()

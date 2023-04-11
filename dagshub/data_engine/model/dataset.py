@@ -2,7 +2,7 @@ import json
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 from dataclasses_json import dataclass_json
 
@@ -66,7 +66,7 @@ class Dataset:
         return self._query("or", param_operand, **query_params)
 
     def peek(self):
-        return self._source.client.get_datapoints(self)
+        return self._source.client.peek(self)
 
     @contextmanager
     def metadata_context(self) -> "MetadataContextManager":
@@ -87,7 +87,9 @@ class MetadataContextManager:
         self._dataset = dataset
         self._metadata_entries: List[DataPointMetadataUpdateEntry] = []
 
-    def update_metadata(self, datapoints: List[str], metadata: Dict[str, Any]):
+    def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
+        if isinstance(datapoints, str):
+            datapoints = [datapoints]
         for dp in datapoints:
             for k, v in metadata.items():
                 self._metadata_entries.append(DataPointMetadataUpdateEntry(
