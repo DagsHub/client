@@ -1,5 +1,6 @@
 import logging
 import enum
+import urllib.parse
 from dataclasses import dataclass, field
 
 from dagshub.data_engine.client.data_client import DataClient
@@ -9,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class DataSourceType(enum.Enum):
-    BUCKET = 1
-    REPO = 2
-    DATASET = 3
+    BUCKET = "BUCKET"
+    REPOSITORY = "REPOSITORY"
+    CUSTOM = "CUSTOM"
 
 
 @dataclass
@@ -24,30 +25,42 @@ class DataSource:
     client: DataClient = field(init=False)
 
     def create(self):
-        self.client = DataClient(self.repo)
-        datasource = self.client.create_datasource(self.name, self.path)
+        datasource = self.client.create_datasource(self)
         logging.debug(f"datasource: {datasource}")
         self.id = datasource["id"]
 
     def __post_init__(self):
         self.client = DataClient(self.repo)
-    #     datasource = self.client.create_datasource(self.name, self.path)
-    #     logging.debug(f"res: {res}")
-    #     self.id = datasource["id"]
+        # TODO: actually query for the id
+        self.id = "1"
+
+    def content_path(self, path: str) -> str:
+        if self.source_type == DataSourceType.BUCKET:
+            parsed_path = urllib.parse.urlparse(self.path)
+            return f"{self.client.host}/api/v1/repos/{self.repo}/storage/content/{parsed_path.scheme}/" \
+                   f"{parsed_path.hostname}/{parsed_path.path}/{path}"
+        raise NotImplementedError
+
+    def raw_path(self, path: str) -> str:
+        if self.source_type == DataSourceType.BUCKET:
+            parsed_path = urllib.parse.urlparse(self.path)
+            return f"{self.client.host}/api/v1/repos/{self.repo}/storage/raw/{parsed_path.scheme}/" \
+                   f"{parsed_path.path}/{path}"
+        raise NotImplementedError
 
 
 def from_bucket(name, repo, bucket_url: str) -> Dataset:
+    # TODO: add "create if not exists" capability
     ds = DataSource(DataSourceType.BUCKET, repo, bucket_url, name=name)
-    ds.create()
     return Dataset(datasource=ds)
 
 
 def from_repo(repo, path: str, revision: str = "main") -> Dataset:
-    return Dataset(DataSource(DataSourceType.REPO, repo, f"{revision}/{path}"))
+    return Dataset(DataSource(DataSourceType.REPOSITORY, repo, f"{revision}/{path}"))
 
 
 def from_dataset(repo, dataset_name: str) -> Dataset:
-    return Dataset(DataSource(DataSourceType.DATASET, repo, dataset_name))
+    return Dataset(DataSource(DataSourceType.CUSTOM, repo, dataset_name))
 
 
 __all__ = [

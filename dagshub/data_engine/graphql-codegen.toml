@@ -1,5 +1,4 @@
-# Not working for now - need to write queries first
 [tool.ariadne-codegen]
 #queries_path = "queries.graphql"
-schema_path = "schema.graphql"
-
+schema_path = "schema.graphqls"
+queries_path = "schema.graphqls"

@@ -1,12 +1,20 @@
 import json
 import logging
+import os.path
+import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
+import httpx
 from dataclasses_json import dataclass_json
 
+import dagshub.auth
+from dagshub.auth.token_auth import HTTPBearerAuth
+from dagshub.common import config
 from dagshub.data_engine.model.query import Query, _metadataTypeLookup
+import fiftyone as fo
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
@@ -80,6 +88,43 @@ class Dataset:
     def save_dataset(self):
         logger.info(f"Saving dataset")
         raise NotImplementedError
+
+    def to_voxel51_dataset(self) -> fo.Dataset:
+        logger.info("Migrating dataset to voxel51")
+        name = self._source.name
+        ds: fo.Dataset = fo.Dataset(name)
+        # ds.persistent = True
+        dataset_location = os.path.join(Path.home(), "dagshub_datasets")
+        os.makedirs(dataset_location, exist_ok=True)
+        logger.info("Downloading files...")
+        # Load the dataset from the query
+
+        # FIXME: shouldnt use peek here, but only peekresult has the dataframe
+        dp = self.peek()
+
+        host = config.host
+        client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host)))
+
+        samples = []
+
+        # TODO: parallelize this with some async magic
+        for row_num, file_row in dp.dataframe.iterrows():
+            file_url = file_row["name"]
+            resp = client.get(file_url)
+            assert resp.status_code == 200
+            # TODO: doesn't work with nesting
+            filename = file_url.split("/")[-1]
+            filepath = os.path.join(dataset_location, filename)
+            with open(filepath, "wb") as f:
+                f.write(resp.content)
+            sample = fo.Sample(filepath=filepath)
+            # TODO: figure out how to iterate over metadata columns
+            sample["url"] = file_row["name"]
+            sample["img_number"] = file_row["img_number"]
+            samples.append(sample)
+        logger.info(f"Downloaded {len(dp.dataframe['name'])} file(s) into {dataset_location}")
+        ds.add_samples(samples)
+        return ds
 
 
 class MetadataContextManager:

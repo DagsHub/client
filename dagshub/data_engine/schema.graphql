@@ -1,10 +1,12 @@
+scalar DateTime
+
 type DataPoint {
-  id: ID!
-  name: String!
+	id: ID!
+	name: String!
 	source: DataPointSource!
-  metadata: [MetadataField!]
-  createdAt: DateTime!
-  updatedAt: DateTime!
+	metadata: [MetadataField!]
+	createdAt: DateTime!
+	updatedAt: DateTime!
 }
 
 interface DataPointSource {
@@ -46,8 +48,8 @@ type Bucket {
 }
 
 type MetadataField {
-  key: String!
-  value: MetadataValue!
+	key: String!
+	value: MetadataValue!
 }
 
 scalar MetadataValue
@@ -59,13 +61,13 @@ enum DatasetLifeCycleStage {
 }
 
 type Dataset {
-  id: ID!
-  name: String!
-  createdAt: String!
-  updatedAt: String!
+	id: ID!
+	name: String!
+	createdAt: String!
+	updatedAt: String!
 	lifeCycle: DatasetLifeCycleStage!
 	metadata: [MetadataField!]
-  datapoints(first: Int, after: String): DataPointsConnection!
+	datapoints(first: Int, after: String): DataPointsConnection!
 }
 
 type DataPointsConnection {
@@ -84,42 +86,42 @@ type PageInfo {
 }
 
 type Query {
-  dataPoints(dataset: ID!, filter: [MetadataFilter!], first: Int, after: String): DataPointsConnection!
+	dataPoints(dataset: ID!, filter: [MetadataFilter!], first: Int, after: String): DataPointsConnection!
 	dataSets(repo: ID, first: Int , after: String): DataSetsConnection!
 }
 
 input MetadataFilter {
-  key: String!
-  value: MetadataInputValue!
+	key: String!
+	value: MetadataInputValue!
 }
 
 union MetadataInputValue = Int | Float | String | Boolean | [MetadataInput!]! | MetadataInput
 
 type Mutation {
-	createDataset(name: String!, from: DatasetInput!): Dataset,
-	updateDataset(id: ID!, name: String, lifeCycle: LifeCycleStage, addMetadataaddDataPoints: [ID!], removeDataPoints: [ID!]): Dataset,
-	addDataPointMetadata(id: ID!, metadata: [MetadataInput!]): DataPoint,
+createDataset(name: String!, from: DatasetInput!): Dataset,
+updateDataset(id: ID!, name: String, lifeCycle: LifeCycleStage, addMetadataaddDataPoints: [ID!], removeDataPoints: [ID!]): Dataset,
+addDataPointMetadata(id: ID!, metadata: [MetadataInput!]): DataPoint,
 }
 
 input RepoPathInput {
-	repo: ID!
-	revision: String!
-	dirPath: String!
+repo: ID!
+revision: String!
+dirPath: String!
 }
 
 input CopyDatasetInput {
-	dataset: ID!
+dataset: ID!
 }
 
 input BucketInput {
-	name: String!
-	root: String
-	dirPath: String
+name: String!
+root: String
+dirPath: String
 }
 
 input ParentDatasetInput {
-	parentDataset: ID!
-	dataPoints: [ID!]
+parentDataset: ID!
+dataPoints: [ID!]
 }
 
 union DatasetInput = RepoPathInput | CopyDatasetInput | BucketInput | ParentDatasetInput
