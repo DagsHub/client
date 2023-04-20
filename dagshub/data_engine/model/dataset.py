@@ -18,6 +18,7 @@ import fiftyone as fo
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
+    from dagshub.data_engine.client.data_client import PeekResult
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class Dataset:
     def or_query(self, param_operand="and", **query_params):
         return self._query("or", param_operand, **query_params)
 
-    def peek(self):
+    def peek(self) -> "PeekResult":
         return self._source.client.peek(self)
 
     @contextmanager
@@ -100,7 +101,7 @@ class Dataset:
         # Load the dataset from the query
 
         # FIXME: shouldnt use peek here, but only peekresult has the dataframe
-        dp = self.peek()
+        datapoints = self.peek()
 
         host = config.host
         client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host)))
@@ -108,8 +109,8 @@ class Dataset:
         samples = []
 
         # TODO: parallelize this with some async magic
-        for row_num, file_row in dp.dataframe.iterrows():
-            file_url = file_row["name"]
+        for datapoint in datapoints.entries:
+            file_url = datapoint.downloadUrl
             resp = client.get(file_url)
             assert resp.status_code == 200
             # TODO: doesn't work with nesting
@@ -119,10 +120,11 @@ class Dataset:
                 f.write(resp.content)
             sample = fo.Sample(filepath=filepath)
             # TODO: figure out how to iterate over metadata columns
-            sample["url"] = file_row["name"]
-            sample["img_number"] = file_row["img_number"]
+            sample["url"] = file_url
+            for k, v in datapoint.metadata.items():
+                sample[k] = v
             samples.append(sample)
-        logger.info(f"Downloaded {len(dp.dataframe['name'])} file(s) into {dataset_location}")
+        logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
         return ds
 
