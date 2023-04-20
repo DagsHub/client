@@ -94,7 +94,7 @@ class Dataset:
         logger.info("Migrating dataset to voxel51")
         name = self._source.name
         ds: fo.Dataset = fo.Dataset(name)
-        # ds.persistent = True
+        ds.persistent = True
         dataset_location = os.path.join(Path.home(), "dagshub_datasets")
         os.makedirs(dataset_location, exist_ok=True)
         logger.info("Downloading files...")
