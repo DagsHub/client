@@ -90,8 +90,7 @@ class DESnippetDriver:
         sess.wait()
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+def dataset_create_flow():
     snippet_driver = DESnippetDriver()
 
     # TO CREATE DATASOURCE (If it wasn't yet)
@@ -106,3 +105,7 @@ if __name__ == "__main__":
 
     # TO CREATE THE VOXEL APP
     snippet_driver.make_voxel()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)

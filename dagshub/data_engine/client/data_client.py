@@ -154,7 +154,7 @@ class DataClient:
 
         params = {
             "datasource": dataset.source.id,
-            "queryInput": {"query": dataset._ds_query.serialize_graphql()}
+            "queryInput": {"query": dataset._query.serialize_graphql()}
         }
 
         return self._exec(q, params)
@@ -195,7 +195,7 @@ class DataClient:
             "datasource": dataset.source.id,
             "first": limit,
         }
-        query_filter = dataset._ds_query.serialize_graphql()
+        query_filter = dataset._query.serialize_graphql()
         if query_filter is not None:
             query_input["filter"] = query_filter
 

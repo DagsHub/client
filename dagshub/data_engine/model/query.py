@@ -3,6 +3,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, TYPE_CHECKING, List, Optional, Union
 
+from treelib import Tree, Node
+
 from dagshub.data_engine import DEFAULT_NAMESPACE
 
 if TYPE_CHECKING:
@@ -84,18 +86,64 @@ class QueryFilterOperand(enum.Enum):
             raise RuntimeError(f"Unknown operand {operand}. Possible values: ['and', 'or']")
 
 
-class Query:
-    def __init__(self, dataset: "Dataset"):
+#
+# class DatasetQuery:
+#     def __init__(self, dataset: "Dataset", arg: Any):
+#         self.dataset = dataset
+#         # TODO: change from Any to an actual object
+#         self.arg = arg
+
+
+class DatasetQuery:
+    def __init__(self, dataset: "Dataset", column_or_query: Optional[Union[str, "DatasetQuery"]] = None):
         self.dataset = dataset
         self.filter: Optional[QueryFilter] = None
 
+        self._operand_tree: Optional[Tree] = Tree()
+        self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
+        if type(column_or_query) is str:
+            # If it's ds["column"] then the root node is just the column name
+            self._column_filter = column_or_query
+        elif column_or_query is not None:
+            self._operand_tree.create_node(column_or_query)
+
     def __str__(self):
-        return f"<Query: Filter: {self.filter}>"
+        return f"<Query: {self.to_dict()}>"
+
+    def compose(self, op: str, other: Union[str, int, float, "DatasetQuery"]):
+        print(f"Composing {op} with {other}")
+        if self._column_filter is not None:
+            # Just the column is in the query - compose into a tree
+            self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
+            self._column_filter = None
+        else:
+            # The query is an actual query with a tree - make a subtree
+            if type(other) is not DatasetQuery:
+                raise RuntimeError(f"Expected other argument to be a dataset, got {type(other)} instead")
+            if op not in ["and", "or"]:
+                raise RuntimeError(f"Cannot use operator '{op}' to chain two queries together.\r\n"
+                                   f"Queries:\r\n"
+                                   f"\t{self}\r\n"
+                                   f"\t{other}\r\n")
+            composite_tree = Tree()
+            root_node = composite_tree.create_node(op)
+            composite_tree.paste(root_node.identifier, self._operand_tree)
+            composite_tree.paste(root_node.identifier, other._operand_tree)
+            self._operand_tree = composite_tree
+
+    @property
+    def _operand_root(self):
+        return self._operand_tree[self._operand_tree.root]
 
     def serialize_graphql(self):
         if self.filter is None:
             return None
         return self.filter.serialize_graphql()
+
+    def to_dict(self):
+        if self._operand_tree is None:
+            raise RuntimeError("Can't serialize empty queries. You need to specify an operator")
+        return self._operand_tree.to_dict(with_data=True)
 
     @staticmethod
     def from_query_params(dataset: "Dataset", operand="and", **query_params) -> "Query":
@@ -103,16 +151,24 @@ class Query:
         Example usecase:
         Query(ds, name_contains="Data", date_eq = "2022-01-01")
         """
-        q = Query(dataset)
+        q = DatasetQuery(dataset)
         params = q.parse_query_params(**query_params)
         q.filter = QueryFilter(QueryFilterOperand.from_str(operand), params)
         return q
 
+    def __deepcopy__(self, memodict={}):
+        q = DatasetQuery(self.dataset, None)
+        if self._column_filter is not None:
+            q._column_filter = self._column_filter
+        else:
+            q._operand_tree = Tree(tree=self._operand_tree, deep=True)
+        return q
+
     @property
     def is_empty(self):
-        return self.filter is None or len(self.filter.queries) == 0
+        return self._column_filter is not None or self._operand_tree.root is None
 
-    def compose(self, other_query: "Query", operand="and") -> "Query":
+    def __oldcompose(self, other_query: "Query", operand="and") -> "Query":
         operand = QueryFilterOperand.from_str(operand)
 
         # If the operand is equal to the operand of the left-side query, "fold" the right side into the left side
@@ -123,7 +179,7 @@ class Query:
             return self
 
         # Otherwise compose into a new query
-        res = Query(self.dataset)
+        res = DatasetQuery(self.dataset)
         queries = list(filter(lambda q: not q.is_empty, [self, other_query]))
 
         # If one of the queries is empty - ignore the composure and return the non-empty one

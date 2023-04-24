@@ -37,6 +37,7 @@ install_requires = [
     "gql[requests]",
     "dataclasses-json",
     "pandas",
+    "treelib~=1.6.4"
 ]
 
 # Polyfills for Python 3.7

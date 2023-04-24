@@ -51,16 +51,16 @@ class DataSource:
 
 def from_bucket(name, repo, bucket_url: str) -> Dataset:
     # TODO: add "create if not exists" capability
-    ds = DataSource(DataSourceType.BUCKET, repo, bucket_url, name=name)
+    ds = DataSource(DataSourceType.BUCKET, name, repo, bucket_url)
     return Dataset(datasource=ds)
 
 
-def from_repo(repo, path: str, revision: str = "main") -> Dataset:
-    return Dataset(DataSource(DataSourceType.REPOSITORY, repo, f"{revision}/{path}"))
+def from_repo(name: str, repo: str, path: str, revision: str = "main") -> Dataset:
+    return Dataset(DataSource(DataSourceType.REPOSITORY, name, repo, f"{revision}/{path}"))
 
 
-def from_dataset(repo, dataset_name: str) -> Dataset:
-    return Dataset(DataSource(DataSourceType.CUSTOM, repo, dataset_name))
+def from_dataset(name: str, repo: str, dataset_name: str) -> Dataset:
+    return Dataset(DataSource(DataSourceType.CUSTOM, name, repo, dataset_name))
 
 
 __all__ = [

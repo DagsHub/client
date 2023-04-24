@@ -1,20 +1,19 @@
 import json
 import logging
 import os.path
-import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
+import fiftyone as fo
 import httpx
 from dataclasses_json import dataclass_json
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.data_engine.model.query import Query, _metadataTypeLookup
-import fiftyone as fo
+from dagshub.data_engine.model.query import DatasetQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
@@ -32,13 +31,30 @@ class DataPointMetadataUpdateEntry(json.JSONEncoder):
     valueType: str
 
 
+class WrongOrderError(Exception):
+    def __init__(self, other_type: type):
+        super().__init__()
+        self.other_type = other_type
+
+    def __str__(self):
+        return f"Can't have a dataset to the right of {self.other_type}.\r\n" \
+               f"Make sure to use parentheses to chain logical and/or.\r\n" \
+               f"Example: `ds[(ds['col1'] > 1) & (ds['col2'] < 3)])`"
+
+
+class DatasetFieldComparisonError(Exception):
+    def __str__(self):
+        return f"Can't compare two fields in a dataset between each other.\r\n" \
+               f"Querying only supports comparisons with primitives (int/str/float)"
+
+
 class Dataset:
 
-    def __init__(self, datasource: "DataSource", query: Optional[Query] = None):
+    def __init__(self, datasource: "DataSource", query: Optional[DatasetQuery] = None):
         self._source = datasource
         if query is None:
-            query = Query(self)
-        self._ds_query = query
+            query = DatasetQuery(self)
+        self._query = query
         self._include_list: Optional[str] = None
         self._exclude_list: Optional[str] = None
 
@@ -54,25 +70,29 @@ class Dataset:
         """Excludes datapoints from the returned set. They will not show up even if they pass the query"""
         raise NotImplementedError
 
-    def _query(self, query_operand="and", param_operand="and", **query_params):
-        """
-        Composites a new dataset out of this dataset's query and the new query
+    # def _query(self, query_operand="and", param_operand="and", **query_params):
+    #     """
+    #     Composites a new dataset out of this dataset's query and the new query
+    #
+    #     query_operand decides the operand between the dataset's query and the new query
+    #     filter_operand decides the operand used between the query parameters
+    #     """
+    #
+    #     new_query = Query.from_query_params(self, param_operand, **query_params)
+    #     return Dataset(datasource=self._source, query=self._ds_query.compose(new_query, query_operand))
 
-        query_operand decides the operand between the dataset's query and the new query
-        filter_operand decides the operand used between the query parameters
-        """
+    def __deepcopy__(self, memodict={}) -> "Dataset":
+        return Dataset(self._source, self._query.__deepcopy__())
 
-        new_query = Query.from_query_params(self, param_operand, **query_params)
-        return Dataset(datasource=self._source, query=self._ds_query.compose(new_query, query_operand))
+    def get_query(self):
+        return self._query
 
-    def query(self, param_operand="and", **query_params):
-        return self.and_query(param_operand, **query_params)
-
-    def and_query(self, param_operand="and", **query_params):
-        return self._query("and", param_operand, **query_params)
-
-    def or_query(self, param_operand="and", **query_params):
-        return self._query("or", param_operand, **query_params)
+    #
+    # def and_query(self, param_operand="and", **query_params):
+    #     return self._query("and", param_operand, **query_params)
+    #
+    # def or_query(self, param_operand="and", **query_params):
+    #     return self._query("or", param_operand, **query_params)
 
     def peek(self) -> "PeekResult":
         return self._source.client.peek(self)
@@ -84,7 +104,7 @@ class Dataset:
         self.source.client.add_metadata(self, ctx.get_metadata_entries())
 
     def __str__(self):
-        return f"<Dataset source:{self._source}, query: {self._ds_query}>"
+        return f"<Dataset source:{self._source}, query: {self._query}>"
 
     def save_dataset(self):
         logger.info(f"Saving dataset")
@@ -119,7 +139,6 @@ class Dataset:
             with open(filepath, "wb") as f:
                 f.write(resp.content)
             sample = fo.Sample(filepath=filepath)
-            # TODO: figure out how to iterate over metadata columns
             sample["url"] = file_url
             for k, v in datapoint.metadata.items():
                 sample[k] = v
@@ -127,6 +146,78 @@ class Dataset:
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
         return ds
+
+    def __getitem__(self, column_or_query: Union[str, "Dataset"]):
+        new_ds = self.__deepcopy__()
+        if type(column_or_query) is str:
+            new_ds._query = DatasetQuery(new_ds, column_or_query)
+            return new_ds
+        else:
+            # "index" is a dataset with a query - compose with "and"
+            if self._query.is_empty:
+                new_ds._query = column_or_query._query
+                return new_ds
+            else:
+                return self.__and__(column_or_query)
+
+    def __gt__(self, other: Union[int, float, str]):
+        self._test_not_comparing_other_ds(other)
+        return self.add_query_op("gt", other)
+
+    def __ge__(self, other: Union[int, float, str]):
+        self._test_not_comparing_other_ds(other)
+        return self.add_query_op("ge", other)
+
+    def __le__(self, other: Union[int, float, str]):
+        self._test_not_comparing_other_ds(other)
+        return self.add_query_op("le", other)
+
+    def __lt__(self, other: Union[int, float, str]):
+        self._test_not_comparing_other_ds(other)
+        return self.add_query_op("lt", other)
+
+    def __eq__(self, other: Union[int, float, str]):
+        self._test_not_comparing_other_ds(other)
+        return self.add_query_op("eq", other)
+
+    def __ne__(self, other: Union[int, float, str]):
+        self._test_not_comparing_other_ds(other)
+        return self.add_query_op("ne", other)
+
+    def __contains__(self, item: Union[int, float, str]):
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("contains", item)
+
+    def __and__(self, other: "Dataset"):
+        return self.add_query_op("and", other)
+
+    def __or__(self, other: "Dataset"):
+        return self.add_query_op("or", other)
+
+    def __rand__(self, other):
+        if type(other) is not Dataset:
+            raise WrongOrderError(type(other))
+        raise NotImplementedError
+
+    def __ror__(self, other):
+        if type(other) is not Dataset:
+            raise WrongOrderError(type(other))
+        raise NotImplementedError
+
+    def add_query_op(self, op: str, other: [str, int, float, "Dataset"]) -> "Dataset":
+        """
+        Returns a new dataset with an added query param
+        """
+        new_ds = self.__deepcopy__()
+        if type(other) is Dataset:
+            other = other.get_query()
+        new_ds._query.compose(op, other)
+        return new_ds
+
+    @staticmethod
+    def _test_not_comparing_other_ds(other):
+        if type(other) is Dataset:
+            raise DatasetFieldComparisonError()
 
 
 class MetadataContextManager:
