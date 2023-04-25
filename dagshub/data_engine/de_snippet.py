@@ -17,6 +17,7 @@ from dagshub.streaming.dataclasses import ContentAPIEntry
 
 logger = logging.getLogger(__name__)
 
+
 class DESnippetDriver:
 
     def __init__(self, repo="kirill/DataEngineTesting", bucket_url="s3://dagshub-storage"):
@@ -28,7 +29,7 @@ class DESnippetDriver:
         self.client = httpx.Client(auth=auth)
 
     def init_dataset(self):
-        return datasources.from_bucket("my-data", self.repo, self.bucket_url)
+        return datasources.from_bucket("data-2", self.repo, self.bucket_url)
 
     def create_datasource(self):
         logger.info("Creating datasource...")
@@ -49,10 +50,12 @@ class DESnippetDriver:
     #         ctx.update_metadata("file2", {"air_date": "2022-01-08"})
     #         ctx.update_metadata("file1", {"has_baby_yoda": True})
 
-    def query(self):
-        res = self.dataset.and_query(img_number_ge=5).or_query(img_number_eq=0).peek()
-        # res = ds.or_query(episode_eq=2).peek()
-        print(res.dataframe)
+    # def query(self):
+    #     # res = self.dataset.and_query(img_number_ge=5).or_query(img_number_eq=0).peek()
+    #     ds = self.dataset
+    #     res = ds[(ds["img_number"] >= 5) | (ds["img_number"] == 0)].peek()
+    #     # res = ds.or_query(episode_eq=2).peek()
+    #     print(res.dataframe)
 
     def get_file_list(self, path):
         resp = self.client.get(self.dataset.source.content_path(path))
@@ -84,7 +87,13 @@ class DESnippetDriver:
 
     def make_voxel(self):
         logger.info("Importing to voxel51")
-        v51_ds = self.dataset.and_query(episode_eq=1).or_query(episode_ge=5).to_voxel51_dataset()
+        # v51_ds = self.dataset.and_query(episode_eq=1).or_query(episode_ge=5).to_voxel51_dataset()
+        ds = self.dataset
+        # TODO: don't need redundant ands once the gql query actually works
+        q1 = (ds["episode"] > 5) & (ds["episode"] > 5)
+        q2 = (ds["episode"] == 1) & (ds["episode"] == 1)
+        v51_ds = ds[q1 | q2].to_voxel51_dataset()
+
         sess = fo.launch_app(v51_ds)
         IPython.embed()
         sess.wait()
@@ -109,3 +118,4 @@ def dataset_create_flow():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    dataset_create_flow()

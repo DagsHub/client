@@ -19,9 +19,9 @@ class DataSourceType(enum.Enum):
 class DataSource:
     id: str = field(init=False)
     source_type: DataSourceType
+    name: str
     repo: str
     path: str
-    name: str
     client: DataClient = field(init=False)
 
     def create(self):

@@ -13,6 +13,7 @@ from dataclasses_json import dataclass_json
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DatasetQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
@@ -30,22 +31,6 @@ class DataPointMetadataUpdateEntry(json.JSONEncoder):
     value: str
     valueType: str
 
-
-class WrongOrderError(Exception):
-    def __init__(self, other_type: type):
-        super().__init__()
-        self.other_type = other_type
-
-    def __str__(self):
-        return f"Can't have a dataset to the right of {self.other_type}.\r\n" \
-               f"Make sure to use parentheses to chain logical and/or.\r\n" \
-               f"Example: `ds[(ds['col1'] > 1) & (ds['col2'] < 3)])`"
-
-
-class DatasetFieldComparisonError(Exception):
-    def __str__(self):
-        return f"Can't compare two fields in a dataset between each other.\r\n" \
-               f"Querying only supports comparisons with primitives (int/str/float)"
 
 
 class Dataset:
@@ -114,7 +99,7 @@ class Dataset:
         logger.info("Migrating dataset to voxel51")
         name = self._source.name
         ds: fo.Dataset = fo.Dataset(name)
-        ds.persistent = True
+        # ds.persistent = True
         dataset_location = os.path.join(Path.home(), "dagshub_datasets")
         os.makedirs(dataset_location, exist_ok=True)
         logger.info("Downloading files...")
@@ -158,7 +143,7 @@ class Dataset:
                 new_ds._query = column_or_query._query
                 return new_ds
             else:
-                return self.__and__(column_or_query)
+                return column_or_query.__and__(self)
 
     def __gt__(self, other: Union[int, float, str]):
         self._test_not_comparing_other_ds(other)
@@ -185,6 +170,9 @@ class Dataset:
         return self.add_query_op("ne", other)
 
     def __contains__(self, item: Union[int, float, str]):
+        raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in contains`")
+
+    def contains(self, item: Union[int, float, str]):
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 

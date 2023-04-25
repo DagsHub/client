@@ -154,7 +154,7 @@ class DataClient:
 
         params = {
             "datasource": dataset.source.id,
-            "queryInput": {"query": dataset._query.serialize_graphql()}
+            "queryInput": {"query": dataset.get_query().serialize_graphql()}
         }
 
         return self._exec(q, params)

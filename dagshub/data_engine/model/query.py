@@ -6,6 +6,7 @@ from typing import Any, Dict, TYPE_CHECKING, List, Optional, Union
 from treelib import Tree, Node
 
 from dagshub.data_engine import DEFAULT_NAMESPACE
+from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.dataset import Dataset
@@ -40,6 +41,7 @@ class FieldFilter:
 
 class FieldFilterOperand(enum.Enum):
     EQUAL = "EQUAL"
+    NOT_EQUAL = "NOT_EQUAL"
     GREATER_THAN = "GREATER_THAN"
     GREATER_EQUAL_THAN = "GREATER_EQUAL_THAN"
     LESS_THAN = "LESS_THAN"
@@ -49,6 +51,7 @@ class FieldFilterOperand(enum.Enum):
 
 fieldFilterOperandMap = {
     "eq": FieldFilterOperand.EQUAL,
+    "ne": FieldFilterOperand.NOT_EQUAL,
     "gt": FieldFilterOperand.GREATER_THAN,
     "ge": FieldFilterOperand.GREATER_EQUAL_THAN,
     "lt": FieldFilterOperand.LESS_THAN,
@@ -111,7 +114,6 @@ class DatasetQuery:
         return f"<Query: {self.to_dict()}>"
 
     def compose(self, op: str, other: Union[str, int, float, "DatasetQuery"]):
-        print(f"Composing {op} with {other}")
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree
             self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
@@ -132,17 +134,40 @@ class DatasetQuery:
             self._operand_tree = composite_tree
 
     @property
-    def _operand_root(self):
+    def _operand_root(self) -> Node:
         return self._operand_tree[self._operand_tree.root]
 
     def serialize_graphql(self):
-        if self.filter is None:
+        if self.is_empty:
             return None
-        return self.filter.serialize_graphql()
+        return self._serialize_node(self._operand_root, self._operand_tree)
+        #
+        # return self.filter.serialize_graphql()
+
+    @staticmethod
+    def _serialize_node(node: Node, tree: Tree) -> dict:
+        operand = node.tag
+        if operand in ["and", "or"]:
+            # recursively serialize children subqueries
+            return {operand: [DatasetQuery._serialize_node(child, tree) for child in tree.children(node.identifier)]}
+        else:
+            query_op = fieldFilterOperandMap.get(operand)
+            if query_op is None:
+                raise WrongOperatorError(f"Operator {operand} is not supported")
+            key = node.data["field"]
+            value = node.data["value"]
+            value_type = _metadataTypeLookup.get(type(value))
+            if value_type is None:
+                raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
+                                   f"Supported types: {list(_metadataTypeLookup.keys())}")
+            return {
+                "key": key,
+                "value": str(value),
+                "valueType": value_type,
+                "comparator": query_op.value,
+            }
 
     def to_dict(self):
-        if self._operand_tree is None:
-            raise RuntimeError("Can't serialize empty queries. You need to specify an operator")
         return self._operand_tree.to_dict(with_data=True)
 
     @staticmethod
