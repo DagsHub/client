@@ -270,12 +270,13 @@ class DagsHubFilesystem:
             self.dagshub_remotes.append(remote.geturl())
 
     def __del__(self):
-        os.close(self.project_root_fd)
+        if hasattr(self, "project_root_fd"):
+            os.close(self.project_root_fd)
         self.cleanup()
 
     def cleanup(self):
         # Remove from map of mounted filesystems
-        if self.project_root in DagsHubFilesystem.already_mounted_filesystems:
+        if hasattr(self, "project_root") and self.project_root in DagsHubFilesystem.already_mounted_filesystems:
             DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
