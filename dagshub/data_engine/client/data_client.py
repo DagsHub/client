@@ -36,7 +36,7 @@ class PeekResultEntry:
 
 
 @dataclass
-class PeekResult:
+class HeadResult:
     entries: List[PeekResultEntry]
 
     @property
@@ -101,9 +101,9 @@ class DataClient:
         res = self._exec(q, params)
         return res["createDataSource"]
 
-    def peek(self, dataset: Dataset) -> PeekResult:
+    def head(self, dataset: Dataset) -> HeadResult:
         resp = self._query(dataset, 10, True)
-        res = PeekResult([self.edge_to_peekresult(edge) for edge in resp["datasourceQuery"]["edges"]])
+        res = HeadResult([self.edge_to_peekresult(edge) for edge in resp["datasourceQuery"]["edges"]])
         return res
 
     def edge_to_peekresult(self, edge: Dict) -> PeekResultEntry:

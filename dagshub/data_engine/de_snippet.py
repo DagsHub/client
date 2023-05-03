@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 from typing import List
 
@@ -13,6 +12,7 @@ import dagshub
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.data_engine.model import datasources
+from dagshub.data_engine.voxel_plugin_server.server import run_plugin_server
 from dagshub.streaming.dataclasses import ContentAPIEntry
 
 logger = logging.getLogger(__name__)
@@ -90,8 +90,8 @@ class DESnippetDriver:
         # v51_ds = self.dataset.and_query(episode_eq=1).or_query(episode_ge=5).to_voxel51_dataset()
         ds = self.dataset
         # TODO: don't need redundant ands once the gql query actually works
-        q1 = (ds["episode"] > 5) & (ds["episode"] > 5)
-        q2 = (ds["episode"] == 1) & (ds["episode"] == 1)
+        q1 = (ds["episode"] > 5) & (ds["has_dog"] == True)
+        q2 = (ds["episode"] == 1) & (ds["animal"] == "parrot")
         v51_ds = ds[q1 | q2].to_voxel51_dataset()
 
         sess = fo.launch_app(v51_ds)
@@ -116,6 +116,22 @@ def dataset_create_flow():
     snippet_driver.make_voxel()
 
 
+def just_debugging_voxel():
+    ds = fo.load_dataset("my-data")
+    plugin_server = run_plugin_server()
+    sess = fo.launch_app(ds)
+
+    # NVM this doesn't work
+    # fcse.DagshubLabelstudio = DagshubLabelstudio
+    # setattr(sys.modules[fcse.Event.__module__], DagshubLabelstudio.__name__, DagshubLabelstudio)
+    # sess._client.add_event_listener("event", fiftyone_handler)
+
+    sess.wait()
+
+    plugin_server.stop()
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    dataset_create_flow()
+    just_debugging_voxel()
+    # dataset_create_flow()

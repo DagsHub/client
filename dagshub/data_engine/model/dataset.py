@@ -18,7 +18,7 @@ from dagshub.data_engine.model.query import DatasetQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
-    from dagshub.data_engine.client.data_client import PeekResult
+    from dagshub.data_engine.client.data_client import HeadResult
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,8 @@ class Dataset:
     # def or_query(self, param_operand="and", **query_params):
     #     return self._query("or", param_operand, **query_params)
 
-    def peek(self) -> "PeekResult":
-        return self._source.client.peek(self)
+    def head(self) -> "HeadResult":
+        return self._source.client.head(self)
 
     @contextmanager
     def metadata_context(self) -> "MetadataContextManager":
@@ -106,7 +106,7 @@ class Dataset:
         # Load the dataset from the query
 
         # FIXME: shouldnt use peek here, but only peekresult has the dataframe
-        datapoints = self.peek()
+        datapoints = self.head()
 
         host = config.host
         client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host)))
