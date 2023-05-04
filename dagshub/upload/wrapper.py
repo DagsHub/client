@@ -9,6 +9,7 @@ from typing import Union, Tuple, BinaryIO, Dict
 from io import IOBase
 import httpx
 import rich.progress
+from functools import wraps
 
 from dagshub.common import config, helpers, rich_console
 from http import HTTPStatus
@@ -31,6 +32,21 @@ s = httpx.Client()
 s.timeout = config.http_timeout
 s.follow_redirects = True
 s.headers.update(config.requests_headers)
+
+
+def check_all_args_given(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Check if all arguments are given
+        for arg in args:
+            if arg is None:
+                raise ValueError(f"Missing value for argument {arg}")
+        for arg in kwargs.values():
+            if arg is None:
+                raise ValueError(f"Missing value for argument {arg}")
+        # Call the original function
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
@@ -174,25 +190,26 @@ class Repo:
             self._set_default_branch()
         logger.debug(f"Set branch: {self.branch}")
 
+    @check_all_args_given
     def upload(
         self,
         local_path: Union[str, IOBase],
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        remote_path=None,
+        remote_path,
         **kwargs,
     ):
         """
         The upload function is used to upload files to the repository.
         It takes a file as an argument and logs the response status code and content.
-
-
-        :param file (str): Specify the file to be uploaded
-        :param commit_message (str): Specify a commit message
-        :param path (str): Specify the path to upload the file to
-        :param **kwargs: Pass in any additional parameters that are required for the upload function
+        
+        
+        :param local_path: Union[str,IOBase]: Specify the path to the file or directory you want to upload
+        :param commit_message:  A message describing what was changed in this commit. Defaults to DEFAULT_COMMIT_MESSAGE
+        :param remote_path: The remote path where you want your files/directories uploaded to on DataSet's server side storage system.
+        :param **kwargs: Pass in keyword arguments
         :return: None
-
         """
+        
         if os.path.isdir(local_path):
             dir_to_upload = self.directory(remote_path)
             dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
@@ -553,3 +570,4 @@ class DataSet:
             file_list, self.directory, commit_message=commit_message, *args, **kwargs
         )
         self._reset_dataset()
+        
