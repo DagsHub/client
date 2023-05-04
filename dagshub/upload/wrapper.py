@@ -194,8 +194,8 @@ class Repo:
     def upload(
         self,
         local_path: Union[str, IOBase],
-        commit_message=DEFAULT_COMMIT_MESSAGE,
         remote_path,
+        commit_message=DEFAULT_COMMIT_MESSAGE,
         **kwargs,
     ):
         """
@@ -570,4 +570,3 @@ class DataSet:
             file_list, self.directory, commit_message=commit_message, *args, **kwargs
         )
         self._reset_dataset()
-        
