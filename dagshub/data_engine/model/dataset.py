@@ -74,6 +74,13 @@ class Dataset:
     def get_query(self):
         return self._query
 
+    def serialize_gql_query_input(self):
+        return {
+            "query": self._query.serialize_graphql(),
+            "include": self.include_list if len(self.include_list) > 0 else None,
+            "exclude": self.exclude_list if len(self.exclude_list) > 0 else None,
+        }
+
     def head(self) -> "QueryResult":
         return self._source.client.head(self)
 
@@ -105,7 +112,7 @@ class Dataset:
         # Load the dataset from the query
 
         # FIXME: shouldnt use peek here, but only peekresult has the dataframe
-        datapoints = self.head()
+        datapoints = self.all()
 
         host = config.host
         client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host)))

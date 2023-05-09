@@ -179,7 +179,7 @@ class DataClient:
 
         params = {
             "datasource": dataset.source.id,
-            "queryInput": {"query": dataset.get_query().serialize_graphql()},
+            "queryInput": dataset.serialize_gql_query_input(),
             "first": limit,
             "after": after,
         }
