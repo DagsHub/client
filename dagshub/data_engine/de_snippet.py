@@ -50,12 +50,14 @@ class DESnippetDriver:
     #         ctx.update_metadata("file2", {"air_date": "2022-01-08"})
     #         ctx.update_metadata("file1", {"has_baby_yoda": True})
 
-    # def query(self):
-    #     # res = self.dataset.and_query(img_number_ge=5).or_query(img_number_eq=0).peek()
-    #     ds = self.dataset
-    #     res = ds[(ds["img_number"] >= 5) | (ds["img_number"] == 0)].peek()
-    #     # res = ds.or_query(episode_eq=2).peek()
-    #     print(res.dataframe)
+    def query(self):
+        # res = self.dataset.and_query(img_number_ge=5).or_query(img_number_eq=0).peek()
+        ds = self.dataset
+        q1 = (ds["episode"] > 5) & (ds["episode"] > 5)
+        q2 = (ds["episode"] == 1) & (ds["episode"] == 1)
+        res = ds[q1 | q2].all()
+        # res = ds.or_query(episode_eq=2).peek()
+        print(res.dataframe)
 
     def get_file_list(self, path):
         resp = self.client.get(self.dataset.source.content_path(path))
@@ -90,8 +92,8 @@ class DESnippetDriver:
         # v51_ds = self.dataset.and_query(episode_eq=1).or_query(episode_ge=5).to_voxel51_dataset()
         ds = self.dataset
         # TODO: don't need redundant ands once the gql query actually works
-        q1 = (ds["episode"] > 5) & (ds["has_dog"] == True)
-        q2 = (ds["episode"] == 1) & (ds["animal"] == "parrot")
+        q1 = (ds["episode"] > 5) & (ds["episode"] > 5)
+        q2 = (ds["episode"] == 1) & (ds["episode"] == 1)
         v51_ds = ds[q1 | q2].to_voxel51_dataset()
 
         sess = fo.launch_app(v51_ds)
@@ -133,7 +135,13 @@ def just_debugging_voxel():
     plugin_server.stop()
 
 
+def query_debugging():
+    snippet_driver = DESnippetDriver()
+    snippet_driver.query()
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    just_debugging_voxel()
+    query_debugging()
+    # just_debugging_voxel()
     # dataset_create_flow()

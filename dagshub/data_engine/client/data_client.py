@@ -29,15 +29,26 @@ class Metadata:
 
 
 @dataclass
-class PeekResultEntry:
+class DataPoint:
     name: str
     downloadUrl: str
     metadata: Dict[str, Any]
 
+    @staticmethod
+    def from_gql_edge(edge: Dict) -> "DataPoint":
+        res = DataPoint(
+            name=edge["node"]["name"],
+            downloadUrl=edge["node"]["source"]["downloadUrl"],
+            metadata={}
+        )
+        for meta_dict in edge["node"]["metadata"]:
+            res.metadata[meta_dict["key"]] = meta_dict["value"]
+        return res
+
 
 @dataclass
-class HeadResult:
-    entries: List[PeekResultEntry]
+class DataPointCollection:
+    entries: List[DataPoint]
 
     @property
     def dataframe(self):
@@ -55,8 +66,19 @@ class HeadResult:
 
         return res
 
+    @staticmethod
+    def from_gql_query(query_resp: Dict[str, Any]) -> "DataPointCollection":
+        if query_resp["totalCount"] == 0:
+            return DataPointCollection([])
+        return DataPointCollection([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]])
+
+    def extend_from_gql_query(self, query_resp: Dict[str, Any]):
+        self.entries += self.from_gql_query(query_resp).entries
+
 
 class DataClient:
+    HEAD_QUERY_SIZE = 10
+    FULL_LIST_PAGE_SIZE = 100
 
     def __init__(self, repo: str):
         # TODO: add project authentication here
@@ -101,63 +123,66 @@ class DataClient:
         res = self._exec(q, params)
         return res["createDataSource"]
 
-    def head(self, dataset: Dataset) -> HeadResult:
-        resp = self._query(dataset, 10, True)
-        res = HeadResult([self.edge_to_peekresult(edge) for edge in resp["datasourceQuery"]["edges"]])
-        return res
+    def head(self, dataset: Dataset) -> DataPointCollection:
+        resp = self._datasourceQuery(dataset, True, self.HEAD_QUERY_SIZE)
+        return DataPointCollection.from_gql_query(resp)
 
-    def edge_to_peekresult(self, edge: Dict) -> PeekResultEntry:
-        res = PeekResultEntry(
-            name=edge["node"]["name"],
-            downloadUrl=edge["node"]["source"]["downloadUrl"],
-            metadata={}
-        )
-        for meta_dict in edge["node"]["metadata"]:
-            res.metadata[meta_dict["key"]] = meta_dict["value"]
-        return res
-
-    def get_datapoints(self, dataset: Dataset):
+    def get_datapoints(self, dataset: Dataset) -> DataPointCollection:
         return self._get_all(dataset, True)
 
-    def _get_all(self, dataset: Dataset, include_metadata: bool):
-        # Todo: use pagination here
-        return self._query(dataset, 100, include_metadata)
+    def _get_all(self, dataset: Dataset, include_metadata: bool) -> DataPointCollection:
+        has_next_page = True
+        after = None
+        res = DataPointCollection([])
+        while has_next_page:
+            resp = self._datasourceQuery(dataset, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
+            has_next_page = resp["pageInfo"]["hasNextPage"]
+            after = resp["pageInfo"]["endCursor"]
+            res.extend_from_gql_query(resp)
+        return res
 
     def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         logger.debug(f"Executing query: {query}")
         if params is not None:
             logger.debug(f"Params: {params}")
-        # TODO: what about params?
         q = gql.gql(query)
         resp = self.client.execute(q, variable_values=params)
-        logger.debug(f"Got result: {resp}")
         return resp
 
-    def _query(self, dataset: Dataset, limit: int, include_metadata: bool):
+    def _datasourceQuery(self, dataset: Dataset, include_metadata: bool, limit: Optional[int] = None,
+                         after: Optional[str] = None):
+        metadata_fields = "metadata { key value }" if include_metadata else ""
         q = GqlQuery().operation(
             "query",
             name="datasourceQuery",
             input={
                 "$datasource": "ID!",
-                "$queryInput": "QueryInput"
+                "$queryInput": "QueryInput",
+                "$first": "Int",
+                "$after": "String",
             }
         ).query(
             "datasourceQuery",
             input={
                 "datasource": "$datasource",
-                "filter": "$queryInput"
+                "filter": "$queryInput",
+                "first": "$first",
+                "after": "$after",
             }
         ).fields([
             "totalCount",
-            "edges { node { name source { name downloadUrl previewUrl } metadata { key value } } cursor }"
+            f"edges {{ node {{ name source {{ name downloadUrl previewUrl }} {metadata_fields} }} }}",
+            "pageInfo { hasNextPage endCursor }"
         ]).generate()
 
         params = {
             "datasource": dataset.source.id,
-            "queryInput": {"query": dataset.get_query().serialize_graphql()}
+            "queryInput": {"query": dataset.get_query().serialize_graphql()},
+            "first": limit,
+            "after": after,
         }
 
-        return self._exec(q, params)
+        return self._exec(q, params)["datasourceQuery"]
 
     def add_metadata(self, dataset: Dataset, entries: List[DataPointMetadataUpdateEntry]):
         q = GqlQuery().operation(
@@ -188,25 +213,3 @@ class DataClient:
 
     def save_dataset(self, dataset: Dataset):
         raise NotImplementedError
-
-    @staticmethod
-    def _datasource_query(dataset: Dataset, limit: int, include_metadata: bool = False) -> str:
-        query_input = {
-            "datasource": dataset.source.id,
-            "first": limit,
-        }
-        query_filter = dataset._query.serialize_graphql()
-        if query_filter is not None:
-            query_input["filter"] = query_filter
-
-        node_fields = ["name"]
-        if include_metadata:
-            node_fields.append(GqlQuery().fields(["key", "value"], name="metadata").generate())
-        node_fields = GqlQuery().fields(node_fields, name="node").generate()
-
-        edges_fields = GqlQuery().fields([node_fields], name="edges").generate()
-
-        query = GqlQuery().query("datasourceQuery",
-                                 input=query_input).fields([edges_fields])
-
-        return query.generate()

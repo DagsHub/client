@@ -18,7 +18,7 @@ from dagshub.data_engine.model.query import DatasetQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
-    from dagshub.data_engine.client.data_client import HeadResult
+    from dagshub.data_engine.client.data_client import DataPointCollection
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,11 @@ class Dataset:
     # def or_query(self, param_operand="and", **query_params):
     #     return self._query("or", param_operand, **query_params)
 
-    def head(self) -> "HeadResult":
+    def head(self) -> "DataPointCollection":
         return self._source.client.head(self)
+
+    def all(self) -> "DataPointCollection":
+        return self._source.client.get_datapoints(self)
 
     @contextmanager
     def metadata_context(self) -> "MetadataContextManager":
