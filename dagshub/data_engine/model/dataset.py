@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
-import fiftyone as fo
 import httpx
 from dataclasses_json import dataclass_json
 
@@ -18,7 +17,8 @@ from dagshub.data_engine.model.query import DatasetQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
-    from dagshub.data_engine.client.data_client import DataPointCollection
+    from dagshub.data_engine.client.data_client import QueryResult
+    import fiftyone as fo
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,6 @@ class DataPointMetadataUpdateEntry(json.JSONEncoder):
     valueType: str
 
 
-
 class Dataset:
 
     def __init__(self, datasource: "DataSource", query: Optional[DatasetQuery] = None):
@@ -40,56 +39,52 @@ class Dataset:
         if query is None:
             query = DatasetQuery(self)
         self._query = query
-        self._include_list: Optional[str] = None
-        self._exclude_list: Optional[str] = None
+
+        self._include_list: List[str] = []
+        self._exclude_list: List[str] = []
+
+    @property
+    def include_list(self):
+        """List of urls of datapoints to always be included in query results """
+        return self._include_list
+
+    @include_list.setter
+    def include_list(self, val):
+        self._include_list = val
+
+    @property
+    def exclude_list(self):
+        """List of urls of datapoints to always be excluded in query results """
+        return self._exclude_list
+
+    @exclude_list.setter
+    def exclude_list(self, val):
+        self._exclude_list = val
 
     @property
     def source(self):
         return self._source
 
-    def include(self):
-        """Force adds datapoints to the returned set. They will show up even if they don't pass the query"""
-        raise NotImplementedError
-
-    def exclude(self):
-        """Excludes datapoints from the returned set. They will not show up even if they pass the query"""
-        raise NotImplementedError
-
-    # def _query(self, query_operand="and", param_operand="and", **query_params):
-    #     """
-    #     Composites a new dataset out of this dataset's query and the new query
-    #
-    #     query_operand decides the operand between the dataset's query and the new query
-    #     filter_operand decides the operand used between the query parameters
-    #     """
-    #
-    #     new_query = Query.from_query_params(self, param_operand, **query_params)
-    #     return Dataset(datasource=self._source, query=self._ds_query.compose(new_query, query_operand))
-
     def __deepcopy__(self, memodict={}) -> "Dataset":
-        return Dataset(self._source, self._query.__deepcopy__())
+        res = Dataset(self._source, self._query.__deepcopy__())
+        res.include_list = self.include_list.copy()
+        res.exclude_list = self.exclude_list.copy()
+        return res
 
     def get_query(self):
         return self._query
 
-    #
-    # def and_query(self, param_operand="and", **query_params):
-    #     return self._query("and", param_operand, **query_params)
-    #
-    # def or_query(self, param_operand="and", **query_params):
-    #     return self._query("or", param_operand, **query_params)
-
-    def head(self) -> "DataPointCollection":
+    def head(self) -> "QueryResult":
         return self._source.client.head(self)
 
-    def all(self) -> "DataPointCollection":
+    def all(self) -> "QueryResult":
         return self._source.client.get_datapoints(self)
 
     @contextmanager
     def metadata_context(self) -> "MetadataContextManager":
         ctx = MetadataContextManager(self)
         yield ctx
-        self.source.client.add_metadata(self, ctx.get_metadata_entries())
+        self.source.client._update_metadata(self, ctx.get_metadata_entries())
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
@@ -98,7 +93,8 @@ class Dataset:
         logger.info(f"Saving dataset")
         raise NotImplementedError
 
-    def to_voxel51_dataset(self) -> fo.Dataset:
+    def to_voxel51_dataset(self) -> "fo.Dataset":
+        import fiftyone as fo
         logger.info("Migrating dataset to voxel51")
         name = self._source.name
         ds: fo.Dataset = fo.Dataset(name)
@@ -135,6 +131,12 @@ class Dataset:
         ds.add_samples(samples)
         return ds
 
+    """ FUNCTIONS RELATED TO QUERYING
+    These are functions that overload operators on the DataSet, so you can do pandas-like filtering
+        ds = Dataset(...)
+        queried_ds = ds[ds["value"] == 5]
+    """
+
     def __getitem__(self, column_or_query: Union[str, "Dataset"]):
         new_ds = self.__deepcopy__()
         if type(column_or_query) is str:
@@ -142,6 +144,10 @@ class Dataset:
             return new_ds
         else:
             # "index" is a dataset with a query - compose with "and"
+            # Example:
+            #   ds = Dataset()
+            #   filtered_ds = ds[ds["aaa"] > 5]
+            #   filtered_ds2 = filtered_ds[filtered_ds["bbb"] < 4]
             if self._query.is_empty:
                 new_ds._query = column_or_query._query
                 return new_ds
@@ -173,7 +179,7 @@ class Dataset:
         return self.add_query_op("ne", other)
 
     def __contains__(self, item: Union[int, float, str]):
-        raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in contains`")
+        raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in ds`")
 
     def contains(self, item: Union[int, float, str]):
         self._test_not_comparing_other_ds(item)
@@ -185,6 +191,8 @@ class Dataset:
     def __or__(self, other: "Dataset"):
         return self.add_query_op("or", other)
 
+    # Prevent users from messing up their queries due to operator order
+    # They always need to put the dataset query filters in parentheses, otherwise the binary and/or get executed before
     def __rand__(self, other):
         if type(other) is not Dataset:
             raise WrongOrderError(type(other))

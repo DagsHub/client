@@ -3,18 +3,16 @@ import typing
 from dataclasses import dataclass
 from typing import Any, Optional, List, Dict
 
-import pandas as pd
 import gql
+import pandas as pd
+from gql.transport.requests import RequestsHTTPTransport
 from gql_query_builder import GqlQuery
-from graphene import Schema
 
 import dagshub.auth
+import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.data_engine.client.mock_graphql import Query
 from dagshub.data_engine.model.dataset import Dataset, DataPointMetadataUpdateEntry
-from gql.transport.requests import RequestsHTTPTransport
-import dagshub.common.config
 
 if typing.TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
@@ -47,8 +45,11 @@ class DataPoint:
 
 
 @dataclass
-class DataPointCollection:
+class QueryResult:
+    # List of downloaded entries. In case of .head() calls the number entries will be less than totalCount
     entries: List[DataPoint]
+    # Total amount of entries returned by the query
+    totalCount: int = 0
 
     @property
     def dataframe(self):
@@ -67,12 +68,13 @@ class DataPointCollection:
         return res
 
     @staticmethod
-    def from_gql_query(query_resp: Dict[str, Any]) -> "DataPointCollection":
-        if query_resp["totalCount"] == 0:
-            return DataPointCollection([])
-        return DataPointCollection([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]])
+    def from_gql_query(query_resp: Dict[str, Any]) -> "QueryResult":
+        total_count = query_resp["totalCount"]
+        if total_count == 0:
+            return QueryResult([])
+        return QueryResult([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]], total_count)
 
-    def extend_from_gql_query(self, query_resp: Dict[str, Any]):
+    def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
         self.entries += self.from_gql_query(query_resp).entries
 
 
@@ -123,22 +125,22 @@ class DataClient:
         res = self._exec(q, params)
         return res["createDataSource"]
 
-    def head(self, dataset: Dataset) -> DataPointCollection:
-        resp = self._datasourceQuery(dataset, True, self.HEAD_QUERY_SIZE)
-        return DataPointCollection.from_gql_query(resp)
+    def head(self, dataset: Dataset) -> QueryResult:
+        resp = self._datasource_query(dataset, True, self.HEAD_QUERY_SIZE)
+        return QueryResult.from_gql_query(resp)
 
-    def get_datapoints(self, dataset: Dataset) -> DataPointCollection:
+    def get_datapoints(self, dataset: Dataset) -> QueryResult:
         return self._get_all(dataset, True)
 
-    def _get_all(self, dataset: Dataset, include_metadata: bool) -> DataPointCollection:
+    def _get_all(self, dataset: Dataset, include_metadata: bool) -> QueryResult:
         has_next_page = True
         after = None
-        res = DataPointCollection([])
+        res = QueryResult([])
         while has_next_page:
-            resp = self._datasourceQuery(dataset, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
+            resp = self._datasource_query(dataset, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
             has_next_page = resp["pageInfo"]["hasNextPage"]
             after = resp["pageInfo"]["endCursor"]
-            res.extend_from_gql_query(resp)
+            res._extend_from_gql_query(resp)
         return res
 
     def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -149,8 +151,8 @@ class DataClient:
         resp = self.client.execute(q, variable_values=params)
         return resp
 
-    def _datasourceQuery(self, dataset: Dataset, include_metadata: bool, limit: Optional[int] = None,
-                         after: Optional[str] = None):
+    def _datasource_query(self, dataset: Dataset, include_metadata: bool, limit: Optional[int] = None,
+                          after: Optional[str] = None):
         metadata_fields = "metadata { key value }" if include_metadata else ""
         q = GqlQuery().operation(
             "query",
@@ -184,7 +186,7 @@ class DataClient:
 
         return self._exec(q, params)["datasourceQuery"]
 
-    def add_metadata(self, dataset: Dataset, entries: List[DataPointMetadataUpdateEntry]):
+    def _update_metadata(self, dataset: Dataset, entries: List[DataPointMetadataUpdateEntry]):
         q = GqlQuery().operation(
             "mutation",
             name="updateMetadata",

@@ -1,11 +1,9 @@
 import enum
 import logging
-from dataclasses import dataclass
-from typing import Any, Dict, TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from treelib import Tree, Node
 
-from dagshub.data_engine import DEFAULT_NAMESPACE
 from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:
@@ -19,24 +17,6 @@ _metadataTypeLookup = {
     type(0.5): "FLOAT",
     type("aaa"): "STRING",
 }
-
-
-@dataclass
-class FieldFilter:
-    field: str
-    op: "FieldFilterOperand"
-    val: Union[int, float, bool, str]
-
-    def serialize_graphql(self):
-        return {
-            "key": self.field,
-            "value": self.val,
-            "valueType": _metadataTypeLookup[type(self.val)],
-            "comparator": self.op.value,
-        }
-
-    def __str__(self):
-        return f"<{self.field} {self.op.value} {self.val}>"
 
 
 class FieldFilterOperand(enum.Enum):
@@ -60,47 +40,9 @@ fieldFilterOperandMap = {
 }
 
 
-@dataclass
-class QueryFilter:
-    op: "QueryFilterOperand"
-    queries: List[Union["Query", FieldFilter]]
-
-    def serialize_graphql(self) -> dict:
-        return {self.op.value.lower(): [
-            q.serialize_graphql() for q in self.queries
-        ]}
-
-    def __str__(self):
-        return f"<{self.op.value}: {[str(q) for q in self.queries]}>"
-
-
-class QueryFilterOperand(enum.Enum):
-    OR = "OR"
-    AND = "AND"
-
-    @staticmethod
-    def from_str(operand: str) -> "QueryFilterOperand":
-        operand = operand.lower()
-        if operand == "and":
-            return QueryFilterOperand.AND
-        elif operand == "or":
-            return QueryFilterOperand.OR
-        else:
-            raise RuntimeError(f"Unknown operand {operand}. Possible values: ['and', 'or']")
-
-
-#
-# class DatasetQuery:
-#     def __init__(self, dataset: "Dataset", arg: Any):
-#         self.dataset = dataset
-#         # TODO: change from Any to an actual object
-#         self.arg = arg
-
-
 class DatasetQuery:
     def __init__(self, dataset: "Dataset", column_or_query: Optional[Union[str, "DatasetQuery"]] = None):
         self.dataset = dataset
-        self.filter: Optional[QueryFilter] = None
 
         self._operand_tree: Optional[Tree] = Tree()
         self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
@@ -141,8 +83,6 @@ class DatasetQuery:
         if self.is_empty:
             return None
         return self._serialize_node(self._operand_root, self._operand_tree)
-        #
-        # return self.filter.serialize_graphql()
 
     @staticmethod
     def _serialize_node(node: Node, tree: Tree) -> dict:
@@ -170,17 +110,6 @@ class DatasetQuery:
     def to_dict(self):
         return self._operand_tree.to_dict(with_data=True)
 
-    @staticmethod
-    def from_query_params(dataset: "Dataset", operand="and", **query_params) -> "Query":
-        """
-        Example usecase:
-        Query(ds, name_contains="Data", date_eq = "2022-01-01")
-        """
-        q = DatasetQuery(dataset)
-        params = q.parse_query_params(**query_params)
-        q.filter = QueryFilter(QueryFilterOperand.from_str(operand), params)
-        return q
-
     def __deepcopy__(self, memodict={}):
         q = DatasetQuery(self.dataset, None)
         if self._column_filter is not None:
@@ -192,43 +121,3 @@ class DatasetQuery:
     @property
     def is_empty(self):
         return self._column_filter is not None or self._operand_tree.root is None
-
-    def __oldcompose(self, other_query: "Query", operand="and") -> "Query":
-        operand = QueryFilterOperand.from_str(operand)
-
-        # If the operand is equal to the operand of the left-side query, "fold" the right side into the left side
-        # AND ((AND (a, b), c) = AND (a, b, c)
-        # OR (OR(a, AND(b, c)), d) = OR (a, AND(b, c), d)
-        if self.filter is not None and operand == self.filter.op:
-            self.filter.queries += other_query.filter.queries
-            return self
-
-        # Otherwise compose into a new query
-        res = DatasetQuery(self.dataset)
-        queries = list(filter(lambda q: not q.is_empty, [self, other_query]))
-
-        # If one of the queries is empty - ignore the composure and return the non-empty one
-        if len(queries) == 1:
-            return queries[0]
-
-        op = QueryFilter(operand, queries)
-        res.filter = op
-        return res
-
-    @staticmethod
-    def parse_query_params(**params) -> List[FieldFilter]:
-        separator = "_"
-        res = []
-        for filter_param, val in params.items():
-            filter_separated = filter_param.split(separator)
-            if len(filter_separated) < 2:
-                raise RuntimeError(
-                    f"Invalid query parameter: {filter_param}. Query params should have a format of '<field>_<operand>'")
-            filter_field = filter_separated[:len(filter_separated) - 1]
-            filter_operand = filter_separated[-1].lower()
-            operand = fieldFilterOperandMap.get(filter_operand.lower())
-            if operand is None:
-                raise RuntimeError(
-                    f"Invalid filter operand {filter_operand}.\nPossible values: {list(fieldFilterOperandMap.keys())}")
-            res.append(FieldFilter(separator.join(filter_field), fieldFilterOperandMap[filter_operand], val))
-        return res
