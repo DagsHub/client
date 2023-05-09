@@ -118,15 +118,17 @@ def dataset_create_flow():
 
 def just_debugging_voxel():
     ds = fo.load_dataset("my-data")
-    plugin_server = run_plugin_server()
-    sess = fo.launch_app(ds)
+    plugin_server = run_plugin_server(ds)
+    # sess = fo.launch_app(ds)
 
     # NVM this doesn't work
     # fcse.DagshubLabelstudio = DagshubLabelstudio
     # setattr(sys.modules[fcse.Event.__module__], DagshubLabelstudio.__name__, DagshubLabelstudio)
     # sess._client.add_event_listener("event", fiftyone_handler)
 
-    sess.wait()
+    # sess.wait()
+
+    input("Press enter to exit")
 
     plugin_server.stop()
 
