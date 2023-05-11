@@ -71,7 +71,6 @@ def test_storage_pagination(mock_api, repo_with_hooks):
     assert set(actual) == set(expected)
 
 
-
 def test_binary(mock_api, repo_with_hooks):
     files = [("a.txt", "file"), ("b.txt", "file"), ("dir1", "dir")]
     path = "testdir"
