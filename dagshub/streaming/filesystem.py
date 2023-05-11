@@ -10,14 +10,14 @@ from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
-from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
 from urllib.parse import urlparse
 import dacite
 
 from dagshub.common import config, helpers
 import logging
 from dagshub.common.helpers import http_request, get_project_root
-from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath
+from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath, StorageContentAPIResult
 from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
@@ -449,8 +449,16 @@ class DagsHubFilesystem:
             self.__chdir(path)
 
     def listdir(self, path='.'):
+
         # listdir needs to return results for bytes path arg also in bytes
         is_bytes_path_arg = type(path) is bytes
+
+        def encode_results(res):
+            res = list(res)
+            if is_bytes_path_arg:
+                res = [os.fsencode(p) for p in res]
+            return res
+
         if is_bytes_path_arg:
             str_path = os.fsdecode(path)
         else:
@@ -470,6 +478,10 @@ class DagsHubFilesystem:
                     error = e
                 dircontents.update(
                     special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
+                # If we're accessing .dagshub/storage/s3/ we don't need to access the API, return straight away
+                if parsed_path.relative_path.parts[0] == ".dagshub" and len(
+                    parsed_path.relative_path.parts) <= 3:
+                    return encode_results(dircontents)
                 resp = self._api_listdir(parsed_path)
                 if resp is not None:
                     dircontents.update(Path(f.path).name for f in resp)
@@ -477,18 +489,13 @@ class DagsHubFilesystem:
                         Path(f.path).name: f.type
                         for f in resp
                     }
-                    res = list(dircontents)
-                    if is_bytes_path_arg:
-                        res = [os.fsencode(p) for p in res]
-                    return res
+                    return encode_results(dircontents)
                 else:
                     if error is not None:
                         raise error
                     else:
-                        res = list(dircontents)
-                        if is_bytes_path_arg:
-                            res = [os.fsencode(p) for p in res]
-                        return res
+                        return encode_results(dircontents)
+
         else:
             return self.__listdir(path)
 
@@ -555,19 +562,36 @@ class DagsHubFilesystem:
         response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
         if hit:
             return response
-        response = self.http_get(self._content_url_for_path(path),
-                                 params={'include_size': 'true'} if include_size else {},
-                                 headers=config.requests_headers)
+        params: Dict[str, Any] = {"include_size": "true"} if include_size else {}
+        if path.is_storage_path:
+            params["paging"] = True
+        url = self._content_url_for_path(path)
+        response = self.http_get(url, params=params, headers=config.requests_headers)
         if response.status_code >= 400:
-            logger.debug(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+            logger.warning(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
             return None
-        res = []
-        for entry_raw in response.json():
-            entry = dacite.from_dict(ContentAPIEntry, entry_raw)
-            # Ignore storage root entries, we handle them separately in a different place
-            if entry.type == "storage":
-                continue
-            res.append(entry)
+        res: List[ContentAPIEntry] = []
+        # Storage - token pagination, different return structure + if there's a token we do another request
+        if path.is_storage_path:
+            result = dacite.from_dict(StorageContentAPIResult, response.json())
+            res += result.entries
+            while result.next_token is not None:
+                params["from_token"] = result.next_token
+                new_resp = self.http_get(url, params=params, headers=config.requests_headers)
+                if response.status_code >= 400:
+                    logger.warning(
+                        f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+                    return None
+                result = dacite.from_dict(StorageContentAPIResult, new_resp.json())
+                res += result.entries
+        else:
+            for entry_raw in response.json():
+                entry = dacite.from_dict(ContentAPIEntry, entry_raw)
+                # Ignore storage root entries, we handle them separately in a different place
+                if entry.type == "storage":
+                    continue
+                res.append(entry)
+
         self._listdir_cache[path.relative_path.as_posix()] = (res, include_size)
         return res
 

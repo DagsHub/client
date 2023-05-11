@@ -15,7 +15,7 @@ class HTTPBearerAuth(Auth):
     def __eq__(self, other):
         return all([
             self.token == getattr(other, 'token', None),
-            ])
+        ])
 
     def __ne__(self, other):
         return not self == other
