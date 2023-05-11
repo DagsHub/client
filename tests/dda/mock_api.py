@@ -60,8 +60,8 @@ class MockApi(MockRouter):
     def _default_endpoints_and_responses(self):
         endpoints = {
             "repo": rf"{self.repoapipath}/?$",
-            "branch": rf"{self.repoapipath}/branches/\w+",
-            "branches": rf"{self.repoapipath}/branches",
+            "branch": rf"{self.repoapipath}/branches/(main|master)$",
+            "branches": rf"{self.repoapipath}/branches/?$",
             "list_root": rf"{self.repoapipath}/content/{self.current_revision}/$",
             "storages": rf"{self.repoapipath}/storage/?$"
         }
@@ -267,3 +267,30 @@ class MockApi(MockRouter):
             "download_url": f"https://dagshub.com/{self.repourlpath}/raw/{self.current_revision}/{path}",
             "content_url": f"https://dagshub.com/{self.repourlpath}/content/{self.current_revision}/{path}",
         }
+
+    def add_branch(self, branch, revision):
+        resp_json = {
+            "name": branch,
+            "commit": {
+                "id": revision,
+                "message": "Update 'README.md'\n",
+                "url": "",
+                "author": {
+                    "name": "dagshub",
+                    "email": "info@dagshub.com",
+                    "username": "",
+                },
+                "committer": {
+                    "name": "dagshub",
+                    "email": "info@dagshub.com",
+                    "username": "",
+                },
+                "added": None,
+                "removed": None,
+                "modified": None,
+                "timestamp": "2021-08-10T09:03:32Z",
+            }
+        }
+        branch_route = self.get(url=f"/api/v1/repos/{self.repourlpath}/branches/{branch}")
+        branch_route.mock(Response(200, json=resp_json))
+        return branch_route
