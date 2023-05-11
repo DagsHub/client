@@ -7,9 +7,11 @@ class ignore_exceptions:
     # Taken from fastcore code
     """Context manager to ignore exceptions"""
 
-    def __enter__(self): pass
+    def __enter__(self):
+        pass
 
-    def __exit__(self, *args): return True
+    def __exit__(self, *args):
+        return True
 
 
 class DAGsHubLogger(Callback):
