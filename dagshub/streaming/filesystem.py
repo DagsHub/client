@@ -10,7 +10,7 @@ from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
-from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
 from urllib.parse import urlparse
 import dacite
 
@@ -449,8 +449,16 @@ class DagsHubFilesystem:
             self.__chdir(path)
 
     def listdir(self, path='.'):
+
         # listdir needs to return results for bytes path arg also in bytes
         is_bytes_path_arg = type(path) is bytes
+
+        def encode_results(res):
+            res = list(res)
+            if is_bytes_path_arg:
+                res = [os.fsencode(p) for p in res]
+            return res
+
         if is_bytes_path_arg:
             str_path = os.fsdecode(path)
         else:
@@ -470,6 +478,10 @@ class DagsHubFilesystem:
                     error = e
                 dircontents.update(
                     special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
+                # If we're accessing .dagshub/storage/s3/ we don't need to access the API, return straight away
+                if parsed_path.relative_path.parts[0] == ".dagshub" and len(
+                    parsed_path.relative_path.parts) <= 3:
+                    return encode_results(dircontents)
                 resp = self._api_listdir(parsed_path)
                 if resp is not None:
                     dircontents.update(Path(f.path).name for f in resp)
@@ -477,18 +489,13 @@ class DagsHubFilesystem:
                         Path(f.path).name: f.type
                         for f in resp
                     }
-                    res = list(dircontents)
-                    if is_bytes_path_arg:
-                        res = [os.fsencode(p) for p in res]
-                    return res
+                    return encode_results(dircontents)
                 else:
                     if error is not None:
                         raise error
                     else:
-                        res = list(dircontents)
-                        if is_bytes_path_arg:
-                            res = [os.fsencode(p) for p in res]
-                        return res
+                        return encode_results(dircontents)
+
         else:
             return self.__listdir(path)
 
@@ -555,7 +562,9 @@ class DagsHubFilesystem:
         response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
         if hit:
             return response
-        params = {"include_size": "true"} if include_size else {}
+        params: Dict[str, Any] = {"include_size": "true"} if include_size else {}
+        if path.is_storage_path:
+            params["paging"] = True
         url = self._content_url_for_path(path)
         response = self.http_get(url, params=params, headers=config.requests_headers)
         if response.status_code >= 400:
@@ -566,7 +575,7 @@ class DagsHubFilesystem:
         if path.is_storage_path:
             result = dacite.from_dict(StorageContentAPIResult, response.json())
             res += result.entries
-            while result.next_token != "":
+            while result.next_token is not None:
                 params["from_token"] = result.next_token
                 new_resp = self.http_get(url, params=params, headers=config.requests_headers)
                 if response.status_code >= 400:

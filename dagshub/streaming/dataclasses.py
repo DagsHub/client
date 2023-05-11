@@ -39,8 +39,7 @@ class ContentAPIEntry:
 @dataclass
 class StorageContentAPIResult:
     entries: List[ContentAPIEntry]
-    next_token: str
-    limit: int
+    next_token: Optional[str]
 
 
 storage_schemas = ["s3", "gs"]

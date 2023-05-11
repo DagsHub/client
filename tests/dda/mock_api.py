@@ -236,17 +236,18 @@ class MockApi(MockRouter):
         Add a directory to the storage api
         Storage has a different response schema
         """
-        url = f"{self.api_storage_list_path}/{path}"
+        url = f"{self.api_storage_list_path}/{path}?paging=true"
         if from_token is not None:
-            url += f"?from_token={from_token}"
+            url += f"&from_token={from_token}"
         route = self.route(url=url)
         content = {
             "entries": [
                 self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
             ],
             "limit": len(contents),
-            "next_token": next_token if next_token is not None else "",
         }
+        if next_token is not None:
+            content["next_token"] = next_token
         route.mock(Response(status, json=content))
         return route
 
