@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
 from urllib.parse import urlparse
 import dacite
+from httpx import Response
 
 from dagshub.common import config, helpers
 import logging
@@ -480,7 +481,7 @@ class DagsHubFilesystem:
                     special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
                 # If we're accessing .dagshub/storage/s3/ we don't need to access the API, return straight away
                 len_parts = len(parsed_path.relative_path.parts)
-                if 0 < len_parts <= 3 and  parsed_path.relative_path.parts[0] == ".dagshub":
+                if 0 < len_parts <= 3 and parsed_path.relative_path.parts[0] == ".dagshub":
                     return encode_results(dircontents)
                 resp = self._api_listdir(parsed_path)
                 if resp is not None:
@@ -566,9 +567,20 @@ class DagsHubFilesystem:
         if path.is_storage_path:
             params["paging"] = True
         url = self._content_url_for_path(path)
-        response = self.http_get(url, params=params, headers=config.requests_headers)
-        if response.status_code >= 400:
-            logger.warning(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+
+        def _get() -> Optional[Response]:
+            resp = self.http_get(url, params=params, headers=config.requests_headers)
+            if resp.status_code == 404:
+                logger.debug(f"Got HTTP code {resp.status_code} while listing {path}, no results will be returned")
+                return None
+            elif resp.status_code >= 400:
+                logger.warning(
+                    f"Got HTTP code {resp.status_code} while listing {path}, no results will be returned")
+                return None
+            return resp
+
+        response = _get()
+        if response is None:
             return None
         res: List[ContentAPIEntry] = []
         # Storage - token pagination, different return structure + if there's a token we do another request
@@ -577,10 +589,8 @@ class DagsHubFilesystem:
             res += result.entries
             while result.next_token is not None:
                 params["from_token"] = result.next_token
-                new_resp = self.http_get(url, params=params, headers=config.requests_headers)
-                if response.status_code >= 400:
-                    logger.warning(
-                        f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+                new_resp = _get()
+                if new_resp is None:
                     return None
                 result = dacite.from_dict(StorageContentAPIResult, new_resp.json())
                 res += result.entries
