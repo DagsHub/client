@@ -479,8 +479,8 @@ class DagsHubFilesystem:
                 dircontents.update(
                     special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
                 # If we're accessing .dagshub/storage/s3/ we don't need to access the API, return straight away
-                if parsed_path.relative_path.parts[0] == ".dagshub" and len(
-                    parsed_path.relative_path.parts) <= 3:
+                len_parts = len(parsed_path.relative_path.parts)
+                if 0 < len_parts <= 3 and  parsed_path.relative_path.parts[0] == ".dagshub":
                     return encode_results(dircontents)
                 resp = self._api_listdir(parsed_path)
                 if resp is not None:

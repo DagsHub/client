@@ -98,6 +98,6 @@ class DagshubPath:
             - Any /site-packages/ folder - if you have a venv in your repo, python will try to find packages there.
         """
         str_path = self.relative_path.as_posix()
-        if "/site-packages/" in str_path:
+        if "/site-packages/" in str_path or str_path.endswith("/site-packages"):
             return True
         return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
