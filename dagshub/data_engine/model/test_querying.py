@@ -152,7 +152,7 @@ def test_serialization(ds):
                             "valueType": "STRING",
                             "comparator": "CONTAINS",
                         }
-                    }
+                    },
                 ]
             },
             {

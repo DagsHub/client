@@ -185,10 +185,12 @@ class Dataset:
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("ne", other)
 
-    def __contains__(self, item: Union[int, float, str]):
+    def __contains__(self, item):
         raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in ds`")
 
-    def contains(self, item: Union[int, float, str]):
+    def contains(self, item: str):
+        if type(item) is not str:
+            return WrongOperatorError(f"Cannot use contains with non-string value {item}")
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
