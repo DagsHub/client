@@ -28,15 +28,13 @@ class Metadata:
 
 @dataclass
 class DataPoint:
-    name: str
-    downloadUrl: str
+    path: str
     metadata: Dict[str, Any]
 
     @staticmethod
     def from_gql_edge(edge: Dict) -> "DataPoint":
         res = DataPoint(
-            name=edge["node"]["name"],
-            downloadUrl=edge["node"]["source"]["downloadUrl"],
+            path=edge["node"]["path"],
             metadata={}
         )
         for meta_dict in edge["node"]["metadata"]:
@@ -48,16 +46,14 @@ class DataPoint:
 class QueryResult:
     # List of downloaded entries. In case of .head() calls the number entries will be less than totalCount
     entries: List[DataPoint]
-    # Total amount of entries returned by the query
-    totalCount: int = 0
 
     @property
     def dataframe(self):
-        self.entries = list(sorted(self.entries, key=lambda a: a.name))
+        self.entries = list(sorted(self.entries, key=lambda a: a.path))
         metadata_keys = set()
         names = []
         for e in self.entries:
-            names.append(e.name)
+            names.append(e.path)
             metadata_keys.update(e.metadata.keys())
 
         res = pd.DataFrame({"name": names})
@@ -69,10 +65,9 @@ class QueryResult:
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any]) -> "QueryResult":
-        total_count = query_resp["totalCount"]
-        if total_count == 0:
+        if "edges" not in query_resp:
             return QueryResult([])
-        return QueryResult([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]], total_count)
+        return QueryResult([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]])
 
     def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
         self.entries += self.from_gql_query(query_resp).entries
@@ -172,9 +167,8 @@ class DataClient:
                 "after": "$after",
             }
         ).fields([
-            "totalCount",
-            f"edges {{ node {{ name source {{ name downloadUrl previewUrl }} {metadata_fields} }} }}",
-            "pageInfo { hasNextPage endCursor }"
+            f"edges {{ node {{ path {metadata_fields} }} }}",
+            "pageInfo { hasNextPage endCursor }",
         ]).generate()
 
         params = {

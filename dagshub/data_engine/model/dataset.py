@@ -121,7 +121,7 @@ class Dataset:
 
         # TODO: parallelize this with some async magic
         for datapoint in datapoints.entries:
-            file_url = datapoint.downloadUrl
+            # file_url = datapoint.downloadUrl
             resp = client.get(file_url)
             assert resp.status_code == 200
             # TODO: doesn't work with nesting
