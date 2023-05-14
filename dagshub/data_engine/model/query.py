@@ -101,10 +101,12 @@ class DatasetQuery:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
                                    f"Supported types: {list(_metadataTypeLookup.keys())}")
             return {
-                "key": key,
-                "value": str(value),
-                "valueType": value_type,
-                "comparator": query_op.value,
+                "filter": {
+                    "key": key,
+                    "value": str(value),
+                    "valueType": value_type,
+                    "comparator": query_op.value,
+                }
             }
 
     def to_dict(self):

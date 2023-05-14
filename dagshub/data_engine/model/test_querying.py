@@ -9,7 +9,7 @@ from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldCompar
 
 @pytest.fixture
 def ds():
-    yield datasources.create_from_repo("test-dataset", "kirill/repo", ".")
+    yield Dataset(datasources.DataSource("test-dataset", "kirill/repo"))
 
 
 def test_query_single_column(ds):
@@ -128,32 +128,40 @@ def test_serialization(ds):
                     {
                         "and": [
                             {
-                                "key": "col1",
-                                "value": str(5),
-                                "valueType": "INTEGER",
-                                "comparator": "GREATER_THAN",
+                                "filter": {
+                                    "key": "col1",
+                                    "value": str(5),
+                                    "valueType": "INTEGER",
+                                    "comparator": "GREATER_THAN",
+                                }
                             },
                             {
-                                "key": "col2",
-                                "value": str(3),
-                                "valueType": "INTEGER",
-                                "comparator": "LESS_EQUAL_THAN",
+                                "filter": {
+                                    "key": "col2",
+                                    "value": str(3),
+                                    "valueType": "INTEGER",
+                                    "comparator": "LESS_EQUAL_THAN",
+                                }
                             }
                         ]
                     },
                     {
-                        "key": "col3",
-                        "value": "aaa",
-                        "valueType": "STRING",
-                        "comparator": "CONTAINS",
+                        "filter": {
+                            "key": "col3",
+                            "value": "aaa",
+                            "valueType": "STRING",
+                            "comparator": "CONTAINS",
+                        }
                     }
                 ]
             },
             {
-                "key": "col4",
-                "value": str(5.0),
-                "valueType": "FLOAT",
-                "comparator": "NOT_EQUAL"
+                "filter": {
+                    "key": "col4",
+                    "value": str(5.0),
+                    "valueType": "FLOAT",
+                    "comparator": "NOT_EQUAL"
+                }
             }
         ]
     }
