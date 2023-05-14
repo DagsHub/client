@@ -201,8 +201,7 @@ class DataClient:
                 "dataPoints": "$dataPoints"
             }
         ).fields([
-            "name",
-            "source {name downloadUrl previewUrl}",
+            "path",
             "metadata {key value}"
         ]).generate()
 

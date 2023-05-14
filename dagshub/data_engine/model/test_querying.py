@@ -9,7 +9,7 @@ from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldCompar
 
 @pytest.fixture
 def ds():
-    yield datasources.from_repo("test-dataset", "kirill/repo", ".")
+    yield datasources.create_from_repo("test-dataset", "kirill/repo", ".")
 
 
 def test_query_single_column(ds):

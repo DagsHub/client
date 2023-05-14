@@ -5,7 +5,7 @@ class WrongOrderError(Exception):
 
     def __str__(self):
         return f"Can't have a dataset to the right of {self.other_type}.\r\n" \
-               f"Make sure to use parentheses to chain logical and/or.\r\n" \
+               f"Make sure to use parentheses to chain logical and/or operators.\r\n" \
                f"Example: `ds[(ds['col1'] > 1) & (ds['col2'] < 3)])`"
 
 

@@ -17,11 +17,12 @@ class DataSourceType(enum.Enum):
 
 @dataclass
 class DataSource:
-    id: str = field(init=False)
-    source_type: DataSourceType
     name: str
     repo: str
-    path: str
+
+    id: str = field(init=False)
+    source_type: DataSourceType = field(init=False)
+    path: str = field(init=False)
     client: DataClient = field(init=False)
 
     def create(self):
@@ -49,22 +50,35 @@ class DataSource:
         raise NotImplementedError
 
 
-def from_bucket(name, repo, bucket_url: str) -> Dataset:
+def create_from_bucket(name, repo, bucket_url: str) -> Dataset:
     # TODO: add "create if not exists" capability
     ds = DataSource(DataSourceType.BUCKET, name, repo, bucket_url)
     return Dataset(datasource=ds)
 
 
-def from_repo(name: str, repo: str, path: str, revision: str = "main") -> Dataset:
+def create_from_repo(name: str, repo: str, path: str, revision: str = "main") -> Dataset:
     return Dataset(DataSource(DataSourceType.REPOSITORY, name, repo, f"{revision}/{path}"))
 
 
-def from_dataset(name: str, repo: str, dataset_name: str) -> Dataset:
+def create_from_dataset(name: str, repo: str, dataset_name: str) -> Dataset:
     return Dataset(DataSource(DataSourceType.CUSTOM, name, repo, dataset_name))
 
 
+def get_datasource(name: str, repo: str) -> Dataset:
+    ds = DataSource(name=name)
+
+
+def _get_datasource(name: str) -> DataSource:
+    ds = DataSource(name=name)
+
+
+def _create_datasource(ds: DataSource):
+    pass
+
+
 __all__ = [
-    from_bucket,
-    from_repo,
-    from_dataset,
+    create_from_bucket,
+    create_from_repo,
+    create_from_dataset,
+    get_datasource,
 ]
