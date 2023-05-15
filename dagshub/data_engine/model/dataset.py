@@ -91,7 +91,7 @@ class Dataset:
     def metadata_context(self) -> "MetadataContextManager":
         ctx = MetadataContextManager(self)
         yield ctx
-        self.source.client._update_metadata(self, ctx.get_metadata_entries())
+        self.source.client.update_metadata(self, ctx.get_metadata_entries())
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"

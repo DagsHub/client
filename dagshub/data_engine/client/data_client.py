@@ -1,76 +1,24 @@
 import logging
 import typing
-from dataclasses import dataclass
 from typing import Any, Optional, List, Dict
 
+import dacite
 import gql
-import pandas as pd
 from gql.transport.requests import RequestsHTTPTransport
-from gql_query_builder import GqlQuery
 
 import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.data_engine.client.dataclasses import QueryResult, DataSourceResult
+from dagshub.data_engine.client.gql_mutations import GqlMutations
+from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.dataset import Dataset, DataPointMetadataUpdateEntry
 
 if typing.TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSource
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Metadata:
-    key: str
-    value: Any
-
-
-@dataclass
-class DataPoint:
-    path: str
-    metadata: Dict[str, Any]
-
-    @staticmethod
-    def from_gql_edge(edge: Dict) -> "DataPoint":
-        res = DataPoint(
-            path=edge["node"]["path"],
-            metadata={}
-        )
-        for meta_dict in edge["node"]["metadata"]:
-            res.metadata[meta_dict["key"]] = meta_dict["value"]
-        return res
-
-
-@dataclass
-class QueryResult:
-    # List of downloaded entries. In case of .head() calls the number entries will be less than totalCount
-    entries: List[DataPoint]
-
-    @property
-    def dataframe(self):
-        self.entries = list(sorted(self.entries, key=lambda a: a.path))
-        metadata_keys = set()
-        names = []
-        for e in self.entries:
-            names.append(e.path)
-            metadata_keys.update(e.metadata.keys())
-
-        res = pd.DataFrame({"name": names})
-
-        for key in sorted(metadata_keys):
-            res[key] = [e.metadata.get(key) for e in self.entries]
-
-        return res
-
-    @staticmethod
-    def from_gql_query(query_resp: Dict[str, Any]) -> "QueryResult":
-        if "edges" not in query_resp:
-            return QueryResult([])
-        return QueryResult([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]])
-
-    def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
-        self.entries += self.from_gql_query(query_resp).entries
 
 
 class DataClient:
@@ -90,35 +38,20 @@ class DataClient:
         client = gql.Client(transport=transport)
         return client
 
-    def create_datasource(self, ds: "DataSource"):
-        q = GqlQuery().operation(
-            "mutation",
-            name="createDataSource",
-            input={
-                "$name": "String!",
-                "$url": "String!",
-                "$dsType": "DatasourceType!"
-            }
-        ).query(
-            "createDataSource",
-            input={
-                "name": "$name",
-                "url": "$url",
-                "dsType": "$dsType"
-            }
-        ).fields([
-            "id",
-            "name",
-            "type"
-        ])
-        q = q.generate()
-        params = {
-            "name": ds.name,
-            "url": ds.path,
-            "dsType": str(ds.source_type.value),
-        }
+    def create_datasource(self, ds: "DataSource") -> DataSourceResult:
+        q = GqlMutations.create_datasource()
+
+        assert ds.name is not None
+        assert ds.path is not None
+        assert ds.source_type is not None
+
+        params = GqlMutations.create_datasource_params(
+            name=ds.name,
+            url=ds.path,
+            ds_type=ds.source_type
+        )
         res = self._exec(q, params)
-        return res["createDataSource"]
+        return dacite.from_dict(DataSourceResult, res["createDataSource"])
 
     def head(self, dataset: Dataset) -> QueryResult:
         resp = self._datasource_query(dataset, True, self.HEAD_QUERY_SIZE)
@@ -148,63 +81,35 @@ class DataClient:
 
     def _datasource_query(self, dataset: Dataset, include_metadata: bool, limit: Optional[int] = None,
                           after: Optional[str] = None):
-        metadata_fields = "metadata { key value }" if include_metadata else ""
-        q = GqlQuery().operation(
-            "query",
-            name="datasourceQuery",
-            input={
-                "$datasource": "ID!",
-                "$queryInput": "QueryInput",
-                "$first": "Int",
-                "$after": "String",
-            }
-        ).query(
-            "datasourceQuery",
-            input={
-                "datasource": "$datasource",
-                "filter": "$queryInput",
-                "first": "$first",
-                "after": "$after",
-            }
-        ).fields([
-            f"edges {{ node {{ path {metadata_fields} }} }}",
-            "pageInfo { hasNextPage endCursor }",
-        ]).generate()
+        q = GqlQueries.datasource_query(include_metadata)
 
-        params = {
-            "datasource": dataset.source.id,
-            "queryInput": dataset.serialize_gql_query_input(),
-            "first": limit,
-            "after": after,
-        }
+        params = GqlQueries.datasource_query_params(
+            datasource_id=dataset.source.id,
+            query_input=dataset.serialize_gql_query_input(),
+            first=limit,
+            after=after
+        )
 
         return self._exec(q, params)["datasourceQuery"]
 
-    def _update_metadata(self, dataset: Dataset, entries: List[DataPointMetadataUpdateEntry]):
-        q = GqlQuery().operation(
-            "mutation",
-            name="updateMetadata",
-            input={
-                "$dataSource": "ID!",
-                "$dataPoints": "[DataPointMetadataInput!]!"
-            }
-        ).query(
-            "updateMetadata",
-            input={
-                "dataSource": "$dataSource",
-                "dataPoints": "$dataPoints"
-            }
-        ).fields([
-            "path",
-            "metadata {key value}"
-        ]).generate()
+    def update_metadata(self, dataset: Dataset, entries: List[DataPointMetadataUpdateEntry]):
+        q = GqlMutations.update_metadata()
 
-        params = {
-            "dataSource": dataset.source.id,
-            "dataPoints": [e.to_dict() for e in entries],
-        }
+        assert dataset.source.id is not None
+        assert len(entries) > 0
+
+        params = GqlMutations.update_metadata_params(
+            datasource_id=dataset.source.id,
+            datapoints=[e.to_dict() for e in entries]
+        )
 
         return self._exec(q, params)
 
-    def save_dataset(self, dataset: Dataset):
-        raise NotImplementedError
+    def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DataSourceResult]:
+        q = GqlQueries.datasource()
+        params = GqlQueries.datasource_params(id=id, name=name)
+
+        res = self._exec(q, params)["datasource"]
+        if res is None:
+            return []
+        return [dacite.from_dict(DataSourceResult, val) for val in res]

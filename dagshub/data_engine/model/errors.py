@@ -17,3 +17,12 @@ class DatasetFieldComparisonError(Exception):
 
 class WrongOperatorError(Exception):
     pass
+
+
+class DatasourceAlreadyExistsError(Exception):
+    def __init__(self, datasource):
+        super().__init__()
+        self.datasource = datasource
+
+    def __str__(self):
+        return f"Datasource with name {self.datasource.name} already exists in repository {self.datasource.repo}"
