@@ -80,7 +80,7 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning='g
         if _inside_colab():
             from google.colab import _message  # If inside colab, this import is guaranteed
             with open(out_path, 'w') as file:
-                file.write(json.dumps(_message.blocking_request('get_ipynb'), indent=4))
+                file.write(json.dumps(_message.blocking_request('get_ipynb')["ipynb"], indent=4))
         else:
             get_ipython().run_line_magic('notebook', out_path)
 
