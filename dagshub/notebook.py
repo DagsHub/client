@@ -32,13 +32,14 @@ def save_notebook(path, repo, branch=None, commit_message=None, versioning='git'
     :param path (str): Where to save the notebook within the repository (including the filename).
         If filename is not specified, we'll save it as "notebook-{datetime.now}.ipynb" under specified folder
     :prama repo (str): repository in the format of "user/repo"
-    :param branch (str): The branch under which the notebook should be saved. Will commit to the default repo branch if not specified
+    :param branch (str): The branch under which the notebook should be saved.
+        Will commit to the default repo branch if not specified
     :param commit_message (str): The commit message for the update
     :param versioning (str): ['git'|'dvc'] The VCS used to version the notebook
     """
 
     if not _inside_notebook():
-        log_message(f'Trying to save a notebook while not being in an IPython environment. No notebook will be saved',
+        log_message('Trying to save a notebook while not being in an IPython environment. No notebook will be saved',
                     logger)
         return
 
