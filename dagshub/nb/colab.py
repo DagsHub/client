@@ -17,7 +17,7 @@ def save(filename, path, repo_owner, repo_name, branch, commit_message='added a 
     with tempfile.TemporaryDirectory() as tmp:
         if inside_colab():
             from google.colab import _message
-            with open('{tmp}/{filename}', 'w') as file: file.write(json.dumps(_message.blocking_request('get_ipynb'), indent=4))
+            with open(f'{tmp}/{filename}', 'w') as file: file.write(json.dumps(_message.blocking_request('get_ipynb'), indent=4))
         else: get_ipython().run_line_magic('notebook', f'{tmp}/{filename}')
 
         repo = Repo(repo_owner, repo_name, branch)
