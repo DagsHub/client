@@ -2,6 +2,7 @@ import sys
 import setuptools
 import os.path
 
+
 # Thank you pip contributors
 def read(rel_path: str) -> str:
     here = os.path.abspath(os.path.dirname(__file__))
