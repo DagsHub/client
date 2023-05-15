@@ -4,10 +4,6 @@ import tempfile
 from IPython import get_ipython
 from dagshub.upload import Repo
 
-from google.colab import _message
-
-# Load the notebook JSON.
-
 
 def inside_colab():
     try:
@@ -16,11 +12,11 @@ def inside_colab():
     return False
 
 
-
 def save(filename, path, repo_owner, repo_name, branch, commit_message='added a notebook', versioning='git') -> None:
     with tempfile.TemporaryDirectory() as tmp:
         if inside_colab():
-            with open('{tmp}/{filename}', 'w') as file: 
+            from google.colab import _message
+            with open(f'{tmp}/{filename}', 'w') as file: 
                 file.write(_message.blocking_request('get_ipynb'))
         else: get_ipython().run_line_magic('notebook', f'{tmp}/{filename}')
 
