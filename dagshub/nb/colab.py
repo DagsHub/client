@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import tempfile
 from IPython import get_ipython
 from dagshub.upload import Repo
@@ -16,8 +17,7 @@ def save(filename, path, repo_owner, repo_name, branch, commit_message='added a 
     with tempfile.TemporaryDirectory() as tmp:
         if inside_colab():
             from google.colab import _message
-            with open(f'{tmp}/{filename}', 'w') as file: 
-                file.write(_message.blocking_request('get_ipynb'))
+            json.dumps(_message.blocking_request('get_ipynb'), indent=4)
         else: get_ipython().run_line_magic('notebook', f'{tmp}/{filename}')
 
         repo = Repo(repo_owner, repo_name, branch)
