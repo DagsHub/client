@@ -343,7 +343,7 @@ class Repo:
             )
         except Exception:
             raise RuntimeError(
-                "Failed to get default branch for repository. "
+                f"Failed to get default branch for repository [{self.owner}/{self.name}]. "
                 "Please specify a branch and make sure repository details are correct."
             )
 
