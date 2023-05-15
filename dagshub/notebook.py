@@ -70,7 +70,6 @@ def save_notebook(path, repo, branch=None, commit_message=None, versioning='git'
             get_ipython().run_line_magic('notebook', out_path)
 
         repo = Repo(owner, repo, branch)
-        repo.last_commit = repo._get_last_commit()
         repo.upload(out_path,
                     remote_path=file_path.as_posix(),
                     commit_message=commit_message,
