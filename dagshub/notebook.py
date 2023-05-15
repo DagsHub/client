@@ -84,7 +84,7 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning='g
         else:
             get_ipython().run_line_magic('notebook', out_path)
 
-        repo = Repo(owner, repo, branch)
+        repo = Repo(owner, repo, branch=branch)
         repo.upload(out_path,
                     remote_path=file_path.as_posix(),
                     commit_message=commit_message,
