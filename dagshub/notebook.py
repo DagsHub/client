@@ -3,7 +3,10 @@ import json
 import logging
 import tempfile
 from pathlib import PosixPath
+from socket import gethostname, gethostbyname
 
+import httpx
+import urllib.parse
 from IPython import get_ipython
 
 from dagshub.common.helpers import log_message
@@ -25,7 +28,19 @@ def _inside_colab():
     return False
 
 
-def save_notebook(path, repo, branch=None, commit_message=None, versioning='git') -> None:
+def _default_notebook_name():
+    if _inside_colab():
+        # Shout out to https://stackoverflow.com/a/61906730
+        ip = gethostbyname(gethostname())
+        filename = httpx.get(f"http://{ip}:9000/api/sessions").json()[0]["name"]
+        filename = urllib.parse.unquote(filename)
+        if filename.endswith(".ipynb"):
+            filename = filename + ".ipynb"
+        return filename
+    return f"notebook-{datetime.datetime.utcnow().strftime('%Y-%m-%d')}.ipynb"
+
+
+def save_notebook(repo, path="", branch=None, commit_message=None, versioning='git') -> None:
     """
     IPython wrapper for saving notebooks.
 
@@ -46,7 +61,7 @@ def save_notebook(path, repo, branch=None, commit_message=None, versioning='git'
     # Handle file path
     file_path = PosixPath(path)
     if file_path.name != "." and "." not in file_path.name:
-        file_path /= f"notebook-{datetime.datetime.utcnow().strftime('%Y-%m-%d')}.ipynb"
+        file_path /= _default_notebook_name()
     file_path = "/" / file_path
 
     # Handle commit message
