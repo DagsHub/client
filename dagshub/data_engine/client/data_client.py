@@ -10,7 +10,7 @@ import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.data_engine.client.dataclasses import QueryResult, DataSourceResult
+from dagshub.data_engine.client.dataclasses import QueryResult, DataSourceResult, DataSourceType, IntegrationStatus
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import DataSource, DataPointMetadataUpdateEntry
@@ -51,7 +51,8 @@ class DataClient:
             ds_type=ds.source_type
         )
         res = self._exec(q, params)
-        return dacite.from_dict(DataSourceResult, res["createDataSource"])
+        return dacite.from_dict(DataSourceResult, res["createDataSource"],
+                                config=dacite.Config(cast=[IntegrationStatus, DataSourceType]))
 
     def head(self, dataset: DataSource) -> QueryResult:
         resp = self._datasource_query(dataset, True, self.HEAD_QUERY_SIZE)
@@ -112,4 +113,5 @@ class DataClient:
         res = self._exec(q, params)["dataSource"]
         if res is None:
             return []
-        return [dacite.from_dict(DataSourceResult, val) for val in res]
+        return [dacite.from_dict(DataSourceResult, val, config=dacite.Config(cast=[IntegrationStatus, DataSourceType]))
+                for val in res]

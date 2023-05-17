@@ -34,4 +34,5 @@ class DatasourceNotFoundError(Exception):
         self.datasource = datasource
 
     def __str__(self):
-        return f"Datasource with name {self.datasource.name} or id {self.datasource.id} not found in repository {self.datasource.repo}"
+        return f"Datasource with name {self.datasource.name} or id {self.datasource.id} not found " \
+               f"in repository {self.datasource.repo}"
