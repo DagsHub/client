@@ -29,6 +29,8 @@ class GqlMutations:
         ).fields([
             "id",
             "name",
+            "rootUrl",
+            "integrationStatus",
             "type"
         ]).generate()
         return q

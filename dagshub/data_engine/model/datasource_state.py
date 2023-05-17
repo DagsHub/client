@@ -2,6 +2,8 @@ import urllib.parse
 from dataclasses import dataclass, field
 from typing import Optional, Union, Mapping, Any
 
+import httpx
+
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.dataclasses import DataSourceType, DataPoint, DataSourceResult
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
@@ -58,10 +60,23 @@ class DataSourceState:
             return f"{self.client.host}/api/v1/repos/{self.repo}/storage/{api_type}/{parsed_path.scheme}/" \
                    f"{parsed_path.hostname}/{parsed_path.path}/{path}"
         elif self.source_type == DataSourceType.REPOSITORY:
-            # Assuming path format is "branch:/repo/path"
-            branch, repo_path = self.path.split(":")
-            return f"{self.client.host}/api/v1/repos/{self.repo}/{api_type}/{branch}/{repo_path}/{path}"
-        raise NotImplementedError
+            # Assuming path format is "repo://user/repo/prefix" (branch for now assuming using default)
+            # TODO: handle paths here nicer, this is a bit of a mess
+            parsed_url = urllib.parse.urlparse(self.path)
+            path_parts = parsed_url.path.split("/")
+            path_parts = [x for x in path_parts if x != ""]
+            if len(path_parts) == 1:
+                repo_path = ""
+            else:
+                repo_path = "/".join(path_parts[1:]) + "/"
+            return f"{self.client.host}/api/v1/repos/{self.repo}/{api_type}/{self._get_default_branch()}/{repo_path}{path}"
+
+    def _get_default_branch(self):
+        # todo: fix this aaaaa
+        url = f"{self.client.host}/api/v1/repos/{self.repo}"
+        resp = httpx.get(url)
+        assert resp.status_code < 400
+        return resp.json()["default_branch"]
 
     def _update_from_ds_result(self, ds: DataSourceResult):
         self.id = ds.id

@@ -12,6 +12,7 @@ import dagshub
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.data_engine.model import datasources
+from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError
 from dagshub.data_engine.voxel_plugin_server.server import run_plugin_server
 from dagshub.streaming.dataclasses import ContentAPIEntry
 
@@ -20,20 +21,21 @@ logger = logging.getLogger(__name__)
 
 class DESnippetDriver:
 
-    def __init__(self, repo="kirill/DataEngineTesting", bucket_url="s3://dagshub-storage"):
+    def __init__(self, repo="simon/baby-yoda-segmentation-dataset", url="s3://dagshub-storage"):
         self.repo = repo
-        self.bucket_url = bucket_url
-        self.dataset = self.init_dataset()
         self.host = config.host
+        self.url = url
+        self.datasource_name = "kirill-yoda-dataset4"
+        self.dataset = self.init_dataset()
         auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.host))
         self.client = httpx.Client(auth=auth)
 
     def init_dataset(self):
-        return datasources.create_from_bucket(self.repo, "data-2", self.bucket_url)
-
-    def create_datasource(self):
-        logger.info("Creating datasource...")
-        self.dataset.source.create()
+        try:
+            ds = datasources.create_from_repo(self.repo, self.datasource_name, "")
+        except DatasourceAlreadyExistsError:
+            ds = datasources.get_datasource(self.repo, self.datasource_name)
+        return ds
 
     # def create_datasource(self):
     #     # TODO: make prettier actually :)
@@ -60,7 +62,8 @@ class DESnippetDriver:
         print(res.dataframe)
 
     def get_file_list(self, path):
-        resp = self.client.get(self.dataset.source.content_path(path))
+        path = self.dataset.source.content_path(path)
+        resp = self.client.get(path)
         return [dacite.from_dict(ContentAPIEntry, e) for e in resp.json()]
 
     def add_files_with_metadata(self, entries: List[ContentAPIEntry]):
@@ -85,7 +88,7 @@ class DESnippetDriver:
                     val = random.choice(WORDS)
                     meta_dict[key] = val
 
-                ctx.update_metadata(entry.download_url, meta_dict)
+                ctx.update_metadata(entry.path, meta_dict)
 
     def make_voxel(self):
         logger.info("Importing to voxel51")
@@ -103,9 +106,6 @@ class DESnippetDriver:
 
 def dataset_create_flow():
     snippet_driver = DESnippetDriver()
-
-    # TO CREATE DATASOURCE (If it wasn't yet)
-    snippet_driver.create_datasource()
 
     # TO ADD FILES WITH METADATA. DO NOT REPEAT!!
     files = snippet_driver.get_file_list("images")
@@ -142,6 +142,6 @@ def query_debugging():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    query_debugging()
+    # query_debugging()
     # just_debugging_voxel()
-    # dataset_create_flow()
+    dataset_create_flow()

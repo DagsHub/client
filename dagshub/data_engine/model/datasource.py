@@ -123,7 +123,12 @@ class DataSource:
         for datapoint in datapoints.entries:
             file_url = self.source.raw_path(datapoint.path)
             resp = client.get(file_url)
-            assert resp.status_code == 200
+            try:
+                assert resp.status_code == 200
+            except AssertionError:
+                logger.warning(
+                    f"Couldn't get image for path {datapoint.path}. Response code {resp.status_code} (Body: {resp.content})")
+                continue
             # TODO: doesn't work with nesting
             filename = file_url.split("/")[-1]
             filepath = os.path.join(dataset_location, filename)
