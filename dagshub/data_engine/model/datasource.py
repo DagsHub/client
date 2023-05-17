@@ -100,10 +100,16 @@ class DataSource:
         logger.info(f"Saving dataset")
         raise NotImplementedError
 
-    def to_voxel51_dataset(self) -> "fo.Dataset":
+    def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
+        """
+        Creates a voxel51 dataset that can be used with `fo.launch_app()` to run it
+
+        Args:
+            name (str): name of the dataset (by default uses the same name as the datasource)
+        """
         import fiftyone as fo
         logger.info("Migrating dataset to voxel51")
-        name = self._source.name
+        name = kwargs.get("name", self._source.name)
         ds: fo.Dataset = fo.Dataset(name)
         # ds.persistent = True
         dataset_location = os.path.join(Path.home(), "dagshub_datasets")
