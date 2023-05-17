@@ -153,7 +153,9 @@ filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 
 We also added `fiftyone` to the dependencies, which allows you to load your data into a Voxel51 dataset and explore it
 in voxel.
-The dataset will have all the metadata loaded
+The datapoints will have all the metadata loaded and a new dataset named same as the datasource name will be created.
+
+**All of the files in the queried subset will be downloaded to the local machine to `~/dagshub_datasets`**
 
 Usage:
 
@@ -178,7 +180,7 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
 - We don't have any validation for now. That means that if you typo the repo name or a datapoints url, it'll still work
   probably
   (with unexpected results)
-- Voxel integration shoves all data into `~/dagshub-datasets` with no concern for whatever files are already there (
+- Voxel integration shoves all data into `~/dagshub_datasets` with no concern for whatever files are already there (
   wastes bandwidth + space)
 
 ## Troubleshooting
