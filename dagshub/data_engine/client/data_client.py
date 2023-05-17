@@ -109,7 +109,7 @@ class DataClient:
         q = GqlQueries.datasource()
         params = GqlQueries.datasource_params(id=id, name=name)
 
-        res = self._exec(q, params)["datasource"]
+        res = self._exec(q, params)["dataSource"]
         if res is None:
             return []
         return [dacite.from_dict(DataSourceResult, val) for val in res]
