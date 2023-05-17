@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataClient:
-    HEAD_QUERY_SIZE = 10
+    HEAD_QUERY_SIZE = 100
     FULL_LIST_PAGE_SIZE = 100
 
     def __init__(self, repo: str):
