@@ -34,7 +34,7 @@ def _default_notebook_name():
         ip = gethostbyname(gethostname())
         filename = httpx.get(f"http://{ip}:9000/api/sessions").json()[0]["name"]
         filename = urllib.parse.unquote(filename)
-        if filename.endswith(".ipynb"):
+        if not filename.endswith(".ipynb"):
             filename = filename + ".ipynb"
         return filename
     return f"notebook-{datetime.datetime.utcnow().strftime('%Y-%m-%d')}.ipynb"
