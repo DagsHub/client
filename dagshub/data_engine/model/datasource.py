@@ -13,10 +13,10 @@ import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
-from dagshub.data_engine.model.query import DatasetQuery, _metadataTypeLookup
+from dagshub.data_engine.model.query import DataSourceQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasources import DataSource
+    from dagshub.data_engine.model.datasources import DataSourceState
     from dagshub.data_engine.client.data_client import QueryResult
     import fiftyone as fo
 
@@ -32,12 +32,12 @@ class DataPointMetadataUpdateEntry(json.JSONEncoder):
     valueType: str
 
 
-class Dataset:
+class DataSource:
 
-    def __init__(self, datasource: "DataSource", query: Optional[DatasetQuery] = None):
+    def __init__(self, datasource: "DataSourceState", query: Optional[DataSourceQuery] = None):
         self._source = datasource
         if query is None:
-            query = DatasetQuery(self)
+            query = DataSourceQuery(self)
         self._query = query
 
         self._include_list: List[str] = []
@@ -65,8 +65,8 @@ class Dataset:
     def source(self):
         return self._source
 
-    def __deepcopy__(self, memodict={}) -> "Dataset":
-        res = Dataset(self._source, self._query.__deepcopy__())
+    def __deepcopy__(self, memodict={}) -> "DataSource":
+        res = DataSource(self._source, self._query.__deepcopy__())
         res.include_list = self.include_list.copy()
         res.exclude_list = self.exclude_list.copy()
         return res
@@ -144,10 +144,10 @@ class Dataset:
         queried_ds = ds[ds["value"] == 5]
     """
 
-    def __getitem__(self, column_or_query: Union[str, "Dataset"]):
+    def __getitem__(self, column_or_query: Union[str, "DataSource"]):
         new_ds = self.__deepcopy__()
         if type(column_or_query) is str:
-            new_ds._query = DatasetQuery(new_ds, column_or_query)
+            new_ds._query = DataSourceQuery(new_ds, column_or_query)
             return new_ds
         else:
             # "index" is a dataset with a query - compose with "and"
@@ -194,42 +194,42 @@ class Dataset:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
-    def __and__(self, other: "Dataset"):
+    def __and__(self, other: "DataSource"):
         return self.add_query_op("and", other)
 
-    def __or__(self, other: "Dataset"):
+    def __or__(self, other: "DataSource"):
         return self.add_query_op("or", other)
 
     # Prevent users from messing up their queries due to operator order
     # They always need to put the dataset query filters in parentheses, otherwise the binary and/or get executed before
     def __rand__(self, other):
-        if type(other) is not Dataset:
+        if type(other) is not DataSource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
     def __ror__(self, other):
-        if type(other) is not Dataset:
+        if type(other) is not DataSource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
-    def add_query_op(self, op: str, other: [str, int, float, "Dataset"]) -> "Dataset":
+    def add_query_op(self, op: str, other: [str, int, float, "DataSource"]) -> "DataSource":
         """
         Returns a new dataset with an added query param
         """
         new_ds = self.__deepcopy__()
-        if type(other) is Dataset:
+        if type(other) is DataSource:
             other = other.get_query()
         new_ds._query.compose(op, other)
         return new_ds
 
     @staticmethod
     def _test_not_comparing_other_ds(other):
-        if type(other) is Dataset:
+        if type(other) is DataSource:
             raise DatasetFieldComparisonError()
 
 
 class MetadataContextManager:
-    def __init__(self, dataset: Dataset):
+    def __init__(self, dataset: DataSource):
         self._dataset = dataset
         self._metadata_entries: List[DataPointMetadataUpdateEntry] = []
 

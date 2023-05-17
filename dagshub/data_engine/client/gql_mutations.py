@@ -1,5 +1,5 @@
 import functools
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from gql_query_builder import GqlQuery
 
@@ -64,7 +64,7 @@ class GqlMutations:
         return q
 
     @staticmethod
-    def update_metadata_params(datasource_id: str, datapoints: List[Dict[str, Any]]):
+    def update_metadata_params(datasource_id: Union[int, str], datapoints: List[Dict[str, Any]]):
         return {
             "dataSource": datasource_id,
             "dataPoints": datapoints,

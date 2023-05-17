@@ -1,6 +1,6 @@
 import enum
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 
 
 @dataclass
@@ -39,7 +39,7 @@ class DataSourceType(enum.Enum):
 
 @dataclass
 class DataSourceResult:
-    id: str
+    id: Union[str, int]
     name: str
     rootUrl: str
     integrationStatus: IntegrationStatus

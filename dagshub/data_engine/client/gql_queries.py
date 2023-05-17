@@ -1,5 +1,5 @@
 import functools
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Union
 
 from gql_query_builder import GqlQuery
 
@@ -32,7 +32,7 @@ class GqlQueries:
         return q
 
     @staticmethod
-    def datasource_params(id: Optional[str], name: Optional[str]) -> Dict[str, Any]:
+    def datasource_params(id: Optional[Union[int, str]], name: Optional[str]) -> Dict[str, Any]:
         return {
             "id": id,
             "name": name,
@@ -66,7 +66,7 @@ class GqlQueries:
         return q
 
     @staticmethod
-    def datasource_query_params(datasource_id: str, query_input: Dict[str, Any], first: Optional[int],
+    def datasource_query_params(datasource_id: Union[int, str], query_input: Dict[str, Any], first: Optional[int],
                                 after: Optional[str]) -> Dict[str, Any]:
         return {
             "datasource": datasource_id,

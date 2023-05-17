@@ -13,10 +13,10 @@ from dagshub.common import config
 from dagshub.data_engine.client.dataclasses import QueryResult, DataSourceResult
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.dataset import Dataset, DataPointMetadataUpdateEntry
+from dagshub.data_engine.model.datasource import DataSource, DataPointMetadataUpdateEntry
 
 if typing.TYPE_CHECKING:
-    from dagshub.data_engine.model.datasources import DataSource
+    from dagshub.data_engine.model.datasources import DataSourceState
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class DataClient:
         client = gql.Client(transport=transport)
         return client
 
-    def create_datasource(self, ds: "DataSource") -> DataSourceResult:
+    def create_datasource(self, ds: "DataSourceState") -> DataSourceResult:
         q = GqlMutations.create_datasource()
 
         assert ds.name is not None
@@ -53,14 +53,14 @@ class DataClient:
         res = self._exec(q, params)
         return dacite.from_dict(DataSourceResult, res["createDataSource"])
 
-    def head(self, dataset: Dataset) -> QueryResult:
+    def head(self, dataset: DataSource) -> QueryResult:
         resp = self._datasource_query(dataset, True, self.HEAD_QUERY_SIZE)
         return QueryResult.from_gql_query(resp)
 
-    def get_datapoints(self, dataset: Dataset) -> QueryResult:
+    def get_datapoints(self, dataset: DataSource) -> QueryResult:
         return self._get_all(dataset, True)
 
-    def _get_all(self, dataset: Dataset, include_metadata: bool) -> QueryResult:
+    def _get_all(self, dataset: DataSource, include_metadata: bool) -> QueryResult:
         has_next_page = True
         after = None
         res = QueryResult([])
@@ -79,7 +79,7 @@ class DataClient:
         resp = self.client.execute(q, variable_values=params)
         return resp
 
-    def _datasource_query(self, dataset: Dataset, include_metadata: bool, limit: Optional[int] = None,
+    def _datasource_query(self, dataset: DataSource, include_metadata: bool, limit: Optional[int] = None,
                           after: Optional[str] = None):
         q = GqlQueries.datasource_query(include_metadata)
 
@@ -92,7 +92,7 @@ class DataClient:
 
         return self._exec(q, params)["datasourceQuery"]
 
-    def update_metadata(self, dataset: Dataset, entries: List[DataPointMetadataUpdateEntry]):
+    def update_metadata(self, dataset: DataSource, entries: List[DataPointMetadataUpdateEntry]):
         q = GqlMutations.update_metadata()
 
         assert dataset.source.id is not None
