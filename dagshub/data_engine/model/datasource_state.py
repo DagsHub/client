@@ -4,7 +4,7 @@ from typing import Optional, Union, Mapping, Any
 
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.dataclasses import DataSourceType, DataPoint, DataSourceResult
-from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError
+from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
 
 @dataclass
@@ -32,7 +32,7 @@ class DataSourceState:
     def get_from_dagshub(self):
         sources = self.client.get_datasources(self.id, self.name)
         if len(sources) == 0:
-            raise RuntimeError(f"No datasources found with id '{self.id}' OR name '{self.name}'")
+            raise DatasourceNotFoundError(self)
         elif len(sources) > 1:
             raise RuntimeError(
                 f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong")
