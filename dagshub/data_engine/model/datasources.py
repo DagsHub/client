@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 from dagshub.data_engine.client.dataclasses import DataSourceType
 from dagshub.data_engine.model.datasource import DataSource
@@ -24,7 +24,7 @@ def create_from_dataset(repo: str, name: str, dataset_name: str) -> DataSource:
     return DataSource(source)
 
 
-def get_datasource(repo: str, name: Optional[str] = None, id: Optional[str] = None) -> DataSource:
+def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None) -> DataSource:
     ds = DataSourceState(repo=repo, name=name, id=id)
     ds.get_from_dagshub()
     return DataSource(ds)

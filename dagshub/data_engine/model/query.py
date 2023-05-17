@@ -31,7 +31,8 @@ class FieldFilterOperand(enum.Enum):
 
 fieldFilterOperandMap = {
     "eq": FieldFilterOperand.EQUAL,
-    "ne": FieldFilterOperand.NOT_EQUAL,
+    # TODO: turn on when ready
+    # "ne": FieldFilterOperand.NOT_EQUAL,
     "gt": FieldFilterOperand.GREATER_THAN,
     "ge": FieldFilterOperand.GREATER_EQUAL_THAN,
     "lt": FieldFilterOperand.LESS_THAN,
