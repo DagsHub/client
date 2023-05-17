@@ -8,14 +8,16 @@ from dagshub.data_engine.model.datasource_state import DataSourceState
 logger = logging.getLogger(__name__)
 
 
-def create_from_bucket(name, repo, bucket_url: str) -> DataSource:
+def create_from_bucket(repo: str, name: str, bucket_url: str) -> DataSource:
     # TODO: validation
     source = _create_datasource_state(repo, name, DataSourceType.BUCKET, bucket_url)
     return DataSource(source)
 
 
 def create_from_repo(repo: str, name: str, path: str, revision: str = "main") -> DataSource:
-    source = _create_datasource_state(repo, name, DataSourceType.REPOSITORY, f"{revision}:{path}")
+    url = f"repo://{repo}/{path}"
+    # TODO: figure out what to do with the revision
+    source = _create_datasource_state(repo, name, DataSourceType.REPOSITORY, url)
     return DataSource(source)
 
 

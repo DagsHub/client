@@ -29,7 +29,7 @@ class DESnippetDriver:
         self.client = httpx.Client(auth=auth)
 
     def init_dataset(self):
-        return datasources.create_from_bucket("data-2", self.repo, self.bucket_url)
+        return datasources.create_from_bucket(self.repo, "data-2", self.bucket_url)
 
     def create_datasource(self):
         logger.info("Creating datasource...")
