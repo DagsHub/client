@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSourceState
     from dagshub.data_engine.client.data_client import QueryResult
     import fiftyone as fo
+    import pandas
 
 logger = logging.getLogger(__name__)
 
@@ -92,9 +93,59 @@ class DataSource:
 
     @contextmanager
     def metadata_context(self) -> "MetadataContextManager":
+        """
+        Returns a metadata context, that you can upload metadata through via update_metadata
+        Once the context is exited, all metadata is uploaded in one batch
+
+        with df.metadata_context() as ctx:
+            ctx.update_metadata(["file1", "file2"], {"key1": True, "key2": "value"})
+
+        """
         ctx = MetadataContextManager(self)
         yield ctx
-        self.source.client.update_metadata(self, ctx.get_metadata_entries())
+        self._upload_metadata(ctx.get_metadata_entries())
+
+    def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
+        """
+        Uploads metadata from a pandas dataframe
+        path_column can either be a name of the column with the data or its index.
+        This will be the column from which the datapoints are extracted.
+        All the other columns are treated as metadata to upload
+        If path_column is not specified, the first column is used as the datapoints
+        """
+        self._upload_metadata(self._df_to_metadata(df, path_column))
+
+    @staticmethod
+    def _df_to_metadata(df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None) -> List[
+        DataPointMetadataUpdateEntry]:
+        res = []
+        if path_column is None:
+            path_column = df.columns[0]
+        elif type(path_column) is str:
+            if path_column not in df.columns:
+                raise RuntimeError(f"Column {path_column} does not exist in the dataframe")
+        elif type(path_column) is int:
+            path_column = df.columns[path_column]
+
+        # objects are actually mixed and not guaranteed to be string, but this should cover most use cases
+        if df.dtypes[path_column] != "object":
+            raise RuntimeError(f"Column {path_column} doesn't have strings")
+
+        for _, row in df.iterrows():
+            datapoint = row[path_column]
+            for key, val in row.items():
+                if key == path_column:
+                    continue
+                res.append(DataPointMetadataUpdateEntry(
+                    url=datapoint,
+                    key=str(key),
+                    value=str(val),
+                    valueType=_metadataTypeLookup[type(val)]
+                ))
+        return res
+
+    def _upload_metadata(self, metadata_entries: List[DataPointMetadataUpdateEntry]):
+        self.source.client.update_metadata(self, metadata_entries)
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
