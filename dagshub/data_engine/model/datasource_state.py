@@ -83,3 +83,9 @@ class DataSourceState:
         self.name = ds.name
         self.path = ds.rootUrl
         self.source_type = ds.type
+
+    @staticmethod
+    def from_gql_result(repo: str, res: DataSourceResult):
+        ds = DataSourceState(repo)
+        ds._update_from_ds_result(res)
+        return ds

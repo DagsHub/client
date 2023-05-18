@@ -1,6 +1,7 @@
 import logging
-from typing import Optional, Union
+from typing import Optional, Union, List
 
+from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.dataclasses import DataSourceType
 from dagshub.data_engine.model.datasource import DataSource
 from dagshub.data_engine.model.datasource_state import DataSourceState
@@ -30,6 +31,12 @@ def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int
     ds = DataSourceState(repo=repo, name=name, id=id)
     ds.get_from_dagshub()
     return DataSource(ds)
+
+
+def get_datasources(repo: str) -> List[DataSource]:
+    client = DataClient(repo)
+    sources = client.get_datasources(None, None)
+    return [DataSource(DataSourceState.from_gql_result(repo, source)) for source in sources]
 
 
 def _create_datasource_state(repo: str, name: str, source_type: DataSourceType, path: str) -> DataSourceState:

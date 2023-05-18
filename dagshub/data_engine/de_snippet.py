@@ -142,8 +142,16 @@ def query_debugging():
     snippet_driver.query()
 
 
+def get_all_datasources(repo="simon/baby-yoda-segmentation-dataset"):
+    sources = datasources.get_datasources(repo)
+    print(f"Data sources in repo {repo}:")
+    for ds in sources:
+        print(f"\t{ds.source}")
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # query_debugging()
     # just_debugging_voxel()
-    dataset_create_flow()
+    # dataset_create_flow()
+    get_all_datasources()
