@@ -1,8 +1,8 @@
 import asyncio
 import logging
 from threading import Thread
+from typing import TYPE_CHECKING
 
-import fiftyone as fo
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
 
@@ -10,11 +10,14 @@ from dagshub.data_engine.voxel_plugin_server.app import app
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    import fiftyone as fo
+
 DEFAULT_PORT = 5152
 
 
 class PluginServer:
-    def __init__(self, voxel_dataset: fo.Dataset):
+    def __init__(self, voxel_dataset: "fo.Dataset"):
         self._ev_loop = asyncio.new_event_loop()
 
         self._config = Config()
@@ -31,7 +34,7 @@ class PluginServer:
     def server_address(self):
         return f"http://{self._config.bind[0]}"
 
-    def set_dataset_config(self, dataset: fo.Dataset):
+    def set_dataset_config(self, dataset: "fo.Dataset"):
         dataset.app_config.plugins["dagshub"] = {
             "server": self.server_address
         }
@@ -44,6 +47,6 @@ class PluginServer:
         self._thread.join()
 
 
-def run_plugin_server(voxel_dataset: fo.Dataset) -> PluginServer:
+def run_plugin_server(voxel_dataset: "fo.Dataset") -> PluginServer:
     plugin_server = PluginServer(voxel_dataset)
     return plugin_server

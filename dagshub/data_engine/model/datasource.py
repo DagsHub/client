@@ -12,8 +12,11 @@ from dataclasses_json import dataclass_json
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.util import lazy_load
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DataSourceQuery, _metadataTypeLookup
+
+fo = lazy_load("fiftyone")
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DataSourceState
@@ -107,7 +110,6 @@ class DataSource:
         Args:
             name (str): name of the dataset (by default uses the same name as the datasource)
         """
-        import fiftyone as fo
         logger.info("Migrating dataset to voxel51")
         name = kwargs.get("name", self._source.name)
         ds: fo.Dataset = fo.Dataset(name)
@@ -117,7 +119,6 @@ class DataSource:
         logger.info("Downloading files...")
         # Load the dataset from the query
 
-        # FIXME: shouldnt use peek here, but only peekresult has the dataframe
         datapoints = self.all()
 
         host = config.host

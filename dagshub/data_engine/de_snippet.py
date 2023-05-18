@@ -2,21 +2,23 @@ import logging
 import random
 from typing import List
 
-import IPython
 import dacite
 import httpx
-import fiftyone as fo
 import requests
 
 import dagshub
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.util import lazy_load
 from dagshub.data_engine.model import datasources
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError
 from dagshub.data_engine.voxel_plugin_server.server import run_plugin_server
 from dagshub.streaming.dataclasses import ContentAPIEntry
 
 logger = logging.getLogger(__name__)
+
+fo = lazy_load("fiftyone")
+IPython = lazy_load("IPython")
 
 
 class DESnippetDriver:
