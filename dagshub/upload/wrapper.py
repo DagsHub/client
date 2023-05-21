@@ -162,7 +162,7 @@ class Repo:
         """
         self.owner = owner
         self.name = name
-        self.src_url = config.host
+        self.host = config.host
 
         self.username = username or config.username
         self.password = password or config.password
@@ -320,7 +320,7 @@ class Repo:
 
         """
         return urllib.parse.urljoin(
-            self.src_url,
+            self.host,
             CONTENT_UPLOAD_URL.format(
                 owner=self.owner,
                 reponame=self.name,
@@ -340,7 +340,7 @@ class Repo:
 
         try:
             self.branch = helpers.get_default_branch(
-                self.owner, self.name, self.auth, self.src_url
+                self.owner, self.name, self.auth, self.host
             )
         except Exception:
             raise RuntimeError(
@@ -368,7 +368,7 @@ class Repo:
         :return: The commit id of the last commit for the branch
         """
         api_path = f"api/v1/repos/{self.full_name}/branches/{self.branch}"
-        api_url = urllib.parse.urljoin(self.src_url, api_path)
+        api_url = urllib.parse.urljoin(self.host, api_path)
         res = s.get(api_url, auth=self.auth)
         if res.status_code == HTTPStatus.OK:
             content = res.json()
