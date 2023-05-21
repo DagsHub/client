@@ -34,11 +34,11 @@ class UserAPIResponse:
     id: int
     login: str
     full_name: str
-    avatar_url: str
-    public_email: str
-    website: str
-    company: str
-    description: str
+    avatar_url: Optional[str]
+    public_email: Optional[str]
+    website:Optional[str]
+    company: Optional[str]
+    description: Optional[str]
     username: str
 
 
