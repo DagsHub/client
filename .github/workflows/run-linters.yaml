@@ -33,4 +33,4 @@ jobs:
         uses: wearerequired/lint-action@v2
         with:
           flake8: true
-          flake8_args: "--max-line-length 120 --exclude oss_licenses.py"
+          flake8_args: "--max-line-length 120 --exclude oss_licenses.py --ignore=E203,W503,W504,E125,E126"

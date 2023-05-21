@@ -224,13 +224,30 @@ class MockApi(MockRouter):
         Add a directory to the api (only accessible via the content endpoint)
         We don't keep a tree of added dirs, so it's not dynamic
         """
-        if is_storage:
-            route = self.route(url=f"{self.api_storage_list_path}/{path}")
-        else:
-            route = self.route(url=f"{self.api_list_path}/{path}")
+        route = self.route(url=f"{self.api_list_path}/{path}")
         content = [
             self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
         ]
+        route.mock(Response(status, json=content))
+        return route
+
+    def add_storage_dir(self, path, contents=[], from_token=None, next_token=None, status=200):
+        """
+        Add a directory to the storage api
+        Storage has a different response schema
+        """
+        url = f"{self.api_storage_list_path}/{path}?paging=true"
+        if from_token is not None:
+            url += f"&from_token={from_token}"
+        route = self.route(url=url)
+        content = {
+            "entries": [
+                self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
+            ],
+            "limit": len(contents),
+        }
+        if next_token is not None:
+            content["next_token"] = next_token
         route.mock(Response(status, json=content))
         return route
 
