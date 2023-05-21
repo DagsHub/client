@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 try:
     from functools import cached_property
@@ -34,6 +34,12 @@ class ContentAPIEntry:
     versioning: str
     download_url: str
     content_url: Optional[str]  # TODO: remove Optional once content_url is exposed in API
+
+
+@dataclass
+class StorageContentAPIResult:
+    entries: List[ContentAPIEntry]
+    next_token: Optional[str]
 
 
 storage_schemas = ["s3", "gs"]
@@ -92,6 +98,6 @@ class DagshubPath:
             - Any /site-packages/ folder - if you have a venv in your repo, python will try to find packages there.
         """
         str_path = self.relative_path.as_posix()
-        if "/site-packages/" in str_path:
+        if "/site-packages/" in str_path or str_path.endswith("/site-packages"):
             return True
         return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
