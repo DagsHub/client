@@ -1,6 +1,6 @@
 import logging
 from functools import cached_property
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 import dacite
 
@@ -10,7 +10,7 @@ from dagshub.common import config
 import httpx
 from urllib.parse import urljoin, quote_plus
 
-from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse
+from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse
 
 logger = logging.getLogger("dagshub")
 
@@ -29,14 +29,24 @@ class BranchNotFoundError(Exception):
 
 class RepoAPI:
 
-    def __init__(self, repo: str, host: Optional[str] = None):
+    def __init__(self, repo: str, host: Optional[str] = None, auth: Optional[Any] = None):
+        """
+        Class for interacting with the API of a repository
+
+        :param repo (str): repo in the format of "user/repo"
+        :param host (str): Optional: url of the dagshub instance to connect to
+        :param auth: authentication to use to connect
+        """
         self.owner, self.repo_name = self.parse_repo(repo)
         self.host = host if host is not None else config.host
 
-        self.client = httpx.Client(
-            auth=HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
-        )
-        print("Done")
+        if auth is None:
+            auth = HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
+
+        self.client = httpx.Client(auth=auth)
+        self.client.timeout = config.http_timeout
+        self.client.follow_redirects = True
+        self.client.headers.update(config.requests_headers)
 
     def get_repo_info(self) -> RepoAPIResponse:
         res = self.client.get(self.repo_api_url)
@@ -66,10 +76,16 @@ class RepoAPI:
         return self.get_repo_info().default_branch
 
     @property
-    def last_commit(self, branch: Optional[str] = None) -> str:
+    def full_name(self) -> str:
+        return f"{self.owner}/{self.repo_name}"
+
+    def last_commit(self, branch: Optional[str] = None) -> CommitAPIResponse:
         if branch is None:
             branch = self.default_branch
-        return self.get_branch_info(branch).commit.id
+        return self.get_branch_info(branch).commit
+
+    def last_commit_sha(self, branch: Optional[str] = None) -> str:
+        return self.last_commit(branch).id
 
     @cached_property
     def repo_api_url(self) -> str:
@@ -112,7 +128,7 @@ class RepoAPI:
         parts = repo.split("/")
         if len(parts) != 2:
             raise WrongRepoFormatError("repo needs to be in the format <repo-owner>/<repo-name>")
-        return tuple(parts)
+        return parts[0], parts[1]
 
 
 def _multi_urljoin(*parts):
