@@ -198,7 +198,7 @@ class Repo:
             dir_to_upload = self.directory(remote_path if remote_path is not None else DEFAULT_REMOTE_PATH)
             dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
         else:
-            file_to_upload = DataSet.get_file(local_path, remote_path if remote_path is not None else DEFAULT_REMOTE_PATH)
+            file_to_upload = DataSet.get_file(local_path, remote_path)
             self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
     def upload_files(
