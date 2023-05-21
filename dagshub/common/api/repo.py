@@ -7,10 +7,10 @@ import dacite
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-import httpx
 from urllib.parse import urljoin, quote_plus
 
 from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse
+from dagshub.common.helpers import http_request
 
 logger = logging.getLogger("dagshub")
 
@@ -41,15 +41,12 @@ class RepoAPI:
         self.host = host if host is not None else config.host
 
         if auth is None:
-            auth = HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
-
-        self.client = httpx.Client(auth=auth)
-        self.client.timeout = config.http_timeout
-        self.client.follow_redirects = True
-        self.client.headers.update(config.requests_headers)
+            self.auth = HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
+        else:
+            self.auth = auth
 
     def get_repo_info(self) -> RepoAPIResponse:
-        res = self.client.get(self.repo_api_url)
+        res = http_request("GET", self.repo_api_url, auth=self.auth)
 
         if res.status_code == 404:
             raise RepoNotFoundError(f"Repo {self.repo_url} doesn't exist")
@@ -60,7 +57,7 @@ class RepoAPI:
         return dacite.from_dict(RepoAPIResponse, res.json())
 
     def get_branch_info(self, branch: str):
-        res = self.client.get(self.branch_url(branch))
+        res = http_request("GET", self.branch_url(branch), auth=self.auth)
 
         if res.status_code == 404:
             raise BranchNotFoundError(f"Branch {branch} not found in repo {self.repo_url}")
