@@ -11,14 +11,17 @@ from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
 from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, ParseResult
 import dacite
 from httpx import Response
 
 from dagshub.common import config, helpers
 import logging
+
+from dagshub.common.api.repo import RepoAPI, CommitNotFoundError
+from dagshub.common.api.responses import ContentAPIEntry, StorageContentAPIResult
 from dagshub.common.helpers import http_request, get_project_root
-from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath, StorageContentAPIResult
+from dagshub.streaming.dataclasses import DagshubPath
 from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
@@ -111,18 +114,15 @@ class DagsHubFilesystem:
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
-        self.dagshub_remotes = []
-        self.parse_git_config()
-
         if not repo_url:
-            if len(self.dagshub_remotes) > 0:
-                repo_url = self.dagshub_remotes[0]
+            remotes = self.get_remotes_from_git_config()
+            if len(remotes) > 0:
+                repo_url = remotes[0]
             else:
                 raise ValueError('No DagsHub git remote detected, please specify repo_url= argument or --repo_url flag')
 
         self.user_specified_branch = branch
         self.parsed_repo_url = urlparse(repo_url)
-        self.dvc_remote_url = f'{repo_url}.dvc/cache'
         # Key: path, value: dict of {name, type} on that path (in remote)
         self.remote_tree: Dict[str, Dict[str, str]] = {}
 
@@ -134,6 +134,8 @@ class DagsHubFilesystem:
 
         self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
 
+        self._api = self._generate_repo_api(self.parsed_repo_url)
+
         self.check_project_root_use()
 
         # Check that the repo is accessible by accessing the content root
@@ -142,7 +144,12 @@ class DagsHubFilesystem:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
-        self._storages = self._api_storages()
+        self._storages = self._api.get_connected_storages()
+
+    def _generate_repo_api(self, repo_url: ParseResult) -> RepoAPI:
+        host = f"{repo_url.scheme}://{repo_url.netloc}"
+        repo = repo_url.path
+        return RepoAPI(repo=repo, host=host, auth=self.auth)
 
     @cached_property
     def _current_revision(self) -> str:
@@ -173,35 +180,15 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 logger.debug("Couldn't get branch info from local git repository, " +
                              "fetching default branch from the remote...")
-                owner, reponame = self.parsed_repo_url.path.split("/")[1:]
-                branch = helpers.get_default_branch(owner, reponame, self.auth)
-                logger.debug(f'Set default branch: "{branch}"')
-        return self.get_remote_branch_head(branch)
-
-    @property
-    def content_api_url(self):
-        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/content/{self._current_revision}")
-
-    @property
-    def raw_api_url(self):
-        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
-
-    @property
-    def storage_api_url(self):
-        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/storage")
-
-    @property
-    def storage_content_api_url(self):
-        return f"{self.storage_api_url}/content"
-
-    @property
-    def storage_raw_api_url(self):
-        return f"{self.storage_api_url}/raw"
+                branch = self._api.default_branch
+        return self._api.last_commit_sha(branch)
 
     def is_commit_on_remote(self, sha1):
-        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
-        resp = self.http_get(url)
-        return resp.status_code == 200
+        try:
+            self._api.get_commit_info(sha1)
+            return True
+        except CommitNotFoundError:
+            return False
 
     def check_project_root_use(self):
         """
@@ -229,9 +216,6 @@ class DagsHubFilesystem:
                                f"Response body: {resp.content}")
         return resp.json()["commit"]["id"]
 
-    def get_api_url(self, path):
-        return str(self.parsed_repo_url._replace(path=path).geturl())
-
     @property
     def auth(self):
         import dagshub.auth
@@ -256,19 +240,21 @@ class DagsHubFilesystem:
         if 'username' in answer and 'password' in answer:
             return answer['username'], answer['password']
 
-    def parse_git_config(self):
+    def get_remotes_from_git_config(self) -> List[str]:
         # Get URLs of dagshub remotes
         git_config = ConfigParser()
         git_config.read(Path(self.project_root) / '.git/config')
         git_remotes = [urlparse(git_config[remote]['url'])
                        for remote in git_config
                        if remote.startswith('remote ')]
+        res_remotes = []
         for remote in git_remotes:
             if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
-            self.dagshub_remotes.append(remote.geturl())
+            res_remotes.append(remote.geturl())
+        return res_remotes
 
     def __del__(self):
         if hasattr(self, "project_root_fd"):
@@ -605,14 +591,6 @@ class DagsHubFilesystem:
         self._listdir_cache[path.relative_path.as_posix()] = (res, include_size)
         return res
 
-    def _api_storages(self) -> List[StorageAPIEntry]:
-        response = self.http_get(self.storage_api_url)
-        if response.status_code >= 400:
-            logger.warning(f"Got HTTP code {response.status_code} while getting storages. Content: {response.content}")
-            logger.warning("Storages are unavailable")
-            return []
-        return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in response.json()]
-
     def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[List[ContentAPIEntry]], bool]:
         # Checks that path has a pre-cached response
         # If include_size is True, but only a response without size is cached, that's a cache miss
@@ -628,8 +606,8 @@ class DagsHubFilesystem:
         str_path = path.relative_path.as_posix()
         if path.is_storage_path:
             path_to_access = str_path[len(".dagshub/storage/"):]
-            return f"{self.storage_content_api_url}/{path_to_access}"
-        return f"{self.content_api_url}/{str_path}"
+            return self._api.storage_content_api_url(path_to_access)
+        return self._api.content_api_url(self._current_revision, str_path)
 
     def _raw_url_for_path(self, path: DagshubPath):
         if not path.is_in_repo:
@@ -637,8 +615,8 @@ class DagsHubFilesystem:
         str_path = path.relative_path.as_posix()
         if path.is_storage_path:
             path_to_access = str_path[len(".dagshub/storage/"):]
-            return f"{self.storage_raw_api_url}/{path_to_access}"
-        return f"{self.raw_api_url}/{str_path}"
+            return self._api.storage_raw_api_url(path_to_access)
+        return self._api.raw_api_url(self._current_revision, str_path)
 
     def _api_download_file_git(self, path: DagshubPath):
         return self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)

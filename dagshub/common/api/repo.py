@@ -1,6 +1,11 @@
 import logging
-from functools import cached_property
-from typing import Optional, Tuple, Any
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
+
+from typing import Optional, Tuple, Any, List
 
 import dacite
 
@@ -9,7 +14,7 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from urllib.parse import urljoin, quote_plus
 
-from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse
+from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse, StorageAPIEntry
 from dagshub.common.helpers import http_request
 
 logger = logging.getLogger("dagshub")
@@ -24,6 +29,10 @@ class RepoNotFoundError(Exception):
 
 
 class BranchNotFoundError(Exception):
+    pass
+
+
+class CommitNotFoundError(Exception):
     pass
 
 
@@ -49,14 +58,14 @@ class RepoAPI:
         res = http_request("GET", self.repo_api_url, auth=self.auth)
 
         if res.status_code == 404:
-            raise RepoNotFoundError(f"Repo {self.repo_url} doesn't exist")
+            raise RepoNotFoundError(f"Repo {self.repo_url} not found")
         elif res.status_code >= 400:
             error_msg = f"Got status code {res.status_code} when getting repository info."
             logger.error(error_msg)
             raise RuntimeError(error_msg)
         return dacite.from_dict(RepoAPIResponse, res.json())
 
-    def get_branch_info(self, branch: str):
+    def get_branch_info(self, branch: str) -> BranchAPIResponse:
         res = http_request("GET", self.branch_url(branch), auth=self.auth)
 
         if res.status_code == 404:
@@ -67,6 +76,31 @@ class RepoAPI:
             raise RuntimeError(error_msg)
 
         return dacite.from_dict(BranchAPIResponse, res.json())
+
+    def get_commit_info(self, sha: str) -> CommitAPIResponse:
+        res = http_request("GET", self.commit_url(sha), auth=self.auth)
+
+        if res.status_code == 404:
+            raise BranchNotFoundError(f"Commit {sha} not found in repo {self.repo_url}")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when getting commit."
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        return dacite.from_dict(CommitAPIResponse, res.json())
+
+
+    def get_connected_storages(self) -> List[StorageAPIEntry]:
+        res = http_request("GET", self.storage_api_url(), auth=self.auth)
+
+        if res.status_code == 404:
+            raise RepoNotFoundError(f"Repo {self.repo_url} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when getting repository info."
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in res.json()]
 
     @cached_property
     def default_branch(self) -> str:
@@ -120,8 +154,75 @@ class RepoAPI:
             branch
         )
 
+    def commit_url(self, sha) -> str:
+        """
+        URL of a commit in the repo
+        Format: https://dagshub.com/api/v1/repos/user/repo/commits/sha
+        """
+        return _multi_urljoin(
+            self.repo_api_url,
+            "commits",
+            sha
+        )
+
+    def content_api_url(self, revision: str, path: str) -> str:
+        """
+        URL for Content API access
+        Format: https://dagshub.com/api/v1/repos/user/repo/content/revision/path
+        """
+        return _multi_urljoin(
+            self.repo_api_url,
+            "content",
+            revision,
+            path
+        )
+
+    def raw_api_url(self, revision: str, path: str) -> str:
+        """
+        URL for Raw Content API access
+        Format: https://dagshub.com/api/v1/repos/user/repo/raw/revision/path
+        """
+        return _multi_urljoin(
+            self.repo_api_url,
+            "raw",
+            revision,
+            path
+        )
+
+    def storage_content_api_url(self, path: str) -> str:
+        """
+        URL for Storage Content API access
+        path example: s3/bucket-name/path/in/bucket
+        Format: https://dagshub.com/api/v1/repos/user/repo/storage/content/path
+        """
+        return _multi_urljoin(
+            self.repo_api_url,
+            "storage/content",
+            path
+        )
+
+    def storage_raw_api_url(self, path: str) -> str:
+        """
+        URL for Storage Raw Content API access
+        path example: s3/bucket-name/path/in/bucket
+        Format: https://dagshub.com/api/v1/repos/user/repo/storage/raw/path
+        """
+        return _multi_urljoin(
+            self.repo_api_url,
+            "storage/raw",
+            path
+        )
+
+    def storage_api_url(self) -> str:
+        """
+        URL for getting connected storages
+        Format: https://dagshub.com/api/v1/repos/user/repo/storage
+        """
+        return _multi_urljoin(self.repo_api_url, "storage")
+
     @staticmethod
     def parse_repo(repo: str) -> Tuple[str, str]:
+        repo = repo.strip("/")
         parts = repo.split("/")
         if len(parts) != 2:
             raise WrongRepoFormatError("repo needs to be in the format <repo-owner>/<repo-name>")

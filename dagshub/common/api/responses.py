@@ -1,5 +1,11 @@
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Optional, Dict, List
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 
 @dataclass
@@ -36,7 +42,7 @@ class UserAPIResponse:
     full_name: str
     avatar_url: Optional[str]
     public_email: Optional[str]
-    website:Optional[str]
+    website: Optional[str]
     company: Optional[str]
     description: Optional[str]
     username: str
@@ -66,3 +72,37 @@ class GitUser:
     name: str
     email: str
     username: str
+
+
+@dataclass
+class StorageAPIEntry:
+    name: str
+    protocol: str
+    list_path: str
+
+    @cached_property
+    def full_path(self):
+        return f"{self.protocol}/{self.name}"
+
+    @cached_property
+    def path_in_mount(self) -> PurePosixPath:
+        return PurePosixPath(".dagshub/storage") / self.protocol / self.name
+
+
+@dataclass
+class ContentAPIEntry:
+    path: str
+    # Possible values: dir, file, storage
+    type: str
+    size: int
+    hash: str
+    # Possible values: git, dvc, bucket
+    versioning: str
+    download_url: str
+    content_url: Optional[str]  # TODO: remove Optional once content_url is exposed in API
+
+
+@dataclass
+class StorageContentAPIResult:
+    entries: List[ContentAPIEntry]
+    next_token: Optional[str]
