@@ -46,7 +46,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
                           to the repository with --url or a pair of --repo-owner and --repo-name')
 
     # Setup authentication
-    token = config.token or get_token()
+    token = config.token or get_token(host=host)
     bearer = HTTPBearerAuth(token)
 
     # Configure repository
