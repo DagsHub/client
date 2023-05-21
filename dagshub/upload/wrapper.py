@@ -205,7 +205,7 @@ class Repo:
         files,
         directory_path="",
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        versioning=None,
+        versioning="auto",
         new_branch=None,
         last_commit=None,
         force=False,
@@ -217,7 +217,8 @@ class Repo:
         :param files (list(str)): Pass the files that are to be uploaded
         :param directory_path (str): Indicate the path of the directory in which we want to upload our files
         :param commit_message (str): Set the commit message
-        :param versioning (str): Determine whether the files are uploaded to a new branch or not
+        :param versioning (str): Which versioning system to use to upload a file.
+            Possible options: git, dvc, auto (best effort guess)
         :param new_branch (str): Create a new branch
         :param last_commit (str): Tell the server that we want to upload a file without committing it
         :param force (bool): Force the upload of a file even if it is already present on the server
@@ -432,6 +433,10 @@ class DataSet:
                                           console=rich_console, transient=True, disable=config.quiet)
         total_task = progress.add_task("Uploading files...")
 
+        # If user hasn't specified versioning, then assume we're uploading dvc (this makes most sense for folders)
+        if "versioning" not in upload_kwargs:
+            upload_kwargs["versioning"] = "dvc"
+
         with progress:
             for root, dirs, files in os.walk(local_path):
                 folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
@@ -452,12 +457,12 @@ class DataSet:
                             self.add(file=rel_file_path, path=rel_remote_file_path)
                             if len(self.files) > 49:
                                 file_counter += len(self.files)
-                                self.commit(commit_message, versioning="dvc", **upload_kwargs)
+                                self.commit(commit_message, **upload_kwargs)
                                 progress.update(folder_task, advance=len(self.files))
                                 progress.update(total_task, completed=file_counter)
                     if len(self.files) > 0:
                         file_counter += len(self.files)
-                        self.commit(commit_message, versioning="dvc", **upload_kwargs)
+                        self.commit(commit_message, **upload_kwargs)
                         progress.update(total_task, completed=file_counter)
                 progress.remove_task(folder_task)
 

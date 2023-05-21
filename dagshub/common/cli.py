@@ -130,6 +130,8 @@ def to_log_level(verbosity):
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
+@click.option("--versioning", help="Versioning system to be used to upload the file(s)",
+              type=click.Choice(["git", "dvc", "auto"]))
 @click.pass_context
 def upload(ctx,
            filename,
@@ -141,6 +143,7 @@ def upload(ctx,
            update,
            quiet,
            host,
+           versioning,
            **kwargs):
     """
     Upload FILENAME to REPO at location TARGET
@@ -157,7 +160,8 @@ def upload(ctx,
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
     try:
-        repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update)
+        repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update,
+                    versioning=versioning)
     except UpdateNotAllowedError:
         log_message(":warning: You're trying to update existing files! :warning:\n"
                     "If you want to do that, retry with --update to force the update", logger)
