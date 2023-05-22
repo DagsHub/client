@@ -26,13 +26,13 @@ REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 DEFAULT_DATA_DIR_NAME = 'data'
+DEFAULT_REMOTE_PATH = "/data/src/"
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
 s.timeout = config.http_timeout
 s.follow_redirects = True
 s.headers.update(config.requests_headers)
-
 
 def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
     """
@@ -177,6 +177,7 @@ class Repo:
             self.branch = self._api.default_branch
         logger.debug(f"Set branch: {self.branch}")
 
+
     def upload(
         self,
         local_path: Union[str, IOBase],
@@ -197,7 +198,7 @@ class Repo:
 
         """
         if os.path.isdir(local_path):
-            dir_to_upload = self.directory(remote_path)
+            dir_to_upload = self.directory(remote_path if remote_path is not None else DEFAULT_REMOTE_PATH)
             dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
         else:
             file_to_upload = DataSet.get_file(local_path, remote_path)
