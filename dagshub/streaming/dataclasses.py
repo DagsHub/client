@@ -1,14 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any, List
+from typing import Optional, Any
 
 try:
     from functools import cached_property
 except ImportError:
     from cached_property import cached_property
-
-
-
 
 storage_schemas = ["s3", "gs"]
 
