@@ -1,5 +1,6 @@
 import builtins
 import io
+import logging
 import os
 import re
 import subprocess
@@ -10,14 +11,19 @@ from functools import partial, wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path
-from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List
-from urllib.parse import urlparse
-import dacite
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
+from urllib.parse import urlparse, ParseResult
 
-from dagshub.common import config, helpers
-import logging
+import dacite
+from httpx import Response
+from tenacity import retry, retry_if_result, stop_after_attempt, wait_exponential, before_sleep_log, RetryError
+
+from dagshub.common import config
+from dagshub.common.api.repo import RepoAPI, CommitNotFoundError
+from dagshub.common.api.responses import ContentAPIEntry, StorageContentAPIResult
 from dagshub.common.helpers import http_request, get_project_root
-from dagshub.streaming.dataclasses import StorageAPIEntry, ContentAPIEntry, DagshubPath
+from dagshub.streaming.dataclasses import DagshubPath
+from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
 # Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
 # In 3.11 _NormalAccessor was removed
@@ -65,6 +71,10 @@ class dagshub_ScandirIterator:
 SPECIAL_FILE = Path(".dagshub-streaming")
 
 
+def _is_server_error(resp: Response):
+    return resp.status_code >= 500
+
+
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
     """
@@ -83,8 +93,11 @@ class DagsHubFilesystem:
         Influences all requests except for file download, which has no timeout
     """
 
+    already_mounted_filesystems: Dict[Path, 'DagsHubFilesystem'] = {}
+    hooked_instance: Optional['DagsHubFilesystem'] = None
+
     def __init__(self,
-                 project_root: Optional[PathLike] = None,
+                 project_root: Optional['PathLike | str'] = None,
                  repo_url: Optional[str] = None,
                  branch: Optional[str] = None,
                  username: Optional[str] = None,
@@ -106,18 +119,15 @@ class DagsHubFilesystem:
         else:
             self.project_root_fd = os.open(self.project_root, os.O_DIRECTORY)
 
-        self.dagshub_remotes = []
-        self.parse_git_config()
-
         if not repo_url:
-            if len(self.dagshub_remotes) > 0:
-                repo_url = self.dagshub_remotes[0]
+            remotes = self.get_remotes_from_git_config()
+            if len(remotes) > 0:
+                repo_url = remotes[0]
             else:
                 raise ValueError('No DagsHub git remote detected, please specify repo_url= argument or --repo_url flag')
 
         self.user_specified_branch = branch
         self.parsed_repo_url = urlparse(repo_url)
-        self.dvc_remote_url = f'{repo_url}.dvc/cache'
         # Key: path, value: dict of {name, type} on that path (in remote)
         self.remote_tree: Dict[str, Dict[str, str]] = {}
 
@@ -129,13 +139,22 @@ class DagsHubFilesystem:
 
         self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
 
+        self._api = self._generate_repo_api(self.parsed_repo_url)
+
+        self.check_project_root_use()
+
         # Check that the repo is accessible by accessing the content root
         response = self._api_listdir(DagshubPath(self, self.project_root, Path()))
         if response is None:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError('DagsHub credentials required, however none provided or discovered')
 
-        self._storages = self._api_storages()
+        self._storages = self._api.get_connected_storages()
+
+    def _generate_repo_api(self, repo_url: ParseResult) -> RepoAPI:
+        host = f"{repo_url.scheme}://{repo_url.netloc}"
+        repo = repo_url.path
+        return RepoAPI(repo=repo, host=host, auth=self.auth)
 
     @cached_property
     def _current_revision(self) -> str:
@@ -166,35 +185,33 @@ class DagsHubFilesystem:
             except FileNotFoundError:
                 logger.debug("Couldn't get branch info from local git repository, " +
                              "fetching default branch from the remote...")
-                owner, reponame = self.parsed_repo_url.path.split("/")[1:]
-                branch = helpers.get_default_branch(owner, reponame, self.auth)
-                logger.debug(f'Set default branch: "{branch}"')
-        return self.get_remote_branch_head(branch)
-
-    @property
-    def content_api_url(self):
-        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/content/{self._current_revision}")
-
-    @property
-    def raw_api_url(self):
-        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/raw/{self._current_revision}")
-
-    @property
-    def storage_api_url(self):
-        return self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/storage")
-
-    @property
-    def storage_content_api_url(self):
-        return f"{self.storage_api_url}/content"
-
-    @property
-    def storage_raw_api_url(self):
-        return f"{self.storage_api_url}/raw"
+                branch = self._api.default_branch
+        return self._api.last_commit_sha(branch)
 
     def is_commit_on_remote(self, sha1):
-        url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/commits/{sha1}")
-        resp = self.http_get(url)
-        return resp.status_code == 200
+        try:
+            self._api.get_commit_info(sha1)
+            return True
+        except CommitNotFoundError:
+            return False
+
+    def check_project_root_use(self):
+        """
+        Checks that there's no other filesystem being mounted at the current project root
+        If there is one, throw an error
+        """
+
+        def is_subpath(a: Path, b: Path) -> bool:
+            # Checks if either a or b are subpaths of each other
+            a_str = a.as_posix()
+            b_str = b.as_posix()
+            return a_str.startswith(b_str) or b_str.startswith(a_str)
+
+        for p, f in DagsHubFilesystem.already_mounted_filesystems.items():
+            if is_subpath(p, self.project_root):
+                raise FilesystemAlreadyMountedError(self.project_root, f.parsed_repo_url.path[1:], f._current_revision)
+
+        DagsHubFilesystem.already_mounted_filesystems[self.project_root] = self
 
     def get_remote_branch_head(self, branch):
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
@@ -203,9 +220,6 @@ class DagsHubFilesystem:
             raise RuntimeError(f"Got status {resp.status_code} while trying to get head of branch {branch}. \r\n"
                                f"Response body: {resp.content}")
         return resp.json()["commit"]["id"]
-
-    def get_api_url(self, path):
-        return str(self.parsed_repo_url._replace(path=path).geturl())
 
     @property
     def auth(self):
@@ -231,22 +245,31 @@ class DagsHubFilesystem:
         if 'username' in answer and 'password' in answer:
             return answer['username'], answer['password']
 
-    def parse_git_config(self):
+    def get_remotes_from_git_config(self) -> List[str]:
         # Get URLs of dagshub remotes
         git_config = ConfigParser()
         git_config.read(Path(self.project_root) / '.git/config')
         git_remotes = [urlparse(git_config[remote]['url'])
                        for remote in git_config
                        if remote.startswith('remote ')]
+        res_remotes = []
         for remote in git_remotes:
             if remote.hostname != config.hostname:
                 continue
             remote = remote._replace(netloc=remote.hostname)
             remote = remote._replace(path=re.compile(r'(\.git)?/?$').sub('', remote.path))
-            self.dagshub_remotes.append(remote.geturl())
+            res_remotes.append(remote.geturl())
+        return res_remotes
 
     def __del__(self):
-        os.close(self.project_root_fd)
+        if hasattr(self, "project_root_fd"):
+            os.close(self.project_root_fd)
+        self.cleanup()
+
+    def cleanup(self):
+        # Remove from map of mounted filesystems
+        if hasattr(self, "project_root") and self.project_root in DagsHubFilesystem.already_mounted_filesystems:
+            DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
         if isinstance(file, int):
@@ -287,7 +310,10 @@ class DagsHubFilesystem:
                 except FileNotFoundError as err:
                     # Open for reading - try to download the file
                     if "r" in mode:
-                        resp = self._api_download_file_git(path)
+                        try:
+                            resp = self._api_download_file_git(path)
+                        except RetryError:
+                            raise RuntimeError(f"Couldn't download {path.relative_path} after multiple attempts")
                         if resp.status_code < 400:
                             self._mkdirs(path.relative_path.parent, dir_fd=self.project_root_fd)
                             # TODO: Handle symlinks
@@ -295,10 +321,12 @@ class DagsHubFilesystem:
                                 output.write(resp.content)
                             return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                                closefd, opener=project_root_opener)
-                        else:
-                            # TODO: After API no longer 500s on FileNotFounds
-                            #       check status code and only return FileNotFound on 404s
+                        elif resp.status_code == 404:
                             raise FileNotFoundError(f'Error finding {path.relative_path} in repo or on DagsHub')
+                        else:
+                            raise RuntimeError(
+                                f"Got response code {resp.status_code} from DagsHub while downloading file"
+                                f" {path.relative_path}")
                     # Write modes - make sure that the folder is a tracked folder (create if doesn't exist on disk),
                     # and then let the user write to file
                     else:
@@ -309,7 +337,10 @@ class DagsHubFilesystem:
                             raise err
                         # Try to download the file if we're in append modes
                         if "a" in mode or "+" in mode:
-                            resp = self._api_download_file_git(path.relative_path.as_posix())
+                            try:
+                                resp = self._api_download_file_git(path)
+                            except RetryError:
+                                raise RuntimeError(f"Couldn't download {path.relative_path} after multiple attempts")
                             if resp.status_code < 400:
                                 with self.__open(path.relative_path, 'wb', opener=project_root_opener) as output:
                                     output.write(resp.content)
@@ -418,8 +449,16 @@ class DagsHubFilesystem:
             self.__chdir(path)
 
     def listdir(self, path='.'):
+
         # listdir needs to return results for bytes path arg also in bytes
         is_bytes_path_arg = type(path) is bytes
+
+        def encode_results(res):
+            res = list(res)
+            if is_bytes_path_arg:
+                res = [os.fsencode(p) for p in res]
+            return res
+
         if is_bytes_path_arg:
             str_path = os.fsdecode(path)
         else:
@@ -439,6 +478,10 @@ class DagsHubFilesystem:
                     error = e
                 dircontents.update(
                     special.name for special in self._get_special_paths(parsed_path, Path(), is_bytes_path_arg))
+                # If we're accessing .dagshub/storage/s3/ we don't need to access the API, return straight away
+                len_parts = len(parsed_path.relative_path.parts)
+                if 0 < len_parts <= 3 and parsed_path.relative_path.parts[0] == ".dagshub":
+                    return encode_results(dircontents)
                 resp = self._api_listdir(parsed_path)
                 if resp is not None:
                     dircontents.update(Path(f.path).name for f in resp)
@@ -446,18 +489,13 @@ class DagsHubFilesystem:
                         Path(f.path).name: f.type
                         for f in resp
                     }
-                    res = list(dircontents)
-                    if is_bytes_path_arg:
-                        res = [os.fsencode(p) for p in res]
-                    return res
+                    return encode_results(dircontents)
                 else:
                     if error is not None:
                         raise error
                     else:
-                        res = list(dircontents)
-                        if is_bytes_path_arg:
-                            res = [os.fsencode(p) for p in res]
-                        return res
+                        return encode_results(dircontents)
+
         else:
             return self.__listdir(path)
 
@@ -524,29 +562,47 @@ class DagsHubFilesystem:
         response, hit = self._check_listdir_cache(path.relative_path.as_posix(), include_size)
         if hit:
             return response
-        response = self.http_get(self._content_url_for_path(path),
-                                 params={'include_size': 'true'} if include_size else {},
-                                 headers=config.requests_headers)
-        if response.status_code >= 400:
-            logger.debug(f"Got HTTP code {response.status_code} while listing {path}, no results will be returned")
+        params: Dict[str, Any] = {"include_size": "true"} if include_size else {}
+        if path.is_storage_path:
+            params["paging"] = True
+        url = self._content_url_for_path(path)
+
+        def _get() -> Optional[Response]:
+            resp = self.http_get(url, params=params, headers=config.requests_headers)
+            if resp.status_code == 404:
+                logger.debug(f"Got HTTP code {resp.status_code} while listing {path}, no results will be returned")
+                return None
+            elif resp.status_code >= 400:
+                logger.warning(
+                    f"Got HTTP code {resp.status_code} while listing {path}, no results will be returned")
+                return None
+            return resp
+
+        response = _get()
+        if response is None:
             return None
-        res = []
-        for entry_raw in response.json():
-            entry = dacite.from_dict(ContentAPIEntry, entry_raw)
-            # Ignore storage root entries, we handle them separately in a different place
-            if entry.type == "storage":
-                continue
-            res.append(entry)
+        res: List[ContentAPIEntry] = []
+        # Storage - token pagination, different return structure + if there's a token we do another request
+        if path.is_storage_path:
+            result = dacite.from_dict(StorageContentAPIResult, response.json())
+            res += result.entries
+            while result.next_token is not None:
+                params["from_token"] = result.next_token
+                new_resp = _get()
+                if new_resp is None:
+                    return None
+                result = dacite.from_dict(StorageContentAPIResult, new_resp.json())
+                res += result.entries
+        else:
+            for entry_raw in response.json():
+                entry = dacite.from_dict(ContentAPIEntry, entry_raw)
+                # Ignore storage root entries, we handle them separately in a different place
+                if entry.type == "storage":
+                    continue
+                res.append(entry)
+
         self._listdir_cache[path.relative_path.as_posix()] = (res, include_size)
         return res
-
-    def _api_storages(self) -> List[StorageAPIEntry]:
-        response = self.http_get(self.storage_api_url)
-        if response.status_code >= 400:
-            logger.warning(f"Got HTTP code {response.status_code} while getting storages. Content: {response.content}")
-            logger.warning("Storages are unavailable")
-            return []
-        return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in response.json()]
 
     def _check_listdir_cache(self, path: str, include_size: bool) -> Tuple[Optional[List[ContentAPIEntry]], bool]:
         # Checks that path has a pre-cached response
@@ -563,8 +619,8 @@ class DagsHubFilesystem:
         str_path = path.relative_path.as_posix()
         if path.is_storage_path:
             path_to_access = str_path[len(".dagshub/storage/"):]
-            return f"{self.storage_content_api_url}/{path_to_access}"
-        return f"{self.content_api_url}/{str_path}"
+            return self._api.storage_content_api_url(path_to_access)
+        return self._api.content_api_url(str_path, self._current_revision)
 
     def _raw_url_for_path(self, path: DagshubPath):
         if not path.is_in_repo:
@@ -572,11 +628,15 @@ class DagsHubFilesystem:
         str_path = path.relative_path.as_posix()
         if path.is_storage_path:
             path_to_access = str_path[len(".dagshub/storage/"):]
-            return f"{self.storage_raw_api_url}/{path_to_access}"
-        return f"{self.raw_api_url}/{str_path}"
+            return self._api.storage_raw_api_url(path_to_access)
+        return self._api.raw_api_url(str_path, self._current_revision)
 
+    @retry(retry=retry_if_result(_is_server_error), stop=stop_after_attempt(3),
+           wait=wait_exponential(multiplier=1, min=4, max=10),
+           before_sleep=before_sleep_log(logger, logging.WARNING))
     def _api_download_file_git(self, path: DagshubPath):
-        return self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)
+        resp = self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)
+        return resp
 
     def http_get(self, path: str, **kwargs):
         timeout = self.timeout
@@ -616,7 +676,7 @@ class DagsHubFilesystem:
             _pathlib.listdir = self.listdir
             _pathlib.scandir = self.scandir
 
-        self.__class__.hooked_instance = self
+        DagsHubFilesystem.hooked_instance = self
 
     @classmethod
     def uninstall_hooks(cls):
@@ -631,6 +691,9 @@ class DagsHubFilesystem:
                 _pathlib.stat = cls.__unpatched['stat']
                 _pathlib.listdir = cls.__unpatched['listdir']
                 _pathlib.scandir = cls.__unpatched['scandir']
+        if DagsHubFilesystem.hooked_instance is not None:
+            DagsHubFilesystem.hooked_instance.cleanup()
+            DagsHubFilesystem.hooked_instance = None
 
     def _mkdirs(self, relative_path: PathLike, dir_fd: Optional[int] = None):
         for parent in list(relative_path.parents)[::-1]:

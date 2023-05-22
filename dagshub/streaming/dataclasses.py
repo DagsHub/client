@@ -7,35 +7,6 @@ try:
 except ImportError:
     from cached_property import cached_property
 
-
-@dataclass
-class StorageAPIEntry:
-    name: str
-    protocol: str
-    list_path: str
-
-    @cached_property
-    def full_path(self):
-        return f"{self.protocol}/{self.name}"
-
-    @cached_property
-    def path_in_mount(self) -> Path:
-        return Path(".dagshub/storage") / self.protocol / self.name
-
-
-@dataclass
-class ContentAPIEntry:
-    path: str
-    # Possible values: dir, file, storage
-    type: str
-    size: int
-    hash: str
-    # Possible values: git, dvc, bucket
-    versioning: str
-    download_url: str
-    content_url: Optional[str]  # TODO: remove Optional once content_url is exposed in API
-
-
 storage_schemas = ["s3", "gs"]
 
 
@@ -92,6 +63,6 @@ class DagshubPath:
             - Any /site-packages/ folder - if you have a venv in your repo, python will try to find packages there.
         """
         str_path = self.relative_path.as_posix()
-        if "/site-packages/" in str_path:
+        if "/site-packages/" in str_path or str_path.endswith("/site-packages"):
             return True
         return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")

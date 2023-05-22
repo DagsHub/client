@@ -18,7 +18,7 @@ def test_file():
         pass
 
 
-def test_upload_dataset_closes_files(upload_repo: Repo, test_file: str):
+def test_upload_dataset_closes_files(mock_api, upload_repo: Repo, test_file: str):
     ds = upload_repo.directory("subdir")
     file_handle = open(test_file)
     ds.add(file_handle, "filepath.txt")

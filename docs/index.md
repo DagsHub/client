@@ -81,6 +81,9 @@ install_hooks()
 ```
 That’s it! You now have streaming access to all your project files.
 
+**Note:** You can stream files from a spesific branch or commit by setting the `branch` parameter.
+ 
+
 To see an example of this that actually runs, check out the Colab below:
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1CtBmcDtZnxZKVIhNvPagX-8UFWHZ5HAg?usp=sharing)

@@ -1,21 +1,22 @@
-import json
-import posixpath
-
-import urllib
-import os
-import logging
 import fnmatch
-from typing import Union, Tuple, BinaryIO, Dict
+import json
+import logging
+import os
+import posixpath
+import urllib
+from http import HTTPStatus
 from io import IOBase
+from typing import Union, Tuple, BinaryIO, Dict
+
 import httpx
 import rich.progress
 
-from dagshub.common import config, helpers, rich_console
-from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.upload.errors import determine_upload_api_error
+from dagshub.common import config, rich_console
+from dagshub.common.api.repo import RepoAPI
 from dagshub.common.helpers import log_message
+from dagshub.upload.errors import determine_upload_api_error
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -25,6 +26,7 @@ REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 DEFAULT_DATA_DIR_NAME = 'data'
+DEFAULT_REMOTE_PATH = "/data/src/"
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -162,16 +164,18 @@ class Repo:
         """
         self.owner = owner
         self.name = name
-        self.src_url = config.host
+        self.host = config.host
 
         self.username = username or config.username
         self.password = password or config.password
         self.token = token or config.token
         self.branch = branch
 
+        self._api = RepoAPI(f"{owner}/{name}", host=self.host, auth=self.auth)
+
         if self.branch is None:
             logger.debug("Branch wasn't provided. Fetching default branch...")
-            self._set_default_branch()
+            self.branch = self._api.default_branch
         logger.debug(f"Set branch: {self.branch}")
 
     def upload(
@@ -194,7 +198,7 @@ class Repo:
 
         """
         if os.path.isdir(local_path):
-            dir_to_upload = self.directory(remote_path)
+            dir_to_upload = self.directory(remote_path if remote_path is not None else DEFAULT_REMOTE_PATH)
             dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
         else:
             file_to_upload = DataSet.get_file(local_path, remote_path)
@@ -205,7 +209,7 @@ class Repo:
         files,
         directory_path="",
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        versioning=None,
+        versioning="auto",
         new_branch=None,
         last_commit=None,
         force=False,
@@ -217,7 +221,8 @@ class Repo:
         :param files (list(str)): Pass the files that are to be uploaded
         :param directory_path (str): Indicate the path of the directory in which we want to upload our files
         :param commit_message (str): Set the commit message
-        :param versioning (str): Determine whether the files are uploaded to a new branch or not
+        :param versioning (str): Which versioning system to use to upload a file.
+            Possible options: git, dvc, auto (best effort guess)
         :param new_branch (str): Create a new branch
         :param last_commit (str): Tell the server that we want to upload a file without committing it
         :param force (bool): Force the upload of a file even if it is already present on the server
@@ -241,9 +246,9 @@ class Repo:
             )
 
         if force:
-            data["last_commit"] = self._get_last_commit()
+            data["last_commit"] = self._api.last_commit_sha(self.branch)
 
-        log_message(f'Uploading files ({len(files)}) to "{self.full_name}"...', logger)
+        log_message(f'Uploading files ({len(files)}) to "{self._api.full_name}"...', logger)
         res = s.put(
             self.get_request_url(directory_path),
             data=data,
@@ -319,7 +324,7 @@ class Repo:
 
         """
         return urllib.parse.urljoin(
-            self.src_url,
+            self.host,
             CONTENT_UPLOAD_URL.format(
                 owner=self.owner,
                 reponame=self.name,
@@ -327,55 +332,6 @@ class Repo:
                 path=urllib.parse.quote(directory, safe=""),
             ),
         )
-
-    def _set_default_branch(self):
-
-        """
-        The _set_default_branch function is used to set the default branch for a repository.
-        It first tries to get the default branch from DagsHub. If it fails, an error message is raised.
-
-        :return: None
-        """
-
-        try:
-            self.branch = helpers.get_default_branch(
-                self.owner, self.name, self.auth, self.src_url
-            )
-        except Exception:
-            raise RuntimeError(
-                "Failed to get default branch for repository. "
-                "Please specify a branch and make sure repository details are correct."
-            )
-
-    @property
-    def full_name(self):
-        """
-        The full_name function returns the full name of a repository, meaning: "<owner>/<repo>"
-
-
-        :return: The full name of a repository
-
-        """
-
-        return f"{self.owner}/{self.name}"
-
-    def _get_last_commit(self):
-        """
-        The _get_last_commit function returns the last commit sha for a given branch.
-        It is used to check if there are any new commits in the repo since we last ran our dag.
-
-        :return: The commit id of the last commit for the branch
-        """
-        api_path = f"api/v1/repos/{self.full_name}/branches/{self.branch}"
-        api_url = urllib.parse.urljoin(self.src_url, api_path)
-        res = s.get(api_url, auth=self.auth)
-        if res.status_code == HTTPStatus.OK:
-            content = res.json()
-            try:
-                return content["commit"]["id"]
-            except KeyError:
-                logger.error(f"Cannot get commit sha for branch '{self.branch}'")
-        return ""
 
 
 class DataSet:
@@ -432,6 +388,10 @@ class DataSet:
                                           console=rich_console, transient=True, disable=config.quiet)
         total_task = progress.add_task("Uploading files...")
 
+        # If user hasn't specified versioning, then assume we're uploading dvc (this makes most sense for folders)
+        if "versioning" not in upload_kwargs:
+            upload_kwargs["versioning"] = "dvc"
+
         with progress:
             for root, dirs, files in os.walk(local_path):
                 folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
@@ -452,12 +412,12 @@ class DataSet:
                             self.add(file=rel_file_path, path=rel_remote_file_path)
                             if len(self.files) > 49:
                                 file_counter += len(self.files)
-                                self.commit(commit_message, versioning="dvc", **upload_kwargs)
+                                self.commit(commit_message, **upload_kwargs)
                                 progress.update(folder_task, advance=len(self.files))
                                 progress.update(total_task, completed=file_counter)
                     if len(self.files) > 0:
                         file_counter += len(self.files)
-                        self.commit(commit_message, versioning="dvc", **upload_kwargs)
+                        self.commit(commit_message, **upload_kwargs)
                         progress.update(total_task, completed=file_counter)
                 progress.remove_task(folder_task)
 
