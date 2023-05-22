@@ -12,7 +12,7 @@ import dacite
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from urllib.parse import urljoin, quote_plus
+from urllib.parse import urljoin, quote
 
 from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse, StorageAPIEntry
 from dagshub.common.helpers import http_request
@@ -231,4 +231,4 @@ class RepoAPI:
 
 def _multi_urljoin(*parts):
     """Shoutout to https://stackoverflow.com/a/55722792"""
-    return urljoin(parts[0] + "/", "/".join(quote_plus(part.strip("/"), safe="/") for part in parts[1:]))
+    return urljoin(parts[0] + "/", "/".join(quote(part.strip("/"), safe="/") for part in parts[1:]))
