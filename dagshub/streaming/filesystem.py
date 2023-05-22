@@ -616,7 +616,7 @@ class DagsHubFilesystem:
         if path.is_storage_path:
             path_to_access = str_path[len(".dagshub/storage/"):]
             return self._api.storage_content_api_url(path_to_access)
-        return self._api.content_api_url(self._current_revision, str_path)
+        return self._api.content_api_url(str_path, self._current_revision)
 
     def _raw_url_for_path(self, path: DagshubPath):
         if not path.is_in_repo:
@@ -625,7 +625,7 @@ class DagsHubFilesystem:
         if path.is_storage_path:
             path_to_access = str_path[len(".dagshub/storage/"):]
             return self._api.storage_raw_api_url(path_to_access)
-        return self._api.raw_api_url(self._current_revision, str_path)
+        return self._api.raw_api_url(str_path, self._current_revision)
 
     @staticmethod
     def _is_server_error(resp: Response):

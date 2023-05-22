@@ -14,7 +14,7 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from urllib.parse import urljoin, quote
 
-from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse, StorageAPIEntry
+from dagshub.common.api.responses import *
 from dagshub.common.helpers import http_request
 
 logger = logging.getLogger("dagshub")
@@ -36,6 +36,10 @@ class CommitNotFoundError(Exception):
     pass
 
 
+class PathNotFoundError(Exception):
+    pass
+
+
 class RepoAPI:
 
     def __init__(self, repo: str, host: Optional[str] = None, auth: Optional[Any] = None):
@@ -54,53 +58,161 @@ class RepoAPI:
         else:
             self.auth = auth
 
+    def _http_request(self, method, url, **kwargs):
+        if "auth" not in kwargs:
+            kwargs["auth"] = self.auth
+        return http_request(method, url, **kwargs)
+
     def get_repo_info(self) -> RepoAPIResponse:
-        res = http_request("GET", self.repo_api_url, auth=self.auth)
+        """
+        Get information about the repository
+        """
+        res = self._http_request("GET", self.repo_api_url)
 
         if res.status_code == 404:
             raise RepoNotFoundError(f"Repo {self.repo_url} not found")
         elif res.status_code >= 400:
             error_msg = f"Got status code {res.status_code} when getting repository info."
             logger.error(error_msg)
+            logger.debug(res.content)
             raise RuntimeError(error_msg)
         return dacite.from_dict(RepoAPIResponse, res.json())
 
     def get_branch_info(self, branch: str) -> BranchAPIResponse:
-        res = http_request("GET", self.branch_url(branch), auth=self.auth)
+        """
+        Get information about specified branch
+        """
+        res = self._http_request("GET", self.branch_url(branch))
 
         if res.status_code == 404:
             raise BranchNotFoundError(f"Branch {branch} not found in repo {self.repo_url}")
         elif res.status_code >= 400:
             error_msg = f"Got status code {res.status_code} when getting branch."
             logger.error(error_msg)
+            logger.debug(res.content)
             raise RuntimeError(error_msg)
 
         return dacite.from_dict(BranchAPIResponse, res.json())
 
     def get_commit_info(self, sha: str) -> CommitAPIResponse:
-        res = http_request("GET", self.commit_url(sha), auth=self.auth)
+        """
+        Get information about a specific commit
+        """
+        res = self._http_request("GET", self.commit_url(sha))
 
         if res.status_code == 404:
             raise BranchNotFoundError(f"Commit {sha} not found in repo {self.repo_url}")
         elif res.status_code >= 400:
             error_msg = f"Got status code {res.status_code} when getting commit."
             logger.error(error_msg)
+            logger.debug(res.content)
             raise RuntimeError(error_msg)
 
         return dacite.from_dict(CommitAPIResponse, res.json())
 
-
     def get_connected_storages(self) -> List[StorageAPIEntry]:
-        res = http_request("GET", self.storage_api_url(), auth=self.auth)
+        """
+        Get storages that are connected to the repository
+        """
+        res = self._http_request("GET", self.storage_api_url())
 
         if res.status_code == 404:
             raise RepoNotFoundError(f"Repo {self.repo_url} not found")
         elif res.status_code >= 400:
             error_msg = f"Got status code {res.status_code} when getting repository info."
             logger.error(error_msg)
+            logger.debug(res.content)
             raise RuntimeError(error_msg)
 
         return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in res.json()]
+
+    def list_path(self, path: str, revision: Optional[str] = None, include_size: bool = False) -> List[ContentAPIEntry]:
+        """
+        Get listing of everything in the specified path
+        """
+        params = {
+            "include_size": include_size
+        }
+        res = self._http_request("GET", self.content_api_url(path, revision), params=params)
+
+        if res.status_code == 404:
+            raise PathNotFoundError(f"Path {path} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when listing path {path}"
+            logger.error(error_msg)
+            logger.debug(res.content)
+            raise RuntimeError(error_msg)
+
+        return [dacite.from_dict(ContentAPIEntry, entry) for entry in res.json()]
+
+    def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
+        """
+        Get listing of everything in the specified storage path
+        Path format: <scheme>/<bucket-name>/<path>
+        Example: s3/my-bucket/prefix/path/to/file
+        """
+        params = {
+            "include_size": include_size,
+            "paging": True
+        }
+
+        url = self.storage_content_api_url(path)
+        has_next_page = True
+
+        def _get():
+            res = self._http_request("GET", url, params=params)
+
+            if res.status_code == 404:
+                raise PathNotFoundError(f"Path {path} not found")
+            elif res.status_code >= 400:
+                error_msg = f"Got status code {res.status_code} when listing path {path}"
+                logger.error(error_msg)
+                logger.debug(res.content)
+                raise RuntimeError(error_msg)
+
+            return dacite.from_dict(StorageContentAPIResult, res.json())
+
+        entries = []
+
+        while has_next_page:
+            has_next_page = False
+            resp = _get()
+            entries += resp.entries
+            if resp.next_token is not None:
+                has_next_page = True
+                params["from_token"] = resp.next_token
+
+        return entries
+
+    def get_file(self, path: str, revision: Optional[str] = None) -> bytes:
+        """
+        Download file from repo
+        """
+        res = self._http_request("GET", self.raw_api_url(path, revision))
+        if res.status_code == 404:
+            raise PathNotFoundError(f"Path {path} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when getting file {path}"
+            logger.error(error_msg)
+            logger.debug(res.content)
+            raise RuntimeError(error_msg)
+        return res.content
+
+    def get_storage_file(self, path: str) -> bytes:
+        """
+        Download file from storage
+        Path format: <scheme>/<bucket-name>/<path>
+        Example: s3/my-bucket/prefix/path/to/file
+        """
+        res = self._http_request("GET", self.storage_raw_api_url(path))
+        if res.status_code == 404:
+            raise PathNotFoundError(f"Path {path} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when getting file {path}"
+            logger.error(error_msg)
+            logger.debug(res.content)
+            raise RuntimeError(error_msg)
+        return res.content
 
     @cached_property
     def default_branch(self) -> str:
@@ -165,11 +277,13 @@ class RepoAPI:
             sha
         )
 
-    def content_api_url(self, revision: str, path: str) -> str:
+    def content_api_url(self, path: str, revision: Optional[str] = None) -> str:
         """
         URL for Content API access
         Format: https://dagshub.com/api/v1/repos/user/repo/content/revision/path
         """
+        if revision is None:
+            revision = self.default_branch
         return _multi_urljoin(
             self.repo_api_url,
             "content",
@@ -177,11 +291,13 @@ class RepoAPI:
             path
         )
 
-    def raw_api_url(self, revision: str, path: str) -> str:
+    def raw_api_url(self, path: str, revision: Optional[str] = None) -> str:
         """
         URL for Raw Content API access
         Format: https://dagshub.com/api/v1/repos/user/repo/raw/revision/path
         """
+        if revision is None:
+            revision = self.default_branch
         return _multi_urljoin(
             self.repo_api_url,
             "raw",
