@@ -71,6 +71,10 @@ class dagshub_ScandirIterator:
 SPECIAL_FILE = Path(".dagshub-streaming")
 
 
+def _is_server_error(resp: Response):
+    return resp.status_code >= 500
+
+
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
     """
@@ -626,10 +630,6 @@ class DagsHubFilesystem:
             path_to_access = str_path[len(".dagshub/storage/"):]
             return self._api.storage_raw_api_url(path_to_access)
         return self._api.raw_api_url(str_path, self._current_revision)
-
-    @staticmethod
-    def _is_server_error(resp: Response):
-        return resp.status_code >= 500
 
     @retry(retry=retry_if_result(_is_server_error), stop=stop_after_attempt(3),
            wait=wait_exponential(multiplier=1, min=4, max=10),
