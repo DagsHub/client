@@ -34,6 +34,7 @@ s.timeout = config.http_timeout
 s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
+
 def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
     """
     Create a new repository on DagsHub and upload an entire dataset to it
@@ -176,7 +177,6 @@ class Repo:
             logger.debug("Branch wasn't provided. Fetching default branch...")
             self.branch = self._api.default_branch
         logger.debug(f"Set branch: {self.branch}")
-
 
     def upload(
         self,
