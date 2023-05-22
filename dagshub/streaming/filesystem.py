@@ -14,6 +14,7 @@ from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
 from urllib.parse import urlparse, ParseResult
 import dacite
 from httpx import Response
+from tenacity import retry, retry_if_result, stop_after_attempt, wait_exponential, before_sleep_log, RetryError
 
 from dagshub.common import config, helpers
 import logging
@@ -305,7 +306,10 @@ class DagsHubFilesystem:
                 except FileNotFoundError as err:
                     # Open for reading - try to download the file
                     if "r" in mode:
-                        resp = self._api_download_file_git(path)
+                        try:
+                            resp = self._api_download_file_git(path)
+                        except RetryError:
+                            raise RuntimeError(f"Couldn't download {path.relative_path} after multiple attempts")
                         if resp.status_code < 400:
                             self._mkdirs(path.relative_path.parent, dir_fd=self.project_root_fd)
                             # TODO: Handle symlinks
@@ -313,10 +317,12 @@ class DagsHubFilesystem:
                                 output.write(resp.content)
                             return self.__open(path.relative_path, mode, buffering, encoding, errors, newline,
                                                closefd, opener=project_root_opener)
-                        else:
-                            # TODO: After API no longer 500s on FileNotFounds
-                            #       check status code and only return FileNotFound on 404s
+                        elif resp.status_code == 404:
                             raise FileNotFoundError(f'Error finding {path.relative_path} in repo or on DagsHub')
+                        else:
+                            raise RuntimeError(
+                                f"Got response code {resp.status_code} from DagsHub while downloading file"
+                                f" {path.relative_path}")
                     # Write modes - make sure that the folder is a tracked folder (create if doesn't exist on disk),
                     # and then let the user write to file
                     else:
@@ -327,7 +333,10 @@ class DagsHubFilesystem:
                             raise err
                         # Try to download the file if we're in append modes
                         if "a" in mode or "+" in mode:
-                            resp = self._api_download_file_git(path.relative_path.as_posix())
+                            try:
+                                resp = self._api_download_file_git(path)
+                            except RetryError:
+                                raise RuntimeError(f"Couldn't download {path.relative_path} after multiple attempts")
                             if resp.status_code < 400:
                                 with self.__open(path.relative_path, 'wb', opener=project_root_opener) as output:
                                     output.write(resp.content)
@@ -618,8 +627,16 @@ class DagsHubFilesystem:
             return self._api.storage_raw_api_url(path_to_access)
         return self._api.raw_api_url(self._current_revision, str_path)
 
+    @staticmethod
+    def _is_server_error(resp: Response):
+        return resp.status_code >= 500
+
+    @retry(retry=retry_if_result(_is_server_error), stop=stop_after_attempt(3),
+           wait=wait_exponential(multiplier=1, min=4, max=10),
+           before_sleep=before_sleep_log(logger, logging.WARNING))
     def _api_download_file_git(self, path: DagshubPath):
-        return self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)
+        resp = self.http_get(self._raw_url_for_path(path), headers=config.requests_headers, timeout=None)
+        return resp
 
     def http_get(self, path: str, **kwargs):
         timeout = self.timeout

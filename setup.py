@@ -33,6 +33,7 @@ install_requires = [
     "GitPython>=3.1.29",
     "rich[jupyter]~=13.1.0",
     "dacite~=1.8.0",
+    "tenacity~=8.2.2",
 ]
 
 # Polyfills for Python 3.7
