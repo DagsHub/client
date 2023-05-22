@@ -1,46 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any, List
+from typing import Optional, Any
 
 try:
     from functools import cached_property
 except ImportError:
     from cached_property import cached_property
-
-
-@dataclass
-class StorageAPIEntry:
-    name: str
-    protocol: str
-    list_path: str
-
-    @cached_property
-    def full_path(self):
-        return f"{self.protocol}/{self.name}"
-
-    @cached_property
-    def path_in_mount(self) -> Path:
-        return Path(".dagshub/storage") / self.protocol / self.name
-
-
-@dataclass
-class ContentAPIEntry:
-    path: str
-    # Possible values: dir, file, storage
-    type: str
-    size: int
-    hash: str
-    # Possible values: git, dvc, bucket
-    versioning: str
-    download_url: str
-    content_url: Optional[str]  # TODO: remove Optional once content_url is exposed in API
-
-
-@dataclass
-class StorageContentAPIResult:
-    entries: List[ContentAPIEntry]
-    next_token: Optional[str]
-
 
 storage_schemas = ["s3", "gs"]
 

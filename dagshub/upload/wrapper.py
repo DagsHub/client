@@ -1,21 +1,22 @@
-import json
-import posixpath
-
-import urllib
-import os
-import logging
 import fnmatch
-from typing import Union, Tuple, BinaryIO, Dict
+import json
+import logging
+import os
+import posixpath
+import urllib
+from http import HTTPStatus
 from io import IOBase
+from typing import Union, Tuple, BinaryIO, Dict
+
 import httpx
 import rich.progress
 
-from dagshub.common import config, helpers, rich_console
-from http import HTTPStatus
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.upload.errors import determine_upload_api_error
+from dagshub.common import config, rich_console
+from dagshub.common.api.repo import RepoAPI
 from dagshub.common.helpers import log_message
+from dagshub.upload.errors import determine_upload_api_error
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -162,16 +163,18 @@ class Repo:
         """
         self.owner = owner
         self.name = name
-        self.src_url = config.host
+        self.host = config.host
 
         self.username = username or config.username
         self.password = password or config.password
         self.token = token or config.token
         self.branch = branch
 
+        self._api = RepoAPI(f"{owner}/{name}", host=self.host, auth=self.auth)
+
         if self.branch is None:
             logger.debug("Branch wasn't provided. Fetching default branch...")
-            self._set_default_branch()
+            self.branch = self._api.default_branch
         logger.debug(f"Set branch: {self.branch}")
 
     def upload(
@@ -242,9 +245,9 @@ class Repo:
             )
 
         if force:
-            data["last_commit"] = self._get_last_commit()
+            data["last_commit"] = self._api.last_commit_sha(self.branch)
 
-        log_message(f'Uploading files ({len(files)}) to "{self.full_name}"...', logger)
+        log_message(f'Uploading files ({len(files)}) to "{self._api.full_name}"...', logger)
         res = s.put(
             self.get_request_url(directory_path),
             data=data,
@@ -320,7 +323,7 @@ class Repo:
 
         """
         return urllib.parse.urljoin(
-            self.src_url,
+            self.host,
             CONTENT_UPLOAD_URL.format(
                 owner=self.owner,
                 reponame=self.name,
@@ -328,55 +331,6 @@ class Repo:
                 path=urllib.parse.quote(directory, safe=""),
             ),
         )
-
-    def _set_default_branch(self):
-
-        """
-        The _set_default_branch function is used to set the default branch for a repository.
-        It first tries to get the default branch from DagsHub. If it fails, an error message is raised.
-
-        :return: None
-        """
-
-        try:
-            self.branch = helpers.get_default_branch(
-                self.owner, self.name, self.auth, self.src_url
-            )
-        except Exception:
-            raise RuntimeError(
-                f"Failed to get default branch for repository [{self.owner}/{self.name}]. "
-                "Please specify a branch and make sure repository details are correct."
-            )
-
-    @property
-    def full_name(self):
-        """
-        The full_name function returns the full name of a repository, meaning: "<owner>/<repo>"
-
-
-        :return: The full name of a repository
-
-        """
-
-        return f"{self.owner}/{self.name}"
-
-    def _get_last_commit(self):
-        """
-        The _get_last_commit function returns the last commit sha for a given branch.
-        It is used to check if there are any new commits in the repo since we last ran our dag.
-
-        :return: The commit id of the last commit for the branch
-        """
-        api_path = f"api/v1/repos/{self.full_name}/branches/{self.branch}"
-        api_url = urllib.parse.urljoin(self.src_url, api_path)
-        res = s.get(api_url, auth=self.auth)
-        if res.status_code == HTTPStatus.OK:
-            content = res.json()
-            try:
-                return content["commit"]["id"]
-            except KeyError:
-                logger.error(f"Cannot get commit sha for branch '{self.branch}'")
-        return ""
 
 
 class DataSet:
