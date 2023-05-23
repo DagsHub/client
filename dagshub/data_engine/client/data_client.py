@@ -54,19 +54,19 @@ class DataClient:
         return dacite.from_dict(DataSourceResult, res["createDataSource"],
                                 config=dacite.Config(cast=[IntegrationStatus, DataSourceType]))
 
-    def head(self, dataset: DataSource) -> QueryResult:
-        resp = self._datasource_query(dataset, True, self.HEAD_QUERY_SIZE)
-        return QueryResult.from_gql_query(resp)
+    def head(self, datasource: DataSource) -> QueryResult:
+        resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
+        return QueryResult.from_gql_query(resp, datasource)
 
-    def get_datapoints(self, dataset: DataSource) -> QueryResult:
-        return self._get_all(dataset, True)
+    def get_datapoints(self, datasource: DataSource) -> QueryResult:
+        return self._get_all(datasource, True)
 
-    def _get_all(self, dataset: DataSource, include_metadata: bool) -> QueryResult:
+    def _get_all(self, datasource: DataSource, include_metadata: bool) -> QueryResult:
         has_next_page = True
         after = None
-        res = QueryResult([])
+        res = QueryResult([], datasource)
         while has_next_page:
-            resp = self._datasource_query(dataset, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
+            resp = self._datasource_query(datasource, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
             has_next_page = resp["pageInfo"]["hasNextPage"]
             after = resp["pageInfo"]["endCursor"]
             res._extend_from_gql_query(resp)
@@ -80,27 +80,27 @@ class DataClient:
         resp = self.client.execute(q, variable_values=params)
         return resp
 
-    def _datasource_query(self, dataset: DataSource, include_metadata: bool, limit: Optional[int] = None,
+    def _datasource_query(self, datasource: DataSource, include_metadata: bool, limit: Optional[int] = None,
                           after: Optional[str] = None):
         q = GqlQueries.datasource_query(include_metadata)
 
         params = GqlQueries.datasource_query_params(
-            datasource_id=dataset.source.id,
-            query_input=dataset.serialize_gql_query_input(),
+            datasource_id=datasource.source.id,
+            query_input=datasource.serialize_gql_query_input(),
             first=limit,
             after=after
         )
 
         return self._exec(q, params)["datasourceQuery"]
 
-    def update_metadata(self, dataset: DataSource, entries: List[DataPointMetadataUpdateEntry]):
+    def update_metadata(self, datasource: DataSource, entries: List[DataPointMetadataUpdateEntry]):
         q = GqlMutations.update_metadata()
 
-        assert dataset.source.id is not None
+        assert datasource.source.id is not None
         assert len(entries) > 0
 
         params = GqlMutations.update_metadata_params(
-            datasource_id=dataset.source.id,
+            datasource_id=datasource.source.id,
             datapoints=[e.to_dict() for e in entries]
         )
 
