@@ -179,7 +179,7 @@ class DataSource:
 
         # TODO: parallelize this with some async magic
         for datapoint in datapoints.entries:
-            file_url = self.source.raw_path(datapoint.path)
+            file_url = datapoint.download_url(self)
             resp = client.get(file_url)
             try:
                 assert resp.status_code == 200
@@ -193,7 +193,7 @@ class DataSource:
             with open(filepath, "wb") as f:
                 f.write(resp.content)
             sample = fo.Sample(filepath=filepath)
-            sample["url"] = file_url
+            sample["dagshub_download_url"] = file_url
             for k, v in datapoint.metadata.items():
                 sample[k] = v
             samples.append(sample)

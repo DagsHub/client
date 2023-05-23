@@ -9,11 +9,11 @@ import requests
 import dagshub
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.api.responses import ContentAPIEntry
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.model import datasources
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError
 from dagshub.data_engine.voxel_plugin_server.server import run_plugin_server
-from dagshub.streaming.dataclasses import ContentAPIEntry
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +23,17 @@ IPython = lazy_load("IPython")
 
 class DESnippetDriver:
 
-    def __init__(self, repo="simon/baby-yoda-segmentation-dataset", url="s3://dagshub-storage"):
+    def __init__(self, repo="kirill/baby-yoda-segmentation-dataset"):
         self.repo = repo
         self.host = config.host
-        self.url = url
-        self.datasource_name = "kirill-yoda-dataset4"
+        self.datasource_name = "default-dataset"
         self.dataset = self.init_dataset()
         auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.host))
         self.client = httpx.Client(auth=auth)
 
     def init_dataset(self):
         try:
-            ds = datasources.create_from_repo(self.repo, self.datasource_name, "")
+            ds = datasources.create_from_repo(self.repo, self.datasource_name, "/images")
         except DatasourceAlreadyExistsError:
             ds = datasources.get_datasource(self.repo, self.datasource_name)
         return ds
@@ -99,7 +98,7 @@ class DESnippetDriver:
         # TODO: don't need redundant ands once the gql query actually works
         q1 = (ds["episode"] > 5) & (ds["episode"] > 5)
         q2 = (ds["episode"] == 1) & (ds["episode"] == 1)
-        v51_ds = ds[q1 | q2].to_voxel51_dataset()
+        v51_ds = ds[ds["size"] < 1000000].to_voxel51_dataset()
 
         sess = fo.launch_app(v51_ds)
         IPython.embed()
@@ -117,6 +116,11 @@ def dataset_create_flow():
     # snippet_driver.query()
 
     # TO CREATE THE VOXEL APP
+    snippet_driver.make_voxel()
+
+
+def show_voxel():
+    snippet_driver = DESnippetDriver()
     snippet_driver.make_voxel()
 
 
@@ -151,7 +155,8 @@ def get_all_datasources(repo="simon/baby-yoda-segmentation-dataset"):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    show_voxel()
     # query_debugging()
     # just_debugging_voxel()
     # dataset_create_flow()
-    get_all_datasources()
+    # get_all_datasources()
