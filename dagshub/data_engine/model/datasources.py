@@ -16,7 +16,7 @@ def create_from_bucket(repo: str, name: str, bucket_url: str) -> DataSource:
 
 
 def create_from_repo(repo: str, name: str, path: str, revision: str = "main") -> DataSource:
-    url = f"repo://{repo}/{path}"
+    url = f"repo://{repo}/{path.lstrip('/')}"
     source = _create_datasource_state(repo, name, DataSourceType.REPOSITORY, url)
     source.revision = revision
     return DataSource(source)

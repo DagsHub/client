@@ -10,6 +10,8 @@ import pytest
         ("repo://user/repo/longer/prefix", "user", "repo", "/longer/prefix"),
         ("repo://user/repo/", "user", "repo", "/"),
         ("repo://user/repo", "user", "repo", None),
+        ("repo://user-with_dashes/repo", "user-with_dashes", "repo", None),
+        ("repo://user/repo-with_dashes", "user", "repo-with_dashes", None),
     ]
 )
 def test_repo_regex(in_str, user, repo, prefix):
@@ -33,7 +35,6 @@ def test_repo_regex(in_str, user, repo, prefix):
         "user/repo/",
         "repo://user.www.com/repo",
         "repo://user/",
-        "repo://user-with-dashes/",
         "repo://"
     ]
 )

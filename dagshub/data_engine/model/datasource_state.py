@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 path_regexes = {
     DataSourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w-]+)(?P<prefix>/.*)?"),
-    DataSourceType.REPOSITORY: re.compile(r"repo://(?P<user>\w+)/(?P<repo>\w+)(?P<prefix>/.*)?"),
+    DataSourceType.REPOSITORY: re.compile(r"repo://(?P<user>[\w\-_]+)/(?P<repo>[\w\-_]+)(?P<prefix>/.*)?"),
 }
 
 expected_formats = {
