@@ -122,11 +122,14 @@ class DataSourceState:
             elif path_type == "content":
                 return self._api.storage_content_api_url(path_prefix)
         elif self.source_type == DataSourceType.REPOSITORY:
+            prefix = parts["prefix"]
+            if prefix is None:
+                prefix = ""
             # Assuming repo://user/repo is always the same user/repo we work with
             if path_type == "raw":
-                return self._api.raw_api_url(parts["prefix"], self.revision)
+                return self._api.raw_api_url(prefix, self.revision)
             elif path_type == "content":
-                return self._api.content_api_url(parts["prefix"], self.revision)
+                return self._api.content_api_url(prefix, self.revision)
         elif self.source_type == DataSourceType.CUSTOM:
             raise NotImplementedError
         raise NotImplementedError
