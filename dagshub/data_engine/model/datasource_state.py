@@ -1,12 +1,33 @@
-import urllib.parse
+import logging
+import re
 from dataclasses import dataclass, field
-from typing import Optional, Union, Mapping, Any
+from typing import Optional, Union, Mapping, Any, Dict
 
-import httpx
-
+from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.dataclasses import DataSourceType, DataPoint, DataSourceResult
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
+
+logger = logging.getLogger(__name__)
+
+path_regexes = {
+    DataSourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w-]+)(?P<prefix>/.*)?"),
+    DataSourceType.REPOSITORY: re.compile(r"repo://(?P<user>\w+)/(?P<repo>\w+)(?P<prefix>/.*)?"),
+}
+
+expected_formats = {
+    DataSourceType.BUCKET: "s3|gs://bucket-name/prefix",
+    DataSourceType.REPOSITORY: "repo://owner/reponame/prefix",
+}
+
+
+class InvalidPathFormatError(Exception):
+    pass
 
 
 @dataclass
@@ -18,9 +39,25 @@ class DataSourceState:
     source_type: DataSourceType = field(init=False)
     path: str = field(init=False)
     client: DataClient = field(init=False)
+    _api: RepoAPI = field(init=False)
+
+    _revision: Optional[str] = field(init=False, default=None)
 
     def __post_init__(self):
         self.client = DataClient(self.repo)
+        self._api = RepoAPI(self.repo)
+
+    @property
+    def revision(self) -> str:
+        """Used for repository sources, provides branch/revision from which to download files"""
+        if self._revision is None:
+            logger.warning("Revision wasn't set, assuming default repo branch")
+            self.revision = self._api.default_branch
+        return self._revision
+
+    @revision.setter
+    def revision(self, val: str):
+        self._revision = val
 
     def create(self):
         # Check that a datasource with this name doesn't exist
@@ -41,10 +78,66 @@ class DataSourceState:
         self._update_from_ds_result(sources[0])
 
     def content_path(self, path: Union[str, DataPoint, Mapping[str, Any]]) -> str:
-        return self._dagshub_api_path("content", self._extract_path(path))
+        """
+        Returns the url for the content path of a specified path
+        """
+        path = self._extract_path(path).strip("/")
+        return self.root_content_path + "/" + path
 
-    def raw_path(self, path: str) -> str:
-        return self._dagshub_api_path("raw", self._extract_path(path))
+    def raw_path(self, path: Union[str, DataPoint, Mapping[str, Any]]) -> str:
+        """
+        Returns the url for the download path of a specified path
+        """
+        path = self._extract_path(path).strip("/")
+        return self.root_raw_path + "/" + path
+
+    @cached_property
+    def root_content_path(self) -> str:
+        """
+        Returns the root content path of the dataset for listing folders
+        This is just a "prefix" of the datasource relative to the repo.
+        In order to build a path of an entity you need to concatenate the path to this root
+        """
+        return self._root_path("content")
+
+    @cached_property
+    def root_raw_path(self):
+        """
+        Returns the root raw path of the dataset for downloading files
+        This is just a "prefix" of the datasource relative to the repo.
+        In order to build a path of an entity you need to concatenate the path to this root
+        """
+        return self._root_path("raw")
+
+    def _root_path(self, path_type):
+        assert path_type in ["raw", "content"]
+        parts = self.path_parts()
+        if self.source_type == DataSourceType.BUCKET:
+            path_prefix = "/".join([parts["schema"], parts["bucket"], parts["prefix"]])
+            if path_type == "raw":
+                return self._api.storage_raw_api_url(path_prefix)
+            elif path_type == "content":
+                return self._api.storage_content_api_url(path_prefix)
+        elif self.source_type == DataSourceType.REPOSITORY:
+            # Assuming repo://user/repo is always the same user/repo we work with
+            if path_type == "raw":
+                return self._api.raw_api_url(parts["prefix"], self.revision)
+            elif path_type == "content":
+                return self._api.content_api_url(parts["prefix"], self.revision)
+        elif self.source_type == DataSourceType.CUSTOM:
+            raise NotImplementedError
+        raise NotImplementedError
+
+    def path_parts(self) -> Dict[str, str]:
+        """
+        Validates the provided path + returns a dictionary with elements that might be relevant for constructing paths
+        """
+        regex = path_regexes[self.source_type]
+        match = regex.fullmatch(self.path)
+        if match is None:
+            raise InvalidPathFormatError(f"{self.path} is not valid path format for type {self.source_type}.\n"
+                                         f"Expected format: {expected_formats[self.source_type]}")
+        return match.groupdict()
 
     @staticmethod
     def _extract_path(val: Union[str, DataPoint, Mapping[str, Any]]) -> str:
@@ -53,30 +146,6 @@ class DataSourceState:
         elif type(val) is DataPoint:
             return val.path
         return val["path"]
-
-    def _dagshub_api_path(self, api_type: str, path: str) -> str:
-        if self.source_type == DataSourceType.BUCKET:
-            parsed_path = urllib.parse.urlparse(self.path)
-            return f"{self.client.host}/api/v1/repos/{self.repo}/storage/{api_type}/{parsed_path.scheme}/" \
-                   f"{parsed_path.hostname}/{parsed_path.path}/{path}"
-        elif self.source_type == DataSourceType.REPOSITORY:
-            # Assuming path format is "repo://user/repo/prefix" (branch for now assuming using default)
-            # TODO: handle paths here nicer, this is a bit of a mess
-            parsed_url = urllib.parse.urlparse(self.path)
-            path_parts = parsed_url.path.split("/")
-            path_parts = [x for x in path_parts if x != ""]
-            if len(path_parts) == 1:
-                repo_path = ""
-            else:
-                repo_path = "/".join(path_parts[1:]) + "/"
-            return f"{self.client.host}/api/v1/repos/{self.repo}/{api_type}/{self._get_default_branch()}/{repo_path}{path}"
-
-    def _get_default_branch(self):
-        # todo: fix this aaaaa
-        url = f"{self.client.host}/api/v1/repos/{self.repo}"
-        resp = httpx.get(url)
-        assert resp.status_code < 400
-        return resp.json()["default_branch"]
 
     def _update_from_ds_result(self, ds: DataSourceResult):
         self.id = ds.id
