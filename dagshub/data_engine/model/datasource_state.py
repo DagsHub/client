@@ -113,7 +113,10 @@ class DataSourceState:
         assert path_type in ["raw", "content"]
         parts = self.path_parts()
         if self.source_type == DataSourceType.BUCKET:
-            path_prefix = "/".join([parts["schema"], parts["bucket"], parts["prefix"]])
+            path_elems = [parts["schema"], parts["bucket"]]
+            if parts["prefix"] is not None:
+                path_elems.append(parts["prefix"])
+            path_prefix = "/".join(path_elems)
             if path_type == "raw":
                 return self._api.storage_raw_api_url(path_prefix)
             elif path_type == "content":
