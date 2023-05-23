@@ -31,7 +31,13 @@ datasource
 
 ### Getting
 
-You can get an already created datasource using the `datasources.get_datasource()` function
+Get all datasources in a repository:
+
+```python
+ds_list = datasources.get_datasources("simon/baby-yoda-segmentation-dataset")
+```
+
+To get a specific datasource use `datasources.get_datasource()` function
 
 ```python
 from dagshub.data_engine.model import datasources
@@ -109,6 +115,9 @@ df = ds[q1 | q2].all().dataframe
 # Will return a pandas dataframe with the files and the metadata
 ```
 
+The dataframe returned by `.dataframe` has a `dagshub_download_url` field with the URL to the download the file.
+This way if your ML framework supports loading files from dataframes with urls, you can pass the dataframe to them.
+
 Supported operands are: `==, >, >=, <, <=, .contains()` (We're working on adding `!=`)
 
 Queries can be composed logically via binary and/or operators `&` and `|`. If you do a subquery, it is considered to be
@@ -175,9 +184,9 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
 
 ## Known issues
 
-- No initial ingestion for the datapoints after datasource is created
 - No deleting of metadata
-- We don't have any validation for now. That means that if you typo the repo name or a datapoints url, it'll still work
+- The validation layer is very incomplete for now. That means that if you typo the repo name or a datapoints url, it'll
+  still work
   probably
   (with unexpected results)
 - Voxel integration shoves all data into `~/dagshub_datasets` with no concern for whatever files are already there (
