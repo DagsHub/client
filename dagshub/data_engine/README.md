@@ -78,6 +78,24 @@ data source with path at `repo://simon/baby-yoda-segmentor/data` (starting from 
 and you want to add metadata to a file located at `data/images/005.jpg` inside of the repo, then the path should
 be `images/005.jpg`
 
+### Adding metadata from a dataframe
+
+You can also upload a whole dataframe as metadata:
+
+```python
+data = {
+  "path": {"data/file1.png", "data/file2.png"},
+  "has_squirrel": {True, False},
+}
+df = pd.DataFrame(data)
+
+ds.upload_metadata_from_dataframe(df, path_column="path")
+```
+
+`path_column` takes either the index or a name of the column to be used as the column with paths.
+All other columns are considered metadata columns.
+If `path_column` isn't specified, then the first column is considered as the path column.
+
 ## Getting data
 
 At any point during working/querying, you can get the points that exist in the datasource with the current query
