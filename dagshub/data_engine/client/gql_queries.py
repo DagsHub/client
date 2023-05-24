@@ -11,13 +11,13 @@ class GqlQueries:
     def datasource() -> str:
         q = GqlQuery().operation(
             "query",
-            name="dataSource",
+            name="datasource",
             input={
                 "$id": "ID",
                 "$name": "String"
             }
         ).query(
-            "dataSource",
+            "datasource",
             input={
                 "id": "$id",
                 "name": "$name",

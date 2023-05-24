@@ -7,7 +7,7 @@ from treelib import Tree, Node
 from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasource import DataSource
+    from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ fieldFilterOperandMap = {
 
 
 class DataSourceQuery:
-    def __init__(self, dataset: "DataSource", column_or_query: Optional[Union[str, "DataSourceQuery"]] = None):
+    def __init__(self, dataset: "Datasource", column_or_query: Optional[Union[str, "DataSourceQuery"]] = None):
         self.dataset = dataset
 
         self._operand_tree: Optional[Tree] = Tree()

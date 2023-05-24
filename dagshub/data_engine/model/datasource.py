@@ -19,7 +19,7 @@ from dagshub.data_engine.model.query import DataSourceQuery, _metadataTypeLookup
 fo = lazy_load("fiftyone")
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasources import DataSourceState
+    from dagshub.data_engine.model.datasources import DatasourceState
     from dagshub.data_engine.client.data_client import QueryResult
     import fiftyone as fo
     import pandas
@@ -29,16 +29,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass_json
 @dataclass
-class DataPointMetadataUpdateEntry(json.JSONEncoder):
+class DatapointMetadataUpdateEntry(json.JSONEncoder):
     url: str
     key: str
     value: str
     valueType: str
 
 
-class DataSource:
+class Datasource:
 
-    def __init__(self, datasource: "DataSourceState", query: Optional[DataSourceQuery] = None):
+    def __init__(self, datasource: "DatasourceState", query: Optional[DataSourceQuery] = None):
         self._source = datasource
         if query is None:
             query = DataSourceQuery(self)
@@ -69,8 +69,8 @@ class DataSource:
     def source(self):
         return self._source
 
-    def __deepcopy__(self, memodict={}) -> "DataSource":
-        res = DataSource(self._source, self._query.__deepcopy__())
+    def __deepcopy__(self, memodict={}) -> "Datasource":
+        res = Datasource(self._source, self._query.__deepcopy__())
         res.include_list = self.include_list.copy()
         res.exclude_list = self.exclude_list.copy()
         return res
@@ -117,7 +117,7 @@ class DataSource:
 
     @staticmethod
     def _df_to_metadata(df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None) -> List[
-        DataPointMetadataUpdateEntry]:
+        DatapointMetadataUpdateEntry]:
         res = []
         if path_column is None:
             path_column = df.columns[0]
@@ -136,7 +136,7 @@ class DataSource:
             for key, val in row.items():
                 if key == path_column:
                     continue
-                res.append(DataPointMetadataUpdateEntry(
+                res.append(DatapointMetadataUpdateEntry(
                     url=datapoint,
                     key=str(key),
                     value=str(val),
@@ -144,7 +144,7 @@ class DataSource:
                 ))
         return res
 
-    def _upload_metadata(self, metadata_entries: List[DataPointMetadataUpdateEntry]):
+    def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
         self.source.client.update_metadata(self, metadata_entries)
 
     def __str__(self):
@@ -211,7 +211,7 @@ class DataSource:
         queried_ds = ds[ds["value"] == 5]
     """
 
-    def __getitem__(self, column_or_query: Union[str, "DataSource"]):
+    def __getitem__(self, column_or_query: Union[str, "Datasource"]):
         new_ds = self.__deepcopy__()
         if type(column_or_query) is str:
             new_ds._query = DataSourceQuery(new_ds, column_or_query)
@@ -261,51 +261,51 @@ class DataSource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
-    def __and__(self, other: "DataSource"):
+    def __and__(self, other: "Datasource"):
         return self.add_query_op("and", other)
 
-    def __or__(self, other: "DataSource"):
+    def __or__(self, other: "Datasource"):
         return self.add_query_op("or", other)
 
     # Prevent users from messing up their queries due to operator order
     # They always need to put the dataset query filters in parentheses, otherwise the binary and/or get executed before
     def __rand__(self, other):
-        if type(other) is not DataSource:
+        if type(other) is not Datasource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
     def __ror__(self, other):
-        if type(other) is not DataSource:
+        if type(other) is not Datasource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
-    def add_query_op(self, op: str, other: [str, int, float, "DataSource"]) -> "DataSource":
+    def add_query_op(self, op: str, other: [str, int, float, "Datasource"]) -> "Datasource":
         """
         Returns a new dataset with an added query param
         """
         new_ds = self.__deepcopy__()
-        if type(other) is DataSource:
+        if type(other) is Datasource:
             other = other.get_query()
         new_ds._query.compose(op, other)
         return new_ds
 
     @staticmethod
     def _test_not_comparing_other_ds(other):
-        if type(other) is DataSource:
+        if type(other) is Datasource:
             raise DatasetFieldComparisonError()
 
 
 class MetadataContextManager:
-    def __init__(self, dataset: DataSource):
+    def __init__(self, dataset: Datasource):
         self._dataset = dataset
-        self._metadata_entries: List[DataPointMetadataUpdateEntry] = []
+        self._metadata_entries: List[DatapointMetadataUpdateEntry] = []
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
         if isinstance(datapoints, str):
             datapoints = [datapoints]
         for dp in datapoints:
             for k, v in metadata.items():
-                self._metadata_entries.append(DataPointMetadataUpdateEntry(
+                self._metadata_entries.append(DatapointMetadataUpdateEntry(
                     url=dp,
                     key=k,
                     value=str(v),

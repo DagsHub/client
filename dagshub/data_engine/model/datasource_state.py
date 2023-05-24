@@ -5,7 +5,7 @@ from typing import Optional, Union, Mapping, Any, Dict
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.dataclasses import DataSourceType, DataPoint, DataSourceResult
+from dagshub.data_engine.client.dataclasses import DatasourceType, Datapoint, DatasourceResult
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
 try:
@@ -16,13 +16,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 path_regexes = {
-    DataSourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w-]+)(?P<prefix>/.*)?"),
-    DataSourceType.REPOSITORY: re.compile(r"repo://(?P<user>[\w\-_]+)/(?P<repo>[\w\-_]+)(?P<prefix>/.*)?"),
+    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w-]+)(?P<prefix>/.*)?"),
+    DatasourceType.REPOSITORY: re.compile(r"repo://(?P<user>[\w\-_]+)/(?P<repo>[\w\-_]+)(?P<prefix>/.*)?"),
 }
 
 expected_formats = {
-    DataSourceType.BUCKET: "s3|gs://bucket-name/prefix",
-    DataSourceType.REPOSITORY: "repo://owner/reponame/prefix",
+    DatasourceType.BUCKET: "s3|gs://bucket-name/prefix",
+    DatasourceType.REPOSITORY: "repo://owner/reponame/prefix",
 }
 
 
@@ -31,12 +31,12 @@ class InvalidPathFormatError(Exception):
 
 
 @dataclass
-class DataSourceState:
+class DatasourceState:
     repo: str
     name: Optional[str] = field(default=None)
     id: Optional[Union[int, str]] = field(default=None)
 
-    source_type: DataSourceType = field(init=False)
+    source_type: DatasourceType = field(init=False)
     path: str = field(init=False)
     client: DataClient = field(init=False)
     _api: RepoAPI = field(init=False)
@@ -77,14 +77,14 @@ class DataSourceState:
                 f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong")
         self._update_from_ds_result(sources[0])
 
-    def content_path(self, path: Union[str, DataPoint, Mapping[str, Any]]) -> str:
+    def content_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> str:
         """
         Returns the url for the content path of a specified path
         """
         path = self._extract_path(path).strip("/")
         return self.root_content_path + "/" + path
 
-    def raw_path(self, path: Union[str, DataPoint, Mapping[str, Any]]) -> str:
+    def raw_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> str:
         """
         Returns the url for the download path of a specified path
         """
@@ -112,7 +112,7 @@ class DataSourceState:
     def _root_path(self, path_type):
         assert path_type in ["raw", "content"]
         parts = self.path_parts()
-        if self.source_type == DataSourceType.BUCKET:
+        if self.source_type == DatasourceType.BUCKET:
             path_elems = [parts["schema"], parts["bucket"]]
             if parts["prefix"] is not None:
                 path_elems.append(parts["prefix"])
@@ -121,7 +121,7 @@ class DataSourceState:
                 return self._api.storage_raw_api_url(path_prefix)
             elif path_type == "content":
                 return self._api.storage_content_api_url(path_prefix)
-        elif self.source_type == DataSourceType.REPOSITORY:
+        elif self.source_type == DatasourceType.REPOSITORY:
             prefix = parts["prefix"]
             if prefix is None:
                 prefix = ""
@@ -130,7 +130,7 @@ class DataSourceState:
                 return self._api.raw_api_url(prefix, self.revision)
             elif path_type == "content":
                 return self._api.content_api_url(prefix, self.revision)
-        elif self.source_type == DataSourceType.CUSTOM:
+        elif self.source_type == DatasourceType.CUSTOM:
             raise NotImplementedError
         raise NotImplementedError
 
@@ -146,21 +146,21 @@ class DataSourceState:
         return match.groupdict()
 
     @staticmethod
-    def _extract_path(val: Union[str, DataPoint, Mapping[str, Any]]) -> str:
+    def _extract_path(val: Union[str, Datapoint, Mapping[str, Any]]) -> str:
         if type(val) is str:
             return val
-        elif type(val) is DataPoint:
+        elif type(val) is Datapoint:
             return val.path
         return val["path"]
 
-    def _update_from_ds_result(self, ds: DataSourceResult):
+    def _update_from_ds_result(self, ds: DatasourceResult):
         self.id = ds.id
         self.name = ds.name
         self.path = ds.rootUrl
         self.source_type = ds.type
 
     @staticmethod
-    def from_gql_result(repo: str, res: DataSourceResult):
-        ds = DataSourceState(repo)
+    def from_gql_result(repo: str, res: DatasourceResult):
+        ds = DatasourceState(repo)
         ds._update_from_ds_result(res)
         return ds

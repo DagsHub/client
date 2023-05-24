@@ -10,13 +10,13 @@ import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.data_engine.client.dataclasses import QueryResult, DataSourceResult, DataSourceType, IntegrationStatus
+from dagshub.data_engine.client.dataclasses import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import DataSource, DataPointMetadataUpdateEntry
+from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
 
 if typing.TYPE_CHECKING:
-    from dagshub.data_engine.model.datasources import DataSourceState
+    from dagshub.data_engine.model.datasources import DatasourceState
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class DataClient:
         client = gql.Client(transport=transport)
         return client
 
-    def create_datasource(self, ds: "DataSourceState") -> DataSourceResult:
+    def create_datasource(self, ds: "DatasourceState") -> DatasourceResult:
         q = GqlMutations.create_datasource()
 
         assert ds.name is not None
@@ -51,17 +51,17 @@ class DataClient:
             ds_type=ds.source_type
         )
         res = self._exec(q, params)
-        return dacite.from_dict(DataSourceResult, res["createDataSource"],
-                                config=dacite.Config(cast=[IntegrationStatus, DataSourceType]))
+        return dacite.from_dict(DatasourceResult, res["createDataSource"],
+                                config=dacite.Config(cast=[IntegrationStatus, DatasourceType]))
 
-    def head(self, datasource: DataSource) -> QueryResult:
+    def head(self, datasource: Datasource) -> QueryResult:
         resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
         return QueryResult.from_gql_query(resp, datasource)
 
-    def get_datapoints(self, datasource: DataSource) -> QueryResult:
+    def get_datapoints(self, datasource: Datasource) -> QueryResult:
         return self._get_all(datasource, True)
 
-    def _get_all(self, datasource: DataSource, include_metadata: bool) -> QueryResult:
+    def _get_all(self, datasource: Datasource, include_metadata: bool) -> QueryResult:
         has_next_page = True
         after = None
         res = QueryResult([], datasource)
@@ -80,7 +80,7 @@ class DataClient:
         resp = self.client.execute(q, variable_values=params)
         return resp
 
-    def _datasource_query(self, datasource: DataSource, include_metadata: bool, limit: Optional[int] = None,
+    def _datasource_query(self, datasource: Datasource, include_metadata: bool, limit: Optional[int] = None,
                           after: Optional[str] = None):
         q = GqlQueries.datasource_query(include_metadata)
 
@@ -93,7 +93,7 @@ class DataClient:
 
         return self._exec(q, params)["datasourceQuery"]
 
-    def update_metadata(self, datasource: DataSource, entries: List[DataPointMetadataUpdateEntry]):
+    def update_metadata(self, datasource: Datasource, entries: List[DatapointMetadataUpdateEntry]):
         q = GqlMutations.update_metadata()
 
         assert datasource.source.id is not None
@@ -106,17 +106,17 @@ class DataClient:
 
         return self._exec(q, params)
 
-    def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DataSourceResult]:
+    def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
         q = GqlQueries.datasource()
         params = GqlQueries.datasource_params(id=id, name=name)
 
-        res = self._exec(q, params)["dataSource"]
+        res = self._exec(q, params)["datasource"]
         if res is None:
             return []
-        return [dacite.from_dict(DataSourceResult, val, config=dacite.Config(cast=[IntegrationStatus, DataSourceType]))
+        return [dacite.from_dict(DatasourceResult, val, config=dacite.Config(cast=[IntegrationStatus, DatasourceType]))
                 for val in res]
 
-    def delete_datasource(self, datasource: DataSource):
+    def delete_datasource(self, datasource: Datasource):
         q = GqlMutations.delete_datasource()
 
         assert datasource.source.id is not None
@@ -124,7 +124,7 @@ class DataClient:
         params = GqlMutations.delete_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
 
-    def rescan_datasource(self, datasource: DataSource):
+    def rescan_datasource(self, datasource: Datasource):
         q = GqlMutations.rescan_datasource()
 
         assert datasource.source.id is not None

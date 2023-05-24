@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, Any, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasource import DataSource
+    from dagshub.data_engine.model.datasource import Datasource
 
 
 @dataclass
@@ -13,16 +13,16 @@ class Metadata:
 
 
 @dataclass
-class DataPoint:
+class Datapoint:
     path: str
     metadata: Dict[str, Any]
 
-    def download_url(self, ds: "DataSource"):
+    def download_url(self, ds: "Datasource"):
         return ds.source.raw_path(self)
 
     @staticmethod
-    def from_gql_edge(edge: Dict) -> "DataPoint":
-        res = DataPoint(
+    def from_gql_edge(edge: Dict) -> "Datapoint":
+        res = Datapoint(
             path=edge["node"]["path"],
             metadata={}
         )
@@ -37,26 +37,26 @@ class IntegrationStatus(enum.Enum):
     MISSING = "MISSING"
 
 
-class DataSourceType(enum.Enum):
+class DatasourceType(enum.Enum):
     BUCKET = "BUCKET"
     REPOSITORY = "REPOSITORY"
     CUSTOM = "CUSTOM"
 
 
 @dataclass
-class DataSourceResult:
+class DatasourceResult:
     id: Union[str, int]
     name: str
     rootUrl: str
     integrationStatus: IntegrationStatus
-    type: DataSourceType
+    type: DatasourceType
 
 
 @dataclass
 class QueryResult:
-    entries: List[DataPoint]
+    entries: List[Datapoint]
     """ List of downloaded entries."""
-    datasource: "DataSource"
+    datasource: "Datasource"
 
     @property
     def dataframe(self):
@@ -78,10 +78,10 @@ class QueryResult:
         return res
 
     @staticmethod
-    def from_gql_query(query_resp: Dict[str, Any], datasource: "DataSource") -> "QueryResult":
+    def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
         if "edges" not in query_resp:
             return QueryResult([], datasource)
-        return QueryResult([DataPoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
+        return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
 
     def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
         self.entries += self.from_gql_query(query_resp, self.datasource).entries
