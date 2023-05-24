@@ -177,7 +177,7 @@ class DataSource:
         datapoints = self.all()
 
         host = config.host
-        client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host)))
+        client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host), ), follow_redirects=True)
 
         samples = []
 
