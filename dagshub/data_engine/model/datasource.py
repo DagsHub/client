@@ -163,7 +163,11 @@ class DataSource:
         """
         logger.info("Migrating dataset to voxel51")
         name = kwargs.get("name", self._source.name)
-        ds: fo.Dataset = fo.Dataset(name)
+        # TODO: don't override samples in existing one
+        if fo.dataset_exists(name):
+            ds: fo.Dataset = fo.load_dataset(name)
+        else:
+            ds: fo.Dataset = fo.Dataset(name)
         # ds.persistent = True
         dataset_location = os.path.join(Path.home(), "dagshub_datasets")
         os.makedirs(dataset_location, exist_ok=True)
