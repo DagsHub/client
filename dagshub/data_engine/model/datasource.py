@@ -184,7 +184,7 @@ class DataSource:
         # TODO: parallelize this with some async magic
         for datapoint in datapoints.entries:
             file_url = datapoint.download_url(self)
-            resp = client.get(file_url)
+            resp = client.get(file_url, follow_redirects=True)
             try:
                 assert resp.status_code == 200
             except AssertionError:
