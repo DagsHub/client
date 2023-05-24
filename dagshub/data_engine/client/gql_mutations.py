@@ -71,3 +71,50 @@ class GqlMutations:
             "dataSource": datasource_id,
             "dataPoints": datapoints,
         }
+
+    @staticmethod
+    @functools.lru_cache()
+    def delete_datasource():
+        q = GqlQuery().operation(
+            "mutation",
+            name="deleteDatasource",
+            input={
+                "$dataSource": "ID!",
+            }
+        ).query(
+            "deleteDatasource",
+            input={
+                "dataSource": "$dataSource",
+            }
+        ).generate()
+        return q
+
+    @staticmethod
+    def delete_datasource_params(datasource_id: Union[int, str]):
+        return {
+            "dataSource": datasource_id,
+        }
+
+    @staticmethod
+    @functools.lru_cache()
+    def rescan_datasource():
+        q = GqlQuery().operation(
+            "mutation",
+            name="rescanDatasource",
+            input={
+                "$dataSource": "ID!",
+            }
+        ).query(
+            "rescanDatasource",
+            input={
+                "dataSource": "$dataSource",
+            }
+        ).generate()
+        return q
+
+    @staticmethod
+    @functools.lru_cache()
+    def rescan_datasource_params(datasource_id: Union[int, str]):
+        return {
+            "dataSource": datasource_id,
+        }

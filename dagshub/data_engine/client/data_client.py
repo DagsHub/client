@@ -115,3 +115,19 @@ class DataClient:
             return []
         return [dacite.from_dict(DataSourceResult, val, config=dacite.Config(cast=[IntegrationStatus, DataSourceType]))
                 for val in res]
+
+    def delete_datasource(self, datasource: DataSource):
+        q = GqlMutations.delete_datasource()
+
+        assert datasource.source.id is not None
+
+        params = GqlMutations.delete_datasource_params(datasource_id=datasource.source.id)
+        return self._exec(q, params)
+
+    def rescan_datasource(self, datasource: DataSource):
+        q = GqlMutations.rescan_datasource()
+
+        assert datasource.source.id is not None
+
+        params = GqlMutations.rescan_datasource_params(datasource_id=datasource.source.id)
+        return self._exec(q, params)
