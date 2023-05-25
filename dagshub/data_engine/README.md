@@ -203,6 +203,8 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
 ## Known issues
 
 - No deleting of metadata
+- Works only on data in the repository you specified. For now you can't create a datasource in one repo and use data
+  from another repo
 - The validation layer is very incomplete for now. That means that if you typo the repo name or a datapoints url, it'll
   still work
   probably
