@@ -8,10 +8,12 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 import httpx
 from dataclasses_json import dataclass_json
+from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DataSourceQuery, _metadataTypeLookup
@@ -151,14 +153,21 @@ class Datasource:
         """
         prompt = f"You are about to delete datasource \"{self.source.name}\" for repo \"{self.source.repo}\"\n" \
                  f"This will remove the datasource and ALL datapoints " \
-                 f"and metadata records associated with the source.\n" \
-                 f"Are you sure? [y/(N)]"
+                 f"and metadata records associated with the source."
         if not force:
-            user_response = input(prompt)
-            if user_response.lower() != "y":
+            user_response = prompt_user(prompt)
+            if not user_response:
                 print("Deletion cancelled")
                 return
         self.source.client.delete_datasource(self)
+
+    def rescan_source(self):
+        """
+        This function fires a call to the backend to rescan the datapoints.
+        Call this function whenever you updated/new files and want the changes to show up in the datasource metadata
+        """
+        logger.debug("Rescanning datasource")
+        self.source.client.rescan_datasource(self)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
         self.source.client.update_metadata(self, metadata_entries)
@@ -176,25 +185,35 @@ class Datasource:
 
         Args:
             name (str): name of the dataset (by default uses the same name as the datasource)
+            force_download (bool): download the dataset even if the size of the files is bigger than 100MB
+            files_location (str|PathLike): path to the location where to download the local files
+                default: ~/dagshub_datasets/user/repo/ds_name/
         """
         logger.info("Migrating dataset to voxel51")
         name = kwargs.get("name", self._source.name)
+        force_download = kwargs.get("force_download", False)
         # TODO: don't override samples in existing one
         if fo.dataset_exists(name):
             ds: fo.Dataset = fo.load_dataset(name)
         else:
             ds: fo.Dataset = fo.Dataset(name)
         # ds.persistent = True
-        dataset_location = os.path.join(Path.home(), "dagshub_datasets")
+        dataset_location = kwargs.get("files_location", sanitize_filepath(
+            os.path.join(Path.home(), "dagshub_datasets", self.source.repo, self.source.name)))
+
         os.makedirs(dataset_location, exist_ok=True)
         logger.info("Downloading files...")
-        # Load the dataset from the query
 
+        # Load the dataset from the query
         datapoints = self.all()
+
+        if not force_download:
+            self._check_downloaded_dataset_size(datapoints)
 
         host = config.host
         client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host), ), follow_redirects=True)
 
+        logger.warning(f"Downloading {len(datapoints.entries)} files to {dataset_location}")
         samples = []
 
         # TODO: parallelize this with some async magic
@@ -220,6 +239,37 @@ class Datasource:
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
         return ds
+
+    @staticmethod
+    def _check_downloaded_dataset_size(datapoints: "QueryResult"):
+        download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
+        dp_size = Datasource._calculate_datapoint_size(datapoints)
+        if dp_size is not None and dp_size > download_size_prompt_threshold:
+            prompt = f"You're about to download {sizeof_fmt(dp_size)} of images locally."
+            should_download = prompt_user(prompt)
+            if not should_download:
+                msg = "Downloading voxel dataset cancelled"
+                logger.warning(msg)
+                raise RuntimeError(msg)
+
+    @staticmethod
+    def _calculate_datapoint_size(datapoints: "QueryResult") -> Optional[int]:
+        sum_size = 0
+        has_sum_field = False
+        all_have_sum_field = True
+        size_field = "size"
+        for dp in datapoints.entries:
+            if size_field in dp.metadata:
+                has_sum_field = True
+                sum_size += dp.metadata[size_field]
+            else:
+                all_have_sum_field = False
+        if not has_sum_field:
+            logger.warning("None of the datapoints had a size field, can't calculate size of the downloading dataset")
+            return None
+        if not all_have_sum_field:
+            logger.warning("Not every datapoint has a size field, size calculations might be wrong")
+        return sum_size
 
     """ FUNCTIONS RELATED TO QUERYING
     These are functions that overload operators on the DataSet, so you can do pandas-like filtering

@@ -10,6 +10,7 @@ import dagshub
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.api.responses import ContentAPIEntry
+from dagshub.common.helpers import prompt_user
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.model import datasources
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError

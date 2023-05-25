@@ -39,6 +39,7 @@ install_requires = [
     "dataclasses-json",
     "pandas",
     "treelib~=1.6.4",
+    "pathvalidate~=3.0.0",
 ]
 
 # Polyfills for Python 3.7
