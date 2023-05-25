@@ -10,7 +10,8 @@ import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.data_engine.client.dataclasses import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus
+from dagshub.data_engine.client.dataclasses import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus, \
+    PreprocessingStatus
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
@@ -19,6 +20,8 @@ if typing.TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DatasourceState
 
 logger = logging.getLogger(__name__)
+
+_dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus])
 
 
 class DataClient:
@@ -51,8 +54,7 @@ class DataClient:
             ds_type=ds.source_type
         )
         res = self._exec(q, params)
-        return dacite.from_dict(DatasourceResult, res["createDataSource"],
-                                config=dacite.Config(cast=[IntegrationStatus, DatasourceType]))
+        return dacite.from_dict(DatasourceResult, res["createDataSource"], config=_dacite_config)
 
     def head(self, datasource: Datasource) -> QueryResult:
         resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
@@ -113,7 +115,7 @@ class DataClient:
         res = self._exec(q, params)["datasource"]
         if res is None:
             return []
-        return [dacite.from_dict(DatasourceResult, val, config=dacite.Config(cast=[IntegrationStatus, DatasourceType]))
+        return [dacite.from_dict(DatasourceResult, val, config=_dacite_config)
                 for val in res]
 
     def delete_datasource(self, datasource: Datasource):

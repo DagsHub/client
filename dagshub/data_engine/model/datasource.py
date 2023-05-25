@@ -15,6 +15,7 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.util import lazy_load
+from dagshub.data_engine.client.dataclasses import PreprocessingStatus
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DataSourceQuery, _metadataTypeLookup
 
@@ -88,10 +89,19 @@ class Datasource:
         }
 
     def head(self) -> "QueryResult":
+        self._check_preprocess()
         return self._source.client.head(self)
 
     def all(self) -> "QueryResult":
+        self._check_preprocess()
         return self._source.client.get_datapoints(self)
+
+    def _check_preprocess(self):
+        self.source.get_from_dagshub()
+        if self.source.preprocessing_status == PreprocessingStatus.IN_PROGRESS:
+            logger.warning(
+                f"Datasource {self.source.name} is currently in the progress of rescanning. "
+                f"Values might change if you requery later")
 
     @contextmanager
     def metadata_context(self) -> "MetadataContextManager":

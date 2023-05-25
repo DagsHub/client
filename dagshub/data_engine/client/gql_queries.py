@@ -27,6 +27,7 @@ class GqlQueries:
             "name",
             "rootUrl",
             "integrationStatus",
+            "preprocessingStatus",
             "type",
         ]).generate()
         return q

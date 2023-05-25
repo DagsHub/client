@@ -31,6 +31,7 @@ class GqlMutations:
             "name",
             "rootUrl",
             "integrationStatus",
+            "preprocessingStatus",
             "type"
         ]).generate()
         return q
@@ -91,6 +92,7 @@ class GqlMutations:
             "name",
             "rootUrl",
             "integrationStatus",
+            "preprocessingStatus",
             "type",
         ]).generate()
         return q
@@ -115,7 +117,14 @@ class GqlMutations:
             input={
                 "datasource": "$datasource",
             }
-        ).generate()
+        ).fields([
+            "id",
+            "name",
+            "rootUrl",
+            "integrationStatus",
+            "preprocessingStatus",
+            "type",
+        ]).generate()
         return q
 
     @staticmethod

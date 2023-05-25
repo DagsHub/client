@@ -5,7 +5,7 @@ from typing import Optional, Union, Mapping, Any, Dict
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.dataclasses import DatasourceType, Datapoint, DatasourceResult
+from dagshub.data_engine.client.dataclasses import DatasourceType, Datapoint, DatasourceResult, PreprocessingStatus
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
 try:
@@ -37,6 +37,7 @@ class DatasourceState:
     id: Optional[Union[int, str]] = field(default=None)
 
     source_type: DatasourceType = field(init=False)
+    preprocessing_status: PreprocessingStatus = field(init=False)
     path: str = field(init=False)
     client: DataClient = field(init=False)
     _api: RepoAPI = field(init=False)
@@ -158,6 +159,7 @@ class DatasourceState:
         self.name = ds.name
         self.path = ds.rootUrl
         self.source_type = ds.type
+        self.preprocessing_status = ds.preprocessingStatus
 
     @staticmethod
     def from_gql_result(repo: str, res: DatasourceResult):

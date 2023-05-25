@@ -36,6 +36,10 @@ class IntegrationStatus(enum.Enum):
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
     MISSING = "MISSING"
 
+class PreprocessingStatus(enum.Enum):
+    READY = "READY"
+    IN_PROGRESS = "IN_PROGRESS"
+    UNKNOWN = ""  # TODO: delete once it's returned consistently
 
 class DatasourceType(enum.Enum):
     BUCKET = "BUCKET"
@@ -49,6 +53,7 @@ class DatasourceResult:
     name: str
     rootUrl: str
     integrationStatus: IntegrationStatus
+    preprocessingStatus: PreprocessingStatus
     type: DatasourceType
 
 
