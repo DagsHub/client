@@ -2,20 +2,20 @@ import pytest
 
 from dagshub.data_engine.model import datasources
 from dagshub.data_engine.model.datasource import (
-    DataSource,
+    Datasource,
 )
 from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError
 
 
 @pytest.fixture
 def ds():
-    yield DataSource(datasources.DataSourceState("test-dataset", "kirill/repo"))
+    yield Datasource(datasources.DatasourceState("test-dataset", "kirill/repo"))
 
 
 def test_query_single_column(ds):
     column_name = "column1"
     ds2 = ds[column_name]
-    assert type(ds2) is DataSource
+    assert type(ds2) is Datasource
 
     q = ds2.get_query()
     print(q._column_filter == column_name)

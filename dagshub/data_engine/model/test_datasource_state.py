@@ -1,5 +1,5 @@
-from dagshub.data_engine.client.dataclasses import DataSourceType
-from dagshub.data_engine.model.datasource_state import path_regexes, DataSourceState, InvalidPathFormatError
+from dagshub.data_engine.client.dataclasses import DatasourceType
+from dagshub.data_engine.model.datasource_state import path_regexes, DatasourceState, InvalidPathFormatError
 import pytest
 
 
@@ -15,9 +15,9 @@ import pytest
     ]
 )
 def test_repo_regex(in_str, user, repo, prefix):
-    ds = DataSourceState(repo="user/repo")
+    ds = DatasourceState(repo="user/repo")
     ds.path = in_str
-    ds.source_type = DataSourceType.REPOSITORY
+    ds.source_type = DatasourceType.REPOSITORY
     res = ds.path_parts()
 
     expected = {
@@ -39,9 +39,9 @@ def test_repo_regex(in_str, user, repo, prefix):
     ]
 )
 def test_repo_regex_incorrect(in_str):
-    ds = DataSourceState(repo="user/repo")
+    ds = DatasourceState(repo="user/repo")
     ds.path = in_str
-    ds.source_type = DataSourceType.REPOSITORY
+    ds.source_type = DatasourceType.REPOSITORY
     with pytest.raises(InvalidPathFormatError):
         ds.path_parts()
 
@@ -58,9 +58,9 @@ def test_repo_regex_incorrect(in_str):
     ]
 )
 def test_bucket_regex(in_str, schema, bucket, prefix):
-    ds = DataSourceState(repo="user/repo")
+    ds = DatasourceState(repo="user/repo")
     ds.path = in_str
-    ds.source_type = DataSourceType.BUCKET
+    ds.source_type = DatasourceType.BUCKET
     res = ds.path_parts()
 
     expected = {
@@ -80,8 +80,8 @@ def test_bucket_regex(in_str, schema, bucket, prefix):
     ]
 )
 def test_bucket_regex_incorrect(in_str):
-    ds = DataSourceState(repo="user/repo")
+    ds = DatasourceState(repo="user/repo")
     ds.path = in_str
-    ds.source_type = DataSourceType.REPOSITORY
+    ds.source_type = DatasourceType.REPOSITORY
     with pytest.raises(InvalidPathFormatError):
         ds.path_parts()
