@@ -79,20 +79,26 @@ class GqlMutations:
             "mutation",
             name="deleteDatasource",
             input={
-                "$datasource": "ID!",
+                "$id": "ID!",
             }
         ).query(
             "deleteDatasource",
             input={
-                "datasource": "$datasource",
+                "id": "$id",
             }
-        ).generate()
+        ).fields([
+            "id",
+            "name",
+            "rootUrl",
+            "integrationStatus",
+            "type",
+        ]).generate()
         return q
 
     @staticmethod
     def delete_datasource_params(datasource_id: Union[int, str]):
         return {
-            "datasource": datasource_id,
+            "id": datasource_id,
         }
 
     @staticmethod
