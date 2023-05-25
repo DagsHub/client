@@ -144,6 +144,22 @@ class Datasource:
                 ))
         return res
 
+    def delete_source(self, force: bool = False):
+        """
+        Delete the record of this datasource
+        This will remove ALL the datapoints + metadata associated with the datasource
+        """
+        prompt = f"You are about to delete datasource \"{self.source.name}\" for repo \"{self.source.repo}\"\n" \
+                 f"This will remove the datasource and ALL datapoints " \
+                 f"and metadata records associated with the source.\n" \
+                 f"Are you sure? [y/(N)]"
+        if not force:
+            user_response = input(prompt)
+            if user_response.lower() != "y":
+                print("Deletion cancelled")
+                return
+        self.source.client.delete_datasource(self)
+
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
         self.source.client.update_metadata(self, metadata_entries)
 

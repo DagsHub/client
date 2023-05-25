@@ -196,6 +196,12 @@ sess.wait()
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
 
+## Deleting a datasource
+
+```python
+ds.delete_source()
+```
+
 ## Contributing
 
 Feel free to add whatever issues you get into the issue tracker on the repository
