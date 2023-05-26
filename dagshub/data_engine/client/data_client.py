@@ -54,7 +54,7 @@ class DataClient:
             ds_type=ds.source_type
         )
         res = self._exec(q, params)
-        return dacite.from_dict(DatasourceResult, res["createDataSource"], config=_dacite_config)
+        return dacite.from_dict(DatasourceResult, res["createDatasource"], config=_dacite_config)
 
     def head(self, datasource: Datasource) -> QueryResult:
         resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
