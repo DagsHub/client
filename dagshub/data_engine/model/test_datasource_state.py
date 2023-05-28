@@ -12,6 +12,7 @@ import pytest
         ("repo://user/repo", "user", "repo", None),
         ("repo://user-with_dashes/repo", "user-with_dashes", "repo", None),
         ("repo://user/repo-with_dashes", "user", "repo-with_dashes", None),
+        ("repo://user/repo.with.dots", "user", "repo.with.dots", None),
     ]
 )
 def test_repo_regex(in_str, user, repo, prefix):
