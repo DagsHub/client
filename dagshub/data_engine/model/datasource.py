@@ -180,7 +180,12 @@ class Datasource:
         self.source.client.rescan_datasource(self)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
-        self.source.client.update_metadata(self, metadata_entries)
+        logger.debug("Uploading metadata...")
+        upload_batch_size = 5000
+        for start in range(0, len(metadata_entries), upload_batch_size):
+            entries = metadata_entries[start:start + upload_batch_size]
+            logger.debug(f"Uploading {len(entries)} metadata entries...")
+            self.source.client.update_metadata(self, entries)
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
