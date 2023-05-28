@@ -96,9 +96,6 @@ class DESnippetDriver:
         logger.info("Importing to voxel51")
         # v51_ds = self.dataset.and_query(episode_eq=1).or_query(episode_ge=5).to_voxel51_dataset()
         ds = self.dataset
-        # TODO: don't need redundant ands once the gql query actually works
-        q1 = (ds["episode"] > 5) & (ds["episode"] > 5)
-        q2 = (ds["episode"] == 1) & (ds["episode"] == 1)
         v51_ds = ds[ds["size"] < 1000000].to_voxel51_dataset()
 
         sess = fo.launch_app(v51_ds)

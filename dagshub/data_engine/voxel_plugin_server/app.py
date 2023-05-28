@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 async def homepage(request):
-    return JSONResponse({"Hello": "from the dagshub voxel plugin server"})
+    return JSONResponse({"Hello": "from the dagshub voxel dagshub server"})
 
 
 async def to_labelstudio(request: Request):
