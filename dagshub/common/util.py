@@ -1,9 +1,11 @@
 import importlib
 import types
 
-
-def lazy_load(module_name, callback=None):
-    return LazyModule(module_name, callback)
+def lazy_load(module_name, source_package=None, callback=None):
+    if source_package is None:
+        # TODO: need to have a map for commonly used imports here. Also handle dots
+        source_package = module_name
+    return LazyModule(module_name, source_package, callback)
 
 
 class LazyModule(types.ModuleType):
@@ -18,10 +20,11 @@ class LazyModule(types.ModuleType):
             module
     """
 
-    def __init__(self, module_name, callback=None):
+    def __init__(self, module_name, source_package, callback=None):
         super().__init__(module_name)
         self._module = None
         self._callback = callback
+        self._source_package = source_package
 
     def __getattr__(self, item):
         if self._module is None:
@@ -41,8 +44,12 @@ class LazyModule(types.ModuleType):
             self._callback()
 
         # Actually import the module
-        module = importlib.import_module(self.__name__)
-        self._module = module
+        try:
+            module = importlib.import_module(self.__name__)
+            self._module = module
+        except ModuleNotFoundError:
+            print(f"Could not import module {self.__name__}. Make sure to pip install {self._source_package}")
+            raise
 
         # Update this object's dict so that attribute references are efficient
         # (__getattr__ is only called on lookups that fail)
