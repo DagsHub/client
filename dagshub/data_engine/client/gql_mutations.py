@@ -105,17 +105,17 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
-    def rescan_datasource():
+    def scan_datasource():
         q = GqlQuery().operation(
             "mutation",
-            name="rescanDatasource",
+            name="scanDatasource",
             input={
-                "$datasource": "ID!",
+                "$id": "ID!",
             }
         ).query(
-            "rescanDatasource",
+            "scanDatasource",
             input={
-                "datasource": "$datasource",
+                "id": "$id",
             }
         ).fields([
             "id",
@@ -129,9 +129,9 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
-    def rescan_datasource_params(datasource_id: Union[int, str]):
+    def scan_datasource_params(datasource_id: Union[int, str]):
         return {
-            "datasource": datasource_id,
+            "id": datasource_id,
         }
 
     @staticmethod

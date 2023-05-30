@@ -179,13 +179,13 @@ class Datasource:
                 return
         self.source.client.delete_datasource(self)
 
-    def rescan_source(self):
+    def generate_datapoints(self):
         """
         This function fires a call to the backend to rescan the datapoints.
         Call this function whenever you updated/new files and want the changes to show up in the datasource metadata
         """
         logger.debug("Rescanning datasource")
-        self.source.client.rescan_datasource(self)
+        self.source.client.scan_datasource(self)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
         logger.debug("Uploading metadata...")
