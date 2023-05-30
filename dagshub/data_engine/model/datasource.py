@@ -73,6 +73,13 @@ class Datasource:
     def source(self):
         return self._source
 
+    def clear_query(self):
+        """
+        This function clears the query assigned to this datasource.
+        Once you clear the query, next time you try to get datapoints, you'll get all the datapoints in the datasource
+        """
+        self._query = DataSourceQuery(self)
+
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__())
         res.include_list = self.include_list.copy()
