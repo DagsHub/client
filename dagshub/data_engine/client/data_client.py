@@ -1,6 +1,5 @@
 import logging
-import typing
-from typing import Any, Optional, List, Dict
+from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
 
 import dacite
 import gql
@@ -16,7 +15,7 @@ from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DatasourceState
 
 logger = logging.getLogger(__name__)
@@ -133,3 +132,21 @@ class DataClient:
 
         params = GqlMutations.rescan_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
+
+    def save_dataset(self, datasource: Datasource, name: str):
+        q = GqlMutations.save_dataset()
+
+        assert not datasource.get_query().is_empty
+        assert name is not None
+
+        params = GqlMutations.save_dataset_params(datasource_id=datasource.source.id,
+                                                  name=name,
+                                                  query_input=datasource.serialize_gql_query_input())
+        return self._exec(q, params)
+
+    def get_dataset(self, id: Optional[Union[str, int]], name: Optional[str]):
+        q = GqlQueries.dataset()
+        params = GqlQueries.dataset_params(id=id, name=name)
+
+        raise NotImplementedError
+        # res =

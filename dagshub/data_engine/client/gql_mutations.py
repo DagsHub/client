@@ -133,3 +133,37 @@ class GqlMutations:
         return {
             "datasource": datasource_id,
         }
+
+    @staticmethod
+    @functools.lru_cache()
+    def save_dataset():
+        q = GqlQuery().operation(
+            "mutation",
+            name="saveDataset",
+            input={
+                "$datasource": "ID!",
+                "$name": "String!",
+                "$filter": "QueryInput!"
+            }
+        ).query(
+            "saveDataset",
+            input={
+                "datasource": "$datasource",
+                "name": "$name",
+                "filter": "$filter"
+            }
+        ).fields([
+            "id",
+            "name",
+            "createdAt",
+        ]).generate()
+        return q
+
+    @staticmethod
+    @functools.lru_cache()
+    def save_dataset_params(datasource_id: Union[int, str], name: str, query_input: Dict[str, Any]):
+        return {
+            "datasource": datasource_id,
+            "name": name,
+            "filter": query_input,
+        }

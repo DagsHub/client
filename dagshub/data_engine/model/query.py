@@ -42,9 +42,7 @@ fieldFilterOperandMap = {
 
 
 class DataSourceQuery:
-    def __init__(self, datasource: "Datasource", column_or_query: Optional[Union[str, "DataSourceQuery"]] = None):
-        self.datasource = datasource
-
+    def __init__(self, column_or_query: Optional[Union[str, "DataSourceQuery"]] = None):
         self._operand_tree: Optional[Tree] = Tree()
         self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
         if type(column_or_query) is str:
@@ -114,7 +112,7 @@ class DataSourceQuery:
         return self._operand_tree.to_dict(with_data=True)
 
     def __deepcopy__(self, memodict={}):
-        q = DataSourceQuery(self.datasource, None)
+        q = DataSourceQuery()
         if self._column_filter is not None:
             q._column_filter = self._column_filter
         else:

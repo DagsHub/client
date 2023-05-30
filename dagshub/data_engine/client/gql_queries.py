@@ -75,3 +75,33 @@ class GqlQueries:
             "first": first,
             "after": after,
         }
+
+    @staticmethod
+    @functools.lru_cache
+    def dataset() -> str:
+        q = GqlQuery().operation(
+            "query",
+            name="dataset",
+            input={
+                "$id": "ID",
+                "$name": "String"
+            }
+        ).query(
+            "dataset",
+            input={
+                "id": "$id",
+                "name": "$name",
+            }
+        ).fields([
+            "id",
+            "name",
+            "datasource {id name rootUrl integrationStatus preprocessingStatus type}",
+        ]).generate()
+        return q
+
+    @staticmethod
+    def dataset_params(id: Optional[Union[int, str]], name: Optional[str]) -> Dict[str, Any]:
+        return {
+            "id": id,
+            "name": name,
+        }

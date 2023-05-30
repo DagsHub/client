@@ -45,7 +45,7 @@ class Datasource:
     def __init__(self, datasource: "DatasourceState", query: Optional[DataSourceQuery] = None):
         self._source = datasource
         if query is None:
-            query = DataSourceQuery(self)
+            query = DataSourceQuery()
         self._query = query
 
         self._include_list: List[str] = []
@@ -78,7 +78,7 @@ class Datasource:
         This function clears the query assigned to this datasource.
         Once you clear the query, next time you try to get datapoints, you'll get all the datapoints in the datasource
         """
-        self._query = DataSourceQuery(self)
+        self._query = DataSourceQuery()
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__())
@@ -198,9 +198,13 @@ class Datasource:
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
 
-    def save_dataset(self):
-        logger.info(f"Saving dataset")
-        raise NotImplementedError
+    def save_dataset(self, name: str):
+        """
+        Save the dataset, which is a combination of datasource + query, on the backend.
+        That way you can persist and share your queries on the backend
+        You can get the dataset back by calling `datasources.get_dataset(repo, name)`
+        """
+        self.source.client.save_dataset(self, name)
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
@@ -331,7 +335,7 @@ class Datasource:
     def __getitem__(self, column_or_query: Union[str, "Datasource"]):
         new_ds = self.__deepcopy__()
         if type(column_or_query) is str:
-            new_ds._query = DataSourceQuery(new_ds, column_or_query)
+            new_ds._query = DataSourceQuery(column_or_query)
             return new_ds
         else:
             # "index" is a dataset with a query - compose with "and"

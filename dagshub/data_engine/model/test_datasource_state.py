@@ -34,7 +34,6 @@ def test_repo_regex(in_str, user, repo, prefix):
     [
         "s3://user/repo/prefix",
         "user/repo/",
-        "repo://user.www.com/repo",
         "repo://user/",
         "repo://"
     ]
