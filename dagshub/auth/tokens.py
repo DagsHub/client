@@ -33,7 +33,7 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
-    def get_token(self, host: str = None, **kwargs):
+    def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
         host = host or config.host
         tokens = self._token_cache.get(host, [])
         app_tokens = [t for t in tokens if t.get("token_type") == APP_TOKEN_TYPE]
@@ -43,6 +43,8 @@ class TokenStorage:
             non_expired_tokens = [t for t in tokens if not self._is_expired(t)]
             if len(non_expired_tokens) > 0:
                 token = non_expired_tokens[0]
+            elif fail_if_no_token:
+                raise RuntimeError(f"No valid tokens found for host '{host}'. Maybe you need to set an environment variable or run `dagshub.init()`?")
             else:
                 logger.debug(
                     f"No valid tokens found for host '{host}'. Authenticating with OAuth"
