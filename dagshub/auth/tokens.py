@@ -45,9 +45,8 @@ class TokenStorage:
                 token = non_expired_tokens[0]
             elif fail_if_no_token:
                 raise RuntimeError(
-                        f"No valid tokens found for host '{host}'. \
-                                Maybe you need to set an environment variable or run `dagshub.init()`?"
-                                )
+                        f"No valid tokens found for host '{host}'.\n" \
+                         "Log into DagsHub by executing `dagshub login` in your terminal")
             else:
                 logger.debug(
                     f"No valid tokens found for host '{host}'. Authenticating with OAuth"
