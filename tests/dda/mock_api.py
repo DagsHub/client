@@ -41,13 +41,15 @@ class MockApi(MockRouter):
         else:
             return heads.master.commit.hexsha
 
-    @property
-    def api_list_path(self):
-        return f"{self.repoapipath}/content/{self.current_revision}"
+    def api_list_path(self, branch=None):
+        if branch is None:
+            branch = self.current_revision
+        return f"{self.repoapipath}/content/{branch}"
 
-    @property
-    def api_raw_path(self):
-        return f"{self.repoapipath}/raw/{self.current_revision}"
+    def api_raw_path(self, branch=None):
+        if branch is None:
+            branch = self.current_revision
+        return f"{self.repoapipath}/raw/{branch}"
 
     @property
     def api_storage_list_path(self):
@@ -208,23 +210,30 @@ class MockApi(MockRouter):
 
         return endpoints, responses
 
-    def add_file(self, path, content="aaa", status=200, is_storage=False) -> Route:
+    def add_file(self, path, content="aaa", status=200, is_storage=False, revision=None) -> Route:
         """
         Add a file to the api (only accessible via the raw endpoint)
         """
+
+        # TODO: add branch
         if is_storage:
             route = self.route(url=f"{self.api_storage_raw_path}/{path}")
         else:
-            route = self.route(url=f"{self.api_raw_path}/{path}")
+            route = self.route(url=f"{self.api_raw_path(revision)}/{path}")
         route.mock(Response(status, content=content))
         return route
 
-    def add_dir(self, path, contents=[], status=200, is_storage=False) -> Route:
+    def add_dir(self, path, contents=[], status=200, is_storage=False, revision=None) -> Route:
         """
         Add a directory to the api (only accessible via the content endpoint)
         We don't keep a tree of added dirs, so it's not dynamic
         """
-        route = self.route(url=f"{self.api_list_path}/{path}")
+
+        # TODO: add branch
+        if is_storage:
+            route = self.route(url=f"{self.api_storage_list_path}/{path}")
+        else:
+            route = self.route(url=f"{self.api_list_path(revision)}/{path}")
         content = [
             self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
         ]
@@ -293,5 +302,31 @@ class MockApi(MockRouter):
             }
         }
         branch_route = self.get(url=f"/api/v1/repos/{self.repourlpath}/branches/{branch}")
+        branch_route.mock(Response(200, json=resp_json))
+        return branch_route
+
+    def add_commit(self, revision):
+        resp_json = {
+            "commit": {
+                "id": revision,
+                "message": "Update 'README.md'\n",
+                "url": "",
+                "author": {
+                    "name": "dagshub",
+                    "email": "info@dagshub.com",
+                    "username": "",
+                },
+                "committer": {
+                    "name": "dagshub",
+                    "email": "info@dagshub.com",
+                    "username": "",
+                },
+                "added": None,
+                "removed": None,
+                "modified": None,
+                "timestamp": "2021-08-10T09:03:32Z",
+            }
+        }
+        branch_route = self.get(url=f"/api/v1/repos/{self.repourlpath}/commits/{revision}")
         branch_route.mock(Response(200, json=resp_json))
         return branch_route
