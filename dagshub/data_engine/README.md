@@ -4,17 +4,6 @@
 
 Let Kirill know if the README is not up to date and he will update
 
-## Usage
-
-Before using, make sure that your `DAGSHUB_CLIENT_HOST` env var is set to whatever host you connect to
-
-**Make sure to import this before any dagshub import**
-
-```python
-import os
-os.environ["DAGSHUB_CLIENT_HOST"] = "https://test.dagshub.com"
-```
-
 ## Creating/Getting a datasource
 
 ### Creating
