@@ -1,11 +1,15 @@
 import asyncio
 import logging
+
+from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
+from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from threading import Thread
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
 
+from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.voxel_plugin_server.app import app
 
 logger = logging.getLogger(__name__)
@@ -15,15 +19,18 @@ if TYPE_CHECKING:
 
 DEFAULT_PORT = 5152
 
+_running_server = None
+
 
 class PluginServer:
-    def __init__(self, voxel_dataset: "fo.Dataset"):
+    def __init__(self, state: PluginServerState):
         self._ev_loop = asyncio.new_event_loop()
 
         self._config = Config()
         self._config.bind = f"localhost:{DEFAULT_PORT}"
+        self._state = state
 
-        self.set_dataset_config(voxel_dataset)
+        self.set_dataset_config(self._state.voxel_session)
 
         asyncio.set_event_loop(self._ev_loop)
         self._shutdown_event = asyncio.Event()
@@ -34,19 +41,45 @@ class PluginServer:
     def server_address(self):
         return f"http://{self._config.bind[0]}"
 
-    def set_dataset_config(self, dataset: "fo.Dataset"):
-        dataset.app_config.plugins["dagshub"] = {
+    def set_dataset_config(self, session: "fo.Session"):
+        session.config.plugins["dagshub"] = {
             "server": self.server_address
         }
 
     async def start_serve(self):
+        self.set_state(self._state)
         await serve(app, self._config, shutdown_trigger=self._shutdown_event.wait)
+
+    def set_state(self, state: PluginServerState):
+        self._state = state
+        app.state.PLUGIN_STATE = self._state
 
     def stop(self):
         self._shutdown_event.set()
         self._thread.join()
 
 
-def run_plugin_server(voxel_dataset: "fo.Dataset") -> PluginServer:
-    plugin_server = PluginServer(voxel_dataset)
-    return plugin_server
+def run_plugin_server(voxel_session: "fo.Session", repo: RepoAPI, branch: Optional[str]) -> PluginServer:
+    global _running_server
+    state = PluginServerState(voxel_session, repo, branch)
+    if _running_server is None:
+        _running_server = PluginServer(state)
+    else:
+        _running_server.set_state(state)
+
+    return _running_server
+
+
+if __name__ == "__main__":
+    repo = RepoAPI(repo="kirill/baby-yoda-segmentation-dataset", host="http://localhost:3000")
+    set_voxel_envvars()
+    logging.basicConfig(level=logging.INFO)
+
+    import fiftyone as fo
+
+    fo.set_logging_level(level=logging.INFO)
+
+    sess = fo.launch_app(fo.load_dataset("default-dataset"))
+    server_state = PluginServerState(voxel_session=sess, repo=repo, branch=None)
+    run_plugin_server(sess, repo, None)
+    sess.wait()

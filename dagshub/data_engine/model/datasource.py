@@ -5,7 +5,7 @@ import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
 import httpx
 from dataclasses_json import dataclass_json
@@ -16,17 +16,19 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.client.dataclasses import PreprocessingStatus
+from dagshub.data_engine.client.models import PreprocessingStatus
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
-from dagshub.data_engine.model.query import DataSourceQuery, _metadataTypeLookup
-
-fo = lazy_load("fiftyone")
+from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
+from dagshub.data_engine.voxel_plugin_server.server import run_plugin_server
+from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasources import DatasourceState
     from dagshub.data_engine.client.data_client import QueryResult
     import fiftyone as fo
     import pandas
+else:
+    fo = lazy_load("fiftyone")
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +44,10 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 
 class Datasource:
 
-    def __init__(self, datasource: "DatasourceState", query: Optional[DataSourceQuery] = None):
+    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None):
         self._source = datasource
         if query is None:
-            query = DataSourceQuery()
+            query = DatasourceQuery()
         self._query = query
 
         self._include_list: List[str] = []
@@ -78,7 +80,7 @@ class Datasource:
         This function clears the query assigned to this datasource.
         Once you clear the query, next time you try to get datapoints, you'll get all the datapoints in the datasource
         """
-        self._query = DataSourceQuery()
+        self._query = DatasourceQuery()
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__())
@@ -112,7 +114,7 @@ class Datasource:
                 f"Values might change if you requery later")
 
     @contextmanager
-    def metadata_context(self) -> "MetadataContextManager":
+    def metadata_context(self) -> Iterator["MetadataContextManager"]:
         """
         Returns a metadata context, that you can upload metadata through via update_metadata
         Once the context is exited, all metadata is uploaded in one batch
@@ -266,34 +268,18 @@ class Datasource:
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
 
-        self._set_voxel_envvars()
-
         return ds
 
-    @staticmethod
-    def _set_voxel_envvars():
-        """
-        Sets the environment variables relevant for voxel:
-            FIFTYONE_PLUGINS_DIR - where to load the plugins from
-        """
-        script_dir = os.path.dirname(__file__)
-        plugin_dir = os.environ.get("DAGSHUB_FIFTYONE_PLUGINS_DIR",
-                                    os.path.join(script_dir, "../voxel_plugin_server/plugins"))
-        plugin_dir = os.path.abspath(plugin_dir)
-        fo_dir_envkey = "FIFTYONE_PLUGINS_DIR"
-        if fo_dir_envkey in os.environ and os.environ[fo_dir_envkey] != plugin_dir:
-            plugins_dest_dir = os.path.join(os.environ[fo_dir_envkey], "dagshub")
-            # TODO: handle version changes, for now prompt only if the plugin isn't copied
-            if not os.path.exists(plugins_dest_dir):
-                response = prompt_user(f"You have {fo_dir_envkey} env var setup to {os.environ[fo_dir_envkey]}. "
-                                       "Do you want to copy the dagshub plugin there?"
-                                       "You need the plugin copied in order to get full integration experience",
-                                       default=True)
-                if not response:
-                    return
-                shutil.copytree(os.path.join(plugin_dir, "dagshub"), plugins_dest_dir)
-        else:
-            os.environ[fo_dir_envkey] = plugin_dir
+    def visualize(self, **kwargs):
+        set_voxel_envvars()
+
+        ds = self.to_voxel51_dataset(**kwargs)
+
+        sess = fo.launch_app(ds)
+        # Launch the server for plugin interaction (off for now)
+        run_plugin_server(sess, self._source._api, self.source.revision)
+
+        return sess
 
     @staticmethod
     def _check_downloaded_dataset_size(datapoints: "QueryResult"):
@@ -335,7 +321,7 @@ class Datasource:
     def __getitem__(self, column_or_query: Union[str, "Datasource"]):
         new_ds = self.__deepcopy__()
         if type(column_or_query) is str:
-            new_ds._query = DataSourceQuery(column_or_query)
+            new_ds._query = DatasourceQuery(column_or_query)
             return new_ds
         else:
             # "index" is a dataset with a query - compose with "and"
@@ -349,27 +335,39 @@ class Datasource:
             else:
                 return column_or_query.__and__(self)
 
-    def __gt__(self, other: Union[int, float, str]):
+    def __gt__(self, other: object):
+        if not isinstance(other, (int, float, str)):
+            raise NotImplementedError
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("gt", other)
 
-    def __ge__(self, other: Union[int, float, str]):
+    def __ge__(self, other: object):
+        if not isinstance(other, (int, float, str)):
+            raise NotImplementedError
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("ge", other)
 
-    def __le__(self, other: Union[int, float, str]):
+    def __le__(self, other: object):
+        if not isinstance(other, (int, float, str)):
+            raise NotImplementedError
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("le", other)
 
-    def __lt__(self, other: Union[int, float, str]):
+    def __lt__(self, other: object):
+        if not isinstance(other, (int, float, str)):
+            raise NotImplementedError
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("lt", other)
 
-    def __eq__(self, other: Union[int, float, str]):
+    def __eq__(self, other: object):
+        if not isinstance(other, (int, float, str)):
+            raise NotImplementedError
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("eq", other)
 
-    def __ne__(self, other: Union[int, float, str]):
+    def __ne__(self, other: object):
+        if not isinstance(other, (int, float, str)):
+            raise NotImplementedError
         self._test_not_comparing_other_ds(other)
         return self.add_query_op("ne", other)
 
@@ -400,7 +398,7 @@ class Datasource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
-    def add_query_op(self, op: str, other: [str, int, float, "Datasource"]) -> "Datasource":
+    def add_query_op(self, op: str, other: Union[str, int, float, "Datasource", "DatasourceQuery"]) -> "Datasource":
         """
         Returns a new dataset with an added query param
         """

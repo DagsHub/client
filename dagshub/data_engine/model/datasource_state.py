@@ -5,7 +5,7 @@ from typing import Optional, Union, Mapping, Any, Dict
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.dataclasses import DatasourceType, Datapoint, DatasourceResult, PreprocessingStatus
+from dagshub.data_engine.client.models import DatasourceType, Datapoint, DatasourceResult, PreprocessingStatus
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
 try:

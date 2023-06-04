@@ -9,7 +9,7 @@ import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.data_engine.client.dataclasses import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus, \
+from dagshub.data_engine.client.models import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus, \
     PreprocessingStatus
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
