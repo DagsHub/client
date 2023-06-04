@@ -19,7 +19,6 @@ from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.models import PreprocessingStatus
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
-from dagshub.data_engine.voxel_plugin_server.server import run_plugin_server
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 
 if TYPE_CHECKING:
@@ -27,7 +26,9 @@ if TYPE_CHECKING:
     from dagshub.data_engine.client.data_client import QueryResult
     import fiftyone as fo
     import pandas
+    import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
 else:
+    plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
 
 logger = logging.getLogger(__name__)
@@ -277,7 +278,7 @@ class Datasource:
 
         sess = fo.launch_app(ds)
         # Launch the server for plugin interaction (off for now)
-        run_plugin_server(sess, self._source._api, self.source.revision)
+        plugin_server_module.run_plugin_server(sess, self._source._api, self.source.revision)
 
         return sess
 
