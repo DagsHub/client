@@ -186,6 +186,16 @@ class DagsHubFilesystem:
                 logger.debug("Couldn't get branch info from local git repository, " +
                              "fetching default branch from the remote...")
                 branch = self._api.default_branch
+
+        # check if it is a commit sha, in that case do not load the sha
+        sha_regex = re.compile(r"^([a-f0-9]){5,40}$")
+        if sha_regex.match(branch):
+            try:
+                self._api.get_commit_info(branch)
+                return branch
+            except CommitNotFoundError:
+                pass
+
         return self._api.last_commit_sha(branch)
 
     def is_commit_on_remote(self, sha1):

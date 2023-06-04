@@ -110,7 +110,7 @@ class RepoAPI:
             logger.debug(res.content)
             raise RuntimeError(error_msg)
 
-        return dacite.from_dict(CommitAPIResponse, res.json())
+        return dacite.from_dict(CommitAPIResponse, res.json()["commit"])
 
     def get_connected_storages(self) -> List[StorageAPIEntry]:
         """
