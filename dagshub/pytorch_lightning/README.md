@@ -13,8 +13,7 @@ from dagshub.pytorch_lightning import DAGsHubLogger
 from pytorch_lightning import Trainer
 
 trainer = Trainer(
-    logger=DAGsHubLogger(),
-    default_save_path='lightning_logs',
+    logger=DAGsHubLogger()
 )
 ```
 
