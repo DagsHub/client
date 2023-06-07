@@ -1,6 +1,6 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 
 from treelib import Tree, Node
 
@@ -17,6 +17,10 @@ _metadataTypeLookup = {
     type(0.5): "FLOAT",
     type("aaa"): "STRING",
 }
+
+_metadataTypeLookupReverse: Dict[str, Type] = {}
+for k, v in _metadataTypeLookup.items():
+    _metadataTypeLookupReverse[v] = k
 
 
 class FieldFilterOperand(enum.Enum):
@@ -39,6 +43,10 @@ fieldFilterOperandMap = {
     "le": FieldFilterOperand.LESS_EQUAL_THAN,
     "contains": FieldFilterOperand.CONTAINS,
 }
+
+fieldFilterOperandMapReverseMap: Dict[str, str] = {}
+for k, v in fieldFilterOperandMap.items():
+    fieldFilterOperandMapReverseMap[v.value] = k
 
 
 class DatasourceQuery:
@@ -84,7 +92,7 @@ class DatasourceQuery:
         return self._serialize_node(self._operand_root, self._operand_tree)
 
     @staticmethod
-    def _serialize_node(node: Node, tree: Tree) -> dict:
+    def _serialize_node(node: Node, tree: Tree) -> Dict:
         operand = node.tag
         if operand in ["and", "or"]:
             # recursively serialize children subqueries
@@ -107,6 +115,39 @@ class DatasourceQuery:
                     "comparator": query_op.value,
                 }
             }
+
+    @staticmethod
+    def deserialize(serialized_query: Dict) -> "DatasourceQuery":
+        q = DatasourceQuery()
+        op_tree = Tree()
+
+        DatasourceQuery._deserialize_node(serialized_query, op_tree)
+
+        q._operand_tree = op_tree
+        return q
+
+    @staticmethod
+    def _deserialize_node(node_dict: Dict, tree: Tree, parent_node=None) -> None:
+        keys = list(node_dict.keys())
+        if len(keys) > 1:
+            raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
+        op_type = keys[0]
+        val = node_dict[op_type]
+        # Types: and, or, filter
+        if op_type == "filter":
+            comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
+            key = val["key"]
+            value_type = _metadataTypeLookupReverse[val["valueType"]]
+            value = value_type(val["value"])
+            node = Node(tag=comparator, data={"field": key, "value": value})
+            tree.add_node(node, parent_node)
+        elif op_type in ("and", "or"):
+            main_node = Node(tag=op_type)
+            tree.add_node(main_node, parent_node)
+            for nested_node in val:
+                DatasourceQuery._deserialize_node(nested_node, tree, main_node)
+        else:
+            raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
 
     def to_dict(self):
         return self._operand_tree.to_dict(with_data=True)

@@ -5,11 +5,14 @@ from dagshub.data_engine.model.datasource import (
     Datasource,
 )
 from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError
+from dagshub.data_engine.model.query import DatasourceQuery
 
 
 @pytest.fixture
 def ds():
-    yield Datasource(datasources.DatasourceState("test-dataset", "kirill/repo"))
+    ds_state = datasources.DatasourceState(name="test-dataset", repo="kirill/repo")
+    ds_state.path = "repo://kirill/repo/data/"
+    yield Datasource(ds_state)
 
 
 def test_query_single_column(ds):
@@ -51,12 +54,12 @@ def test_complexer_filter(ds):
     ds2 = ds[
         ((ds["col1"] > 5) & (ds["col2"] <= 3))
         | ds["col3"].contains("aaa")
-        | (ds["col4"] != 5.0)
+        | (ds["col4"] == 5.0)
         ]
     expected = {
         "or": {
             "children": [
-                {"ne": {"data": {"field": "col4", "value": 5.0}}},
+                {"eq": {"data": {"field": "col4", "value": 5.0}}},
                 {
                     "or": {
                         "children": [
@@ -119,7 +122,7 @@ def test_serialization(ds):
     ds2 = ds[
         ((ds["col1"] > 5) & (ds["col2"] <= 3))
         | ds["col3"].contains("aaa")
-        | (ds["col4"] != 5.0)
+        | (ds["col4"] == 5.0)
         ]
     expected = {
         "or": [
@@ -160,9 +163,64 @@ def test_serialization(ds):
                     "key": "col4",
                     "value": str(5.0),
                     "valueType": "FLOAT",
-                    "comparator": "NOT_EQUAL"
+                    "comparator": "EQUAL"
                 }
             }
         ]
     }
     assert ds2.get_query().serialize_graphql() == expected
+
+
+def test_deserialization_complex(ds):
+    queried = ds[
+        ((ds["col1"] > 5) & (ds["col2"] <= 3))
+        | ds["col3"].contains("aaa")
+        | (ds["col4"] == 5.0)
+        ]
+    serialized = {
+        "or": [
+            {
+                "or": [
+                    {
+                        "and": [
+                            {
+                                "filter": {
+                                    "key": "col1",
+                                    "value": str(5),
+                                    "valueType": "INTEGER",
+                                    "comparator": "GREATER_THAN",
+                                }
+                            },
+                            {
+                                "filter": {
+                                    "key": "col2",
+                                    "value": str(3),
+                                    "valueType": "INTEGER",
+                                    "comparator": "LESS_EQUAL_THAN",
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "filter": {
+                            "key": "col3",
+                            "value": "aaa",
+                            "valueType": "STRING",
+                            "comparator": "CONTAINS",
+                        }
+                    },
+                ]
+            },
+            {
+                "filter": {
+                    "key": "col4",
+                    "value": str(5.0),
+                    "valueType": "FLOAT",
+                    "comparator": "EQUAL"
+                }
+            }
+        ]
+    }
+
+    deserialized = DatasourceQuery.deserialize(serialized)
+    assert deserialized.serialize_graphql() == queried.get_query().serialize_graphql()

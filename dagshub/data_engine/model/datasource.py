@@ -337,39 +337,39 @@ class Datasource:
                 return column_or_query.__and__(self)
 
     def __gt__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("gt", other)
 
     def __ge__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("ge", other)
 
     def __le__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("le", other)
 
     def __lt__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("lt", other)
 
     def __eq__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("eq", other)
 
     def __ne__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("ne", other)
 
     def __contains__(self, item):
