@@ -125,12 +125,12 @@ class DataClient:
         params = GqlMutations.delete_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
 
-    def rescan_datasource(self, datasource: Datasource):
-        q = GqlMutations.rescan_datasource()
+    def scan_datasource(self, datasource: Datasource):
+        q = GqlMutations.scan_datasource()
 
         assert datasource.source.id is not None
 
-        params = GqlMutations.rescan_datasource_params(datasource_id=datasource.source.id)
+        params = GqlMutations.scan_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
 
     def save_dataset(self, datasource: Datasource, name: str):
