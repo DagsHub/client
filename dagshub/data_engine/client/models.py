@@ -88,6 +88,8 @@ class QueryResult:
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
         if "edges" not in query_resp:
             return QueryResult([], datasource)
+        if query_resp["edges"] is None:
+            return QueryResult([], datasource)
         return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
 
     def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
