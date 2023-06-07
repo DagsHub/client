@@ -2,7 +2,7 @@ import logging
 from typing import Optional, Union, List
 
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.dataclasses import DatasourceType
+from dagshub.data_engine.client.models import DatasourceType
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState
 
