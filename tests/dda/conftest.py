@@ -19,6 +19,11 @@ def repopath(repouser, reponame):
 
 
 @pytest.fixture
+def repourl(repopath):
+    return f"https://dagshub.com/{repopath}"
+
+
+@pytest.fixture
 def current_revision(dagshub_repo):
     return dagshub_repo.api.heads.main.commit.hexsha
 

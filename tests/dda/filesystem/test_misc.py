@@ -27,7 +27,7 @@ from dagshub.streaming.errors import FilesystemAlreadyMountedError
 )
 def test_passthrough_path(path, expected):
     fs_mock = MagicMock()
-    path = DagshubPath(fs_mock, Path(os.path.abspath(path)), Path(path))
+    path = DagshubPath(fs_mock, Path(os.path.abspath(path)), Path(path), Path(path))
     actual = path.is_passthrough_path
     assert actual == expected
 

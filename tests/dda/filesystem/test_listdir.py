@@ -2,6 +2,8 @@ import os
 
 import pytest
 
+from dagshub.streaming import DagsHubFilesystem
+
 
 def test_listdir(mock_api, repo_with_hooks):
     files = [("a.txt", "file"), ("b.txt", "file"), ("dir1", "dir")]
@@ -77,4 +79,23 @@ def test_binary(mock_api, repo_with_hooks):
     mock_api.add_dir(path, files)
     actual = os.listdir(path.encode("utf-8"))
     expected = [f[0].encode("utf-8") for f in files]
+    assert set(actual) == set(expected)
+
+
+def test_revision_pinning(mock_api, repourl, dagshub_repo):
+    revision = "aaaabbbbcccc"
+    mock_api.add_commit(revision)
+    files = [("a.txt", "file"), ("b.txt", "file"), ("dir1", "dir")]
+    path = "testdir"
+    mock_api.add_dir("", [("testdir", "dir")], revision=revision)
+    mock_api.add_dir(path, files, revision=revision)
+
+    dfs = DagsHubFilesystem(project_root=".", repo_url=repourl, branch=revision)
+
+    dfs.install_hooks()
+    expected = [f[0] for f in files]
+    actual = os.listdir("testdir")
+
+    dfs.uninstall_hooks()
+
     assert set(actual) == set(expected)
