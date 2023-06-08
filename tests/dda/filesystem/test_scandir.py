@@ -14,6 +14,7 @@ def scandir_to_dict(scandir_iter):
 @pytest.fixture
 def scandir_mock(mock_api):
     mock_api.add_dir("temp", [("b.txt", "file")])
+    mock_api.add_file("temp/b.txt")
     yield mock_api
 
 
