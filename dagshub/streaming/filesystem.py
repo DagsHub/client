@@ -294,6 +294,10 @@ class DagsHubFilesystem:
 
     def open(self, file, mode='r', buffering=-1, encoding=None,
              errors=None, newline=None, closefd=True, opener=None):
+        # FD passthrough
+        if type(file) is int:
+            return self.__open(file, mode, buffering, encoding, errors, newline, closefd)
+
         if type(file) is bytes:
             file = os.fsdecode(file)
         path = self._parse_path(file)
@@ -382,7 +386,11 @@ class DagsHubFilesystem:
                 logger.debug("fs.os_open - failed to materialize path, os.open will throw")
         return os.open(path.relative_path, flags, mode, dir_fd=dir_fd)
 
-    def stat(self, path, *, dir_fd=None, follow_symlinks=True):
+    def stat(self, path, *args, dir_fd=None, follow_symlinks=True):
+        # FD passthrough
+        if type(path) is int:
+            return self.__stat(path, *args, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+
         if type(path) is bytes:
             path = os.fsdecode(path)
         if dir_fd is not None or not follow_symlinks:
@@ -433,6 +441,10 @@ class DagsHubFilesystem:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
     def chdir(self, path):
+        # FD check
+        if type(path) is int:
+            return self.__chdir(path)
+
         if type(path) is bytes:
             path = os.fsdecode(path)
         parsed_path = self._parse_path(path)
@@ -451,6 +463,9 @@ class DagsHubFilesystem:
             self.__chdir(path)
 
     def listdir(self, path='.'):
+        # FD check
+        if type(path) is int:
+            return self.__listdir(path)
 
         # listdir needs to return results for bytes path arg also in bytes
         is_bytes_path_arg = type(path) is bytes
@@ -511,6 +526,11 @@ class DagsHubFilesystem:
 
     @wrapreturn(dagshub_ScandirIterator)
     def scandir(self, path='.'):
+        # FD check
+        if type(path) is int:
+            for direntry in self.__scandir(path):
+                yield direntry
+            return
         # scandir needs to return name and path as bytes, if entry arg is bytes
         is_bytes_path_arg = type(path) is bytes
         if is_bytes_path_arg:
