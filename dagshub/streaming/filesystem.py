@@ -6,8 +6,7 @@ import re
 import subprocess
 import sys
 from configparser import ConfigParser
-from contextlib import contextmanager
-from functools import partial, wraps
+from functools import wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path, PurePosixPath
