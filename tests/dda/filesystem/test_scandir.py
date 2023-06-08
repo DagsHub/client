@@ -53,9 +53,9 @@ def test_abspath(scandir_mock):
 
 def test_nested(scandir_mock):
     repodir = os.path.basename(os.getcwd())
-    test_scandir(scandir_mock, "..", f"{repodir}/temp")
+    test_scandir(scandir_mock, "..", os.path.join(repodir, "temp"))
 
 
 def test_up(scandir_mock):
     repodir = os.path.basename(os.getcwd())
-    test_scandir(scandir_mock, ".", f"../{repodir}/temp")
+    test_scandir(scandir_mock, ".", f"..{os.path.sep}{repodir}{os.path.sep}temp")
