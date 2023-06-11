@@ -15,6 +15,7 @@ from dagshub.data_engine.voxel_plugin_server.app import app
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from dagshub.data_engine.model.datasource import Datasource
     import fiftyone as fo
 
 DEFAULT_PORT = 5152
@@ -27,14 +28,14 @@ class PluginServer:
         self._ev_loop = asyncio.new_event_loop()
 
         self._config = Config()
-        self._config.bind = f"localhost:{DEFAULT_PORT}"
+        self._config.bind = [f"localhost:{DEFAULT_PORT}"]
         self._state = state
 
         self.set_dataset_config(self._state.voxel_session)
 
         asyncio.set_event_loop(self._ev_loop)
         self._shutdown_event = asyncio.Event()
-        self._thread = Thread(target=self._ev_loop.run_until_complete, args=(self.start_serve(),))
+        self._thread = Thread(target=self._ev_loop.run_until_complete, args=(self.start_serve(),), daemon=True)
         self._thread.start()
 
     @property
@@ -59,9 +60,9 @@ class PluginServer:
         self._thread.join()
 
 
-def run_plugin_server(voxel_session: "fo.Session", repo: RepoAPI, branch: Optional[str]) -> PluginServer:
+def run_plugin_server(voxel_session: "fo.Session", datasource: "Datasource", branch: Optional[str]) -> PluginServer:
     global _running_server
-    state = PluginServerState(voxel_session, repo, branch)
+    state = PluginServerState(voxel_session, datasource, branch)
     if _running_server is None:
         _running_server = PluginServer(state)
     else:
@@ -69,17 +70,16 @@ def run_plugin_server(voxel_session: "fo.Session", repo: RepoAPI, branch: Option
 
     return _running_server
 
-
-if __name__ == "__main__":
-    repo = RepoAPI(repo="kirill/baby-yoda-segmentation-dataset", host="http://localhost:3000")
-    set_voxel_envvars()
-    logging.basicConfig(level=logging.INFO)
-
-    import fiftyone as fo
-
-    fo.set_logging_level(level=logging.INFO)
-
-    sess = fo.launch_app(fo.load_dataset("default-dataset"))
-    server_state = PluginServerState(voxel_session=sess, repo=repo, branch=None)
-    run_plugin_server(sess, repo, None)
-    sess.wait()
+# if __name__ == "__main__":
+#     repo = RepoAPI(repo="kirill/baby-yoda-segmentation-dataset", host="http://localhost:3000")
+#     set_voxel_envvars()
+#     logging.basicConfig(level=logging.INFO)
+#
+#     import fiftyone as fo
+#
+#     fo.set_logging_level(level=logging.INFO)
+#
+#     sess = fo.launch_app(fo.load_dataset("default-dataset"))
+#     server_state = PluginServerState(voxel_session=sess, repo=repo, branch=None)
+#     run_plugin_server(sess, repo, None)
+#     sess.wait()

@@ -40,20 +40,20 @@ class DatasourceState:
     preprocessing_status: PreprocessingStatus = field(init=False)
     path: str = field(init=False)
     client: DataClient = field(init=False)
-    _api: RepoAPI = field(init=False)
+    repoApi: RepoAPI = field(init=False)
 
     _revision: Optional[str] = field(init=False, default=None)
 
     def __post_init__(self):
         self.client = DataClient(self.repo)
-        self._api = RepoAPI(self.repo)
+        self.repoApi = RepoAPI(self.repo)
 
     @property
     def revision(self) -> str:
         """Used for repository sources, provides branch/revision from which to download files"""
         if self._revision is None:
             logger.warning("Revision wasn't set, assuming default repo branch")
-            self.revision = self._api.default_branch
+            self.revision = self.repoApi.default_branch
         return self._revision
 
     @revision.setter
@@ -119,18 +119,18 @@ class DatasourceState:
                 path_elems.append(parts["prefix"])
             path_prefix = "/".join(path_elems)
             if path_type == "raw":
-                return self._api.storage_raw_api_url(path_prefix)
+                return self.repoApi.storage_raw_api_url(path_prefix)
             elif path_type == "content":
-                return self._api.storage_content_api_url(path_prefix)
+                return self.repoApi.storage_content_api_url(path_prefix)
         elif self.source_type == DatasourceType.REPOSITORY:
             prefix = parts["prefix"]
             if prefix is None:
                 prefix = ""
             # Assuming repo://user/repo is always the same user/repo we work with
             if path_type == "raw":
-                return self._api.raw_api_url(prefix, self.revision)
+                return self.repoApi.raw_api_url(prefix, self.revision)
             elif path_type == "content":
-                return self._api.content_api_url(prefix, self.revision)
+                return self.repoApi.content_api_url(prefix, self.revision)
         elif self.source_type == DatasourceType.CUSTOM:
             raise NotImplementedError
         raise NotImplementedError

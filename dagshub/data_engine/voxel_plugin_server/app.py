@@ -34,7 +34,7 @@ async def homepage(request):
 
 def get_or_create_ls_driver(request: Request):
     _pluginState: PluginServerState = request.app.state.PLUGIN_STATE
-    _api: RepoAPI = _pluginState.repo
+    _api: RepoAPI = _pluginState.datasource.source.repoApi
     _branch = _pluginState.branch
     key = (_api.repo_name, _branch)
     driver = _ls_driver_store.get(key, None)
@@ -52,6 +52,11 @@ async def to_labelstudio(request: Request):
 
     # repo_info = _api.get_repo_info()
     # return JSONResponse(repo_info.full_name)
+
+
+@app.route("/save_dataset", methods=["POST"])
+async def save_dataset(request: Request):
+    return JSONResponse({"Hello": "Saving query"})
 
 
 async def spin_up_labelstudio(request: Request):

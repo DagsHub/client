@@ -277,8 +277,8 @@ class Datasource:
         ds = self.to_voxel51_dataset(**kwargs)
 
         sess = fo.launch_app(ds)
-        # Launch the server for plugin interaction (off for now)
-        plugin_server_module.run_plugin_server(sess, self._source._api, self.source.revision)
+        # Launch the server for plugin interaction
+        plugin_server_module.run_plugin_server(sess, self, self.source.revision)
 
         return sess
 

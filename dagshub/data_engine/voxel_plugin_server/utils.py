@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 
 from dagshub.common.helpers import prompt_user
 
@@ -27,3 +28,8 @@ def set_voxel_envvars():
             shutil.copytree(os.path.join(plugin_dir, "dagshub"), plugins_dest_dir)
     else:
         os.environ[fo_dir_envkey] = plugin_dir
+
+    # Reset the plugin dir if voxel has already been imported
+    if "fiftyone" in sys.modules:
+        import fiftyone as fo
+        fo.config.plugins_dir = plugin_dir
