@@ -1,7 +1,9 @@
+import logging
 from dataclasses import dataclass
 
 import httpx
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class UploadErrorResponseContent:
@@ -71,6 +73,7 @@ def determine_upload_api_error(response: httpx.Response) -> Exception:
     try:
         json_content = response.json()
     except Exception as e:
+        logger.warning(f"Returned body wasn't valid JSON. Content: {response.content}")
         return e
 
     if "error" in json_content and "details" in json_content:
