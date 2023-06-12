@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from json import JSONDecodeError
 
 import httpx
 
@@ -72,9 +73,8 @@ class DagsHubAPIError(Exception):
 def determine_upload_api_error(response: httpx.Response) -> Exception:
     try:
         json_content = response.json()
-    except Exception as e:
-        logger.warning(f"Returned body wasn't valid JSON. Content: {response.content}")
-        return e
+    except JSONDecodeError:
+        return RuntimeError(f"Returned body wasn't valid JSON. Content: {response.content}")
 
     if "error" in json_content and "details" in json_content:
         error_content = UploadErrorResponseContent(json_content["error"], json_content["details"])
