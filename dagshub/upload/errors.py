@@ -69,6 +69,8 @@ class DagsHubAPIError(Exception):
         super().__init__()
         self.message = message
 
+    def __str__(self):
+        return self.message
 
 def determine_upload_api_error(response: httpx.Response) -> Exception:
     try:
