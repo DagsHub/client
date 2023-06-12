@@ -269,6 +269,8 @@ class Datasource:
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
 
+        ds.compute_metadata(skip_failures=True, overwrite=True)
+
         return ds
 
     def visualize(self, **kwargs):

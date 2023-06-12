@@ -68,7 +68,6 @@ class QueryResult:
     @property
     def dataframe(self):
         import pandas as pd
-        self.entries = list(sorted(self.entries, key=lambda a: a.path))
         metadata_keys = set()
         names = []
         urls = []
