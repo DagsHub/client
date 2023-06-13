@@ -35,7 +35,7 @@ def test_upper_unbounded(ds: Datasource):
 
 def test_value_filter(ds: Datasource):
     field_name = "field"
-    filter = VoxelFilterState(_CLS="int", exclude=False, isMatching=True, range=None, values=["a", "b", "c"],
+    filter = VoxelFilterState(_CLS="str", exclude=False, isMatching=True, range=None, values=["a", "b", "c"],
                               filter_field=field_name)
 
     new_ds = apply_filters_to_datasource(ds, [filter])

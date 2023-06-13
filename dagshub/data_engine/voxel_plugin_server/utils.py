@@ -2,11 +2,11 @@ import os
 import shutil
 import sys
 from typing import TYPE_CHECKING
-from starlette.requests import Request
 
 from dagshub.common.helpers import prompt_user
 
 if TYPE_CHECKING:
+    from starlette.requests import Request
     from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
 
 
