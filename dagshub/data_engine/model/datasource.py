@@ -1,19 +1,19 @@
 import json
 import logging
 import os.path
-import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
 import httpx
+import rich.progress
 from dataclasses_json import dataclass_json
 from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config
+from dagshub.common import config, rich_console
 from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.models import PreprocessingStatus
@@ -191,12 +191,23 @@ class Datasource:
         self.source.client.scan_datasource(self)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
-        logger.debug("Uploading metadata...")
+
+        progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
+                                          rich.progress.MofNCompleteColumn(),
+                                          console=rich_console, transient=True, disable=config.quiet)
+
         upload_batch_size = 5000
-        for start in range(0, len(metadata_entries), upload_batch_size):
-            entries = metadata_entries[start:start + upload_batch_size]
-            logger.debug(f"Uploading {len(entries)} metadata entries...")
-            self.source.client.update_metadata(self, entries)
+        total_entries = len(metadata_entries)
+        total_task = progress.add_task(f"Uploading metadata (batch size {upload_batch_size})...",
+                                       total=total_entries)
+
+        with progress:
+            for start in range(0, total_entries, upload_batch_size):
+                entries = metadata_entries[start:start + upload_batch_size]
+                logger.debug(f"Uploading {len(entries)} metadata entries...")
+                self.source.client.update_metadata(self, entries)
+                progress.update(total_task, advance=upload_batch_size)
+            progress.update(total_task, completed=total_entries, refresh=True)
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
