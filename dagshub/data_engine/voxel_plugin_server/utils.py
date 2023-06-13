@@ -40,5 +40,5 @@ def set_voxel_envvars():
         fo.config.plugins_dir = plugin_dir
 
 
-def get_plugin_state(request: Request) -> "PluginServerState":
+def get_plugin_state(request: "Request") -> "PluginServerState":
     return request.app.state.PLUGIN_STATE
