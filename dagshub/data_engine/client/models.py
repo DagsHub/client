@@ -94,3 +94,21 @@ class QueryResult:
 
     def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
         self.entries += self.from_gql_query(query_resp, self.datasource).entries
+
+    def as_dataset(self, flavor, strategy='background', **kwargs):
+        """
+        flavor: torch|tensorflow
+        download: preload|background|lazy; default: background
+        """
+        if flavor == 'torch':
+            from .dataset import PyTorchDataset
+            return PyTorchDataset(self, strategy, **kwargs)
+        elif flavor == 'tensorflow': raise NotImplementedError('coming soon')
+        else: raise ValueError('supported flavors are ["torch", "tensorflow"]')
+
+    def as_dataloader(self, flavor, strategy='background', **kwargs):
+        if flavor == 'torch':
+            from torch.utils.data import DataLoader
+            return DataLoader(self.as_dataset(flavor, strategy), **kwargs)
+        elif flavor == 'tensorflow': raise NotImplementedError('coming soon')
+        else: raise ValueError('supported flavors are ["torch", "tensorflow"]')
