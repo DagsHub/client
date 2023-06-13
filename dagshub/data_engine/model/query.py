@@ -76,6 +76,12 @@ class DatasourceQuery:
                                    f"Queries:\r\n"
                                    f"\t{self}\r\n"
                                    f"\t{other}\r\n")
+            # Don't compose with an empty query, carry the other instead
+            if self.is_empty:
+                self._operand_tree = other._operand_tree
+                return
+            elif other.is_empty:
+                return
             composite_tree = Tree()
             root_node = composite_tree.create_node(op)
             composite_tree.paste(root_node.identifier, self._operand_tree)

@@ -1,8 +1,13 @@
 import os
 import shutil
 import sys
+from typing import TYPE_CHECKING
+from starlette.requests import Request
 
 from dagshub.common.helpers import prompt_user
+
+if TYPE_CHECKING:
+    from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
 
 
 def set_voxel_envvars():
@@ -33,3 +38,7 @@ def set_voxel_envvars():
     if "fiftyone" in sys.modules:
         import fiftyone as fo
         fo.config.plugins_dir = plugin_dir
+
+
+def get_plugin_state(request: Request) -> "PluginServerState":
+    return request.app.state.PLUGIN_STATE

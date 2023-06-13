@@ -8,13 +8,6 @@ from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldCompar
 from dagshub.data_engine.model.query import DatasourceQuery
 
 
-@pytest.fixture
-def ds():
-    ds_state = datasources.DatasourceState(name="test-dataset", repo="kirill/repo")
-    ds_state.path = "repo://kirill/repo/data/"
-    yield Datasource(ds_state)
-
-
 def test_query_single_column(ds):
     column_name = "column1"
     ds2 = ds[column_name]
