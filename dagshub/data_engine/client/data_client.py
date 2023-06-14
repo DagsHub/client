@@ -95,7 +95,7 @@ class DataClient:
         # TODO: smarter batch sizing. Query a constant size at first
         #       On next queries adjust depending on the amount of metadata columns
 
-        progress = get_rich_progress()
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         total_task = progress.add_task("Downloading datapoints...", total=None)
 
         with progress:
