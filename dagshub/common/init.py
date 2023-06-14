@@ -25,7 +25,8 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
             DagsHub hosted MLflow
 
     Arguments:
-        root: path to the locally hosted git repository. If it's not set, tries to find a repository going up the folders
+        root: path to the locally hosted git repository.
+            If it's not set, tries to find a repository going up the folders
         repo_owner: along with `repo_name` defines the repository on DagsHub
         repo_name: along with `repo_owner` defines the repository on DagsHub
         url: url to the repository on DagsHub. Can be used as an alternative to repo_owner/repo_name arguments
