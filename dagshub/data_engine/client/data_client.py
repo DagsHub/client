@@ -59,6 +59,23 @@ class DataClient:
         resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
         return QueryResult.from_gql_query(resp, datasource)
 
+    def sample(self, datasource: Datasource, n: Optional[int], include_metadata: bool) -> QueryResult:
+        if n is None:
+            return self._get_all(datasource, include_metadata)
+
+        has_next_page = True
+        after = None
+        res = QueryResult([], datasource)
+        left = n
+        while has_next_page and left > 0:
+            take = min(left, self.FULL_LIST_PAGE_SIZE)
+            resp = self._datasource_query(datasource, include_metadata, take, after)
+            has_next_page = resp["pageInfo"]["hasNextPage"]
+            after = resp["pageInfo"]["endCursor"]
+            res._extend_from_gql_query(resp)
+            left -= take
+        return res
+
     def get_datapoints(self, datasource: Datasource) -> QueryResult:
         return self._get_all(datasource, True)
 

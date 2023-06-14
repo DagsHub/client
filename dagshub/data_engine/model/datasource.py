@@ -99,6 +99,11 @@ class Datasource:
             "exclude": self.exclude_list if len(self.exclude_list) > 0 else None,
         }
 
+    def sample(self, start: Optional[int] = None, end: Optional[int] = None):
+        if start is not None:
+            logger.warning("Starting slices is not implemented for now")
+        return self._source.client.sample(self, end, include_metadata=True)
+
     def head(self) -> "QueryResult":
         self._check_preprocess()
         return self._source.client.head(self)
@@ -332,10 +337,15 @@ class Datasource:
         queried_ds = ds[ds["value"] == 5]
     """
 
-    def __getitem__(self, column_or_query: Union[str, "Datasource"]):
+    def __getitem__(self, other: Union[slice, str, "Datasource"]):
+        # Slicing - get items from the slice
+        if type(other) is slice:
+            return self.sample(other.start, other.stop)
+
+        # Otherwise we're doing querying
         new_ds = self.__deepcopy__()
-        if type(column_or_query) is str:
-            new_ds._query = DatasourceQuery(column_or_query)
+        if type(other) is str:
+            new_ds._query = DatasourceQuery(other)
             return new_ds
         else:
             # "index" is a dataset with a query - compose with "and"
@@ -344,10 +354,10 @@ class Datasource:
             #   filtered_ds = ds[ds["aaa"] > 5]
             #   filtered_ds2 = filtered_ds[filtered_ds["bbb"] < 4]
             if self._query.is_empty:
-                new_ds._query = column_or_query._query
+                new_ds._query = other._query
                 return new_ds
             else:
-                return column_or_query.__and__(self)
+                return other.__and__(self)
 
     def __gt__(self, other: object):
         self._test_not_comparing_other_ds(other)
