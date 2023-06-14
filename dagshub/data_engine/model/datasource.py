@@ -198,7 +198,7 @@ class Datasource:
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
 
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn)
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
         upload_batch_size = 10000
         total_entries = len(metadata_entries)
