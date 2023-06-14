@@ -13,8 +13,9 @@ from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config, rich_console
+from dagshub.common import config
 from dagshub.common.helpers import sizeof_fmt, prompt_user
+from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.models import PreprocessingStatus
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
@@ -197,9 +198,7 @@ class Datasource:
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
 
-        progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
-                                          rich.progress.MofNCompleteColumn(),
-                                          console=rich_console, transient=True, disable=config.quiet)
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn)
 
         upload_batch_size = 5000
         total_entries = len(metadata_entries)

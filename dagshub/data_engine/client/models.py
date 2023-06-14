@@ -30,6 +30,11 @@ class Datapoint:
             res.metadata[meta_dict["key"]] = meta_dict["value"]
         return res
 
+    def to_dict(self, ds: "Datasource", metadata_keys: List[str]) -> Dict[str, Any]:
+        res_dict = {"name": self.path, "dagshub_download_url": self.download_url(ds)}
+        res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
+        return res_dict
+
 
 class IntegrationStatus(enum.Enum):
     VALID = "VALID"
@@ -69,19 +74,11 @@ class QueryResult:
     def dataframe(self):
         import pandas as pd
         metadata_keys = set()
-        names = []
-        urls = []
         for e in self.entries:
-            names.append(e.path)
-            urls.append(e.download_url(self.datasource))
             metadata_keys.update(e.metadata.keys())
 
-        res = pd.DataFrame({"name": names, "dagshub_download_url": urls})
-
-        for key in sorted(metadata_keys):
-            res[key] = [e.metadata.get(key) for e in self.entries]
-
-        return res
+        metadata_keys = list(sorted(metadata_keys))
+        return pd.DataFrame.from_records([dp.to_dict(self.datasource, metadata_keys) for dp in self.entries])
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
@@ -90,6 +87,3 @@ class QueryResult:
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
         return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
-
-    def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
-        self.entries += self.from_gql_query(query_resp, self.datasource).entries
