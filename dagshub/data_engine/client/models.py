@@ -14,6 +14,7 @@ class Metadata:
 
 @dataclass
 class Datapoint:
+    datapoint_id: str
     path: str
     metadata: Dict[str, Any]
 
@@ -23,6 +24,7 @@ class Datapoint:
     @staticmethod
     def from_gql_edge(edge: Dict) -> "Datapoint":
         res = Datapoint(
+            datapoint_id=edge["node"]["id"],
             path=edge["node"]["path"],
             metadata={}
         )
@@ -31,7 +33,7 @@ class Datapoint:
         return res
 
     def to_dict(self, ds: "Datasource", metadata_keys: List[str]) -> Dict[str, Any]:
-        res_dict = {"name": self.path, "dagshub_download_url": self.download_url(ds)}
+        res_dict = {"name": self.path, "datapoint_id": self.datapoint_id, "dagshub_download_url": self.download_url(ds)}
         res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
         return res_dict
 

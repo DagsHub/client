@@ -61,7 +61,7 @@ class GqlQueries:
                 "after": "$after",
             }
         ).fields([
-            f"edges {{ node {{ path {metadata_fields} }} }}",
+            f"edges {{ node {{ id path {metadata_fields} }} }}",
             "pageInfo { hasNextPage endCursor }",
         ]).generate()
         return q
