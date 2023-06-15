@@ -6,6 +6,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class UploadErrorResponseContent:
     error: str
@@ -26,8 +27,10 @@ def register_upload_api_error(error_value: str):
 
         def __init__(self, details: str):
             self.details = details
+
         cls.__init__ = __init__
         return cls
+
     return decorator
 
 
@@ -65,12 +68,14 @@ class DagsHubAPIError(Exception):
     """
     Generic API Exception, only has a message
     """
+
     def __init__(self, message: str):
         super().__init__()
         self.message = message
 
     def __str__(self):
         return self.message
+
 
 def determine_upload_api_error(response: httpx.Response) -> Exception:
     try:
