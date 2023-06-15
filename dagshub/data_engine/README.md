@@ -1,5 +1,14 @@
 # Data Engine (codename Data Shepherd) preliminary docs
 
+## The overall idea
+
+* You can define paths in your repo or bucket as datasources - collections of files and their metadata.
+* A datasource is like a giant table of metadata, where one column is the filepath and the other columns are metadata that
+  either gets added automatically by DagsHub or that you can attach and modify whenever you want.
+* DagsHub gives a pandas-like Python client to query this giant metadata table and return only matching files from your datasource.
+* Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
+  
+
 ## Warning: The interface for everything is still in development and is subject to big changes.
 
 Let Kirill know if the README is not up to date and he will update
@@ -11,12 +20,27 @@ Let Kirill know if the README is not up to date and he will update
 ```python
 from dagshub.data_engine.model import datasources
 
-# Create a datasource
+# Create a datasource from a connected storage bucket.
+# You need to first connect the bucket to the repo using repo settings -> integrations.
 ds = datasources.create_from_bucket("simon/baby-yoda-segmentation-dataset", "bucket-ds", "s3://data-bucket/prefix")
+
+# OR
+# Create a datasource from a path in the repo
+ds = datasources.create_from_repo("simon/baby-yoda-segmentation-dataset", "path-ds", "path/to/dir")
 ```
 
 If the datasource with name `bucket-ds` already exists, we will throw an error, so on further uses you need to get a
-datasource
+datasource.
+
+Shortly after creating the datasource, the DagsHub system will start scanning it for files and automatically adding some metadata fields that we can infer automatically, such as file size.  
+You can start querying the datasource right away, but you'll see a warning message saying that the scan is still in progress until it finishes adding all the files, so expect partial results.  
+You can start adding metadata before files get scanned, don't worry about waiting for the scan to finish before starting metadata ingestion!
+
+You can create as many datasources as you like, on as many paths as you like.  
+For example, you can create multiple different datasources pointing to the same bucket, 
+or to different subpaths in the same bucket, etc.  
+These different datasources will not be related to each other, each one will start clean and have a separate metadata table
+from all the other datasources, whether they point at the same bucket/path or not.
 
 ### Getting
 
@@ -26,7 +50,7 @@ Get all datasources in a repository:
 ds_list = datasources.get_datasources("simon/baby-yoda-segmentation-dataset")
 ```
 
-To get a specific datasource use `datasources.get_datasource()` function
+To get a specific datasource use `datasources.get_datasource` function
 
 ```python
 from dagshub.data_engine.model import datasources
@@ -47,37 +71,54 @@ with ds.metadata_context() as ctx:
     "episode": 5,
     "has_baby_yoda": True,
   }
+  # Attach metadata to a single specific file in the datasource.
+  # The first argument is the filepath to attach metadata to, **relative to the root of the datasource**.
   ctx.update_metadata("images/005.jpg", metadata)
+  
+  # Attach metadata to several files at once:
+  ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
 ```
 
-The first argument for `update_metadata()` can be a single datapoint, or an array of multiple datapoints if you want to
-add metadata to multiples.
-
-Metadata dictionary is keyed by strings, acceptable value types are:
-
-- Int
-- Float
-- Boolean
-- String
-
-Once the code exits the `metadata_context()`, all of the metadata is uploaded to the server
+Once the code exits the `metadata_context()`, all of the metadata is uploaded to the server.
 
 **Note:**  The datapoint should be the path of the file relative to the root of the data source. So if you have a repo
 data source with path at `repo://simon/baby-yoda-segmentor/data` (starting from the data folder),
 and you want to add metadata to a file located at `data/images/005.jpg` inside of the repo, then the path should
 be `images/005.jpg`
 
+### Schema and field types
+
+Metadata dictionary is keyed by strings, currently acceptable value types are:
+
+- Int
+- Float
+- Boolean
+- String
+- Planned, not implemented yet:
+  - JSON
+  - Label Studio format annotations
+  - Blobs
+  - Images
+- ** Please let us know about other metadata types you'd like to use and why **
+
+We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being added.  
+So, while you don't need to declare a schema in advance, a typed schema gets created automatically and you can't push
+mismatched data types to an existing field.
+We're considering allowing a more declarative typing system for this in the future.
+ 
+
 ### Adding metadata from a dataframe
 
 You can also upload a whole dataframe as metadata:
 
 ```python
-data = {
-  "path": {"data/file1.png", "data/file2.png"},
-  "has_squirrel": {True, False},
-}
-df = pd.DataFrame(data)
+# Create a normal pandas dataframe (usually with pandas.read_csv, but done manually as an example here)
+columns = ["path", "squirrel_detected"]
+data = [["data/file1.png", True],
+        ["data/file2.png", False]]
+df = pd.DataFrame(data, columns=columns)
 
+# Specify to our client which column identifies the file paths relative to the datasource root
 ds.upload_metadata_from_dataframe(df, path_column="path")
 ```
 
@@ -96,16 +137,13 @@ head = ds.head()
 all = ds.all()
 ```
 
-The returned objects carry the returned datapoints + metadata. If you're more used to working pandas dataframes, you can
-get a dataframe back by using the dataframe property:
+The returned objects carry the returned datapoints + metadata.  
+If you're more used to working pandas dataframes, you can get a dataframe back by using the dataframe property:
 
 ```python
 df = ds.head().dataframe
 # Do pandas stuff with it next
 ```
-
-**Caveat:** Since we don't have initial datapoint ingestion for now, the only datapoints you get back are the ones
-you've uploaded the metadata on
 
 ## Querying
 
@@ -141,15 +179,13 @@ ds2 = ds[(ds["episode"] > 5) & (ds["has_baby_yoda"] == True)]
 
 ### Caveats:
 
-- You can only compare with primitives. Comparisons between columns are not allowed
-- `"aaa" in df["col"]` doesn't work, you need to use `df["col"].contains("aaa")`
+- **You can only compare with primitives. Comparisons between columns are not allowed yet. Let us know if you need this.**
+- The Python `in` syntax isn't supported: `"aaa" in df["col"]` doesn't work, you need to use `df["col"].contains("aaa")`
 - Due to the order of execution for binary operators, if you use them, you need to wrap the other comparisons in
   parentheses
   (note the 2nd line in the example query)
 - I don't recommend reusing the dataset variable for querying if you assign a result to a new query. This is undefined
-  behavior that I did not test
-
-Example:
+  behavior that I did not test. Example below:
 
 ```python
 filtered_ds = ds[ds["episode"] > 5]
@@ -197,7 +233,7 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
 
 ## Known issues
 
-- No deleting of metadata
+- No deleting of metadata yet
 - Works only on data in the repository you specified. For now you can't create a datasource in one repo and use data
   from another repo
 - The validation layer is very incomplete for now. That means that if you typo the repo name or a datapoints url, it'll
