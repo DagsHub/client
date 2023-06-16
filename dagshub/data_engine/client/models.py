@@ -1,10 +1,10 @@
 import enum
 from dataclasses import dataclass
+from dagshub.common.util import lazy_load
 from typing import Dict, Any, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
-
 
 @dataclass
 class Metadata:
@@ -95,20 +95,25 @@ class QueryResult:
     def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
         self.entries += self.from_gql_query(query_resp, self.datasource).entries
 
-    def as_dataset(self, flavor, strategy='background', **kwargs):
+    def as_dataset(self, flavor, **kwargs):
         """
         flavor: torch|tensorflow
         download: preload|background|lazy; default: background
         """
         if flavor == 'torch':
-            from .dataset import PyTorchDataset
-            return PyTorchDataset(self, strategy, **kwargs)
+            from .loaders import PyTorchDataset
+            return PyTorchDataset(self, **kwargs)
         elif flavor == 'tensorflow': raise NotImplementedError('coming soon')
-        else: raise ValueError('supported flavors are ["torch", "tensorflow"]')
+        else: raise ValueError('supported flavors are torch|tensorflow')
 
-    def as_dataloader(self, flavor, strategy='background', **kwargs):
-        if flavor == 'torch':
-            from torch.utils.data import DataLoader
-            return DataLoader(self.as_dataset(flavor, strategy), **kwargs)
+    def as_dataloader(self, flavor, **kwargs):
+        from .loaders import PyTorchDataset
+        from torch.utils.data import DataLoader
+        if isinstance(flavor, PyTorchDataset): return DataLoader(flavor, **kwargs)
+        elif flavor == 'torch':
+            import inspect
+            dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
+            return DataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
+                              **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
         elif flavor == 'tensorflow': raise NotImplementedError('coming soon')
-        else: raise ValueError('supported flavors are ["torch", "tensorflow"]')
+        else: raise ValueError('supported flavors are torch|tensorflow')
