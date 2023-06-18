@@ -413,13 +413,13 @@ class DataSet:
                             if len(self.files) >= upload_file_number:
                                 file_counter += len(self.files)
                                 self.commit(commit_message, **upload_kwargs)
-                                progress.update(folder_task, advance=len(self.files))
-                                progress.update(total_task, completed=file_counter)
+                                progress.update(folder_task, advance=len(self.files), refresh=True)
+                                progress.update(total_task, completed=file_counter, refresh=True)
                     if len(self.files) >= upload_file_number:
                         file_counter += len(self.files)
                         self.commit(commit_message, **upload_kwargs)
-                        progress.update(folder_task, advance=len(self.files))
-                        progress.update(total_task, completed=file_counter)
+                        progress.update(folder_task, advance=len(self.files), refresh=True)
+                        progress.update(total_task, completed=file_counter, refresh=True)
                 progress.remove_task(folder_task)
 
             if len(self.files) > 0:
