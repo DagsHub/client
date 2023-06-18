@@ -36,3 +36,15 @@ class DatasourceNotFoundError(Exception):
     def __str__(self):
         return f"Datasource with name {self.datasource.name} or id {self.datasource.id} not found " \
                f"in repository {self.datasource.repo}"
+
+
+class DatasetNotFoundError(Exception):
+    def __init__(self, repo, id, name):
+        super().__init__()
+        self.repo = repo
+        self.id = id
+        self.name = name
+
+    def __str__(self):
+        return f"Dataset with name {self.name} or id {self.id} not found " \
+               f"in repository {self.repo}"

@@ -67,6 +67,14 @@ class DatasourceResult:
 
 
 @dataclass
+class DatasetResult:
+    id: Union[str, int]
+    name: str
+    datasource: DatasourceResult
+    datasetQuery: str
+
+
+@dataclass
 class QueryResult:
     entries: List[Datapoint]
     """ List of downloaded entries."""

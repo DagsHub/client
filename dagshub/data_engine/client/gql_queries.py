@@ -89,13 +89,14 @@ class GqlQueries:
         ).query(
             "dataset",
             input={
-                "id": "$id",
+                "dataset": "$id",
                 "name": "$name",
             }
         ).fields([
             "id",
             "name",
             "datasource {id name rootUrl integrationStatus preprocessingStatus type}",
+            "datasetQuery",
         ]).generate()
         return q
 

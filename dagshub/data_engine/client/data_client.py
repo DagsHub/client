@@ -12,7 +12,7 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus
+    PreprocessingStatus, DatasetResult
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
@@ -180,9 +180,13 @@ class DataClient:
                                                   query_input=datasource.serialize_gql_query_input())
         return self._exec(q, params)
 
-    def get_dataset(self, id: Optional[Union[str, int]], name: Optional[str]):
+    def get_datasets(self, id: Optional[Union[str, int]], name: Optional[str]) -> List[DatasetResult]:
         q = GqlQueries.dataset()
         params = GqlQueries.dataset_params(id=id, name=name)
 
-        raise NotImplementedError
-        # res =
+        res = self._exec(q, params)["dataset"]
+        if res is None:
+            return []
+
+        return [dacite.from_dict(DatasetResult, val, config=_dacite_config)
+                for val in res]

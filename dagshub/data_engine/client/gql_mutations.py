@@ -62,7 +62,6 @@ class GqlMutations:
             }
         ).fields([
             "path",
-            "metadata {key value}"
         ]).generate()
         return q
 
@@ -160,7 +159,6 @@ class GqlMutations:
         return q
 
     @staticmethod
-    @functools.lru_cache()
     def save_dataset_params(datasource_id: Union[int, str], name: str, query_input: Dict[str, Any]):
         return {
             "datasource": datasource_id,
