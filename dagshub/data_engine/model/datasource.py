@@ -14,7 +14,7 @@ from pathvalidate import sanitize_filepath
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.common.helpers import sizeof_fmt, prompt_user
+from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.models import PreprocessingStatus
@@ -329,6 +329,24 @@ class Datasource:
         if not all_have_sum_field:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
+
+    def _send_to_annotation(self, url: str):
+        """ TEMP FUNCTION """
+        auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.source.client.host))
+
+        def _http_request(method, url, **kwargs):
+            if "auth" not in kwargs:
+                kwargs["auth"] = auth
+            return http_request(method, url, **kwargs)
+
+        dps = self.all()
+
+        datapoints = map(lambda dp: {"id": dp.datapoint_id, "downloadurl": dp.download_url(self)}, dps.entries)
+        data = {"datasourceid": self.source.id, "datapoints": list(datapoints)}
+
+        logger.debug(f"Sending request to URL {url}\nwith data: {data}")
+
+        _http_request("POST", url, data=data)
 
     """ FUNCTIONS RELATED TO QUERYING
     These are functions that overload operators on the DataSet, so you can do pandas-like filtering
