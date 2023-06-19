@@ -200,7 +200,7 @@ class Datasource:
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
-        upload_batch_size = 5000
+        upload_batch_size = 15000
         total_entries = len(metadata_entries)
         total_task = progress.add_task(f"Uploading metadata (batch size {upload_batch_size})...",
                                        total=total_entries)
