@@ -4,18 +4,25 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    "in_str, user, repo, prefix",
+    "in_str, user, repo, revision, prefix",
     [
-        ("repo://user/repo/prefix", "user", "repo", "/prefix"),
-        ("repo://user/repo/longer/prefix", "user", "repo", "/longer/prefix"),
-        ("repo://user/repo/", "user", "repo", "/"),
-        ("repo://user/repo", "user", "repo", None),
-        ("repo://user-with_dashes/repo", "user-with_dashes", "repo", None),
-        ("repo://user/repo-with_dashes", "user", "repo-with_dashes", None),
-        ("repo://user/repo.with.dots", "user", "repo.with.dots", None),
+        ("repo://user/repo/prefix", "user", "repo", None, "/prefix"),
+        ("repo://user/repo/longer/prefix", "user", "repo", None, "/longer/prefix"),
+        ("repo://user/repo/", "user", "repo", None, "/"),
+        ("repo://user/repo", "user", "repo", None, None),
+        ("repo://user-with_dashes/repo", "user-with_dashes", "repo", None, None),
+        ("repo://user/repo-with_dashes", "user", "repo-with_dashes", None, None),
+        ("repo://user/repo.with.dots", "user", "repo.with.dots", None, None),
+        # With branches
+        ("repo://user/repo/main:prefix", "user", "repo", "main", "/prefix"),
+        ("repo://user/repo/main:longer/prefix", "user", "repo", "main", "/longer/prefix"),
+        # The path in this one is a bit of an edgecase, but whether it's "/" or None is irrelevant
+        ("repo://user/repo/main:", "user", "repo", "main", "/"),
+        ("repo://user/repo.with.dots/main:", "user", "repo.with.dots", "main", "/"),
+        ("repo://user/repo/branch/with/slashes:/", "user", "repo", "branch/with/slashes", "/"),
     ]
 )
-def test_repo_regex(in_str, user, repo, prefix):
+def test_repo_regex(in_str, user, repo, revision, prefix):
     ds = DatasourceState(repo="user/repo")
     ds.path = in_str
     ds.source_type = DatasourceType.REPOSITORY
@@ -24,7 +31,8 @@ def test_repo_regex(in_str, user, repo, prefix):
     expected = {
         "user": user,
         "repo": repo,
-        "prefix": prefix
+        "prefix": prefix,
+        "revision": revision,
     }
     assert res == expected
 
@@ -36,6 +44,7 @@ def test_repo_regex(in_str, user, repo, prefix):
         "user/repo/",
         "repo://user/",
         "repo://"
+        "repo://user/repo/wrong\\branch:"
     ]
 )
 def test_repo_regex_incorrect(in_str):
