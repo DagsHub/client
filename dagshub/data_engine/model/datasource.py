@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
 import httpx
+import requests
 import rich.progress
 from dataclasses_json import dataclass_json
 from pathvalidate import sanitize_filepath
@@ -341,12 +342,19 @@ class Datasource:
 
         dps = self.all()
 
-        datapoints = map(lambda dp: {"id": dp.datapoint_id, "downloadurl": dp.download_url(self)}, dps.entries)
-        data = {"datasourceid": self.source.id, "datapoints": list(datapoints)}
+        data = {"datasourceid": str(self.source.id),
+                "datapoints": [{"id": str(dp.datapoint_id),
+                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/') } for dp in dps.entries]}
+
 
         logger.debug(f"Sending request to URL {url}\nwith data: {data}")
 
-        _http_request("POST", url, data=data)
+        resp = _http_request("POST", url, json=data)
+
+        print(resp)
+        if resp.status_code == 200:
+            print(resp.json()['link'])
+        return
 
     """ FUNCTIONS RELATED TO QUERYING
     These are functions that overload operators on the DataSet, so you can do pandas-like filtering
