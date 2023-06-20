@@ -53,27 +53,6 @@ class Datasource:
             query = DatasourceQuery()
         self._query = query
 
-        self._include_list: List[str] = []
-        self._exclude_list: List[str] = []
-
-    @property
-    def include_list(self):
-        """List of urls of datapoints to always be included in query results """
-        return self._include_list
-
-    @include_list.setter
-    def include_list(self, val):
-        self._include_list = val
-
-    @property
-    def exclude_list(self):
-        """List of urls of datapoints to always be excluded in query results """
-        return self._exclude_list
-
-    @exclude_list.setter
-    def exclude_list(self, val):
-        self._exclude_list = val
-
     @property
     def source(self):
         return self._source
@@ -87,8 +66,6 @@ class Datasource:
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__())
-        res.include_list = self.include_list.copy()
-        res.exclude_list = self.exclude_list.copy()
         return res
 
     def get_query(self):
@@ -97,8 +74,6 @@ class Datasource:
     def serialize_gql_query_input(self):
         return {
             "query": self._query.serialize_graphql(),
-            "include": self.include_list if len(self.include_list) > 0 else None,
-            "exclude": self.exclude_list if len(self.exclude_list) > 0 else None,
         }
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
