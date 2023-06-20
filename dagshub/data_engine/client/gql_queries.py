@@ -61,7 +61,7 @@ class GqlQueries:
                 "after": "$after",
             }
         ).fields([
-            f"edges {{ node {{ path {metadata_fields} }} }}",
+            f"edges {{ node {{ id path {metadata_fields} }} }}",
             "pageInfo { hasNextPage endCursor }",
         ]).generate()
         return q
@@ -89,13 +89,14 @@ class GqlQueries:
         ).query(
             "dataset",
             input={
-                "id": "$id",
+                "dataset": "$id",
                 "name": "$name",
             }
         ).fields([
             "id",
             "name",
             "datasource {id name rootUrl integrationStatus preprocessingStatus type}",
+            "datasetQuery",
         ]).generate()
         return q
 

@@ -14,6 +14,7 @@ class Metadata:
 
 @dataclass
 class Datapoint:
+    datapoint_id: str
     path: str
     metadata: Dict[str, Any]
 
@@ -23,12 +24,18 @@ class Datapoint:
     @staticmethod
     def from_gql_edge(edge: Dict) -> "Datapoint":
         res = Datapoint(
+            datapoint_id=edge["node"]["id"],
             path=edge["node"]["path"],
             metadata={}
         )
         for meta_dict in edge["node"]["metadata"]:
             res.metadata[meta_dict["key"]] = meta_dict["value"]
         return res
+
+    def to_dict(self, ds: "Datasource", metadata_keys: List[str]) -> Dict[str, Any]:
+        res_dict = {"name": self.path, "datapoint_id": self.datapoint_id, "dagshub_download_url": self.download_url(ds)}
+        res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
+        return res_dict
 
 
 class IntegrationStatus(enum.Enum):
@@ -60,6 +67,14 @@ class DatasourceResult:
 
 
 @dataclass
+class DatasetResult:
+    id: Union[str, int]
+    name: str
+    datasource: DatasourceResult
+    datasetQuery: str
+
+
+@dataclass
 class QueryResult:
     entries: List[Datapoint]
     """ List of downloaded entries."""
@@ -68,21 +83,12 @@ class QueryResult:
     @property
     def dataframe(self):
         import pandas as pd
-        self.entries = list(sorted(self.entries, key=lambda a: a.path))
         metadata_keys = set()
-        names = []
-        urls = []
         for e in self.entries:
-            names.append(e.path)
-            urls.append(e.download_url(self.datasource))
             metadata_keys.update(e.metadata.keys())
 
-        res = pd.DataFrame({"name": names, "dagshub_download_url": urls})
-
-        for key in sorted(metadata_keys):
-            res[key] = [e.metadata.get(key) for e in self.entries]
-
-        return res
+        metadata_keys = list(sorted(metadata_keys))
+        return pd.DataFrame.from_records([dp.to_dict(self.datasource, metadata_keys) for dp in self.entries])
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
@@ -91,9 +97,6 @@ class QueryResult:
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
         return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
-
-    def _extend_from_gql_query(self, query_resp: Dict[str, Any]):
-        self.entries += self.from_gql_query(query_resp, self.datasource).entries
 
     def as_dataset(self, flavor, **kwargs):
         """

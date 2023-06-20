@@ -1,3 +1,3 @@
 import rich.console
 
-rich_console = rich.console.Console()
+rich_console = rich.console.Console(force_terminal=False)

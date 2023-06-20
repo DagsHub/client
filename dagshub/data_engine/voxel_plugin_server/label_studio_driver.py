@@ -27,7 +27,7 @@ else:
 
 class LabelStudioDriver:
     def __init__(self, plugin_state: PluginServerState):
-        self.repo = plugin_state.repo
+        self.repo = plugin_state.datasource.source.repoApi
 
         self.branch = plugin_state.branch if plugin_state.branch is not None else self.repo.default_branch
         self.voxel_session = plugin_state.voxel_session

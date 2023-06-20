@@ -15,6 +15,25 @@ from dagshub.upload import create_repo
 
 def init(repo_name=None, repo_owner=None, url=None, root=None,
          host=config.host, mlflow=True, dvc=False):
+    """
+    Initialize a DagsHub repository.
+
+    Initialization includes:
+        1) Creates a repository on DagsHub if it doesn't exist yet
+        2) If `dvc` flag is set, adds the DagsHub repository as a dvc remote
+        3) If `mlflow` flag is set, initializes MLflow environment variables to enable logging experiments into the
+            DagsHub hosted MLflow
+
+    Arguments:
+        root: path to the locally hosted git repository.
+            If it's not set, tries to find a repository going up the folders
+        repo_owner: along with `repo_name` defines the repository on DagsHub
+        repo_name: along with `repo_owner` defines the repository on DagsHub
+        url: url to the repository on DagsHub. Can be used as an alternative to repo_owner/repo_name arguments
+        host: address of a hosted DagsHub instance
+        mlflow: configure MLflow to log experiments to DagsHub
+        dvc: configure a dvc remote in the repository
+    """
     # Setup required variables
     if dvc:
         root = root or get_project_root(Path(os.path.abspath('.')))

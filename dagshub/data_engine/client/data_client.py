@@ -3,14 +3,16 @@ from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
 
 import dacite
 import gql
+import rich.progress
 from gql.transport.requests import RequestsHTTPTransport
 
 import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus
+    PreprocessingStatus, DatasetResult
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
@@ -25,7 +27,7 @@ _dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, Preproce
 
 class DataClient:
     HEAD_QUERY_SIZE = 100
-    FULL_LIST_PAGE_SIZE = 100
+    FULL_LIST_PAGE_SIZE = 5000
 
     def __init__(self, repo: str):
         # TODO: add project authentication here
@@ -59,6 +61,30 @@ class DataClient:
         resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
         return QueryResult.from_gql_query(resp, datasource)
 
+    def sample(self, datasource: Datasource, n: Optional[int], include_metadata: bool) -> QueryResult:
+        if n is None:
+            return self._get_all(datasource, include_metadata)
+
+        has_next_page = True
+        after = None
+        res = QueryResult([], datasource)
+        left = n
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        total_task = progress.add_task("Downloading datapoints...", total=left)
+
+        with progress:
+            while has_next_page and left > 0:
+                take = min(left, self.FULL_LIST_PAGE_SIZE)
+                resp = self._datasource_query(datasource, include_metadata, take, after)
+                has_next_page = resp["pageInfo"]["hasNextPage"]
+                after = resp["pageInfo"]["endCursor"]
+                new_entries = QueryResult.from_gql_query(resp, datasource)
+                res.entries += new_entries.entries
+                left -= take
+                progress.update(total_task, advance=len(res.entries), refresh=True)
+        return res
+
     def get_datapoints(self, datasource: Datasource) -> QueryResult:
         return self._get_all(datasource, True)
 
@@ -66,11 +92,21 @@ class DataClient:
         has_next_page = True
         after = None
         res = QueryResult([], datasource)
-        while has_next_page:
-            resp = self._datasource_query(datasource, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
-            has_next_page = resp["pageInfo"]["hasNextPage"]
-            after = resp["pageInfo"]["endCursor"]
-            res._extend_from_gql_query(resp)
+        # TODO: smarter batch sizing. Query a constant size at first
+        #       On next queries adjust depending on the amount of metadata columns
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        total_task = progress.add_task("Downloading datapoints...", total=None)
+
+        with progress:
+            while has_next_page:
+                resp = self._datasource_query(datasource, include_metadata, self.FULL_LIST_PAGE_SIZE, after)
+                has_next_page = resp["pageInfo"]["hasNextPage"]
+                after = resp["pageInfo"]["endCursor"]
+
+                new_entries = QueryResult.from_gql_query(resp, datasource)
+                res.entries += new_entries.entries
+                progress.update(total_task, advance=len(res.entries), refresh=True)
         return res
 
     def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -144,9 +180,13 @@ class DataClient:
                                                   query_input=datasource.serialize_gql_query_input())
         return self._exec(q, params)
 
-    def get_dataset(self, id: Optional[Union[str, int]], name: Optional[str]):
+    def get_datasets(self, id: Optional[Union[str, int]], name: Optional[str]) -> List[DatasetResult]:
         q = GqlQueries.dataset()
         params = GqlQueries.dataset_params(id=id, name=name)
 
-        raise NotImplementedError
-        # res =
+        res = self._exec(q, params)["dataset"]
+        if res is None:
+            return []
+
+        return [dacite.from_dict(DatasetResult, val, config=_dacite_config)
+                for val in res]

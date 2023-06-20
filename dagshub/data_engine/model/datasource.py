@@ -1,20 +1,22 @@
 import json
 import logging
 import os.path
-import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
 import httpx
+import requests
+import rich.progress
 from dataclasses_json import dataclass_json
 from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from dagshub.common.helpers import sizeof_fmt, prompt_user
+from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request
+from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.models import PreprocessingStatus
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
@@ -98,6 +100,11 @@ class Datasource:
             "include": self.include_list if len(self.include_list) > 0 else None,
             "exclude": self.exclude_list if len(self.exclude_list) > 0 else None,
         }
+
+    def sample(self, start: Optional[int] = None, end: Optional[int] = None):
+        if start is not None:
+            logger.warning("Starting slices is not implemented for now")
+        return self._source.client.sample(self, end, include_metadata=True)
 
     def head(self) -> "QueryResult":
         self._check_preprocess()
@@ -191,12 +198,21 @@ class Datasource:
         self.source.client.scan_datasource(self)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
-        logger.debug("Uploading metadata...")
-        upload_batch_size = 5000
-        for start in range(0, len(metadata_entries), upload_batch_size):
-            entries = metadata_entries[start:start + upload_batch_size]
-            logger.debug(f"Uploading {len(entries)} metadata entries...")
-            self.source.client.update_metadata(self, entries)
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+
+        upload_batch_size = 15000
+        total_entries = len(metadata_entries)
+        total_task = progress.add_task(f"Uploading metadata (batch size {upload_batch_size})...",
+                                       total=total_entries)
+
+        with progress:
+            for start in range(0, total_entries, upload_batch_size):
+                entries = metadata_entries[start:start + upload_batch_size]
+                logger.debug(f"Uploading {len(entries)} metadata entries...")
+                self.source.client.update_metadata(self, entries)
+                progress.update(total_task, advance=upload_batch_size)
+            progress.update(total_task, completed=total_entries, refresh=True)
 
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
@@ -269,6 +285,8 @@ class Datasource:
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
 
+        ds.compute_metadata(skip_failures=True, overwrite=True)
+
         return ds
 
     def visualize(self, **kwargs):
@@ -277,8 +295,8 @@ class Datasource:
         ds = self.to_voxel51_dataset(**kwargs)
 
         sess = fo.launch_app(ds)
-        # Launch the server for plugin interaction (off for now)
-        plugin_server_module.run_plugin_server(sess, self._source._api, self.source.revision)
+        # Launch the server for plugin interaction
+        plugin_server_module.run_plugin_server(sess, self, self.source.revision)
 
         return sess
 
@@ -313,16 +331,46 @@ class Datasource:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
+    def _send_to_annotation(self, url: str):
+        """ TEMP FUNCTION """
+        auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.source.client.host))
+
+        def _http_request(method, url, **kwargs):
+            if "auth" not in kwargs:
+                kwargs["auth"] = auth
+            return http_request(method, url, **kwargs)
+
+        dps = self.all()
+
+        data = {"datasourceid": str(self.source.id),
+                "datapoints": [{"id": str(dp.datapoint_id),
+                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/') } for dp in dps.entries]}
+
+
+        logger.debug(f"Sending request to URL {url}\nwith data: {data}")
+
+        resp = _http_request("POST", url, json=data)
+
+        print(resp)
+        if resp.status_code == 200:
+            print(resp.json()['link'])
+        return
+
     """ FUNCTIONS RELATED TO QUERYING
     These are functions that overload operators on the DataSet, so you can do pandas-like filtering
         ds = Dataset(...)
         queried_ds = ds[ds["value"] == 5]
     """
 
-    def __getitem__(self, column_or_query: Union[str, "Datasource"]):
+    def __getitem__(self, other: Union[slice, str, "Datasource"]):
+        # Slicing - get items from the slice
+        if type(other) is slice:
+            return self.sample(other.start, other.stop)
+
+        # Otherwise we're doing querying
         new_ds = self.__deepcopy__()
-        if type(column_or_query) is str:
-            new_ds._query = DatasourceQuery(column_or_query)
+        if type(other) is str:
+            new_ds._query = DatasourceQuery(other)
             return new_ds
         else:
             # "index" is a dataset with a query - compose with "and"
@@ -331,45 +379,45 @@ class Datasource:
             #   filtered_ds = ds[ds["aaa"] > 5]
             #   filtered_ds2 = filtered_ds[filtered_ds["bbb"] < 4]
             if self._query.is_empty:
-                new_ds._query = column_or_query._query
+                new_ds._query = other._query
                 return new_ds
             else:
-                return column_or_query.__and__(self)
+                return other.__and__(self)
 
     def __gt__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("gt", other)
 
     def __ge__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("ge", other)
 
     def __le__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("le", other)
 
     def __lt__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("lt", other)
 
     def __eq__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("eq", other)
 
     def __ne__(self, other: object):
+        self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        self._test_not_comparing_other_ds(other)
         return self.add_query_op("ne", other)
 
     def __contains__(self, item):

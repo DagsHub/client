@@ -20,11 +20,13 @@ class DagshubPath:
         absolute_path (Path): Absolute path in the system
         relative_path (Optional[Path]): Path relative to the root of the encapsulating FileSystem.
                                         If None, path is outside the FS
+        original_path (Path): Original path as it was accessed by the user
     """
     # TODO: this couples this class hard to the fs, need to decouple later
     fs: Any  # Actual type is DagsHubFilesystem, but imports are wonky
     absolute_path: Optional[Path]
     relative_path: Optional[Path]
+    original_path: Optional[Path]
 
     def __post_init__(self):
         # Handle storage paths - translate s3:/bla-bla to .dagshub/storage/s3/bla-bla
@@ -66,3 +68,11 @@ class DagshubPath:
         if "/site-packages/" in str_path or str_path.endswith("/site-packages"):
             return True
         return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
+
+    def __truediv__(self, other):
+        return DagshubPath(
+            absolute_path=self.absolute_path / other,
+            relative_path=self.relative_path / other,
+            original_path=self.original_path / other,
+            fs=self.fs
+        )

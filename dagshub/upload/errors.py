@@ -1,6 +1,10 @@
+import logging
 from dataclasses import dataclass
+from json import JSONDecodeError
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -23,8 +27,10 @@ def register_upload_api_error(error_value: str):
 
         def __init__(self, details: str):
             self.details = details
+
         cls.__init__ = __init__
         return cls
+
     return decorator
 
 
@@ -62,16 +68,20 @@ class DagsHubAPIError(Exception):
     """
     Generic API Exception, only has a message
     """
+
     def __init__(self, message: str):
         super().__init__()
         self.message = message
+
+    def __str__(self):
+        return self.message
 
 
 def determine_upload_api_error(response: httpx.Response) -> Exception:
     try:
         json_content = response.json()
-    except Exception as e:
-        return e
+    except JSONDecodeError:
+        return RuntimeError(f"Returned body wasn't valid JSON. Content: {response.content}")
 
     if "error" in json_content and "details" in json_content:
         error_content = UploadErrorResponseContent(json_content["error"], json_content["details"])

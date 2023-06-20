@@ -16,7 +16,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 path_regexes = {
-    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w-]+)(?P<prefix>/.*)?"),
+    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w\-]+)(?P<prefix>/.*)?"),
     DatasourceType.REPOSITORY: re.compile(r"repo://(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)(?P<prefix>/.*)?"),
 }
 
@@ -40,20 +40,22 @@ class DatasourceState:
     preprocessing_status: PreprocessingStatus = field(init=False)
     path: str = field(init=False)
     client: DataClient = field(init=False)
-    _api: RepoAPI = field(init=False)
+    repoApi: RepoAPI = field(init=False)
 
     _revision: Optional[str] = field(init=False, default=None)
 
     def __post_init__(self):
         self.client = DataClient(self.repo)
-        self._api = RepoAPI(self.repo)
+        self.repoApi = RepoAPI(self.repo)
+        if hasattr(self, "source_type") and self.source_type == DatasourceType.REPOSITORY:
+            self.revision = self.path_parts()["revision"]
 
     @property
     def revision(self) -> str:
         """Used for repository sources, provides branch/revision from which to download files"""
         if self._revision is None:
             logger.warning("Revision wasn't set, assuming default repo branch")
-            self.revision = self._api.default_branch
+            self.revision = self.repoApi.default_branch
         return self._revision
 
     @revision.setter
@@ -119,18 +121,18 @@ class DatasourceState:
                 path_elems.append(parts["prefix"])
             path_prefix = "/".join(path_elems)
             if path_type == "raw":
-                return self._api.storage_raw_api_url(path_prefix)
+                return self.repoApi.storage_raw_api_url(path_prefix)
             elif path_type == "content":
-                return self._api.storage_content_api_url(path_prefix)
+                return self.repoApi.storage_content_api_url(path_prefix)
         elif self.source_type == DatasourceType.REPOSITORY:
             prefix = parts["prefix"]
             if prefix is None:
                 prefix = ""
             # Assuming repo://user/repo is always the same user/repo we work with
             if path_type == "raw":
-                return self._api.raw_api_url(prefix, self.revision)
+                return self.repoApi.raw_api_url(prefix, self.revision)
             elif path_type == "content":
-                return self._api.content_api_url(prefix, self.revision)
+                return self.repoApi.content_api_url(prefix, self.revision)
         elif self.source_type == DatasourceType.CUSTOM:
             raise NotImplementedError
         raise NotImplementedError
@@ -144,7 +146,22 @@ class DatasourceState:
         if match is None:
             raise InvalidPathFormatError(f"{self.path} is not valid path format for type {self.source_type}.\n"
                                          f"Expected format: {expected_formats[self.source_type]}")
-        return match.groupdict()
+        res = match.groupdict()
+        # For repository type - handle revision that is in format of repo://user/repo/branch:prefix
+        # Couldn't do that with regexes, so handling it here
+        if self.source_type == DatasourceType.REPOSITORY:
+            res["revision"] = None
+            if res["prefix"] is not None:
+                prefix = res["prefix"]
+                if ":" in prefix:
+                    revision, prefix = prefix.split(":", 1)
+                    res["revision"] = revision.strip("/")
+                    if prefix.isspace():
+                        prefix = None
+                    elif not prefix.startswith("/"):
+                        prefix = "/" + prefix
+                    res["prefix"] = prefix
+        return res
 
     @staticmethod
     def _extract_path(val: Union[str, Datapoint, Mapping[str, Any]]) -> str:
@@ -160,6 +177,8 @@ class DatasourceState:
         self.path = ds.rootUrl
         self.source_type = ds.type
         self.preprocessing_status = ds.preprocessingStatus
+        if self.source_type == DatasourceType.REPOSITORY:
+            self.revision = self.path_parts()["revision"]
 
     @staticmethod
     def from_gql_result(repo: str, res: DatasourceResult):

@@ -381,7 +381,7 @@ class DataSet:
         :return: None
 
         """
-
+        upload_file_number = 100
         file_counter = 0
 
         progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
@@ -410,16 +410,22 @@ class DataSet:
                             or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
                         ):
                             self.add(file=rel_file_path, path=rel_remote_file_path)
-                            if len(self.files) > 49:
+                            if len(self.files) >= upload_file_number:
                                 file_counter += len(self.files)
                                 self.commit(commit_message, **upload_kwargs)
                                 progress.update(folder_task, advance=len(self.files))
                                 progress.update(total_task, completed=file_counter)
-                    if len(self.files) > 0:
+                    if len(self.files) >= upload_file_number:
                         file_counter += len(self.files)
                         self.commit(commit_message, **upload_kwargs)
+                        progress.update(folder_task, advance=len(self.files))
                         progress.update(total_task, completed=file_counter)
                 progress.remove_task(folder_task)
+
+            if len(self.files) > 0:
+                file_counter += len(self.files)
+                self.commit(commit_message, **upload_kwargs)
+                progress.update(total_task, completed=file_counter)
 
         log_message(f"Directory upload complete, uploaded {file_counter} files", logger)
 
