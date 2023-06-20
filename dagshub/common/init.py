@@ -46,7 +46,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
 
     if not url:
         if repo_name is not None and repo_owner is not None:
-            url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
+            url = urllib.parse.urljoin(f'https://{host}/', f'{repo_owner}/{repo_name}')
         elif dvc:
             for remote in git.Repo(root).remotes:
                 if host in remote.url:
