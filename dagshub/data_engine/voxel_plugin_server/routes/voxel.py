@@ -18,11 +18,19 @@ logger = logging.getLogger(__name__)
 
 async def save_dataset(request: Request):
     plugin_state = get_plugin_state(request)
-    filters = await get_voxel_filters(request)
-    ds_with_filters = apply_filters_to_datasource(plugin_state.datasource, filters)
-    print(f"Filters: {filters}")
-    print(f"New filter: {ds_with_filters.get_query().serialize_graphql()}")
-    return JSONResponse(f"Got {len(filters)} filters")
+    data = await request.json()
+    name = data["name"]
+    if data["saveVoxelFilters"]:
+        filters = await get_voxel_filters(request)
+        ds_with_filters = apply_filters_to_datasource(plugin_state.datasource, filters)
+    else:
+        ds_with_filters = plugin_state.datasource
+
+    try:
+        ds_with_filters.save_dataset(name)
+        return JSONResponse(f"Dataset {name} saved successfully")
+    except Exception as e:
+        return JSONResponse(f"Error while saving dataset: {e}", status_code=400)
 
 
 async def get_voxel_filters(request: Request) -> List[VoxelFilterState]:
@@ -59,7 +67,7 @@ def sanitize_voxel_filter(sess: "fo.Session", filters: List[VoxelFilterState]):
             # TODO: maybe get the metadata from the datasource and only filter for existing fields
             # Remove bounds for range queries
             if f.range is not None:
-                min_val, max_val = dataset.bounds(col)
+                min_val, max_val = dataset.bounds(f.filter_field)
                 if f.range[0] == min_val:
                     f.range[0] = None
                 if f.range[1] == max_val:
