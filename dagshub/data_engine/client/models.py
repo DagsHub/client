@@ -130,8 +130,14 @@ class QueryResult:
         return self
 
 
-def _get_blob(url: Optional[str], auth) -> Optional[bytes]:
+def _get_blob(url: Optional[str], auth) -> Optional[Union[str, bytes]]:
     if url is None:
         return None
-    # TODO: handle errors
-    return http_request("GET", url, auth=auth).content
+    try:
+        resp = http_request("GET", url, auth=auth)
+        if resp.status_code >= 400:
+            return f"Error while downloading binary blob: {resp.content.decode()}"
+        else:
+            return resp.content
+    except Exception as e:
+        return f"Error while downloading binary blob: {e}"
