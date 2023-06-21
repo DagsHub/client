@@ -144,6 +144,8 @@ class Datasource:
             for key, val in row.items():
                 if key == path_column:
                     continue
+                if val is None:
+                    continue
                 res.append(DatapointMetadataUpdateEntry(
                     url=datapoint,
                     key=str(key),
