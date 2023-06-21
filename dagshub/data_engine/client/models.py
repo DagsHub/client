@@ -1,9 +1,16 @@
 import enum
+import logging
+import multiprocessing
 from dataclasses import dataclass
-from typing import Dict, Any, List, Union, TYPE_CHECKING
+from itertools import repeat
+from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional, Tuple
+
+from dagshub.common.helpers import http_request
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -97,3 +104,34 @@ class QueryResult:
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
         return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
+
+    def download_binary_columns(self, *columns: str, num_proc: int = 16) -> "QueryResult":
+        """
+        Downloads data from binary-defined columns
+        """
+        for column in columns:
+            logger.info(f"Downloading metadata for column {column} with {num_proc} processes")
+
+            def extract_blob_url(datapoint: Datapoint, col: str) -> Optional[str]:
+                sha = datapoint.metadata.get(col)
+                if sha is None or type(sha) is not str:
+                    return None
+                return self.datasource.source.blob_path(sha)
+
+            blob_urls = map(lambda dp: extract_blob_url(dp, column), self.entries)
+            auth = self.datasource.source.repoApi.auth
+            func_args = zip(blob_urls, repeat(auth))
+            with multiprocessing.Pool() as pool:
+                res = pool.starmap(_get_blob, func_args)
+
+            for dp, binary_val in zip(self.entries, res):
+                dp.metadata[column] = binary_val
+
+        return self
+
+
+def _get_blob(url: Optional[str], auth) -> Optional[bytes]:
+    if url is None:
+        return None
+    # TODO: handle errors
+    return http_request("GET", url, auth=auth).content

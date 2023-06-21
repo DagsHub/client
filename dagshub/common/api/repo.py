@@ -268,6 +268,16 @@ class RepoAPI:
             branch
         )
 
+    @cached_property
+    def data_engine_url(self) -> str:
+        """
+        URL of data engine
+        """
+        return _multi_urljoin(
+            self.repo_api_url,
+            "data-engine"
+        )
+
     def commit_url(self, sha) -> str:
         """
         URL of a commit in the repo
