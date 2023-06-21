@@ -2,6 +2,7 @@ import base64
 import gzip
 import json
 import logging
+import math
 import os.path
 import zlib
 from contextlib import contextmanager
@@ -146,7 +147,7 @@ class Datasource:
                     continue
                 if val is None:
                     continue
-                if val == float("nan"):
+                if type(val) is float and math.isnan(val):
                     continue
                 res.append(DatapointMetadataUpdateEntry(
                     url=datapoint,
@@ -457,7 +458,7 @@ class MetadataContextManager:
             for k, v in metadata.items():
                 if v is None:
                     continue
-                if v == float("nan"):
+                if type(v) is float and math.isnan(v):
                     continue
                 value_type = _metadataTypeLookup[type(v)]
                 if type(v) is bytes:
