@@ -121,7 +121,7 @@ class QueryResult:
             blob_urls = map(lambda dp: extract_blob_url(dp, column), self.entries)
             auth = self.datasource.source.repoApi.auth
             func_args = zip(blob_urls, repeat(auth))
-            with multiprocessing.Pool() as pool:
+            with multiprocessing.Pool(num_proc) as pool:
                 res = pool.starmap(_get_blob, func_args)
 
             for dp, binary_val in zip(self.entries, res):
