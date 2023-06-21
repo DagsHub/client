@@ -1,6 +1,9 @@
+import base64
+import gzip
 import json
 import logging
 import os.path
+import zlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -319,8 +322,8 @@ class Datasource:
 
         data = {"datasourceid": str(self.source.id),
                 "datapoints": [{"id": str(dp.datapoint_id),
-                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/') } for dp in dps.entries]}
-
+                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/')}
+                               for dp in dps.entries]}
 
         logger.debug(f"Sending request to URL {url}\nwith data: {data}")
 
@@ -448,13 +451,27 @@ class MetadataContextManager:
             datapoints = [datapoints]
         for dp in datapoints:
             for k, v in metadata.items():
+                if v is None:
+                    continue
+                value_type = _metadataTypeLookup[type(v)]
+                if type(v) is bytes:
+                    v = self._wrap_bytes(v)
                 self._metadata_entries.append(DatapointMetadataUpdateEntry(
                     url=dp,
                     key=k,
                     value=str(v),
                     # todo: preliminary type check
-                    valueType=_metadataTypeLookup[type(v)]
+                    valueType=value_type,
                 ))
+
+    @staticmethod
+    def _wrap_bytes(val: bytes) -> str:
+        """
+        Handles bytes values for uploading metadata
+        The process is gzip -> base64
+        """
+        compressed = gzip.compress(val)
+        return base64.b64encode(compressed).decode("utf-8")
 
     def get_metadata_entries(self):
         return self._metadata_entries
