@@ -146,6 +146,8 @@ class Datasource:
                     continue
                 if val is None:
                     continue
+                if type(val) is float and val == float("nan"):
+                    continue
                 res.append(DatapointMetadataUpdateEntry(
                     url=datapoint,
                     key=str(key),
@@ -454,6 +456,8 @@ class MetadataContextManager:
         for dp in datapoints:
             for k, v in metadata.items():
                 if v is None:
+                    continue
+                if type(v) is float and v == float("nan"):
                     continue
                 value_type = _metadataTypeLookup[type(v)]
                 if type(v) is bytes:
