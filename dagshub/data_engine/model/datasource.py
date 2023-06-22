@@ -378,6 +378,7 @@ class Datasource:
             else:
                 req_dict["id"] = dp.datapoint_id
                 req_dict["downloadurl"] = dp.download_url(self)
+            req_data["datapoints"].append(req_dict)
 
         init_url = multi_urljoin(self.source.repoApi.data_engine_url, "annotations/init")
         resp = http_request("POST", init_url, json=req_data, auth=self.source.repoApi.auth)
