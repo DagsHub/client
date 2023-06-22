@@ -373,10 +373,10 @@ class Datasource:
         for dp in datapoints:
             req_dict = {}
             if type(dp) is dict:
-                req_dict["id"] = dp["id"]
+                req_dict["id"] = str(dp["id"])
                 req_dict["downloadurl"] = dp["downloadurl"]
             else:
-                req_dict["id"] = dp.datapoint_id
+                req_dict["id"] = str(dp.datapoint_id)
                 req_dict["downloadurl"] = dp.download_url(self)
             req_data["datapoints"].append(req_dict)
 
