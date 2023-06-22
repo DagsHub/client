@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import os.path
+import webbrowser
 import zlib
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -18,10 +19,10 @@ from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config
-from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request
+from dagshub.common import config, rich_console
+from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.common.util import lazy_load
+from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
@@ -292,8 +293,9 @@ class Datasource:
     @staticmethod
     def _handle_ls_annotation(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
         from fiftyone.utils.labelstudio import import_label_studio_annotation
-        # if datapoint.path == "backyard_squirrels_000028.jpg":
-        #     print(datapoint.metadata)
+        if datapoint.path == "backyard_squirrels_000028.jpg":
+            rich_console.print(datapoint.metadata)
+            # print(datapoint.metadata)
         for field in annotation_fields:
             annotations = datapoint.metadata.get(field)
             if type(annotations) is not bytes:
@@ -350,6 +352,45 @@ class Datasource:
         if not all_have_sum_field:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
+
+    def annotate_in_labelstudio(self, datapoints: Union[List[Datapoint], List[Dict]], open_project=True) -> Optional[
+        str]:
+        """
+        Sends datapoints to annotations in Label Studio
+        datapoints can be either a list of Datapoints or dicts that have "id" and "downloadurl" fields
+        open_project specifies whether the link to the returned LS project should be opened from Python
+
+        Returns the URL of the created LS workspace
+        """
+        if len(datapoints) == 0:
+            logger.warning("No datapoints provided to be sent to labelstudio")
+            return None
+        req_data = {
+            "datasourceid": str(self.source.id),
+            "datapoints": []
+        }
+
+        for dp in datapoints:
+            req_dict = {}
+            if type(dp) is dict:
+                req_dict["id"] = dp["id"]
+                req_dict["downloadurl"] = dp["downloadurl"]
+            else:
+                req_dict["id"] = dp.datapoint_id
+                req_dict["downloadurl"] = dp.download_url(self)
+
+        init_url = multi_urljoin(self.source.repoApi.data_engine_url, "annotations/init")
+        resp = http_request("POST", init_url, json=req_data, auth=self.source.repoApi.auth)
+
+        if resp.status_code != 200:
+            logger.error(f"Error while sending request for annotation: {resp.content}")
+            return None
+        link = resp.json()["Link"]
+
+        log_message(f"Open {link} to start working on your annotation project")
+        if open_project:
+            webbrowser.open_new_tab(link)
+        return link
 
     def _send_to_annotation(self, url: str):
         """ TEMP FUNCTION """

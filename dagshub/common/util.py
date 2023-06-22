@@ -1,5 +1,11 @@
 import importlib
 import types
+from urllib.parse import urljoin, quote
+
+
+def multi_urljoin(*parts):
+    """Shoutout to https://stackoverflow.com/a/55722792"""
+    return urljoin(parts[0] + "/", "/".join(quote(part.strip("/"), safe="/") for part in parts[1:]))
 
 
 def lazy_load(module_name, source_package=None, callback=None):
