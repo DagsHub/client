@@ -125,6 +125,8 @@ class QueryResult:
                 res = pool.starmap(_get_blob, func_args)
 
             for dp, binary_val in zip(self.entries, res):
+                if binary_val is None:
+                    continue
                 dp.metadata[column] = binary_val
 
         return self

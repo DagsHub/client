@@ -22,7 +22,7 @@ from dagshub.common import config
 from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.client.models import PreprocessingStatus
+from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
@@ -57,6 +57,8 @@ class Datasource:
             query = DatasourceQuery()
         self._query = query
 
+        self.serialize_gql_query_input()
+
     @property
     def source(self):
         return self._source
@@ -74,6 +76,11 @@ class Datasource:
 
     def get_query(self):
         return self._query
+
+    @property
+    def annotation_columns(self) -> List[str]:
+        # TODO: once the annotation type is implemented, expose those columns here
+        return ["annotation"]
 
     def serialize_gql_query_input(self):
         return {
@@ -234,7 +241,7 @@ class Datasource:
         logger.info("Downloading files...")
 
         # Load the dataset from the query
-        datapoints = self.all()
+        datapoints = self.all().download_binary_columns(*self.annotation_columns)
 
         if not force_download:
             self._check_downloaded_dataset_size(datapoints)
@@ -245,32 +252,61 @@ class Datasource:
         logger.warning(f"Downloading {len(datapoints.entries)} files to {dataset_location}")
         samples = []
 
-        # TODO: parallelize this with some async magic
-        for datapoint in datapoints.entries:
-            file_url = datapoint.download_url(self)
-            resp = client.get(file_url, follow_redirects=True)
-            try:
-                assert resp.status_code == 200
-            except AssertionError:
-                logger.warning(
-                    f"Couldn't get image for path {datapoint.path}. Response code {resp.status_code} (Body: {resp.content})")
-                continue
-            # TODO: doesn't work with nesting
-            filename = file_url.split("/")[-1]
-            filepath = os.path.join(dataset_location, filename)
-            with open(filepath, "wb") as f:
-                f.write(resp.content)
-            sample = fo.Sample(filepath=filepath)
-            sample["dagshub_download_url"] = file_url
-            for k, v in datapoint.metadata.items():
-                sample[k] = v
-            samples.append(sample)
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Creating voxel dataset...", total=len(datapoints.entries))
+
+        with progress:
+            # TODO: parallelize this with some async magic
+            for datapoint in datapoints.entries:
+                file_url = datapoint.download_url(self)
+                resp = client.get(file_url, follow_redirects=True)
+                try:
+                    assert resp.status_code == 200
+                except AssertionError:
+                    logger.warning(
+                        f"Couldn't get image for path {datapoint.path}. Response code {resp.status_code} (Body: {resp.content})")
+                    continue
+                # TODO: doesn't work with nesting
+                filename = file_url.split("/")[-1]
+                filepath = os.path.join(dataset_location, filename)
+                with open(filepath, "wb") as f:
+                    f.write(resp.content)
+                sample = fo.Sample(filepath=filepath)
+                sample["dagshub_download_url"] = file_url
+                self._handle_ls_annotation(sample, datapoint, "annotation")
+                for k, v in datapoint.metadata.items():
+                    if type(v) is not bytes:
+                        sample[k] = v
+                samples.append(sample)
+                progress.update(task, advance=1)
+        progress.update(task, completed=len(datapoints.entries), refresh=True)
+
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
 
         ds.compute_metadata(skip_failures=True, overwrite=True)
 
         return ds
+
+    @staticmethod
+    def _handle_ls_annotation(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+        from fiftyone.utils.labelstudio import import_label_studio_annotation
+        # if datapoint.path == "backyard_squirrels_000028.jpg":
+        #     print(datapoint.metadata)
+        for field in annotation_fields:
+            annotations = datapoint.metadata.get(field)
+            if type(annotations) is not bytes:
+                return
+            ann_dict = json.loads(annotations.decode())
+            for ann in ann_dict["annotations"]:
+                if "result" not in ann:
+                    continue
+                for res in ann["result"]:
+                    try:
+                        converted = import_label_studio_annotation(res)
+                        sample.add_labels(converted, label_field=field)
+                    except:
+                        logger.warning(f"Couldn't convert LS annotation {res} to voxel annotation")
 
     def visualize(self, **kwargs):
         set_voxel_envvars()
