@@ -18,6 +18,7 @@ async def to_labelstudio(request: Request):
     plugin_state = get_plugin_state(request)
 
     selected = plugin_state.voxel_session.selected_view
+    print(selected)
     req_dicts = []
     if selected is None:
         return JSONResponse({"error": "Selection empty"}, status_code=400)
@@ -26,6 +27,7 @@ async def to_labelstudio(request: Request):
             "id": sample["datapoint_id"],
             "downloadurl": sample["dagshub_download_url"],
         })
+    print(f"Sending to annotation: {req_dicts}")
     # Don't open the project because we're going to open it from the Voxel's plugin code
     link = plugin_state.datasource.annotate_in_labelstudio(req_dicts, open_project=False)
     return JSONResponse({"link": link})
