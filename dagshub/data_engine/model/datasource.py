@@ -273,6 +273,7 @@ class Datasource:
                     f.write(resp.content)
                 sample = fo.Sample(filepath=filepath)
                 sample["dagshub_download_url"] = file_url
+                sample["datapoint_id"] = datapoint.datapoint_id
                 self._handle_ls_annotation(sample, datapoint, "annotation")
                 for k, v in datapoint.metadata.items():
                     if type(v) is not bytes:
