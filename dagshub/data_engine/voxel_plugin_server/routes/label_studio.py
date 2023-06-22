@@ -19,6 +19,8 @@ async def to_labelstudio(request: Request):
 
     selected = plugin_state.voxel_session.selected_view
     req_dicts = []
+    if selected is None:
+        return JSONResponse({"error": "Selection empty"}, status_code=400)
     for sample in selected:
         req_dicts.append({
             "id": sample["datapoint_id"],
