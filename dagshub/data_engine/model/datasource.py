@@ -385,7 +385,7 @@ class Datasource:
         if resp.status_code != 200:
             logger.error(f"Error while sending request for annotation: {resp.content}")
             return None
-        link = resp.json()["Link"]
+        link = resp.json()["link"]
 
         log_message(f"Open {link} to start working on your annotation project")
         if open_project:
