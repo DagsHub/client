@@ -31,7 +31,7 @@ class PyTorchDataset(torch.utils.data.Dataset):
         self.tensorizer = lambda x: x # prevent circular calls
         self.savedir = Path(savedir)
         self.entries = query_result.entries
-        self.repo = query_result.datasource.source._api
+        self.repo = query_result.datasource.source.repoApi
         self.datasource_root = Path(query_result.datasource.source.path[query_result.datasource.source.path.index(query_result.datasource.source.repo) + len(query_result.datasource.source.repo)+1:])
 
         if type(tensorizer) == str: self._set_tensorizer(tensorizer)
