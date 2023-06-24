@@ -1,9 +1,14 @@
 import enum
+import logging
+import multiprocessing
 from dataclasses import dataclass
-from dagshub.common.util import lazy_load
-from typing import Dict, Any, List, Union, TYPE_CHECKING
 
 import inspect
+from itertools import repeat
+from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
+
+from dagshub.common.util import lazy_load
+from dagshub.common.helpers import http_request
 from .loaders import PyTorchDataset, TensorFlowDataLoader, TensorFlowDataset
 
 torch = lazy_load('torch')
@@ -11,6 +16,8 @@ tf = lazy_load('tensorflow')
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Metadata:
@@ -135,3 +142,42 @@ class QueryResult:
             return TensorFlowDataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
                                         **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
         else: raise ValueError('supported flavors are torch|tensorflow')
+
+    def download_binary_columns(self, *columns: str, num_proc: int = 16) -> "QueryResult":
+        """
+        Downloads data from binary-defined columns
+        """
+        for column in columns:
+            logger.info(f"Downloading metadata for column {column} with {num_proc} processes")
+
+            def extract_blob_url(datapoint: Datapoint, col: str) -> Optional[str]:
+                sha = datapoint.metadata.get(col)
+                if sha is None or type(sha) is not str:
+                    return None
+                return self.datasource.source.blob_path(sha)
+
+            blob_urls = map(lambda dp: extract_blob_url(dp, column), self.entries)
+            auth = self.datasource.source.repoApi.auth
+            func_args = zip(blob_urls, repeat(auth))
+            with multiprocessing.Pool(num_proc) as pool:
+                res = pool.starmap(_get_blob, func_args)
+
+            for dp, binary_val in zip(self.entries, res):
+                if binary_val is None:
+                    continue
+                dp.metadata[column] = binary_val
+
+        return self
+
+
+def _get_blob(url: Optional[str], auth) -> Optional[Union[str, bytes]]:
+    if url is None:
+        return None
+    try:
+        resp = http_request("GET", url, auth=auth)
+        if resp.status_code >= 400:
+            return f"Error while downloading binary blob: {resp.content.decode()}"
+        else:
+            return resp.content
+    except Exception as e:
+        return f"Error while downloading binary blob: {e}"

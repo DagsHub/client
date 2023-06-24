@@ -7,7 +7,7 @@
   either gets added automatically by DagsHub or that you can attach and modify whenever you want.
 * DagsHub gives a pandas-like Python client to query this giant metadata table and return only matching files from your datasource.
 * Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
-  
+
 
 ## Warning: The interface for everything is still in development and is subject to big changes.
 
@@ -32,14 +32,18 @@ ds = datasources.create_from_repo("simon/baby-yoda-segmentation-dataset", "path-
 If the datasource with name `bucket-ds` already exists, we will throw an error, so on further uses you need to get a
 datasource.
 
-Shortly after creating the datasource, the DagsHub system will start scanning it for files and automatically adding some metadata fields that we can infer automatically, such as file size.  
-You can start querying the datasource right away, but you'll see a warning message saying that the scan is still in progress until it finishes adding all the files, so expect partial results.  
-You can start adding metadata before files get scanned, don't worry about waiting for the scan to finish before starting metadata ingestion!
+Shortly after creating the datasource, the DagsHub system will start scanning it for files and automatically adding some
+metadata fields that we can infer automatically, such as file size.
+You can start querying the datasource right away, but you'll see a warning message saying that the scan is still in
+progress until it finishes adding all the files, so expect partial results.
+You can start adding metadata before files get scanned, don't worry about waiting for the scan to finish before starting
+metadata ingestion!
 
-You can create as many datasources as you like, on as many paths as you like.  
-For example, you can create multiple different datasources pointing to the same bucket, 
-or to different subpaths in the same bucket, etc.  
-These different datasources will not be related to each other, each one will start clean and have a separate metadata table
+You can create as many datasources as you like, on as many paths as you like.
+For example, you can create multiple different datasources pointing to the same bucket,
+or to different subpaths in the same bucket, etc.
+These different datasources will not be related to each other, each one will start clean and have a separate metadata
+table
 from all the other datasources, whether they point at the same bucket/path or not.
 
 ### Getting
@@ -74,7 +78,7 @@ with ds.metadata_context() as ctx:
   # Attach metadata to a single specific file in the datasource.
   # The first argument is the filepath to attach metadata to, **relative to the root of the datasource**.
   ctx.update_metadata("images/005.jpg", metadata)
-  
+
   # Attach metadata to several files at once:
   ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
 ```
@@ -101,11 +105,11 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
   - Images
 - ** Please let us know about other metadata types you'd like to use and why **
 
-We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being added.  
+We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being
+added.
 So, while you don't need to declare a schema in advance, a typed schema gets created automatically and you can't push
 mismatched data types to an existing field.
 We're considering allowing a more declarative typing system for this in the future.
- 
 
 ### Adding metadata from a dataframe
 
@@ -137,7 +141,7 @@ head = ds.head()
 all = ds.all()
 ```
 
-The returned objects carry the returned datapoints + metadata.  
+The returned objects carry the returned datapoints + metadata.
 If you're more used to working pandas dataframes, you can get a dataframe back by using the dataframe property:
 
 ```python
@@ -198,6 +202,27 @@ Instead, it's preferred to have all the columns be addressed by the variable you
 filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 ```
+
+## Saving queries
+
+You can save the query you have on the datasource.
+We call the combination of datasource + query a dataset.
+
+To save a dataset call the `save_dataset` function, adding a name
+
+```python
+ds.save_dataset("my-cool-dataset")
+```
+
+In order to get the dataset back next time, do this:
+
+```python
+from dagshub.data_engine.model import datasets
+
+ds = datasets.get_dataset("user/repo", "my-cool-dataset")
+```
+
+You'll get back the dataset and can continue working from where you left off
 
 # Exporting to Voxel51
 

@@ -12,10 +12,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _metadataTypeLookup = {
-    type(0): "INTEGER",
-    type(True): "BOOLEAN",
-    type(0.5): "FLOAT",
-    type("aaa"): "STRING",
+    int: "INTEGER",
+    bool: "BOOLEAN",
+    float: "FLOAT",
+    str: "STRING",
+    bytes: "BLOB",
 }
 
 _metadataTypeLookupReverse: Dict[str, Type] = {}

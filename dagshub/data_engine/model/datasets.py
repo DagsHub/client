@@ -40,7 +40,5 @@ def _from_gql_result(repo: str, dataset_result: "DatasetResult") -> "Datasource"
 
     query_dict = json.loads(dataset_result.datasetQuery)
     ds._query = DatasourceQuery.deserialize(query_dict["query"])
-    ds.include_list = query_dict["include"]
-    ds.exclude_list = query_dict["exclude"]
 
     return ds

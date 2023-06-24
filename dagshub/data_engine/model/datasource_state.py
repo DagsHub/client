@@ -94,6 +94,12 @@ class DatasourceState:
         path = self._extract_path(path).strip("/")
         return self.root_raw_path + "/" + path
 
+    def blob_path(self, sha: str) -> str:
+        """
+        Returns the path for the blob of a datasource
+        """
+        return f"{self.repoApi.data_engine_url}/blob/{sha}"
+
     @cached_property
     def root_content_path(self) -> str:
         """

@@ -1,6 +1,11 @@
+import base64
+import gzip
 import json
 import logging
+import math
 import os.path
+import webbrowser
+import zlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,11 +19,11 @@ from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config
-from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request
+from dagshub.common import config, rich_console
+from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.common.util import lazy_load
-from dagshub.data_engine.client.models import PreprocessingStatus
+from dagshub.common.util import lazy_load, multi_urljoin
+from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
@@ -53,26 +58,7 @@ class Datasource:
             query = DatasourceQuery()
         self._query = query
 
-        self._include_list: List[str] = []
-        self._exclude_list: List[str] = []
-
-    @property
-    def include_list(self):
-        """List of urls of datapoints to always be included in query results """
-        return self._include_list
-
-    @include_list.setter
-    def include_list(self, val):
-        self._include_list = val
-
-    @property
-    def exclude_list(self):
-        """List of urls of datapoints to always be excluded in query results """
-        return self._exclude_list
-
-    @exclude_list.setter
-    def exclude_list(self, val):
-        self._exclude_list = val
+        self.serialize_gql_query_input()
 
     @property
     def source(self):
@@ -87,18 +73,19 @@ class Datasource:
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__())
-        res.include_list = self.include_list.copy()
-        res.exclude_list = self.exclude_list.copy()
         return res
 
     def get_query(self):
         return self._query
 
+    @property
+    def annotation_columns(self) -> List[str]:
+        # TODO: once the annotation type is implemented, expose those columns here
+        return ["annotation"]
+
     def serialize_gql_query_input(self):
         return {
             "query": self._query.serialize_graphql(),
-            "include": self.include_list if len(self.include_list) > 0 else None,
-            "exclude": self.exclude_list if len(self.exclude_list) > 0 else None,
         }
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
@@ -165,6 +152,10 @@ class Datasource:
             datapoint = row[path_column]
             for key, val in row.items():
                 if key == path_column:
+                    continue
+                if val is None:
+                    continue
+                if type(val) is float and math.isnan(val):
                     continue
                 res.append(DatapointMetadataUpdateEntry(
                     url=datapoint,
@@ -251,7 +242,7 @@ class Datasource:
         logger.info("Downloading files...")
 
         # Load the dataset from the query
-        datapoints = self.all()
+        datapoints = self.all().download_binary_columns(*self.annotation_columns)
 
         if not force_download:
             self._check_downloaded_dataset_size(datapoints)
@@ -262,32 +253,63 @@ class Datasource:
         logger.warning(f"Downloading {len(datapoints.entries)} files to {dataset_location}")
         samples = []
 
-        # TODO: parallelize this with some async magic
-        for datapoint in datapoints.entries:
-            file_url = datapoint.download_url(self)
-            resp = client.get(file_url, follow_redirects=True)
-            try:
-                assert resp.status_code == 200
-            except AssertionError:
-                logger.warning(
-                    f"Couldn't get image for path {datapoint.path}. Response code {resp.status_code} (Body: {resp.content})")
-                continue
-            # TODO: doesn't work with nesting
-            filename = file_url.split("/")[-1]
-            filepath = os.path.join(dataset_location, filename)
-            with open(filepath, "wb") as f:
-                f.write(resp.content)
-            sample = fo.Sample(filepath=filepath)
-            sample["dagshub_download_url"] = file_url
-            for k, v in datapoint.metadata.items():
-                sample[k] = v
-            samples.append(sample)
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Creating voxel dataset...", total=len(datapoints.entries))
+
+        with progress:
+            # TODO: parallelize this with some async magic
+            for datapoint in datapoints.entries:
+                file_url = datapoint.download_url(self)
+                resp = client.get(file_url, follow_redirects=True)
+                try:
+                    assert resp.status_code == 200
+                except AssertionError:
+                    logger.warning(
+                        f"Couldn't get image for path {datapoint.path}. Response code {resp.status_code} (Body: {resp.content})")
+                    continue
+                # TODO: doesn't work with nesting
+                filename = file_url.split("/")[-1]
+                filepath = os.path.join(dataset_location, filename)
+                with open(filepath, "wb") as f:
+                    f.write(resp.content)
+                sample = fo.Sample(filepath=filepath)
+                sample["dagshub_download_url"] = file_url
+                sample["datapoint_id"] = datapoint.datapoint_id
+                self._handle_ls_annotation(sample, datapoint, "annotation")
+                for k, v in datapoint.metadata.items():
+                    if type(v) is not bytes:
+                        sample[k] = v
+                samples.append(sample)
+                progress.update(task, advance=1)
+        progress.update(task, completed=len(datapoints.entries), refresh=True)
+
         logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
 
         ds.compute_metadata(skip_failures=True, overwrite=True)
 
         return ds
+
+    @staticmethod
+    def _handle_ls_annotation(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+        from fiftyone.utils.labelstudio import import_label_studio_annotation
+        if datapoint.path == "backyard_squirrels_000028.jpg":
+            rich_console.print(datapoint.metadata)
+            # print(datapoint.metadata)
+        for field in annotation_fields:
+            annotations = datapoint.metadata.get(field)
+            if type(annotations) is not bytes:
+                return
+            ann_dict = json.loads(annotations.decode())
+            for ann in ann_dict["annotations"]:
+                if "result" not in ann:
+                    continue
+                for res in ann["result"]:
+                    try:
+                        converted = import_label_studio_annotation(res)
+                        sample.add_labels(converted, label_field=field)
+                    except:
+                        logger.warning(f"Couldn't convert LS annotation {res} to voxel annotation")
 
     def visualize(self, **kwargs):
         set_voxel_envvars()
@@ -331,6 +353,46 @@ class Datasource:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
+    def annotate_in_labelstudio(self, datapoints: Union[List[Datapoint], List[Dict]], open_project=True) -> Optional[
+        str]:
+        """
+        Sends datapoints to annotations in Label Studio
+        datapoints can be either a list of Datapoints or dicts that have "id" and "downloadurl" fields
+        open_project specifies whether the link to the returned LS project should be opened from Python
+
+        Returns the URL of the created LS workspace
+        """
+        if len(datapoints) == 0:
+            logger.warning("No datapoints provided to be sent to labelstudio")
+            return None
+        req_data = {
+            "datasourceid": str(self.source.id),
+            "datapoints": []
+        }
+
+        for dp in datapoints:
+            req_dict = {}
+            if type(dp) is dict:
+                req_dict["id"] = str(dp["id"])
+                req_dict["downloadurl"] = dp["downloadurl"]
+            else:
+                req_dict["id"] = str(dp.datapoint_id)
+                req_dict["downloadurl"] = dp.download_url(self)
+            req_data["datapoints"].append(req_dict)
+
+        init_url = multi_urljoin(self.source.repoApi.data_engine_url, "annotations/init")
+        resp = http_request("POST", init_url, json=req_data, auth=self.source.repoApi.auth)
+
+        if resp.status_code != 200:
+            logger.error(f"Error while sending request for annotation: {resp.content}")
+            return None
+        link = resp.json()["link"]
+
+        log_message(f"Open {link} to start working on your annotation project")
+        if open_project:
+            webbrowser.open_new_tab(link)
+        return link
+
     def _send_to_annotation(self, url: str):
         """ TEMP FUNCTION """
         auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.source.client.host))
@@ -344,8 +406,8 @@ class Datasource:
 
         data = {"datasourceid": str(self.source.id),
                 "datapoints": [{"id": str(dp.datapoint_id),
-                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/') } for dp in dps.entries]}
-
+                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/')}
+                               for dp in dps.entries]}
 
         logger.debug(f"Sending request to URL {url}\nwith data: {data}")
 
@@ -473,13 +535,29 @@ class MetadataContextManager:
             datapoints = [datapoints]
         for dp in datapoints:
             for k, v in metadata.items():
+                if v is None:
+                    continue
+                if type(v) is float and math.isnan(v):
+                    continue
+                value_type = _metadataTypeLookup[type(v)]
+                if type(v) is bytes:
+                    v = self._wrap_bytes(v)
                 self._metadata_entries.append(DatapointMetadataUpdateEntry(
                     url=dp,
                     key=k,
                     value=str(v),
                     # todo: preliminary type check
-                    valueType=_metadataTypeLookup[type(v)]
+                    valueType=value_type,
                 ))
+
+    @staticmethod
+    def _wrap_bytes(val: bytes) -> str:
+        """
+        Handles bytes values for uploading metadata
+        The process is gzip -> base64
+        """
+        compressed = gzip.compress(val)
+        return base64.b64encode(compressed).decode("utf-8")
 
     def get_metadata_entries(self):
         return self._metadata_entries

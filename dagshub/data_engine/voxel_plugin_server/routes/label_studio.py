@@ -15,6 +15,25 @@ _ls_driver_store: Dict[Tuple[str, Optional[str]], LabelStudioDriver] = {}
 
 
 async def to_labelstudio(request: Request):
+    plugin_state = get_plugin_state(request)
+
+    selected = plugin_state.voxel_session.selected_view
+    print(selected)
+    req_dicts = []
+    if selected is None:
+        return JSONResponse({"error": "Selection empty"}, status_code=400)
+    for sample in selected:
+        req_dicts.append({
+            "id": sample["datapoint_id"],
+            "downloadurl": sample["dagshub_download_url"],
+        })
+    print(f"Sending to annotation: {req_dicts}")
+    # Don't open the project because we're going to open it from the Voxel's plugin code
+    link = plugin_state.datasource.annotate_in_labelstudio(req_dicts, open_project=False)
+    return JSONResponse({"link": link})
+
+
+async def __to_labelstudio_old(request: Request):
     logger.info(await request.json())
     ls = get_or_create_ls_driver(request)
     return JSONResponse(await ls.annotate_selected())
