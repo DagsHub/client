@@ -103,20 +103,36 @@ class QueryResult:
         flavor: torch|tensorflow
         download: preload|background|lazy; default: background
         """
+        flavor = flavor.lower()
         if flavor == 'torch':
             from .loaders import PyTorchDataset
             return PyTorchDataset(self, **kwargs)
-        elif flavor == 'tensorflow': raise NotImplementedError('coming soon')
+        elif flavor == 'tensorflow':
+            from .loaders import TensorFlowDataset
+            from tensorflow.data import Dataset
+            ds_builder = TensorFlowDataset(self, **kwargs)
+            ds = Dataset.from_generator(ds_builder.generator,
+                                        output_signature=ds_builder.signature)
+            ds.__len__ = lambda: ds_builder.__len__()
+            ds.__getitem__ = ds_builder.__getitem__
+            return ds
         else: raise ValueError('supported flavors are torch|tensorflow')
 
     def as_dataloader(self, flavor, **kwargs):
-        from .loaders import PyTorchDataset
+        import inspect
+        import tensorflow
         from torch.utils.data import DataLoader
+        from .loaders import PyTorchDataset, TensorFlowDataLoader, TensorFlowDataset
+
+        flavor = flavor.lower() if type(flavor) == str else flavor
         if isinstance(flavor, PyTorchDataset): return DataLoader(flavor, **kwargs)
         elif flavor == 'torch':
-            import inspect
             dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
             return DataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
                               **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
-        elif flavor == 'tensorflow': raise NotImplementedError('coming soon')
+        elif isinstance(flavor, tensorflow.data.Dataset): return TensorFlowDataLoader(flavor, **kwargs)
+        elif flavor == 'tensorflow':
+            dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
+            return TensorFlowDataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
+                                        **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
         else: raise ValueError('supported flavors are torch|tensorflow')
