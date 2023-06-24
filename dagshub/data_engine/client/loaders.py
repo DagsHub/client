@@ -5,7 +5,6 @@ import random
 from pathlib import Path
 from multiprocessing import Pool, Process
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.client.models import Datapoint
 
 if TYPE_CHECKING:
     import torch
@@ -19,7 +18,6 @@ torchvision = lazy_load('torchvision')
 tfds = lazy_load('tensorflow_datasets')
 
 logger = logging.getLogger(__name__)
-# logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
 
 class PyTorchDataset(torch.utils.data.Dataset):
@@ -38,6 +36,9 @@ class PyTorchDataset(torch.utils.data.Dataset):
         self.downloader = DataSetDownloader(self.entries, self.repo, savedir)
         self.datasource_root = Path(query_result.datasource.source.path[query_result.datasource.source.path.index(query_result.datasource.source.repo) + len(query_result.datasource.source.repo)+1:])
 
+        from dagshub.data_engine.client.models import Datapoint
+        self.datapoint = Datapoint
+
         if type(tensorizer) == str: self._set_tensorizer(tensorizer)
         else: self.tensorizer = tensorizer
 
@@ -50,7 +51,7 @@ class PyTorchDataset(torch.utils.data.Dataset):
         return len(self.entries)
 
     def __getitem__(self, idx):
-        if type(idx) == Datapoint: entry = idx
+        if type(idx) == self.datapoint: entry = idx
         else: entry = self.entries[idx]
 
         filepath = self.savedir / entry.path

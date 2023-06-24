@@ -3,6 +3,12 @@ from dataclasses import dataclass
 from dagshub.common.util import lazy_load
 from typing import Dict, Any, List, Union, TYPE_CHECKING
 
+import inspect
+from .loaders import PyTorchDataset, TensorFlowDataLoader, TensorFlowDataset
+
+torch = lazy_load('torch')
+tf = lazy_load('tensorflow')
+
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
@@ -105,13 +111,10 @@ class QueryResult:
         """
         flavor = flavor.lower()
         if flavor == 'torch':
-            from .loaders import PyTorchDataset
             return PyTorchDataset(self, **kwargs)
         elif flavor == 'tensorflow':
-            from .loaders import TensorFlowDataset
-            from tensorflow.data import Dataset
             ds_builder = TensorFlowDataset(self, **kwargs)
-            ds = Dataset.from_generator(ds_builder.generator,
+            ds = tf.data.Dataset.from_generator(ds_builder.generator,
                                         output_signature=ds_builder.signature)
             ds.__len__ = lambda: ds_builder.__len__()
             ds.__getitem__ = ds_builder.__getitem__
@@ -119,10 +122,6 @@ class QueryResult:
         else: raise ValueError('supported flavors are torch|tensorflow')
 
     def as_dataloader(self, flavor, **kwargs):
-        import inspect
-        import tensorflow
-        from torch.utils.data import DataLoader
-        from .loaders import PyTorchDataset, TensorFlowDataLoader, TensorFlowDataset
 
         flavor = flavor.lower() if type(flavor) == str else flavor
         if isinstance(flavor, PyTorchDataset): return DataLoader(flavor, **kwargs)
