@@ -129,14 +129,14 @@ class QueryResult:
         else: raise ValueError('supported flavors are torch|tensorflow')
 
     def as_dataloader(self, flavor, **kwargs):
-
+        from torch.utils.data import DataLoader
         flavor = flavor.lower() if type(flavor) == str else flavor
         if isinstance(flavor, PyTorchDataset): return DataLoader(flavor, **kwargs)
         elif flavor == 'torch':
             dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
             return DataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
                               **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
-        elif isinstance(flavor, tensorflow.data.Dataset): return TensorFlowDataLoader(flavor, **kwargs)
+        elif isinstance(flavor, tf.data.Dataset): return TensorFlowDataLoader(flavor, **kwargs)
         elif flavor == 'tensorflow':
             dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
             return TensorFlowDataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),

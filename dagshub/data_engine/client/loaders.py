@@ -1,13 +1,10 @@
 import logging
-from typing import TYPE_CHECKING, Iterator, Tuple
+from typing import TYPE_CHECKING
 
 import random
 from pathlib import Path
 from multiprocessing import Pool, Process
 from dagshub.common.util import lazy_load
-
-if TYPE_CHECKING:
-    import torch
 
 np = lazy_load('numpy')
 torch = lazy_load('torch')
@@ -16,6 +13,9 @@ Image = lazy_load('PIL.Image')
 torchaudio = lazy_load('torchaudio')
 torchvision = lazy_load('torchvision')
 tfds = lazy_load('tensorflow_datasets')
+
+if TYPE_CHECKING:
+    import torch
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
