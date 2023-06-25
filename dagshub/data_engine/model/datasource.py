@@ -5,21 +5,18 @@ import logging
 import math
 import os.path
 import webbrowser
-import zlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
-import httpx
-import requests
 import rich.progress
 from dataclasses_json import dataclass_json
 from pathvalidate import sanitize_filepath
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config, rich_console
+from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
@@ -225,6 +222,7 @@ class Datasource:
             force_download (bool): download the dataset even if the size of the files is bigger than 100MB
             files_location (str|PathLike): path to the location where to download the local files
                 default: ~/dagshub_datasets/user/repo/ds_name/
+            redownload (bool): Redownload files, replacing the ones that might exist on the filesystem
         """
         logger.info("Migrating dataset to voxel51")
         name = kwargs.get("name", self._source.name)
@@ -235,9 +233,8 @@ class Datasource:
         else:
             ds: fo.Dataset = fo.Dataset(name)
         # ds.persistent = True
-        dataset_location = kwargs.get("files_location", sanitize_filepath(
-            os.path.join(Path.home(), "dagshub_datasets", self.source.repo, self.source.name)))
 
+        dataset_location = Path(kwargs.get("files_location", self.default_dataset_location))
         os.makedirs(dataset_location, exist_ok=True)
         logger.info("Downloading files...")
 
@@ -247,55 +244,44 @@ class Datasource:
         if not force_download:
             self._check_downloaded_dataset_size(datapoints)
 
-        host = config.host
-        client = httpx.Client(auth=HTTPBearerAuth(dagshub.auth.get_token(host=host), ), follow_redirects=True)
-
         logger.warning(f"Downloading {len(datapoints.entries)} files to {dataset_location}")
-        samples = []
+
+        def dp_path(dp: Datapoint):
+            return dataset_location / dp.path_in_repo(self)
+
+        download_args = [(dp.download_url(self), dp_path(dp)) for dp in datapoints.entries]
+        redownload = kwargs.get("redownload", False)
+        download_files(download_args, skip_if_exists=not redownload)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        task = progress.add_task("Creating voxel dataset...", total=len(datapoints.entries))
+        task = progress.add_task("Generating voxel samples...", total=len(datapoints.entries))
+
+        samples: List["fo.Sample"] = []
 
         with progress:
-            # TODO: parallelize this with some async magic
             for datapoint in datapoints.entries:
-                file_url = datapoint.download_url(self)
-                resp = client.get(file_url, follow_redirects=True)
-                try:
-                    assert resp.status_code == 200
-                except AssertionError:
-                    logger.warning(
-                        f"Couldn't get image for path {datapoint.path}. Response code {resp.status_code} (Body: {resp.content})")
-                    continue
-                # TODO: doesn't work with nesting
-                filename = file_url.split("/")[-1]
-                filepath = os.path.join(dataset_location, filename)
-                with open(filepath, "wb") as f:
-                    f.write(resp.content)
-                sample = fo.Sample(filepath=filepath)
-                sample["dagshub_download_url"] = file_url
+                sample = fo.Sample(filepath=dp_path(datapoint))
+                sample["dagshub_download_url"] = datapoint.download_url(self)
                 sample["datapoint_id"] = datapoint.datapoint_id
                 self._handle_ls_annotation(sample, datapoint, "annotation")
                 for k, v in datapoint.metadata.items():
                     if type(v) is not bytes:
                         sample[k] = v
                 samples.append(sample)
-                progress.update(task, advance=1)
-        progress.update(task, completed=len(datapoints.entries), refresh=True)
+                progress.update(task, advance=1, refresh=True)
 
-        logger.info(f"Downloaded {len(datapoints.dataframe['name'])} file(s) into {dataset_location}")
         ds.add_samples(samples)
-
         ds.compute_metadata(skip_failures=True, overwrite=True)
-
         return ds
+
+    @property
+    def default_dataset_location(self) -> Path:
+        return Path(
+            sanitize_filepath(os.path.join(Path.home(), "dagshub_datasets", self.source.repo, self.source.id)))
 
     @staticmethod
     def _handle_ls_annotation(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
         from fiftyone.utils.labelstudio import import_label_studio_annotation
-        if datapoint.path == "backyard_squirrels_000028.jpg":
-            rich_console.print(datapoint.metadata)
-            # print(datapoint.metadata)
         for field in annotation_fields:
             annotations = datapoint.metadata.get(field)
             if type(annotations) is not bytes:

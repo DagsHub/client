@@ -12,7 +12,7 @@ from http import HTTPStatus
 from urllib.parse import urlparse
 
 import dagshub.auth
-import dagshub.common.logging
+import dagshub.common.logging_util
 from dagshub import init, __version__
 from dagshub.common import config, rich_console
 from dagshub.upload import create_repo, Repo
@@ -26,7 +26,7 @@ from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def cli(ctx, host, quiet):
-    dagshub.common.logging.init_logger()
+    dagshub.common.logging_util.init_logger()
     ctx.obj = {"host": host.strip("/"), "quiet": quiet or config.quiet}
 
 
