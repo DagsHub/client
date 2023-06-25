@@ -33,8 +33,8 @@ class PyTorchDataset(torch.utils.data.Dataset):
         self.savedir = Path(savedir)
         self.entries = query_result.entries
         self.repo = query_result.datasource.source.repoApi
-        self.downloader = DataSetDownloader(self.entries, self.repo, savedir)
         self.datasource_root = Path(query_result.datasource.source.path[query_result.datasource.source.path.index(query_result.datasource.source.repo) + len(query_result.datasource.source.repo)+1:])
+        self.downloader = DataSetDownloader(self.entries, self.repo, savedir, self.datasource_root)
 
         from dagshub.data_engine.client.models import Datapoint
         self.datapoint = Datapoint
@@ -141,10 +141,11 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
             np.random.shuffle(self.indices)
 
 class DataSetDownloader:
-    def __init__(self, entries, repo, savedir):
+    def __init__(self, entries, repo, savedir, datasource_root):
         self.entries = entries
         self.repo = repo
         self.savedir = savedir
+        self.datasource_root = datasource_root
 
     def _download(self, entry):
         (self.savedir/Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
