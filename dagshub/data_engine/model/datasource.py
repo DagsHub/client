@@ -277,7 +277,7 @@ class Datasource:
     @property
     def default_dataset_location(self) -> Path:
         return Path(
-            sanitize_filepath(os.path.join(Path.home(), "dagshub_datasets", self.source.repo, str(self.source.id))))
+            sanitize_filepath(os.path.join(Path.home(), "dagshub", "datasets", self.source.repo, str(self.source.id))))
 
     @staticmethod
     def _handle_ls_annotation(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
