@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     import torch
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 class PyTorchDataset(torch.utils.data.Dataset):
     def __init__(self, query_result, strategy='lazy', tensorizer='auto', savedir=Path.home()/'.dagshub'/'datasets', processes=8):
