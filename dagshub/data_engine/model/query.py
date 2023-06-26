@@ -26,7 +26,6 @@ for k, v in _metadataTypeLookup.items():
 
 class FieldFilterOperand(enum.Enum):
     EQUAL = "EQUAL"
-    NOT_EQUAL = "NOT_EQUAL"
     GREATER_THAN = "GREATER_THAN"
     GREATER_EQUAL_THAN = "GREATER_EQUAL_THAN"
     LESS_THAN = "LESS_THAN"
@@ -36,8 +35,6 @@ class FieldFilterOperand(enum.Enum):
 
 fieldFilterOperandMap = {
     "eq": FieldFilterOperand.EQUAL,
-    # TODO: turn on when ready
-    # "ne": FieldFilterOperand.NOT_EQUAL,
     "gt": FieldFilterOperand.GREATER_THAN,
     "ge": FieldFilterOperand.GREATER_EQUAL_THAN,
     "lt": FieldFilterOperand.LESS_THAN,
@@ -63,11 +60,16 @@ class DatasourceQuery:
     def __str__(self):
         return f"<Query: {self.to_dict()}>"
 
-    def compose(self, op: str, other: Union[str, int, float, "DatasourceQuery", "Datasource"]):
+    def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree
             self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
             self._column_filter = None
+        elif op == "not":
+            new_tree = Tree()
+            not_node = new_tree.create_node("not")
+            new_tree.paste(not_node.identifier, self._operand_tree)
+            self._operand_tree = new_tree
         else:
             # The query is an actual query with a tree - make a subtree
             if type(other) is not DatasourceQuery:
@@ -104,6 +106,12 @@ class DatasourceQuery:
         if operand in ["and", "or"]:
             # recursively serialize children subqueries
             return {operand: [DatasourceQuery._serialize_node(child, tree) for child in tree.children(node.identifier)]}
+        if operand == "not":
+            assert len(tree.children(node.identifier)) == 1
+            child = tree.children(node.identifier)[0]
+            serialized = DatasourceQuery._serialize_node(child, tree)
+            serialized["not"] = True
+            return serialized
         else:
             query_op = fieldFilterOperandMap.get(operand)
             if query_op is None:
@@ -136,8 +144,14 @@ class DatasourceQuery:
     @staticmethod
     def _deserialize_node(node_dict: Dict, tree: Tree, parent_node=None) -> None:
         keys = list(node_dict.keys())
-        if len(keys) > 1:
-            raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
+
+        is_negative = node_dict.get("not", False)
+        if is_negative:
+            # If operation is negative - prepend a "not" node to the node we'll be adding
+            neg_node = Node(tag="not")
+            tree.add_node(neg_node, parent_node)
+            parent_node = neg_node
+
         op_type = keys[0]
         val = node_dict[op_type]
         # Types: and, or, filter

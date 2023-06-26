@@ -472,7 +472,10 @@ class Datasource:
         self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        return self.add_query_op("ne", other)
+        return self.add_query_op("eq", other).add_query_op("not")
+
+    def __invert__(self):
+        return self.add_query_op("not")
 
     def __contains__(self, item):
         raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in ds`")
@@ -501,7 +504,8 @@ class Datasource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
-    def add_query_op(self, op: str, other: Union[str, int, float, "Datasource", "DatasourceQuery"]) -> "Datasource":
+    def add_query_op(self, op: str,
+                     other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None) -> "Datasource":
         """
         Returns a new dataset with an added query param
         """
