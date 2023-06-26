@@ -201,15 +201,15 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
 class TorchTensorizers:
     @staticmethod
     def image(file: io.BufferedReader) -> torch.Tensor:
-        return torchvision.io.read_image(file.name)
+        return torchvision.io.read_image(file.name).type(torch.float)
 
     @staticmethod
     def audio(file: io.BufferedReader) -> torch.Tensor:
-        return torchaudio.load(file.name)
+        return torchaudio.load(file.name).type(torch.float)
 
     @staticmethod
     def video(file: io.BufferedReader) -> torch.Tensor:
-        return torchvision.io.read_video(file.name)
+        return torchvision.io.read_video(file.name).type(torch.float)
 
 
 class TensorFlowTensorizers:
