@@ -339,8 +339,14 @@ class Datasource:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
-    def annotate_in_labelstudio(self, datapoints: Union[List[Datapoint], List[Dict]], open_project=True) -> Optional[
-        str]:
+    def annotate_in_labelstudio(self):
+        """
+        Sends all datapoints in the datasource for annotation to labelstudio
+        """
+        self.annotate_datapoints_in_labelstudio(self.all().entries)
+
+    def annotate_datapoints_in_labelstudio(self, datapoints: Union[List[Datapoint], List[Dict]], open_project=True) -> \
+        Optional[str]:
         """
         Sends datapoints to annotations in Label Studio
         datapoints can be either a list of Datapoints or dicts that have "id" and "downloadurl" fields

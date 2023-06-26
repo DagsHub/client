@@ -29,7 +29,7 @@ async def to_labelstudio(request: Request):
         })
     print(f"Sending to annotation: {req_dicts}")
     # Don't open the project because we're going to open it from the Voxel's plugin code
-    link = plugin_state.datasource.annotate_in_labelstudio(req_dicts, open_project=False)
+    link = plugin_state.datasource.annotate_datapoints_in_labelstudio(req_dicts, open_project=False)
     return JSONResponse({"link": link})
 
 
