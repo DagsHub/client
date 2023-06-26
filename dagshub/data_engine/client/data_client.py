@@ -37,7 +37,7 @@ class DataClient:
 
     def _init_client(self):
         url = f"{self.host}/api/v1/repos/{self.repo}/data-engine/graphql"
-        auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.host))
+        auth = HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
         transport = RequestsHTTPTransport(url=url, auth=auth)
         client = gql.Client(transport=transport)
         return client
