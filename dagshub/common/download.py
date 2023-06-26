@@ -49,7 +49,8 @@ def download_files(files: List[Tuple[str, Path]], download_fn: Optional[Callable
     """
 
     if download_fn is None:
-        auth = HTTPBearerAuth(token=get_token(host=config.host))
+        token = config.token or get_token(host=config.host)
+        auth = HTTPBearerAuth(token=token)
         download_fn = partial(_dagshub_download, auth=auth, skip_if_exists=skip_if_exists)
 
     progress = get_rich_progress(rich.progress.MofNCompleteColumn(), transient=False)
