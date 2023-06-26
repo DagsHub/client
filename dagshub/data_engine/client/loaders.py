@@ -49,11 +49,9 @@ class DagsHubDataset(torch.utils.data.Dataset):
                 + 1 :
             ]
         )
-
-        if type(tensorizer) == str:
-            self._set_tensorizer(tensorizer)
-        else:
-            self.tensorizer = tensorizer
+        self.tensorizer = (
+            self._get_tensorizer(tensorizer) if type(tensorizer) == str else tensorizer
+        )
 
         strategy = strategy.lower()
         if strategy == "preload":
@@ -81,18 +79,18 @@ class DagsHubDataset(torch.utils.data.Dataset):
             p.map(self._download, self.entries)
         logger.info("Dataset download complete!")
 
-    def _set_tensorizer(self, datatype):
+    def _get_tensorizer(self, datatype):
         if datatype in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning("`tensorizer` set to 'auto'; guessing the datatype")
 
             ## naive pass
             extension = self.__getitem__(0).name.split("/")[-1].split(".")[-1]
             if extension in ["mkv", "mp4"]:
-                self.tensorizer = TorchTensorizers.video
+                return TorchTensorizers.video
             elif extension in ["wav", "mp3"]:
                 self.tensoriszer = TorchTensorizers.audio
             elif extension in ["png", "jpg", "jpeg"]:
-                self.tensorizer = TorchTensorizers.image
+                return TorchTensorizers.image
             else:
                 raise ValueError(
                     "Unable to automatically detect the datatype. Please manually set a tensorizer, \
@@ -100,7 +98,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
                 )
 
         elif datatype in ["image", "audio", "video"]:
-            self.tensorizer = getattr(TorchTensorizers, datatype)
+            return getattr(TorchTensorizers, datatype)
 
     def _download(self, entry):
         (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
@@ -129,18 +127,18 @@ class TensorFlowDataset(DagsHubDataset):
                 self.pull(entry)
             yield (self.tensorizer(open(filepath, "rb")),)
 
-    def _set_tensorizer(self, datatype):
+    def _get_tensorizer(self, datatype):
         if datatype in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning(f"`tensorizer` set to '{datatype}'; guessing the datatype")
 
             ## naive pass
             extension = self.__getitem__(0).name.split("/")[-1].split(".")[-1]
             if extension in ["mkv", "mp4"]:
-                self.tensorizer = TensorFlowTensorizers.video
+                return TensorFlowTensorizers.video
             elif extension in ["wav", "mp3"]:
-                self.tensorizer = TensorFlowTensorizers.audio
+                return TensorFlowTensorizers.audio
             elif extension in ["png", "jpg", "jpeg"]:
-                self.tensorizer = TensorFlowTensorizers.image
+                return TensorFlowTensorizers.image
             else:
                 raise ValueError(
                     "Unable to automatically detect the datatype. Please manually set a tensorizer, \
@@ -148,7 +146,7 @@ class TensorFlowDataset(DagsHubDataset):
                 )
 
         elif datatype in ["image", "audio", "video"]:
-            self.tensorizer = getattr(TensorFlowTensorizers, datatype)
+            return getattr(TensorFlowTensorizers, datatype)
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
@@ -173,14 +171,14 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
             X.append(self.dataset.__getitem__(index))
         return tf.stack(X)
 
-    def _set_tensorizer(self, datatype):
+    def _get_tensorizer(self, datatype):
         if datatype in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning(f"`tensorizer` set to '{datatype}'; guessing the datatype")
 
             ## naive pass
             extension = self.__getitem__(0).name.split("/")[-1].split(".")[-1]
             if extension in ["png", "jpg", "jpeg"]:
-                self.tensorizer = TensorFlowTensorizers.image
+                return TensorFlowTensorizers.image
             else:
                 raise ValueError(
                     'Unable to automatically detect the datatype. Please manually set a tensorizer, \
@@ -188,7 +186,9 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
                 )
 
         elif datatype in ["image"]:
-            self.tensorizer = getattr(TensorFlowTensorizers, datatype)
+            return getattr(TensorFlowTensorizers, datatype)
+        else:
+            raise ValueError("Unsupported tensorizer argument.")
 
     def on_epoch_end(self):
         self.indices = np.arange(self.dataset.__len__())
