@@ -1,6 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import Optional, Union, Mapping, Any, Dict
 
 from dagshub.common.api.repo import RepoAPI
@@ -93,6 +94,17 @@ class DatasourceState:
         """
         path = self._extract_path(path).strip("/")
         return self.root_raw_path + "/" + path
+
+    def file_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> PurePosixPath:
+        """
+        Returns the generic path of the path in the repo (adds prefix)
+        """
+        parts = self.path_parts()
+        if "prefix" in parts:
+            prefix = PurePosixPath(parts["prefix"].strip("/"))
+        else:
+            prefix = PurePosixPath()
+        return prefix / self._extract_path(path)
 
     def blob_path(self, sha: str) -> str:
         """

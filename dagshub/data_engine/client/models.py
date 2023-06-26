@@ -41,6 +41,9 @@ class Datapoint:
     def download_url(self, ds: "Datasource"):
         return ds.source.raw_path(self)
 
+    def path_in_repo(self, ds: "Datasource"):
+        return ds.source.file_path(self)
+
     @staticmethod
     def from_gql_edge(edge: Dict) -> "Datapoint":
         res = Datapoint(
