@@ -9,15 +9,22 @@ from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
 
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
-from .loaders import PyTorchDataset, TensorFlowDataLoader, TensorFlowDataset
+from .loaders import (
+    PyTorchDataset,
+    TensorFlowDataLoader,
+    TensorFlowDataset,
+    DagsHubDataset,
+)
 
-torch = lazy_load('torch')
-tf = lazy_load('tensorflow')
+torch = lazy_load("torch")
+tf = lazy_load("tensorflow")
+torch.utils.data = lazy_load("torch.utils.data", source_package="torch")
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class Metadata:
@@ -37,16 +44,18 @@ class Datapoint:
     @staticmethod
     def from_gql_edge(edge: Dict) -> "Datapoint":
         res = Datapoint(
-            datapoint_id=edge["node"]["id"],
-            path=edge["node"]["path"],
-            metadata={}
+            datapoint_id=edge["node"]["id"], path=edge["node"]["path"], metadata={}
         )
         for meta_dict in edge["node"]["metadata"]:
             res.metadata[meta_dict["key"]] = meta_dict["value"]
         return res
 
     def to_dict(self, ds: "Datasource", metadata_keys: List[str]) -> Dict[str, Any]:
-        res_dict = {"name": self.path, "datapoint_id": self.datapoint_id, "dagshub_download_url": self.download_url(ds)}
+        res_dict = {
+            "name": self.path,
+            "datapoint_id": self.datapoint_id,
+            "dagshub_download_url": self.download_url(ds),
+        }
         res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
         return res_dict
 
@@ -96,20 +105,27 @@ class QueryResult:
     @property
     def dataframe(self):
         import pandas as pd
+
         metadata_keys = set()
         for e in self.entries:
             metadata_keys.update(e.metadata.keys())
 
         metadata_keys = list(sorted(metadata_keys))
-        return pd.DataFrame.from_records([dp.to_dict(self.datasource, metadata_keys) for dp in self.entries])
+        return pd.DataFrame.from_records(
+            [dp.to_dict(self.datasource, metadata_keys) for dp in self.entries]
+        )
 
     @staticmethod
-    def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
+    def from_gql_query(
+        query_resp: Dict[str, Any], datasource: "Datasource"
+    ) -> "QueryResult":
         if "edges" not in query_resp:
             return QueryResult([], datasource)
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
-        return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
+        return QueryResult(
+            [Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource
+        )
 
     def as_dataset(self, flavor, **kwargs):
         """
@@ -117,38 +133,74 @@ class QueryResult:
         download: preload|background|lazy; default: background
         """
         flavor = flavor.lower()
-        if flavor == 'torch':
+        if flavor == "torch":
             return PyTorchDataset(self, **kwargs)
-        elif flavor == 'tensorflow':
+        elif flavor == "tensorflow":
             ds_builder = TensorFlowDataset(self, **kwargs)
-            ds = tf.data.Dataset.from_generator(ds_builder.generator,
-                                        output_signature=ds_builder.signature)
+            ds = tf.data.Dataset.from_generator(
+                ds_builder.generator, output_signature=ds_builder.signature
+            )
             ds.__len__ = lambda: ds_builder.__len__()
             ds.__getitem__ = ds_builder.__getitem__
             return ds
-        else: raise ValueError('supported flavors are torch|tensorflow')
+        else:
+            raise ValueError("supported flavors are torch|tensorflow")
 
     def as_dataloader(self, flavor, **kwargs):
-        from torch.utils.data import DataLoader
         flavor = flavor.lower() if type(flavor) == str else flavor
-        if isinstance(flavor, PyTorchDataset): return DataLoader(flavor, **kwargs)
-        elif flavor == 'torch':
-            dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
-            return DataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
-                              **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
-        elif isinstance(flavor, tf.data.Dataset): return TensorFlowDataLoader(flavor, **kwargs)
-        elif flavor == 'tensorflow':
-            dataset_kwargs = set(list(inspect.signature(PyTorchDataset).parameters.keys())[1:])
-            return TensorFlowDataLoader(self.as_dataset(flavor, **dict(map(lambda key: (key, kwargs[key]), set(kwargs.keys()).intersection(dataset_kwargs)))),
-                                        **dict(map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)))
-        else: raise ValueError('supported flavors are torch|tensorflow')
+        if isinstance(flavor, PyTorchDataset):
+            return torch.utils.data.DataLoader(flavor, **kwargs)
+        elif flavor == "torch":
+            dataset_kwargs = set(
+                list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
+            )
+            return torch.utils.data.DataLoader(
+                self.as_dataset(
+                    flavor,
+                    **dict(
+                        map(
+                            lambda key: (key, kwargs[key]),
+                            set(kwargs.keys()).intersection(dataset_kwargs),
+                        )
+                    ),
+                ),
+                **dict(
+                    map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)
+                ),
+            )
+        elif isinstance(flavor, tf.data.Dataset):
+            return TensorFlowDataLoader(flavor, **kwargs)
+        elif flavor == "tensorflow":
+            dataset_kwargs = set(
+                list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
+            )
+            return TensorFlowDataLoader(
+                self.as_dataset(
+                    flavor,
+                    **dict(
+                        map(
+                            lambda key: (key, kwargs[key]),
+                            set(kwargs.keys()).intersection(dataset_kwargs),
+                        )
+                    ),
+                ),
+                **dict(
+                    map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)
+                ),
+            )
+        else:
+            raise ValueError("supported flavors are torch|tensorflow")
 
-    def download_binary_columns(self, *columns: str, num_proc: int = 16) -> "QueryResult":
+    def download_binary_columns(
+        self, *columns: str, num_proc: int = 16
+    ) -> "QueryResult":
         """
         Downloads data from binary-defined columns
         """
         for column in columns:
-            logger.info(f"Downloading metadata for column {column} with {num_proc} processes")
+            logger.info(
+                f"Downloading metadata for column {column} with {num_proc} processes"
+            )
 
             def extract_blob_url(datapoint: Datapoint, col: str) -> Optional[str]:
                 sha = datapoint.metadata.get(col)
