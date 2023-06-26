@@ -130,7 +130,10 @@ class QueryResult:
     def as_dataset(self, flavor, **kwargs):
         """
         flavor: torch|tensorflow
-        download: preload|background|lazy; default: background
+        download: preload|background|lazy; default: lazy
+        savedir: location at which the dataset is stored
+        processes: number of parallel processes that download the dataset
+        tensorizer: auto|image|<function>
         """
         flavor = flavor.lower()
         if flavor == "torch":
@@ -147,6 +150,17 @@ class QueryResult:
             raise ValueError("supported flavors are torch|tensorflow")
 
     def as_dataloader(self, flavor, **kwargs):
+        """
+        flavor: torch|tensorflow
+        download: preload|background|lazy; default: lazy
+        savedir: location at which the dataset is stored
+        processes: number of parallel processes that download the dataset
+        tensorizer: auto|image|<function>
+        """
+
+        def keypairs(keys):
+            return {key: kwargs[key] for key in keys}
+
         flavor = flavor.lower() if type(flavor) == str else flavor
         if isinstance(flavor, PyTorchDataset):
             return torch.utils.data.DataLoader(flavor, **kwargs)
@@ -157,16 +171,9 @@ class QueryResult:
             return torch.utils.data.DataLoader(
                 self.as_dataset(
                     flavor,
-                    **dict(
-                        map(
-                            lambda key: (key, kwargs[key]),
-                            set(kwargs.keys()).intersection(dataset_kwargs),
-                        )
-                    ),
+                    **keypairs(set(kwargs.keys()).intersection(dataset_kwargs)),
                 ),
-                **dict(
-                    map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)
-                ),
+                **keypairs(kwargs.keys() - dataset_kwargs),
             )
         elif isinstance(flavor, tf.data.Dataset):
             return TensorFlowDataLoader(flavor, **kwargs)
@@ -176,17 +183,9 @@ class QueryResult:
             )
             return TensorFlowDataLoader(
                 self.as_dataset(
-                    flavor,
-                    **dict(
-                        map(
-                            lambda key: (key, kwargs[key]),
-                            set(kwargs.keys()).intersection(dataset_kwargs),
-                        )
-                    ),
+                    flavor, **keypairs(set(kwargs.keys()).intersection(dataset_kwargs))
                 ),
-                **dict(
-                    map(lambda key: (key, kwargs[key]), kwargs.keys() - dataset_kwargs)
-                ),
+                **keypairs(kwargs.keys() - dataset_kwargs),
             )
         else:
             raise ValueError("supported flavors are torch|tensorflow")

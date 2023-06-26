@@ -1,4 +1,6 @@
+import io
 import logging
+from types import FunctionType
 from typing import TYPE_CHECKING
 
 import random
@@ -26,7 +28,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         query_result,
         strategy="lazy",
         tensorizer="auto",
-        savedir=Path.home() / ".dagshub" / "datasets",
+        savedir=None,
         processes=8,
     ):
         """
@@ -37,7 +39,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         tensorizer: auto|image|<function>
         """
         self.tensorizer = lambda x: x  # prevent circular calls
-        self.savedir = Path(savedir)
+        self.savedir = query_result.datasource.default_dataset_location
         self.entries = query_result.entries
         self.repo = query_result.datasource.source.repoApi
         self.datasource_root = Path(
@@ -63,10 +65,10 @@ class DagsHubDataset(torch.utils.data.Dataset):
                 "Invalid download strategy (none from preload|background|lazy); defaulting to lazy."
             )
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.entries)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> (torch.Tensor, tf.Tensor):
         entry = self.entries[idx]
 
         filepath = self.savedir / entry.path
@@ -79,7 +81,19 @@ class DagsHubDataset(torch.utils.data.Dataset):
             p.map(self._download, self.entries)
         logger.info("Dataset download complete!")
 
-    def _get_tensorizer(self, datatype):
+    def _download(self, entry) -> str:
+        (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
+
+        if not (self.savedir / entry.path).is_file():
+            data = self.repo.get_file(f"{self.datasource_root}/{entry.path}")
+            filepath = self.savedir / entry.path
+            with open(filepath, "wb") as file:
+                file.write(data)
+            return filepath
+
+
+class PyTorchDataset(DagsHubDataset):
+    def _get_tensorizer(self, datatype: (str, FunctionType)) -> FunctionType:
         if datatype in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning("`tensorizer` set to 'auto'; guessing the datatype")
 
@@ -94,23 +108,11 @@ class DagsHubDataset(torch.utils.data.Dataset):
             else:
                 raise ValueError(
                     "Unable to automatically detect the datatype. Please manually set a tensorizer, \
-                    either with string arguments image|video|audio, or a custom tensorizer function with prototype `<_io.BufferedReader> -> <Tensor>`."
+                    either with string arguments image|video|audio, or a custom tensorizer function with prototype `<io.BufferedReader> -> <Tensor>`."
                 )
 
         elif datatype in ["image", "audio", "video"]:
             return getattr(TorchTensorizers, datatype)
-
-    def _download(self, entry):
-        (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
-
-        if not (self.savedir / entry.path).is_file():
-            data = self.repo.get_file(f"{self.datasource_root}/{entry.path}")
-            with open(self.savedir / entry.path, "wb") as file:
-                file.write(data)
-
-
-class PyTorchDataset(DagsHubDataset):
-    pass
 
 
 class TensorFlowDataset(DagsHubDataset):
@@ -127,7 +129,7 @@ class TensorFlowDataset(DagsHubDataset):
                 self.pull(entry)
             yield (self.tensorizer(open(filepath, "rb")),)
 
-    def _get_tensorizer(self, datatype):
+    def _get_tensorizer(self, datatype: (str, FunctionType)) -> FunctionType:
         if datatype in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning(f"`tensorizer` set to '{datatype}'; guessing the datatype")
 
@@ -142,7 +144,7 @@ class TensorFlowDataset(DagsHubDataset):
             else:
                 raise ValueError(
                     "Unable to automatically detect the datatype. Please manually set a tensorizer, \
-                    either with string arguments image|video|audio, or a custom tensorizer function with prototype `<_io.BufferedReader> -> <torch.Tensor>`."
+                    either with string arguments image|video|audio, or a custom tensorizer function with prototype `<io.BufferedReader> -> <tf.Tensor>`."
                 )
 
         elif datatype in ["image", "audio", "video"]:
@@ -161,17 +163,17 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         self.indices = {}
         self.on_epoch_end()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.dataset.__len__() // self.batch_size
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tf.Tensor:
         indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
         X = []
         for index in indices:
             X.append(self.dataset.__getitem__(index))
         return tf.stack(X)
 
-    def _get_tensorizer(self, datatype):
+    def _get_tensorizer(self, datatype: (str, FunctionType)) -> FunctionType:
         if datatype in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning(f"`tensorizer` set to '{datatype}'; guessing the datatype")
 
@@ -182,7 +184,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
             else:
                 raise ValueError(
                     'Unable to automatically detect the datatype. Please manually set a tensorizer, \
-                    either with string argument "image", or a custom tensorizer function with prototype `<_io.BufferedReader> -> <tf.Tensor>`.'
+                    either with string argument "image", or a custom tensorizer function with prototype `<io.BufferedReader> -> <tf.Tensor>`.'
                 )
 
         elif datatype in ["image"]:
@@ -190,7 +192,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         else:
             raise ValueError("Unsupported tensorizer argument.")
 
-    def on_epoch_end(self):
+    def on_epoch_end(self) -> None:
         self.indices = np.arange(self.dataset.__len__())
         if self.shuffle:
             np.random.shuffle(self.indices)
@@ -198,19 +200,19 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
 
 class TorchTensorizers:
     @staticmethod
-    def image(file):
+    def image(file: io.BufferedReader) -> torch.Tensor:
         return torchvision.io.read_image(file.name)
 
     @staticmethod
-    def audio(file):
+    def audio(file: io.BufferedReader) -> torch.Tensor:
         return torchaudio.load(file.name)
 
     @staticmethod
-    def video(file):
+    def video(file: io.BufferedReader) -> torch.Tensor:
         return torchvision.io.read_video(file.name)
 
 
 class TensorFlowTensorizers:
     @staticmethod
-    def image(file):
+    def image(file: io.BufferedReader) -> tf.Tensor:
         return tf.convert_to_tensor(tf.keras.utils.load_img(file.name))
