@@ -280,7 +280,6 @@ class Datasource:
                 progress.update(task, advance=1, refresh=True)
 
         ds.add_samples(samples)
-        ds.compute_metadata(skip_failures=True, overwrite=True)
         return ds
 
     @property
