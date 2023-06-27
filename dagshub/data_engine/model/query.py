@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 _metadataTypeLookup = {
     int: MetadataFieldType.INTEGER,
-    bool: MetadataFieldType.BLOB,
+    bool: MetadataFieldType.BOOLEAN,
     float: MetadataFieldType.FLOAT,
     str: MetadataFieldType.STRING,
     bytes: MetadataFieldType.BLOB,
@@ -32,6 +32,7 @@ class FieldFilterOperand(enum.Enum):
     LESS_THAN = "LESS_THAN"
     LESS_EQUAL_THAN = "LESS_EQUAL_THAN"
     CONTAINS = "CONTAINS"
+    IS_NULL = "IS_NULL"
 
 
 fieldFilterOperandMap = {
@@ -41,6 +42,7 @@ fieldFilterOperandMap = {
     "lt": FieldFilterOperand.LESS_THAN,
     "le": FieldFilterOperand.LESS_EQUAL_THAN,
     "contains": FieldFilterOperand.CONTAINS,
+    "isnull": FieldFilterOperand.IS_NULL,
 }
 
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
@@ -66,6 +68,9 @@ class DatasourceQuery:
             # Just the column is in the query - compose into a tree
             self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
             self._column_filter = None
+        elif op == "isnull":
+            # Can only do isnull on the column filter, if we got here, there's something wrong
+            raise RuntimeError(f"is_null operation can only be done on a column (e.g. ds['col1'].is_null())")
         elif op == "not":
             new_tree = Tree()
             not_node = new_tree.create_node("not")
