@@ -206,6 +206,9 @@ class Datasource:
                 progress.update(total_task, advance=upload_batch_size)
             progress.update(total_task, completed=total_entries, refresh=True)
 
+        # Update the status from dagshub, so we get back the new metadata columns
+        self.source.get_from_dagshub()
+
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
 
