@@ -17,12 +17,10 @@ def create_from_bucket(repo: str, name: str, bucket_url: str) -> Datasource:
 
 
 def create_from_repo(repo: str, name: str, path: str, revision: Optional[str] = None) -> Datasource:
-    url = f"repo://{repo}/{path.lstrip('/')}"
-    # Uncomment later when implemented
-    # if revision is None:
-    #     repoApi = RepoAPI(repo)
-    #     revision = repoApi.default_branch
-    # url = f"repo://{repo}/{revision}:{path.lstrip('/')}"
+    if revision is None:
+        repo_api = RepoAPI(repo)
+        revision = repo_api.default_branch
+    url = f"repo://{repo}/{revision}:{path.lstrip('/')}"
     source = _create_datasource_state(repo, name, DatasourceType.REPOSITORY, url)
     if revision is not None:
         source.revision = revision
