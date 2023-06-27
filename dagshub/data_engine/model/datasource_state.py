@@ -2,11 +2,12 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
-from typing import Optional, Union, Mapping, Any, Dict
+from typing import Optional, Union, Mapping, Any, Dict, List
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceType, Datapoint, DatasourceResult, PreprocessingStatus
+from dagshub.data_engine.client.models import DatasourceType, Datapoint, DatasourceResult, PreprocessingStatus, \
+    MetadataFieldSchema
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
 try:
@@ -42,6 +43,7 @@ class DatasourceState:
     path: str = field(init=False)
     client: DataClient = field(init=False)
     repoApi: RepoAPI = field(init=False)
+    metadata_fields: List[MetadataFieldSchema] = field(init=False)
 
     _revision: Optional[str] = field(init=False, default=None)
 
@@ -195,6 +197,7 @@ class DatasourceState:
         self.path = ds.rootUrl
         self.source_type = ds.type
         self.preprocessing_status = ds.preprocessingStatus
+        self.metadata_fields = ds.metadataFields
         if self.source_type == DatasourceType.REPOSITORY:
             self.revision = self.path_parts()["revision"]
 

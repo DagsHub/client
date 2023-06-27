@@ -6,12 +6,12 @@ import math
 import os.path
 import webbrowser
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
 import rich.progress
-from dataclasses_json import dataclass_json
+from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
 
 import dagshub.auth
@@ -20,7 +20,7 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
-from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint
+from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint, MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
@@ -44,7 +44,11 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     url: str
     key: str
     value: str
-    valueType: str
+    valueType: MetadataFieldType = field(
+        metadata=config(
+            encoder=lambda val: val.value
+        )
+    )
 
 
 class Datasource:
@@ -212,6 +216,7 @@ class Datasource:
         You can get the dataset back by calling `datasources.get_dataset(repo, name)`
         """
         self.source.client.save_dataset(self, name)
+        log_message(f"Dataset {name} saved")
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """

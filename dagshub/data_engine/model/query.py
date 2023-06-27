@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 
 from treelib import Tree, Node
 
+from dagshub.data_engine.client.models import MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:
@@ -12,16 +13,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _metadataTypeLookup = {
-    int: "INTEGER",
-    bool: "BOOLEAN",
-    float: "FLOAT",
-    str: "STRING",
-    bytes: "BLOB",
+    int: MetadataFieldType.INTEGER,
+    bool: MetadataFieldType.BLOB,
+    float: MetadataFieldType.FLOAT,
+    str: MetadataFieldType.STRING,
+    bytes: MetadataFieldType.BLOB,
 }
 
 _metadataTypeLookupReverse: Dict[str, Type] = {}
 for k, v in _metadataTypeLookup.items():
-    _metadataTypeLookupReverse[v] = k
+    _metadataTypeLookupReverse[v.value] = k
 
 
 class FieldFilterOperand(enum.Enum):
@@ -118,7 +119,7 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
-            value_type = _metadataTypeLookup.get(type(value))
+            value_type = _metadataTypeLookup[type(value)].value
             if value_type is None:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
                                    f"Supported types: {list(_metadataTypeLookup.keys())}")

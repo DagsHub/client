@@ -1,6 +1,6 @@
 import enum
 import logging
-import multiprocessing
+import multiprocessing.pool
 from dataclasses import dataclass
 from itertools import repeat
 from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional, Tuple
@@ -66,6 +66,21 @@ class DatasourceType(enum.Enum):
     CUSTOM = "CUSTOM"
 
 
+class MetadataFieldType(enum.Enum):
+    BOOLEAN = "BOOLEAN"
+    INTEGER = "INTEGER"
+    FLOAT = "FLOAT"
+    STRING = "STRING"
+    BLOB = "BLOB"
+
+
+@dataclass
+class MetadataFieldSchema:
+    name: str
+    valueType: MetadataFieldType
+    multiple: bool
+
+
 @dataclass
 class DatasourceResult:
     id: Union[str, int]
@@ -74,6 +89,7 @@ class DatasourceResult:
     integrationStatus: IntegrationStatus
     preprocessingStatus: PreprocessingStatus
     type: DatasourceType
+    metadataFields: Optional[List[MetadataFieldSchema]]
 
 
 @dataclass
@@ -108,7 +124,7 @@ class QueryResult:
             return QueryResult([], datasource)
         return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
 
-    def download_binary_columns(self, *columns: str, num_proc: int = 16) -> "QueryResult":
+    def download_binary_columns(self, *columns: str, num_proc: int = 32) -> "QueryResult":
         """
         Downloads data from binary-defined columns
         """
@@ -124,7 +140,7 @@ class QueryResult:
             blob_urls = map(lambda dp: extract_blob_url(dp, column), self.entries)
             auth = self.datasource.source.repoApi.auth
             func_args = zip(blob_urls, repeat(auth))
-            with multiprocessing.Pool(num_proc) as pool:
+            with multiprocessing.pool.ThreadPool(num_proc) as pool:
                 res = pool.starmap(_get_blob, func_args)
 
             for dp, binary_val in zip(self.entries, res):

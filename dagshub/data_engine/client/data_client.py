@@ -12,7 +12,7 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import QueryResult, DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus, DatasetResult
+    PreprocessingStatus, DatasetResult, MetadataFieldType
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus])
+_dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType])
 
 
 class DataClient:
