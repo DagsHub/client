@@ -156,6 +156,7 @@ class Datasource:
                     continue
                 if val is None:
                     continue
+                # ONLY FOR PANDAS: since pandas doesn't distinguish between None and NaN, don't upload it
                 if type(val) is float and math.isnan(val):
                     continue
                 res.append(DatapointMetadataUpdateEntry(
@@ -540,8 +541,6 @@ class MetadataContextManager:
         for dp in datapoints:
             for k, v in metadata.items():
                 if v is None:
-                    continue
-                if type(v) is float and math.isnan(v):
                     continue
                 value_type = _metadataTypeLookup[type(v)]
                 if type(v) is bytes:
