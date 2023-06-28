@@ -246,9 +246,9 @@ For details regarding potential kwarg options, run `help(<class>)` in a python r
 
 ## Tensorizers
 
-DataLoaders cannot return the entries by default. They need to be preprocessed and converted into a tensor before they can be ingested by neural networks. To achieve this, the Dataset and DataLoader classes each expose tensorizer functions, which can be passed as input to tiether `as_dataset` or `as_dataloader`.
+DataLoaders cannot return the entries by default. They need to be preprocessed and converted into a tensor before they can be ingested by neural networks. To achieve this, the Dataset and DataLoader classes each expose tensorizer functions, which can be passed as input to either `as_dataset` or `as_dataloader`.
 
-These functions take as input either the dataframe or the BufferedReader containing file data and are supposed to output Tensors.
+These functions take as input either the raw data from the metadata or a `BufferedReader` containing file data and are supposed to output Tensors.
 
 Alternatively, you can either specify 'auto', where the client makes an attempt at guessing the datatype(s) and tensorizing it. This works naively, checking just the file extension to see if there is a match. You can manually specify a list of types ['image', 'audio', 'video'], and the client sequentially parses each column with the type.
 
