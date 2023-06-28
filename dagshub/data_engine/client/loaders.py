@@ -248,3 +248,15 @@ class TensorFlowTensorizers:
     @staticmethod
     def image(file: io.BufferedReader) -> tf.Tensor:
         return tf.convert_to_tensor(tf.keras.utils.load_img(file.name))
+
+    @staticmethod
+    def audio(file: io.BufferedReader) -> torch.Tensor:
+        raise NotImplementedError('Coming Soon!')
+
+    @staticmethod
+    def video(file: io.BufferedReader) -> torch.Tensor:
+        raise NotImplementedError('Coming Soon!')
+
+    @staticmethod
+    def numeric(num: (float, int)) -> torch.Tensor:
+        raise NotImplementedError('Coming Soon!')

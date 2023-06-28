@@ -132,9 +132,12 @@ class QueryResult:
 
     def as_dataset(self, flavor, **kwargs):
         """
+        ARGS:
         flavor: torch|tensorflow
+
+        KWARGS:
         metadata_columns: columns that are returned from the metadata as part of the dataset
-        download: preload|background|lazy; default: lazy
+        strategy: preload|background|lazy; default: lazy
         savedir: location at which the dataset is stored
         processes: number of parallel processes that download the dataset
         tensorizer: auto|image|<function>
@@ -155,9 +158,12 @@ class QueryResult:
 
     def as_dataloader(self, flavor, **kwargs):
         """
+        ARGS:
         flavor: torch|tensorflow
+
+        KWARGS:
         metadata_columns: columns that are returned from the metadata as part of the dataloader
-        download: preload|background|lazy; default: lazy
+        strategy: preload|background|lazy; default: lazy
         savedir: location at which the dataset is stored
         processes: number of parallel processes that download the dataset
         tensorizer: auto|image|<function>
