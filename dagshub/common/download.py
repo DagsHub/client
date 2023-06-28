@@ -3,7 +3,7 @@ import os.path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
-from typing import Tuple, Callable, Optional, List
+from typing import Tuple, Callable, Optional, List, Union
 
 import rich.progress
 
@@ -16,11 +16,14 @@ from dagshub.common.rich_util import get_rich_progress
 logger = logging.getLogger(__name__)
 
 
-def _dagshub_download(url: str, location: Path, auth: HTTPBearerAuth, skip_if_exists: bool):
+def _dagshub_download(url: str, location: Union[str, Path], auth: HTTPBearerAuth, skip_if_exists: bool):
     logger.debug(f"Download {url} to {location}")
 
     if skip_if_exists and os.path.exists(location):
         return
+
+    if type(location) is str:
+        location = Path(location)
 
     resp = http_request("GET", url, auth=auth)
     try:
@@ -34,13 +37,14 @@ def _dagshub_download(url: str, location: Path, auth: HTTPBearerAuth, skip_if_ex
         f.write(resp.content)
 
 
-def download_files(files: List[Tuple[str, Path]], download_fn: Optional[Callable[[str, Path], None]] = None,
+def download_files(files: List[Tuple[str, Union[str, Path]]],
+                   download_fn: Optional[Callable[[str, Union[Path, str]], None]] = None,
                    threads=32, skip_if_exists=True):
     """
     Download files using multithreading
 
     Parameters:
-        files: iterable of (download_url: str, file_location: Path)
+        files: iterable of (download_url: str, file_location: str or Path)
         download_fn: Optional function that will download the file. Needs to receive a single argument of the tuple
             If function is not specified, then a default function that downloads a file with DagsHub credentials is used
             CAUTION: function needs to be pickleable since we're using ThreadPool to execute

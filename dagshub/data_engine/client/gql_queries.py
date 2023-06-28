@@ -28,6 +28,7 @@ class GqlQueries:
             "rootUrl",
             "integrationStatus",
             "preprocessingStatus",
+            "metadataFields {name valueType multiple}"
             "type",
         ]).generate()
         return q

@@ -217,3 +217,147 @@ def test_deserialization_complex(ds):
 
     deserialized = DatasourceQuery.deserialize(serialized)
     assert deserialized.serialize_graphql() == queried.get_query().serialize_graphql()
+
+
+def test_not_equals(ds):
+    queried = ds[ds["col1"] != "aaa"]
+    expected = {
+        "not": {
+            "children": [
+                {
+                    "eq": {"data": {"field": "col1", "value": "aaa"}}
+                }
+            ],
+            "data": None
+        }
+    }
+    assert queried.get_query().to_dict() == expected
+
+
+def test_not_and(ds):
+    queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
+    expected = {
+        "not": {
+            "children": [
+                {
+                    "and": {
+                        "children": [
+                            {"eq": {"data": {"field": "col1", "value": "aaa"}}},
+                            {"gt": {"data": {"field": "col2", "value": 5}}},
+                        ],
+                        "data": None
+                    }
+                }
+            ],
+            "data": None
+        }
+    }
+    assert queried.get_query().to_dict() == expected
+
+
+def test_not_serialization(ds):
+    queried = ds[ds["col1"] != "aaa"]
+    expected = {
+        "filter": {
+            "key": "col1",
+            "value": "aaa",
+            "valueType": "STRING",
+            "comparator": "EQUAL"
+        },
+        "not": True
+    }
+    assert queried.get_query().serialize_graphql() == expected
+
+
+def test_nand_serialization(ds):
+    queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
+    expected = {
+        "and": [
+            {"filter": {
+                "key": "col1",
+                "value": "aaa",
+                "valueType": "STRING",
+                "comparator": "EQUAL"
+            }},
+            {"filter": {
+                "key": "col2",
+                "value": str(5),
+                "valueType": "INTEGER",
+                "comparator": "GREATER_THAN"
+            }}
+        ],
+        "not": True
+    }
+    assert queried.get_query().serialize_graphql() == expected
+
+
+def test_nand_deserialization(ds):
+    queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
+    serialized = {
+        "and": [
+            {"filter": {
+                "key": "col1",
+                "value": "aaa",
+                "valueType": "STRING",
+                "comparator": "EQUAL"
+            }},
+            {"filter": {
+                "key": "col2",
+                "value": str(5),
+                "valueType": "INTEGER",
+                "comparator": "GREATER_THAN"
+            }}
+        ],
+        "not": True
+    }
+    deserialized = DatasourceQuery.deserialize(serialized)
+    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+
+
+def test_isnull(ds):
+    queried = ds["col1"].is_null()
+    expected = {
+        "isnull": {"data": {"field": "col1", "value": ""}},
+    }
+    assert queried.get_query().to_dict() == expected
+
+
+def test_isnull_int(ds):
+    queried = ds["col_int"].is_null()
+    expected = {
+        "isnull": {"data": {"field": "col_int", "value": int()}},
+    }
+    assert queried.get_query().to_dict() == expected
+
+
+def test_isnull_serialization(ds):
+    queried = ds["col1"].is_null()
+    expected = {
+        "filter": {
+            "key": "col1",
+            "value": "",
+            "valueType": "STRING",
+            "comparator": "IS_NULL"
+        }
+    }
+
+    assert queried.get_query().serialize_graphql() == expected
+
+
+def test_isnull_deserialization(ds):
+    queried = ds["col1"].is_null()
+    serialized = {
+        "filter": {
+            "key": "col1",
+            "value": "",
+            "valueType": "STRING",
+            "comparator": "IS_NULL"
+        }
+    }
+    deserialized = DatasourceQuery.deserialize(serialized)
+    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+
+
+def test_isnull_raises_not_on_field(ds):
+    with pytest.raises(RuntimeError):
+        ds.is_null()

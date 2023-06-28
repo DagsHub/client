@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 
 from treelib import Tree, Node
 
+from dagshub.data_engine.client.models import MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:
@@ -12,37 +13,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _metadataTypeLookup = {
-    int: "INTEGER",
-    bool: "BOOLEAN",
-    float: "FLOAT",
-    str: "STRING",
-    bytes: "BLOB",
+    int: MetadataFieldType.INTEGER,
+    bool: MetadataFieldType.BOOLEAN,
+    float: MetadataFieldType.FLOAT,
+    str: MetadataFieldType.STRING,
+    bytes: MetadataFieldType.BLOB,
 }
 
 _metadataTypeLookupReverse: Dict[str, Type] = {}
 for k, v in _metadataTypeLookup.items():
-    _metadataTypeLookupReverse[v] = k
+    _metadataTypeLookupReverse[v.value] = k
 
 
 class FieldFilterOperand(enum.Enum):
     EQUAL = "EQUAL"
-    NOT_EQUAL = "NOT_EQUAL"
     GREATER_THAN = "GREATER_THAN"
     GREATER_EQUAL_THAN = "GREATER_EQUAL_THAN"
     LESS_THAN = "LESS_THAN"
     LESS_EQUAL_THAN = "LESS_EQUAL_THAN"
     CONTAINS = "CONTAINS"
+    IS_NULL = "IS_NULL"
 
 
 fieldFilterOperandMap = {
     "eq": FieldFilterOperand.EQUAL,
-    # TODO: turn on when ready
-    # "ne": FieldFilterOperand.NOT_EQUAL,
     "gt": FieldFilterOperand.GREATER_THAN,
     "ge": FieldFilterOperand.GREATER_EQUAL_THAN,
     "lt": FieldFilterOperand.LESS_THAN,
     "le": FieldFilterOperand.LESS_EQUAL_THAN,
     "contains": FieldFilterOperand.CONTAINS,
+    "isnull": FieldFilterOperand.IS_NULL,
 }
 
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
@@ -63,11 +63,23 @@ class DatasourceQuery:
     def __str__(self):
         return f"<Query: {self.to_dict()}>"
 
-    def compose(self, op: str, other: Union[str, int, float, "DatasourceQuery", "Datasource"]):
+    @property
+    def column_filter(self) -> Optional[str]:
+        return self._column_filter
+
+    def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree
             self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
             self._column_filter = None
+        elif op == "isnull":
+            # Can only do isnull on the column filter, if we got here, there's something wrong
+            raise RuntimeError(f"is_null operation can only be done on a column (e.g. ds['col1'].is_null())")
+        elif op == "not":
+            new_tree = Tree()
+            not_node = new_tree.create_node("not")
+            new_tree.paste(not_node.identifier, self._operand_tree)
+            self._operand_tree = new_tree
         else:
             # The query is an actual query with a tree - make a subtree
             if type(other) is not DatasourceQuery:
@@ -104,13 +116,19 @@ class DatasourceQuery:
         if operand in ["and", "or"]:
             # recursively serialize children subqueries
             return {operand: [DatasourceQuery._serialize_node(child, tree) for child in tree.children(node.identifier)]}
+        if operand == "not":
+            assert len(tree.children(node.identifier)) == 1
+            child = tree.children(node.identifier)[0]
+            serialized = DatasourceQuery._serialize_node(child, tree)
+            serialized["not"] = True
+            return serialized
         else:
             query_op = fieldFilterOperandMap.get(operand)
             if query_op is None:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
-            value_type = _metadataTypeLookup.get(type(value))
+            value_type = _metadataTypeLookup[type(value)].value
             if value_type is None:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
                                    f"Supported types: {list(_metadataTypeLookup.keys())}")
@@ -136,8 +154,14 @@ class DatasourceQuery:
     @staticmethod
     def _deserialize_node(node_dict: Dict, tree: Tree, parent_node=None) -> None:
         keys = list(node_dict.keys())
-        if len(keys) > 1:
-            raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
+
+        is_negative = node_dict.get("not", False)
+        if is_negative:
+            # If operation is negative - prepend a "not" node to the node we'll be adding
+            neg_node = Node(tag="not")
+            tree.add_node(neg_node, parent_node)
+            parent_node = neg_node
+
         op_type = keys[0]
         val = node_dict[op_type]
         # Types: and, or, filter

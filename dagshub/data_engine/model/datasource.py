@@ -6,12 +6,12 @@ import math
 import os.path
 import webbrowser
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator
 
 import rich.progress
-from dataclasses_json import dataclass_json
+from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
 
 import dagshub.auth
@@ -20,9 +20,9 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
-from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint
+from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint, MetadataFieldType, MetadataFieldSchema
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
-from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
+from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup, _metadataTypeLookupReverse
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 
 if TYPE_CHECKING:
@@ -44,7 +44,11 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     url: str
     key: str
     value: str
-    valueType: str
+    valueType: MetadataFieldType = field(
+        metadata=config(
+            encoder=lambda val: val.value
+        )
+    )
 
 
 class Datasource:
@@ -153,6 +157,7 @@ class Datasource:
                     continue
                 if val is None:
                     continue
+                # ONLY FOR PANDAS: since pandas doesn't distinguish between None and NaN, don't upload it
                 if type(val) is float and math.isnan(val):
                     continue
                 res.append(DatapointMetadataUpdateEntry(
@@ -203,6 +208,9 @@ class Datasource:
                 progress.update(total_task, advance=upload_batch_size)
             progress.update(total_task, completed=total_entries, refresh=True)
 
+        # Update the status from dagshub, so we get back the new metadata columns
+        self.source.get_from_dagshub()
+
     def __str__(self):
         return f"<Dataset source:{self._source}, query: {self._query}>"
 
@@ -213,6 +221,7 @@ class Datasource:
         You can get the dataset back by calling `datasources.get_dataset(repo, name)`
         """
         self.source.client.save_dataset(self, name)
+        log_message(f"Dataset {name} saved")
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
@@ -272,7 +281,6 @@ class Datasource:
                 progress.update(task, advance=1, refresh=True)
 
         ds.add_samples(samples)
-        ds.compute_metadata(skip_failures=True, overwrite=True)
         return ds
 
     @property
@@ -473,7 +481,10 @@ class Datasource:
         self._test_not_comparing_other_ds(other)
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
-        return self.add_query_op("ne", other)
+        return self.add_query_op("eq", other).add_query_op("not")
+
+    def __invert__(self):
+        return self.add_query_op("not")
 
     def __contains__(self, item):
         raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in ds`")
@@ -483,6 +494,23 @@ class Datasource:
             return WrongOperatorError(f"Cannot use contains with non-string value {item}")
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
+
+    def is_null(self):
+        field = self._get_filtering_field()
+        value_type = _metadataTypeLookupReverse[field.valueType.value]
+        return self.add_query_op("isnull", value_type())
+
+    def is_not_null(self):
+        return self.is_null().add_query_op("not")
+
+    def _get_filtering_field(self) -> MetadataFieldSchema:
+        field_name = self.get_query().column_filter
+        if field_name is None:
+            raise RuntimeError("The current query filter is not a field")
+        for col in self.source.metadata_fields:
+            if col.name == field_name:
+                return col
+        raise RuntimeError(f"Field {field_name} doesn't exist in the current uploaded metadata")
 
     def __and__(self, other: "Datasource"):
         return self.add_query_op("and", other)
@@ -502,7 +530,8 @@ class Datasource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
-    def add_query_op(self, op: str, other: Union[str, int, float, "Datasource", "DatasourceQuery"]) -> "Datasource":
+    def add_query_op(self, op: str,
+                     other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None) -> "Datasource":
         """
         Returns a new dataset with an added query param
         """
@@ -529,8 +558,6 @@ class MetadataContextManager:
         for dp in datapoints:
             for k, v in metadata.items():
                 if v is None:
-                    continue
-                if type(v) is float and math.isnan(v):
                     continue
                 value_type = _metadataTypeLookup[type(v)]
                 if type(v) is bytes:
