@@ -130,7 +130,7 @@ class QueryResult:
             [Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource
         )
 
-    def as_dataset(self, flavor, **kwargs):
+    def as_dataset(self, flavor, columns, **kwargs):
         """
         flavor: torch|tensorflow
         download: preload|background|lazy; default: lazy
@@ -140,9 +140,9 @@ class QueryResult:
         """
         flavor = flavor.lower()
         if flavor == "torch":
-            return PyTorchDataset(self, **kwargs)
+            return PyTorchDataset(self, columns, **kwargs)
         elif flavor == "tensorflow":
-            ds_builder = TensorFlowDataset(self, **kwargs)
+            ds_builder = TensorFlowDataset(self, columns, **kwargs)
             ds = tf.data.Dataset.from_generator(
                 ds_builder.generator, output_signature=ds_builder.signature
             )
@@ -152,7 +152,7 @@ class QueryResult:
         else:
             raise ValueError("supported flavors are torch|tensorflow")
 
-    def as_dataloader(self, flavor, **kwargs):
+    def as_dataloader(self, flavor, columns=None, **kwargs):
         """
         flavor: torch|tensorflow
         download: preload|background|lazy; default: lazy
@@ -165,8 +165,8 @@ class QueryResult:
             return {key: kwargs[key] for key in keys}
 
         flavor = flavor.lower() if type(flavor) == str else flavor
-        if isinstance(flavor, PyTorchDataset):
-            return torch.utils.data.DataLoader(flavor, **kwargs)
+        if type(flavor) == PyTorchDataset:
+            return torch.utils.data.DataLoader(flavor, columns, **kwargs)
         elif flavor == "torch":
             dataset_kwargs = set(
                 list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
@@ -174,19 +174,22 @@ class QueryResult:
             return torch.utils.data.DataLoader(
                 self.as_dataset(
                     flavor,
+                    columns,
                     **keypairs(set(kwargs.keys()).intersection(dataset_kwargs)),
                 ),
                 **keypairs(kwargs.keys() - dataset_kwargs),
             )
         elif isinstance(flavor, tf.data.Dataset):
-            return TensorFlowDataLoader(flavor, **kwargs)
+            return TensorFlowDataLoader(flavor, columns, **kwargs)
         elif flavor == "tensorflow":
             dataset_kwargs = set(
                 list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
             )
             return TensorFlowDataLoader(
                 self.as_dataset(
-                    flavor, **keypairs(set(kwargs.keys()).intersection(dataset_kwargs))
+                    flavor,
+                    columns,
+                    **keypairs(set(kwargs.keys()).intersection(dataset_kwargs)),
                 ),
                 **keypairs(kwargs.keys() - dataset_kwargs),
             )

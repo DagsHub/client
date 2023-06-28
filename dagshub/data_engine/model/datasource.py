@@ -75,6 +75,7 @@ class Datasource:
     def get_query(self):
         return self._query
 
+
     @property
     def annotation_columns(self) -> List[str]:
         # TODO: once the annotation type is implemented, expose those columns here

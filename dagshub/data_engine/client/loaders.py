@@ -1,7 +1,7 @@
 import io
 import logging
 from types import FunctionType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 import random
 from pathlib import Path
@@ -26,33 +26,50 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         query_result,
-        strategy="lazy",
-        tensorizer="auto",
-        savedir=None,
-        processes=8,
+        metadata_columns,
+        strategy: str = "lazy",
+        tensorizers: (str, FunctionType) = "auto",
+        savedir: str = None,
+        processes: int = 8,
     ):
         """
         query_result: <dagshub.data_engine.client.models.QueryResult>
         strategy: preload|background|lazy; default: lazy
         savedir: location at which the dataset is stored
         processes: number of parallel processes that download the dataset
-        tensorizer: auto|image|<function>
+        tensorizers: auto|image|<function>
         """
-        self.tensorizer = lambda x: x  # prevent circular calls
-        self.savedir = query_result.datasource.default_dataset_location
+        self.metadata_columns = metadata_columns
+        self.file_columns = [
+            column for column in metadata_columns if column.startswith("file_")
+        ]
         self.entries = query_result.entries
-        self.repo = query_result.datasource.source.repoApi
+        self.tensorizers = [
+            lambda x: x,
+        ] * (
+            len(metadata_columns) + 1
+        )  # prevent circular calls
+        self.datasource = query_result.datasource
+        self.repo = self.datasource.source.repoApi
+        self.savedir = self.datasource.default_dataset_location
         self.datasource_root = Path(
-            query_result.datasource.source.path[
-                query_result.datasource.source.path.index(
-                    query_result.datasource.source.repo
-                )
-                + len(query_result.datasource.source.repo)
+            self.datasource.source.path[
+                self.datasource.source.path.index(self.datasource.source.repo)
+                + len(self.datasource.source.repo)
                 + 1 :
             ]
         )
-        self.tensorizer = (
-            self._get_tensorizer(tensorizer) if type(tensorizer) == str else tensorizer
+
+        from dagshub.data_engine.client.models import (
+            Datapoint,
+        )  # prevent circular imports
+
+        self.datapoint_class = Datapoint
+
+        self.tensorizers = (
+            self._get_tensorizers(tensorizers)
+            if type(tensorizers) == str or type(tensorizers[0]) == str
+            else tensorizers
         )
 
         strategy = strategy.lower()
@@ -68,55 +85,101 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return len(self.entries)
 
-    def __getitem__(self, idx: int) -> (torch.Tensor, tf.Tensor):
+    def __getitem__(self, idx: int) -> (List[torch.Tensor], List[tf.Tensor]):
+        out = []
         entry = self.entries[idx]
 
-        filepath = self.savedir / entry.path
-        if not filepath.is_file():
-            self._download(entry)
-        return self.tensorizer(open(filepath, "rb"))
+        out.append(self._get_file(entry))
+        for idx, column in enumerate(self.metadata_columns):
+            out.append(
+                self._get_file(self.datapoint_class("", entry.metadata[column], {}))
+                if column in self.file_columns
+                else entry.metadata[column]
+            )
 
-    def pull(self, processes) -> None:
+        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, out)]
+
+    def pull(self, processes: int) -> None:
         with Pool(processes=processes) as p:
             p.map(self._download, self.entries)
         logger.info("Dataset download complete!")
 
-    def _download(self, entry) -> str:
-        (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
+    def _get_file(self, entry) -> io.BufferedReader:
+        filepath = self.savedir / entry.path
+        if not filepath.is_file():
+            self._download(entry)
+        return open(filepath, "rb")
 
-        if not (self.savedir / entry.path).is_file():
-            data = self.repo.get_file(f"{self.datasource_root}/{entry.path}")
-            filepath = self.savedir / entry.path
-            with open(filepath, "wb") as file:
-                file.write(data)
-            return filepath
+    def _download(self, datapoint) -> None:
+        entries = [
+            datapoint,
+            *[
+                self.datapoint_class("", datapoint.metadata.get(column), {})
+                for column in self.file_columns
+            ],
+        ]
+
+        for entry in entries:
+            (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
+            if not (self.savedir / entry.path).is_file():
+                data = self.repo.get_file(f"{self.datasource_root}/{entry.path}")
+                filepath = self.savedir / entry.path
+                with open(filepath, "wb") as file:
+                    file.write(data)
+
+    def _get_tensorizers(
+        self, datatypes: (str, List[str], List[FunctionType])
+    ) -> FunctionType:
+        if datatypes in ["auto", "guess"]:  # guess is an easter egg argument
+            logger.warning("`tensorizers` set to 'auto'; guessing the datatypes")
+            tensorizers = []
+
+            ## naive pass
+            for idx, entry in enumerate(self[0]):
+                if not idx or self.metadata_columns[idx - 1] in self.file_columns:
+                    extension = entry.name.split("/")[-1].split(".")[-1]
+                    if extension in ["mkv", "mp4"]:
+                        tensorizers.append(self.tensorlib.video)
+                    elif extension in ["wav", "mp3"]:
+                        tensorizers.append(self.tensorlib.audio)
+                    elif extension in ["png", "jpg", "jpeg"]:
+                        tensorizers.append(self.tensorlib.image)
+                    else:
+                        raise ValueError(
+                            "Unable to automatically detect the datatypes. Please manually set a list of tensorizers, \
+                                        either with string arguments image|video|audio, or custom tensorizer functions with prototype `<io.BufferedReader> -> <torch.Tensor>`."
+                        )
+                elif type(entry) in [int, float]:
+                    tensorizers.append(self.tensorlib.numeric)
+                else:
+                    raise ValueError(
+                        "Unable to automatically tensorize non-numeric metadata. Please menually setup a list of tensorizers, either with string arguments image|video|audio, or custom tensorizer functions with prototype `<io.BufferedReader> -> <torch.Tensor>`."
+                    )
+            return tensorizers
+        elif datatypes in ["image", "audio", "video"]:
+            return [
+                getattr(self.tensorlib, datatypes),
+            ] * len(self.metadata_columns)
+        elif len(datatypes) == len(self.metadata_columns):
+            return [
+                getattr(self.tensorlib, datatype) if type(datatype) == str else datatype
+                for datatype in datatypes
+            ]
+        else:
+            raise ValueError(
+                "Unable to set tensorizers. Please ensure the number of selected columns equals the number of tensorizers."
+            )
 
 
 class PyTorchDataset(DagsHubDataset):
-    def _get_tensorizer(self, datatype: (str, FunctionType)) -> FunctionType:
-        if datatype in ["auto", "guess"]:  # guess is an easter egg argument
-            logger.warning("`tensorizer` set to 'auto'; guessing the datatype")
-
-            ## naive pass
-            extension = self.__getitem__(0).name.split("/")[-1].split(".")[-1]
-            if extension in ["mkv", "mp4"]:
-                return TorchTensorizers.video
-            elif extension in ["wav", "mp3"]:
-                self.tensoriszer = TorchTensorizers.audio
-            elif extension in ["png", "jpg", "jpeg"]:
-                return TorchTensorizers.image
-            else:
-                raise ValueError(
-                    "Unable to automatically detect the datatype. Please manually set a tensorizer, \
-                    either with string arguments image|video|audio, or a custom tensorizer function with prototype `<io.BufferedReader> -> <Tensor>`."
-                )
-
-        elif datatype in ["image", "audio", "video"]:
-            return getattr(TorchTensorizers, datatype)
+    def __init__(self, *args, **kwargs):
+        self.tensorlib = TorchTensorizers
+        super().__init__(*args, **kwargs)
 
 
 class TensorFlowDataset(DagsHubDataset):
     def __init__(self, *args, **kwargs):
+        self.tensorlib = TensorFlowTensorizers
         super().__init__(*args, **kwargs)
         self.signature = tuple(
             tf.TensorSpec.from_tensor(tensor) for tensor in next(self.generator())
@@ -127,28 +190,7 @@ class TensorFlowDataset(DagsHubDataset):
             filepath = self.savedir / entry.path
             if not filepath.is_file():
                 self.pull(entry)
-            yield (self.tensorizer(open(filepath, "rb")),)
-
-    def _get_tensorizer(self, datatype: (str, FunctionType)) -> FunctionType:
-        if datatype in ["auto", "guess"]:  # guess is an easter egg argument
-            logger.warning(f"`tensorizer` set to '{datatype}'; guessing the datatype")
-
-            ## naive pass
-            extension = self.__getitem__(0).name.split("/")[-1].split(".")[-1]
-            if extension in ["mkv", "mp4"]:
-                return TensorFlowTensorizers.video
-            elif extension in ["wav", "mp3"]:
-                return TensorFlowTensorizers.audio
-            elif extension in ["png", "jpg", "jpeg"]:
-                return TensorFlowTensorizers.image
-            else:
-                raise ValueError(
-                    "Unable to automatically detect the datatype. Please manually set a tensorizer, \
-                    either with string arguments image|video|audio, or a custom tensorizer function with prototype `<io.BufferedReader> -> <tf.Tensor>`."
-                )
-
-        elif datatype in ["image", "audio", "video"]:
-            return getattr(TensorFlowTensorizers, datatype)
+            yield (self.tensorizers(open(filepath, "rb")),)
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
@@ -170,27 +212,8 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
         X = []
         for index in indices:
-            X.append(self.dataset.__getitem__(index))
+            X.append(self.dataset[index])
         return tf.stack(X)
-
-    def _get_tensorizer(self, datatype: (str, FunctionType)) -> FunctionType:
-        if datatype in ["auto", "guess"]:  # guess is an easter egg argument
-            logger.warning(f"`tensorizer` set to '{datatype}'; guessing the datatype")
-
-            ## naive pass
-            extension = self.__getitem__(0).name.split("/")[-1].split(".")[-1]
-            if extension in ["png", "jpg", "jpeg"]:
-                return TensorFlowTensorizers.image
-            else:
-                raise ValueError(
-                    'Unable to automatically detect the datatype. Please manually set a tensorizer, \
-                    either with string argument "image", or a custom tensorizer function with prototype `<io.BufferedReader> -> <tf.Tensor>`.'
-                )
-
-        elif datatype in ["image"]:
-            return getattr(TensorFlowTensorizers, datatype)
-        else:
-            raise ValueError("Unsupported tensorizer argument.")
 
     def on_epoch_end(self) -> None:
         self.indices = np.arange(self.dataset.__len__())
@@ -210,6 +233,10 @@ class TorchTensorizers:
     @staticmethod
     def video(file: io.BufferedReader) -> torch.Tensor:
         return torchvision.io.read_video(file.name).type(torch.float)
+
+    @staticmethod
+    def numeric(num: (float, int)) -> torch.Tensor:
+        return torch.tensor(num, dtype=torch.float)
 
 
 class TensorFlowTensorizers:
