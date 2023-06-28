@@ -20,9 +20,9 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
-from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint, MetadataFieldType
+from dagshub.data_engine.client.models import PreprocessingStatus, Datapoint, MetadataFieldType, MetadataFieldSchema
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError
-from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
+from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup, _metadataTypeLookupReverse
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 
 if TYPE_CHECKING:
@@ -493,6 +493,23 @@ class Datasource:
             return WrongOperatorError(f"Cannot use contains with non-string value {item}")
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
+
+    def is_null(self):
+        field = self._get_filtering_field()
+        value_type = _metadataTypeLookupReverse[field.valueType.value]
+        return self.add_query_op("isnull", value_type())
+
+    def is_not_null(self):
+        return self.is_null().add_query_op("not")
+
+    def _get_filtering_field(self) -> MetadataFieldSchema:
+        field_name = self.get_query().column_filter
+        if field_name is None:
+            raise RuntimeError("The current query filter is not a field")
+        for col in self.source.metadata_fields:
+            if col.name == field_name:
+                return col
+        raise RuntimeError(f"Field {field_name} doesn't exist in the current uploaded metadata")
 
     def __and__(self, other: "Datasource"):
         return self.add_query_op("and", other)

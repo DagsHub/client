@@ -63,6 +63,10 @@ class DatasourceQuery:
     def __str__(self):
         return f"<Query: {self.to_dict()}>"
 
+    @property
+    def column_filter(self) -> Optional[str]:
+        return self._column_filter
+
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree
