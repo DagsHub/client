@@ -26,7 +26,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         query_result,
-        metadata_columns,
+        metadata_columns=[],
         strategy: str = "lazy",
         tensorizers: (str, FunctionType) = "auto",
         savedir: str = None,
@@ -107,17 +107,19 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def _get_file(self, entry) -> io.BufferedReader:
         filepath = self.savedir / entry.path
         if not filepath.is_file():
-            self._download(entry)
+            self._download(entry, is_subentry=entry.metadata.get('subentry', False))
         return open(filepath, "rb")
 
-    def _download(self, datapoint) -> None:
-        entries = [
-            datapoint,
-            *[
-                self.datapoint_class("", datapoint.metadata.get(column), {})
-                for column in self.file_columns
-            ],
-        ]
+    def _download(self, datapoint, is_subentry=False) -> None:
+        if is_subentry: entries = [datapoint,]
+        else:
+            entries = [
+                 datapoint,
+                 *[
+                     self.datapoint_class('', datapoint.metadata.get(column), {'subentry': True})
+                     for column in self.file_columns
+                 ],
+             ]
 
         for entry in entries:
             (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
@@ -159,7 +161,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         elif datatypes in ["image", "audio", "video"]:
             return [
                 getattr(self.tensorlib, datatypes),
-            ] * len(self.metadata_columns)
+            ] * len(self.metadata_columns) + 1
         elif len(datatypes) == len(self.metadata_columns):
             return [
                 getattr(self.tensorlib, datatype) if type(datatype) == str else datatype
@@ -186,21 +188,24 @@ class TensorFlowDataset(DagsHubDataset):
         )
 
     def generator(self):
-        for entry in self.entries:
-            filepath = self.savedir / entry.path
-            if not filepath.is_file():
-                self.pull(entry)
-            yield (self.tensorizers(open(filepath, "rb")),)
+        for idx in range(len(self)):
+            yield self[idx]
+        # for entry in self.entries:
+        #     filepath = self.savedir / entry.path
+        #     if not filepath.is_file():
+        #         self.pull(entry)
+        #     yield (self.tensorizers(open(filepath, "rb")),)
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
-    def __init__(self, dataset, batch_size=32, shuffle=True, seed=0):
+    def __init__(self, dataset, batch_size=1, shuffle=True, seed=None):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
 
-        random.seed(seed)
-        np.random.seed(seed)
+        if seed:
+            random.seed(seed)
+            np.random.seed(seed)
 
         self.indices = {}
         self.on_epoch_end()
@@ -212,7 +217,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
         X = []
         for index in indices:
-            X.append(self.dataset[index])
+            X.append(self.dataset.__getitem__(index))
         return tf.stack(X)
 
     def on_epoch_end(self) -> None:
