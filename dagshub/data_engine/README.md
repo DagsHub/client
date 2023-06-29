@@ -250,11 +250,8 @@ The datapoints will have all the metadata loaded and a new dataset named same as
 Usage:
 
 ```python
-import fiftyone as fo
-
-voxel_dataset = ds.to_voxel51_dataset()
-sess = fo.launch_app(voxel_dataset)  # Will open a new voxel window
-sess.wait()
+voxel_session = ds.visualize()  # Will launch a new voxel instance and return back its session object
+voxel_session.wait(-1)
 ```
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
@@ -278,8 +275,6 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
   still work
   probably
   (with unexpected results)
-- Voxel integration shoves all data into `~/dagshub_datasets` with no concern for whatever files are already there (
-  wastes bandwidth + space)
 
 ## Troubleshooting
 
