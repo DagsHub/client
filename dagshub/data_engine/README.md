@@ -167,7 +167,9 @@ df = ds[q1 | q2].all().dataframe
 The dataframe returned by `.dataframe` has a `dagshub_download_url` field with the URL to the download the file.
 This way if your ML framework supports loading files from dataframes with urls, you can pass the dataframe to them.
 
-Supported operands are: `==, >, >=, <, <=, .contains()` (We're working on adding `!=`)
+Supported operands are: `==, !=, >, >=, <, <=, .contains(), .is_null(), is_not_null()`
+
+To negate a condition use the complement `~` symbol: `df[~(<sub-query>)]`
 
 Queries can be composed logically via binary and/or operators `&` and `|`. If you do a subquery, it is considered to be
 composed with and
