@@ -98,10 +98,10 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
 - Float
 - Boolean
 - String
+- Blobs (need to be of type `bytes`)
 - Planned, not implemented yet:
   - JSON
   - Label Studio format annotations
-  - Blobs
   - Images
 - ** Please let us know about other metadata types you'd like to use and why **
 
@@ -147,6 +147,17 @@ If you're more used to working pandas dataframes, you can get a dataframe back b
 ```python
 df = ds.head().dataframe
 # Do pandas stuff with it next
+```
+
+### Blob fields
+
+Blob fields are not downloaded by default, instead we return the hash of the field.
+
+In order to download the data, use the `download_binary_columns(*columns)` function of the QueryResult
+
+```python
+df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
+# Now "binary_1" and "binary_2" have the actual blobs
 ```
 
 ## Querying
