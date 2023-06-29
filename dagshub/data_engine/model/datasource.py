@@ -425,31 +425,6 @@ class Datasource:
             webbrowser.open_new_tab(link)
         return link
 
-    def _send_to_annotation(self, url: str):
-        """ TEMP FUNCTION """
-        auth = HTTPBearerAuth(dagshub.auth.get_token(host=self.source.client.host))
-
-        def _http_request(method, url, **kwargs):
-            if "auth" not in kwargs:
-                kwargs["auth"] = auth
-            return http_request(method, url, **kwargs)
-
-        dps = self.all()
-
-        data = {"datasourceid": str(self.source.id),
-                "datapoints": [{"id": str(dp.datapoint_id),
-                                "downloadurl": dp.download_url(self)[:7] + dp.download_url(self)[7:].replace('//', '/')}
-                               for dp in dps.entries]}
-
-        logger.debug(f"Sending request to URL {url}\nwith data: {data}")
-
-        resp = _http_request("POST", url, json=data)
-
-        print(resp)
-        if resp.status_code == 200:
-            print(resp.json()['link'])
-        return
-
     """ FUNCTIONS RELATED TO QUERYING
     These are functions that overload operators on the DataSet, so you can do pandas-like filtering
         ds = Dataset(...)
