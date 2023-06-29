@@ -9,6 +9,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+    from fiftyone import Label
+    for field in annotation_fields:
+        label = Label.from_json(datapoint.metadata[field].decode())
+        sample.add_labels(label, label_field=field)
+
+
 def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
     """
     Adds LabelStudio annotation to the voxel sample.
