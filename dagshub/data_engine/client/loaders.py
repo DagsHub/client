@@ -1,7 +1,7 @@
 import io
 import logging
 from types import FunctionType
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Union
 
 import random
 from pathlib import Path
@@ -26,21 +26,24 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         query_result,
-        metadata_columns=[],
+        metadata_columns: List[str] = [],
+        file_columns: List[str] = None,
         strategy: str = "lazy",
-        tensorizers: (str, FunctionType) = "auto",
+        tensorizers: Union[str, List[Union[str, FunctionType]]] = "auto",
         savedir: str = None,
         processes: int = 8,
     ):
         """
         query_result: <dagshub.data_engine.client.models.QueryResult>
+        metadata_columns: columns that are returned from the metadata as part of the dataloader
+        file_columns: columns with a datapoint metadata that are files
         strategy: preload|background|lazy; default: lazy
+        tensorizers: auto|image|<function>
         savedir: location at which the dataset is stored
         processes: number of parallel processes that download the dataset
-        tensorizers: auto|image|<function>
         """
         self.metadata_columns = metadata_columns
-        self.file_columns = [
+        self.file_columns = file_columns or [
             column for column in metadata_columns if column.startswith("file_")
         ]
         self.entries = query_result.entries
@@ -51,7 +54,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         )  # prevent circular calls
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
-        self.savedir = self.datasource.default_dataset_location
+        self.savedir = savedir or self.datasource.default_dataset_location
         self.datasource_root = Path(
             self.datasource.source.path[
                 self.datasource.source.path.index(self.datasource.source.repo)
@@ -59,12 +62,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
                 + 1 :
             ]
         )
-
-        from dagshub.data_engine.client.models import (
-            Datapoint,
-        )  # prevent circular imports
-
-        self.datapoint_class = Datapoint
+        self.order = None
 
         self.tensorizers = (
             self._get_tensorizers(tensorizers)
@@ -85,14 +83,15 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return len(self.entries)
 
-    def __getitem__(self, idx: int) -> (List[torch.Tensor], List[tf.Tensor]):
+    def __getitem__(self, idx: int) -> List[Union[torch.Tensor, tf.Tensor]]:
         out = []
         entry = self.entries[idx]
 
-        out.append(self._get_file(entry))
+        self._download(entry)
+        out.append((self.savedir / entry.path).as_posix())
         for idx, column in enumerate(self.metadata_columns):
             out.append(
-                self._get_file(self.datapoint_class("", entry.metadata[column], {}))
+                (self.savedir / entry.metadata[column]).as_posix()
                 if column in self.file_columns
                 else entry.metadata[column]
             )
@@ -101,36 +100,25 @@ class DagsHubDataset(torch.utils.data.Dataset):
 
     def pull(self, processes: int) -> None:
         with Pool(processes=processes) as p:
-            p.map(self._download, self.entries)
+            p.map(self._download, self.order or self.entries)
         logger.info("Dataset download complete!")
 
-    def _get_file(self, entry) -> io.BufferedReader:
-        filepath = self.savedir / entry.path
-        if not filepath.is_file():
-            self._download(entry, is_subentry=entry.metadata.get('subentry', False))
-        return open(filepath, "rb")
+    def _download(self, datapoint) -> None:
+        paths = [
+            datapoint.path,
+            *[datapoint.metadata.get(column) for column in self.file_columns],
+        ]
 
-    def _download(self, datapoint, is_subentry=False) -> None:
-        if is_subentry: entries = [datapoint,]
-        else:
-            entries = [
-                 datapoint,
-                 *[
-                     self.datapoint_class('', datapoint.metadata.get(column), {'subentry': True})
-                     for column in self.file_columns
-                 ],
-             ]
-
-        for entry in entries:
-            (self.savedir / Path(entry.path).parent).mkdir(parents=True, exist_ok=True)
-            if not (self.savedir / entry.path).is_file():
-                data = self.repo.get_file(f"{self.datasource_root}/{entry.path}")
-                filepath = self.savedir / entry.path
+        for path in paths:
+            (self.savedir / Path(path).parent).mkdir(parents=True, exist_ok=True)
+            if not (self.savedir / path).is_file():
+                data = self.repo.get_file(f"{self.datasource_root}/{path}")
+                filepath = self.savedir / path
                 with open(filepath, "wb") as file:
                     file.write(data)
 
     def _get_tensorizers(
-        self, datatypes: (str, List[str], List[FunctionType])
+        self, datatypes: Union[str, List[Union[str, FunctionType]]]
     ) -> FunctionType:
         if datatypes in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning("`tensorizers` set to 'auto'; guessing the datatypes")
@@ -139,7 +127,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
             ## naive pass
             for idx, entry in enumerate(self[0]):
                 if not idx or self.metadata_columns[idx - 1] in self.file_columns:
-                    extension = entry.name.split("/")[-1].split(".")[-1]
+                    extension = entry.split("/")[-1].split(".")[-1]
                     if extension in ["mkv", "mp4"]:
                         tensorizers.append(self.tensorlib.video)
                     elif extension in ["wav", "mp3"]:
@@ -149,20 +137,22 @@ class DagsHubDataset(torch.utils.data.Dataset):
                     else:
                         raise ValueError(
                             "Unable to automatically detect the datatypes. Please manually set a list of tensorizers, \
-                                        either with string arguments image|video|audio, or custom tensorizer functions with prototype `<io.BufferedReader> -> <torch.Tensor>`."
+                                        either with string arguments image|video|audio, or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
                         )
                 elif type(entry) in [int, float]:
                     tensorizers.append(self.tensorlib.numeric)
                 else:
                     raise ValueError(
-                        "Unable to automatically tensorize non-numeric metadata. Please menually setup a list of tensorizers, either with string arguments image|video|audio, or custom tensorizer functions with prototype `<io.BufferedReader> -> <torch.Tensor>`."
+                        "Unable to automatically tensorize non-numeric metadata. Please menually setup a list of tensorizers, either with string arguments image|video|audio, or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
                     )
             return tensorizers
         elif datatypes in ["image", "audio", "video"]:
             return [
                 getattr(self.tensorlib, datatypes),
             ] * len(self.metadata_columns) + 1
-        elif len(datatypes) == len(self.metadata_columns):
+        elif (
+            type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1
+        ):
             return [
                 getattr(self.tensorlib, datatype) if type(datatype) == str else datatype
                 for datatype in datatypes
@@ -190,11 +180,6 @@ class TensorFlowDataset(DagsHubDataset):
     def generator(self):
         for idx in range(len(self)):
             yield self[idx]
-        # for entry in self.entries:
-        #     filepath = self.savedir / entry.path
-        #     if not filepath.is_file():
-        #         self.pull(entry)
-        #     yield (self.tensorizers(open(filepath, "rb")),)
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
@@ -228,35 +213,35 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
 
 class TorchTensorizers:
     @staticmethod
-    def image(file: io.BufferedReader) -> torch.Tensor:
-        return torchvision.io.read_image(file.name).type(torch.float)
+    def image(filepath: str) -> torch.Tensor:
+        return torchvision.io.read_image(filepath).type(torch.float)
 
     @staticmethod
-    def audio(file: io.BufferedReader) -> torch.Tensor:
-        return torchaudio.load(file.name).type(torch.float)
+    def audio(filepath: str) -> torch.Tensor:
+        return torchaudio.load(filepath).type(torch.float)
 
     @staticmethod
-    def video(file: io.BufferedReader) -> torch.Tensor:
-        return torchvision.io.read_video(file.name).type(torch.float)
+    def video(filepath: str) -> torch.Tensor:
+        return torchvision.io.read_video(filepath).type(torch.float)
 
     @staticmethod
-    def numeric(num: (float, int)) -> torch.Tensor:
+    def numeric(num: Union[float, int]) -> torch.Tensor:
         return torch.tensor(num, dtype=torch.float)
 
 
 class TensorFlowTensorizers:
     @staticmethod
-    def image(file: io.BufferedReader) -> tf.Tensor:
-        return tf.convert_to_tensor(tf.keras.utils.load_img(file.name))
+    def image(filepath: str) -> tf.Tensor:
+        return tf.convert_to_tensor(tf.keras.utils.load_img(filepath))
 
     @staticmethod
-    def audio(file: io.BufferedReader) -> torch.Tensor:
-        raise NotImplementedError('Coming Soon!')
+    def audio(filepath: str) -> torch.Tensor:
+        raise NotImplementedError("Coming Soon!")
 
     @staticmethod
-    def video(file: io.BufferedReader) -> torch.Tensor:
-        raise NotImplementedError('Coming Soon!')
+    def video(filepath: str) -> torch.Tensor:
+        raise NotImplementedError("Coming Soon!")
 
     @staticmethod
-    def numeric(num: (float, int)) -> torch.Tensor:
-        raise NotImplementedError('Coming Soon!')
+    def numeric(num: Union[float, int]) -> torch.Tensor:
+        return tf.convert_to_tensor(num)
