@@ -205,6 +205,7 @@ ds2 = ds[(ds["episode"] > 5) & (ds["has_baby_yoda"] == True)]
   behavior that I did not test. Example below:
 
 ```python
+# DON'T DO THIS
 filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[ds["has_baby_yoda"] == True]
 ```
@@ -212,6 +213,7 @@ filtered_ds2 = filtered_ds[ds["has_baby_yoda"] == True]
 Instead, it's preferred to have all the columns be addressed by the variable you address:
 
 ```python
+# INSTEAD THIS IS PREFERRED
 filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 ```
