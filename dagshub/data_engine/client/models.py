@@ -203,7 +203,7 @@ class QueryResult:
         elif isinstance(flavor, tf.data.Dataset):
             return TensorFlowDataLoader(flavor, **kwargs)
 
-        kwargs['for_dataloader'] = False
+        kwargs["for_dataloader"] = True
         dataset_kwargs = set(
             list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
         )

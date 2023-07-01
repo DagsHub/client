@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING, List, Union
 import random
 from pathlib import Path
 from multiprocessing import Pool, Process
+
 from dagshub.common.util import lazy_load
 from dagshub.common.download import download_files
+from dagshub.common.api.repo import PathNotFoundError
 
 np = lazy_load("numpy")
 torch = lazy_load("torch")
@@ -33,7 +35,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         tensorizers: Union[str, List[Union[str, FunctionType]]] = "auto",
         savedir: str = None,
         processes: int = 8,
-        for_dataloader: bool = False
+        for_dataloader: bool = False,
     ):
         """
         query_result: <dagshub.data_engine.client.models.QueryResult>
@@ -45,9 +47,6 @@ class DagsHubDataset(torch.utils.data.Dataset):
         processes: number of parallel processes that download the dataset
         """
         self.metadata_columns = metadata_columns
-        self.file_columns = file_columns or [
-            column for column in metadata_columns if column.startswith("file_")
-        ]
         self.entries = query_result.entries
         self.tensorizers = [
             lambda x: x,
@@ -58,15 +57,15 @@ class DagsHubDataset(torch.utils.data.Dataset):
         self.repo = self.datasource.source.repoApi
         self.savedir = savedir or self.datasource.default_dataset_location
         self.strategy = strategy
+
         self.datasource_root = Path(
-            self.datasource.source.path[
-                self.datasource.source.path.index(self.datasource.source.repo)
-                + len(self.datasource.source.repo)
-                + 1 :
-            ]
+            self.entries[0]
+            .path_in_repo(self.datasource)
+            .as_posix()[: -len(self.entries[0].path)]
         )
         self.processes = processes
         self.order = None
+        self.file_columns = file_columns or self._get_file_columns()
 
         self.tensorizers = (
             self._get_tensorizers(tensorizers)
@@ -78,7 +77,8 @@ class DagsHubDataset(torch.utils.data.Dataset):
         if strategy == "preload":
             self.pull()
         elif strategy == "background":
-            if for_dataloader: return
+            if for_dataloader:
+                return
             Process(target=self.pull).start()
         elif strategy != "lazy":
             logger.warning(
@@ -87,6 +87,21 @@ class DagsHubDataset(torch.utils.data.Dataset):
 
     def __len__(self) -> int:
         return len(self.entries)
+
+    def _get_file_columns(self):
+        logger.warning("Manually detecting file columns; this may take a second.")
+
+        res = []
+        for column, value in zip(
+            self.metadata_columns,
+            [self.entries[0].metadata[col] for col in self.metadata_columns],
+        ):
+            try:
+                self.repo.list_path((self.datasource_root / value).as_posix())
+                res.append(column)
+            except ValueError:
+                pass
+        return res
 
     def get(self, idx: int) -> list:
         out = []
@@ -103,15 +118,18 @@ class DagsHubDataset(torch.utils.data.Dataset):
 
         return out
 
-
     def __getitem__(self, idx: int) -> List[Union[torch.Tensor, tf.Tensor]]:
-        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, self.get(idx))]
+        return [
+            tensorizer(data)
+            for tensorizer, data in zip(self.tensorizers, self.get(idx))
+        ]
 
     def pull(self) -> None:
         if self.order is not None:
             entries = [self.entries[idx] for idx in self.order]
             self.order = None
-        else: entries = self.entries
+        else:
+            entries = self.entries
 
         with Pool(processes=self.processes) as p:
             p.map(self._download, entries, 1)
@@ -195,11 +213,14 @@ class TensorFlowDataset(DagsHubDataset):
         for idx in range(len(self)):
             yield self[idx]
 
+
 class PyTorchDataLoader(torch.utils.data.DataLoader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dataset.order = list(self.sampler)
-        if self.dataset.strategy == 'background': Process(target=self.dataset.pull).start()
+        if self.dataset.strategy == "background":
+            Process(target=self.dataset.pull).start()
+
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
     def __init__(self, dataset, batch_size=1, shuffle=True, seed=None):
@@ -215,7 +236,8 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         self.on_epoch_end()
 
         self.dataset.builder.order = self.indices
-        if self.dataset.builder.strategy == 'background': Process(target=self.dataset.builder.pull).start()
+        if self.dataset.builder.strategy == "background":
+            Process(target=self.dataset.builder.pull).start()
 
     def __len__(self) -> int:
         return self.dataset.__len__() // self.batch_size
