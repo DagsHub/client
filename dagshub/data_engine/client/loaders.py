@@ -97,9 +97,9 @@ class DagsHubDataset(torch.utils.data.Dataset):
             [self.entries[0].metadata[col] for col in self.metadata_columns],
         ):
             try:
-                self.repo.list_path((self.datasource_root / value).as_posix())
+                self.repo.list_path((self.datasource_root / str(value)).as_posix())
                 res.append(column)
-            except ValueError:
+            except PathNotFoundError:
                 pass
         return res
 
