@@ -7,6 +7,7 @@ import random
 from pathlib import Path
 from multiprocessing import Pool, Process
 from dagshub.common.util import lazy_load
+from dagshub.common.download import download_files
 
 np = lazy_load("numpy")
 torch = lazy_load("torch")
@@ -32,6 +33,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         tensorizers: Union[str, List[Union[str, FunctionType]]] = "auto",
         savedir: str = None,
         processes: int = 8,
+        for_dataloader: bool = False
     ):
         """
         query_result: <dagshub.data_engine.client.models.QueryResult>
@@ -55,6 +57,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
         self.savedir = savedir or self.datasource.default_dataset_location
+        self.strategy = strategy
         self.datasource_root = Path(
             self.datasource.source.path[
                 self.datasource.source.path.index(self.datasource.source.repo)
@@ -62,6 +65,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
                 + 1 :
             ]
         )
+        self.processes = processes
         self.order = None
 
         self.tensorizers = (
@@ -72,9 +76,10 @@ class DagsHubDataset(torch.utils.data.Dataset):
 
         strategy = strategy.lower()
         if strategy == "preload":
-            self.pull(processes=processes)
+            self.pull()
         elif strategy == "background":
-            Process(target=self.pull, args=(processes,)).start()
+            if for_dataloader: return
+            Process(target=self.pull).start()
         elif strategy != "lazy":
             logger.warning(
                 "Invalid download strategy (none from preload|background|lazy); defaulting to lazy."
@@ -83,7 +88,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return len(self.entries)
 
-    def __getitem__(self, idx: int) -> List[Union[torch.Tensor, tf.Tensor]]:
+    def get(self, idx: int) -> list:
         out = []
         entry = self.entries[idx]
 
@@ -96,11 +101,20 @@ class DagsHubDataset(torch.utils.data.Dataset):
                 else entry.metadata[column]
             )
 
-        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, out)]
+        return out
 
-    def pull(self, processes: int) -> None:
-        with Pool(processes=processes) as p:
-            p.map(self._download, self.order or self.entries)
+
+    def __getitem__(self, idx: int) -> List[Union[torch.Tensor, tf.Tensor]]:
+        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, self.get(idx))]
+
+    def pull(self) -> None:
+        if self.order is not None:
+            entries = [self.entries[idx] for idx in self.order]
+            self.order = None
+        else: entries = self.entries
+
+        with Pool(processes=self.processes) as p:
+            p.map(self._download, entries, 1)
         logger.info("Dataset download complete!")
 
     def _download(self, datapoint) -> None:
@@ -125,7 +139,7 @@ class DagsHubDataset(torch.utils.data.Dataset):
             tensorizers = []
 
             ## naive pass
-            for idx, entry in enumerate(self[0]):
+            for idx, entry in enumerate(self.get(0)):
                 if not idx or self.metadata_columns[idx - 1] in self.file_columns:
                     extension = entry.split("/")[-1].split(".")[-1]
                     if extension in ["mkv", "mp4"]:
@@ -181,6 +195,11 @@ class TensorFlowDataset(DagsHubDataset):
         for idx in range(len(self)):
             yield self[idx]
 
+class PyTorchDataLoader(torch.utils.data.DataLoader):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset.order = list(self.sampler)
+        if self.dataset.strategy == 'background': Process(target=self.dataset.pull).start()
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
     def __init__(self, dataset, batch_size=1, shuffle=True, seed=None):
@@ -194,6 +213,9 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
 
         self.indices = {}
         self.on_epoch_end()
+
+        self.dataset.builder.order = self.indices
+        if self.dataset.builder.strategy == 'background': Process(target=self.dataset.builder.pull).start()
 
     def __len__(self) -> int:
         return self.dataset.__len__() // self.batch_size

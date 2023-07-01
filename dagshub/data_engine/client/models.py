@@ -10,15 +10,15 @@ from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
 from .loaders import (
-    PyTorchDataset,
-    TensorFlowDataLoader,
-    TensorFlowDataset,
     DagsHubDataset,
+    PyTorchDataset,
+    PyTorchDataLoader,
+    TensorFlowDataset,
+    TensorFlowDataLoader,
 )
 
 torch = lazy_load("torch")
 tf = lazy_load("tensorflow")
-torch_data = lazy_load("torch.utils.data", source_package="torch")
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -168,6 +168,7 @@ class QueryResult:
             )
             ds.__len__ = lambda: ds_builder.__len__()
             ds.__getitem__ = ds_builder.__getitem__
+            ds.builder = ds_builder
             return ds
         else:
             raise ValueError("supported flavors are torch|tensorflow")
@@ -183,6 +184,7 @@ class QueryResult:
         savedir: location at which the dataset is stored
         processes: number of parallel processes that download the dataset
         tensorizer: auto|image|<function>
+        for_dataloader: bool; internal argument, that begins background dataset download after shuffle order is determined for the first epoch; default: False
         """
 
         def keypairs(keys):
@@ -190,18 +192,19 @@ class QueryResult:
 
         flavor = flavor.lower() if type(flavor) == str else flavor
         if type(flavor) == PyTorchDataset:
-            return torch_data.DataLoader(flavor, **kwargs)
+            return PyTorchDataLoader(flavor, **kwargs)
         elif isinstance(flavor, tf.data.Dataset):
             return TensorFlowDataLoader(flavor, **kwargs)
 
+        kwargs['for_dataloader'] = False
         dataset_kwargs = set(
             list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
         )
         global_kwargs = set(kwargs.keys())
         if flavor == "torch":
-            return torch_data.DataLoader(
+            return PyTorchDataLoader(
                 self.as_dataset(
-                    flavor, **keypairs(global_kwargs).intersection(dataset_kwargs)
+                    flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))
                 ),
                 **keypairs(global_kwargs - dataset_kwargs),
             )
