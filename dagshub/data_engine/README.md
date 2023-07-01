@@ -98,10 +98,10 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
 - Float
 - Boolean
 - String
+- Blobs (need to be of type `bytes`)
 - Planned, not implemented yet:
   - JSON
   - Label Studio format annotations
-  - Blobs
   - Images
 - ** Please let us know about other metadata types you'd like to use and why **
 
@@ -149,6 +149,17 @@ df = ds.head().dataframe
 # Do pandas stuff with it next
 ```
 
+### Blob fields
+
+Blob fields are not downloaded by default, instead we return the hash of the field.
+
+In order to download the data, use the `download_binary_columns(*columns)` function of the QueryResult
+
+```python
+df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
+# Now "binary_1" and "binary_2" have the actual blobs
+```
+
 ## Querying
 
 We're striving to support
@@ -167,7 +178,9 @@ df = ds[q1 | q2].all().dataframe
 The dataframe returned by `.dataframe` has a `dagshub_download_url` field with the URL to the download the file.
 This way if your ML framework supports loading files from dataframes with urls, you can pass the dataframe to them.
 
-Supported operands are: `==, >, >=, <, <=, .contains()` (We're working on adding `!=`)
+Supported operands are: `==, !=, >, >=, <, <=, .contains(), .is_null(), is_not_null()`
+
+To negate a condition use the complement `~` symbol: `df[~(<sub-query>)]`
 
 Queries can be composed logically via binary and/or operators `&` and `|`. If you do a subquery, it is considered to be
 composed with and
@@ -192,6 +205,7 @@ ds2 = ds[(ds["episode"] > 5) & (ds["has_baby_yoda"] == True)]
   behavior that I did not test. Example below:
 
 ```python
+# DON'T DO THIS
 filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[ds["has_baby_yoda"] == True]
 ```
@@ -199,6 +213,7 @@ filtered_ds2 = filtered_ds[ds["has_baby_yoda"] == True]
 Instead, it's preferred to have all the columns be addressed by the variable you address:
 
 ```python
+# INSTEAD THIS IS PREFERRED
 filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 ```
@@ -291,11 +306,8 @@ The datapoints will have all the metadata loaded and a new dataset named same as
 Usage:
 
 ```python
-import fiftyone as fo
-
-voxel_dataset = ds.to_voxel51_dataset()
-sess = fo.launch_app(voxel_dataset)  # Will open a new voxel window
-sess.wait()
+voxel_session = ds.visualize()  # Will launch a new voxel instance and return back its session object
+voxel_session.wait(-1)
 ```
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
@@ -319,8 +331,6 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
   still work
   probably
   (with unexpected results)
-- Voxel integration shoves all data into `~/dagshub_datasets` with no concern for whatever files are already there (
-  wastes bandwidth + space)
 
 ## Troubleshooting
 
