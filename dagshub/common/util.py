@@ -1,7 +1,9 @@
-import importlib
 import types
+import logging
+import importlib
 from urllib.parse import urljoin, quote
 
+logger = logging.getLogger(__name__)
 
 def multi_urljoin(*parts):
     """Shoutout to https://stackoverflow.com/a/55722792"""
@@ -55,7 +57,7 @@ class LazyModule(types.ModuleType):
             module = importlib.import_module(self.__name__)
             self._module = module
         except ModuleNotFoundError:
-            print(f"Could not import module {self.__name__}. Make sure to pip install {self._source_package}")
+            logger.warning(f"Could not import module {self.__name__}. Make sure to pip install {self._source_package}")
             raise
 
         # Update this object's dict so that attribute references are efficient

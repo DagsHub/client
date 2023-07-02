@@ -239,6 +239,60 @@ ds = datasets.get_dataset("user/repo", "my-cool-dataset")
 
 You'll get back the dataset and can continue working from where you left off
 
+# Datasets and Dataloaders
+
+To close the pipeline from a filtered dataset to beginning training, you can leverage datasets and dataloaders from `torch` and `tensorflow` frameworks. The data is streamed using the DagsHub API.
+
+## Sample Usage
+```python
+dataset_tr = query_result.as_dataset(flavor='torch', strategy='background', processes = 9000)
+dataset_tf = query_result.as_dataset('tensorflow', savedir='/tmp/.dataset/' metadata_columns=['file_depth', 'clf'], strategy='preload')
+
+dataloader = query_result.as_dataloader('torch', tensorizers='auto')
+dataloader = query_result.as_dataloader(dataset_tr, tensorizers='image')
+dataloader = query_result.as_dataloader('tensorflow', tensorizers=[lambda x: x])
+dataloader = query_result.as_dataloader(dataset_tf, tensorizers=['video', 'image', 'numeric'])
+
+for X, y in dataloader:
+    # some training here
+```
+
+For details regarding potential kwarg options, run `help(<class>)` in a python runtime.
+
+## Tensorizers
+
+DataLoaders cannot return the entries by default. They need to be preprocessed and converted into a tensor before they can be ingested by neural networks. To achieve this, the Dataset and DataLoader classes each expose tensorizer functions, which can be passed as input to either `as_dataset` or `as_dataloader`.
+
+These functions take as input either the raw data from the metadata or a `BufferedReader` containing file data and are supposed to output Tensors.
+
+Alternatively, you can either specify 'auto', where the client makes an attempt at guessing the datatype(s) and tensorizing it. This works naively, checking just the file extension to see if there is a match. You can manually specify a list of types ['image', 'audio', 'video'], and the client sequentially parses each column with the type.
+
+## Multi/Label Columns
+
+At the client-level, the data engine doesn't differentiate between input and label data. This is to support extensible multimodal use cases with varying model I/O. You specify a list of output columns, the tensors for which you can allot and accordingly train.
+
+You can select which columns you would like to extract from the metadata by specifing a list of column names to `metadata_columns`. The dataloaders return a list of all the tensorized entries.
+
+## Streamed Data Download Strategies
+
+1. Lazy: The client queries the DagsHub API as and when indices are requested. Intended for compute-restricted hardware.
+2. Background: The client queries the DagsHub API using multithreading in the background, while returning the UI thread. If an item is requested that isn't already downloaded, the API is queried on the primary thread and returned. This is the ideal strategy.
+3. Preload: The client queries the entire dataset, and only returns the primary thread once the download is completed. Intended for situations where avoiding dataloader delays is critical (for instance, GPU clusters where jobs have strict timeouts).
+
+## Implementation Details + Quirks
+
+`metadata_column` deciphers if a datatype is a file based on if the column starts with 'file_'. This is a temporary solution, and will be replace by datasource-level metadata that is user customizable.
+
+### PyTorch
+
+1. Datsets extend the `torch.utils.data.Dataset` base class.
+2. DataLoaders use the default `torch.utils.data.DataLoader`. Besides the `flavor` argument, calling `as_dataloader` proxies all DataLoader arguments to this class.
+
+### TensorFlow
+
+1. Datasets are created using generators, obtained by extending PyTorch's `torch.utils.data.DataLoader`.
+2. DataLoaders extend `tf.keras.utils.Sequence`. Supported options are limited,
+
 # Exporting to Voxel51
 
 [This part is extremely experimental and only the happiest path is working there, expect to do manual cleanup sometimes]
