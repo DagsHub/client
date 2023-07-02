@@ -406,7 +406,7 @@ class Datasource:
             req_dict = {}
             if type(dp) is dict:
                 req_dict["id"] = dp["id"]
-                req_dict["download_url"] = dp["downloadurl"]
+                req_dict["download_url"] = dp["download_url"]
             else:
                 req_dict["id"] = dp.datapoint_id
                 req_dict["download_url"] = dp.download_url(self)
