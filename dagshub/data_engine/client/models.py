@@ -123,7 +123,7 @@ class QueryResult:
             metadata_keys.update(e.metadata.keys())
 
         metadata_keys = list(sorted(metadata_keys))
-        return pd.DataFrame.from_records([dp.to_dict(self.datasource, metadata_keys) for dp in self.entries])
+        return pd.DataFrame.from_records([dp.to_dict(metadata_keys) for dp in self.entries])
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
