@@ -304,9 +304,9 @@ class Datasource:
         logger.warning(f"Downloading {len(datapoints.entries)} files to {dataset_location}")
 
         def dp_path(dp: Datapoint):
-            return dataset_location / dp.path_in_repo(self)
+            return dataset_location / dp.path_in_repo()
 
-        download_args = [(dp.download_url(self), dp_path(dp)) for dp in datapoints.entries]
+        download_args = [(dp.download_url(), dp_path(dp)) for dp in datapoints.entries]
         redownload = kwargs.get("redownload", False)
         download_files(download_args, skip_if_exists=not redownload)
 
@@ -318,7 +318,7 @@ class Datasource:
         with progress:
             for datapoint in datapoints.entries:
                 sample = fo.Sample(filepath=dp_path(datapoint))
-                sample["dagshub_download_url"] = datapoint.download_url(self)
+                sample["dagshub_download_url"] = datapoint.download_url()
                 sample["datapoint_id"] = datapoint.datapoint_id
                 label_func(sample, datapoint, *annotation_columns)
                 for k, v in datapoint.metadata.items():
@@ -412,7 +412,7 @@ class Datasource:
                 req_dict["download_url"] = dp["download_url"]
             else:
                 req_dict["id"] = dp.datapoint_id
-                req_dict["download_url"] = dp.download_url(self)
+                req_dict["download_url"] = dp.download_url()
             req_data["datapoints"].append(req_dict)
 
         init_url = multi_urljoin(self.source.repoApi.data_engine_url, "annotations/init")

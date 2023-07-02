@@ -31,26 +31,28 @@ class Datapoint:
     datapoint_id: str
     path: str
     metadata: Dict[str, Any]
+    datasource: "Datasource"
 
-    def download_url(self, ds: "Datasource"):
-        return ds.source.raw_path(self)
+    def download_url(self):
+        return self.datasource.source.raw_path(self)
 
-    def path_in_repo(self, ds: "Datasource"):
-        return ds.source.file_path(self)
+    def path_in_repo(self):
+        return self.datasource.source.file_path(self)
 
     @staticmethod
-    def from_gql_edge(edge: Dict) -> "Datapoint":
+    def from_gql_edge(edge: Dict, datasource: "Datasource") -> "Datapoint":
         res = Datapoint(
             datapoint_id=edge["node"]["id"],
             path=edge["node"]["path"],
-            metadata={}
+            metadata={},
+            datasource=datasource
         )
         for meta_dict in edge["node"]["metadata"]:
             res.metadata[meta_dict["key"]] = meta_dict["value"]
         return res
 
-    def to_dict(self, ds: "Datasource", metadata_keys: List[str]) -> Dict[str, Any]:
-        res_dict = {"name": self.path, "datapoint_id": self.datapoint_id, "dagshub_download_url": self.download_url(ds)}
+    def to_dict(self, metadata_keys: List[str]) -> Dict[str, Any]:
+        res_dict = {"name": self.path, "datapoint_id": self.datapoint_id, "dagshub_download_url": self.download_url()}
         res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
         return res_dict
 
@@ -129,7 +131,7 @@ class QueryResult:
             return QueryResult([], datasource)
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
-        return QueryResult([Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource)
+        return QueryResult([Datapoint.from_gql_edge(edge, datasource) for edge in query_resp["edges"]], datasource)
 
     def download_binary_columns(self, *columns: str, num_proc: int = 32) -> "QueryResult":
         """
