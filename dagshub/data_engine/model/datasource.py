@@ -346,6 +346,9 @@ class Datasource:
 
         return sess
 
+    def columns(self) -> List[MetadataFieldSchema]:
+        return self.source.metadata_fields
+
     @staticmethod
     def _check_downloaded_dataset_size(datapoints: "QueryResult"):
         download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
