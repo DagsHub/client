@@ -398,18 +398,18 @@ class Datasource:
             logger.warning("No datapoints provided to be sent to labelstudio")
             return None
         req_data = {
-            "datasourceid": str(self.source.id),
+            "datasource_id": self.source.id,
             "datapoints": []
         }
 
         for dp in datapoints:
             req_dict = {}
             if type(dp) is dict:
-                req_dict["id"] = str(dp["id"])
-                req_dict["downloadurl"] = dp["downloadurl"]
+                req_dict["id"] = dp["id"]
+                req_dict["download_url"] = dp["downloadurl"]
             else:
-                req_dict["id"] = str(dp.datapoint_id)
-                req_dict["downloadurl"] = dp.download_url(self)
+                req_dict["id"] = dp.datapoint_id
+                req_dict["download_url"] = dp.download_url(self)
             req_data["datapoints"].append(req_dict)
 
         init_url = multi_urljoin(self.source.repoApi.data_engine_url, "annotations/init")
