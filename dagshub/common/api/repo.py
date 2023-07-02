@@ -146,9 +146,7 @@ class RepoAPI:
             logger.debug(res.content)
             raise RuntimeError(error_msg)
 
-        content = res.json()
-        if type(content) == dict: content = [content,]
-        return [dacite.from_dict(ContentAPIEntry, entry) for entry in content]
+        return [dacite.from_dict(ContentAPIEntry, entry) for entry in res.json()]
 
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
         """
