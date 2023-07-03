@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
 
-torch = lazy_load("torch")
 tf = lazy_load("tensorflow")
 
 if TYPE_CHECKING:
@@ -162,6 +161,12 @@ class QueryResult:
         processes: number of parallel processes that download the dataset
         tensorizer: auto|image|<function>
         """
+        from .loaders import (
+            DagsHubDataset,
+            PyTorchDataset,
+            TensorFlowDataset,
+        )
+
         flavor = flavor.lower()
         if flavor == "torch":
             return PyTorchDataset(self, **kwargs)
@@ -190,6 +195,12 @@ class QueryResult:
         tensorizer: auto|image|<function>
         for_dataloader: bool; internal argument, that begins background dataset download after shuffle order is determined for the first epoch; default: False
         """
+        from .loaders import (
+            DagsHubDataset,
+            PyTorchDataset,
+            PyTorchDataLoader,
+            TensorFlowDataLoader,
+        )
 
         def keypairs(keys):
             return {key: kwargs[key] for key in keys}
