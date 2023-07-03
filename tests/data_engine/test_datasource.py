@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from dagshub.data_engine.client.models import MetadataFieldType
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, MetadataContextManager
 
 
 @pytest.fixture
@@ -64,3 +64,13 @@ def test_fails_out_of_bounds(metadata_df):
 def test_fails_nonexistent_field(metadata_df):
     with pytest.raises(Exception):
         Datasource._df_to_metadata(metadata_df, "dgsdfgsdg")
+
+
+def test_binary_metadata(ds):
+    ctx = MetadataContextManager(ds)
+    data = "aaa".encode()
+    encoded_data = MetadataContextManager.wrap_bytes(data)
+    ctx.update_metadata("test.txt", {"binary_value": data})
+
+    expected = DatapointMetadataUpdateEntry("test.txt", "binary_value", encoded_data, MetadataFieldType.BLOB)
+    assert ctx.get_metadata_entries() == [expected]

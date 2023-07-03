@@ -2,12 +2,9 @@ import enum
 import logging
 import multiprocessing.pool
 from dataclasses import dataclass
-
-import inspect
 from itertools import repeat
-from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
+from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional, Tuple
 
-from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
 
 tf = lazy_load("tensorflow")
@@ -36,28 +33,28 @@ class Datapoint:
     datapoint_id: str
     path: str
     metadata: Dict[str, Any]
+    datasource: "Datasource"
 
-    def download_url(self, ds: "Datasource"):
-        return ds.source.raw_path(self)
+    def download_url(self):
+        return self.datasource.source.raw_path(self)
 
-    def path_in_repo(self, ds: "Datasource"):
-        return ds.source.file_path(self)
+    def path_in_repo(self):
+        return self.datasource.source.file_path(self)
 
     @staticmethod
-    def from_gql_edge(edge: Dict) -> "Datapoint":
+    def from_gql_edge(edge: Dict, datasource: "Datasource") -> "Datapoint":
         res = Datapoint(
-            datapoint_id=edge["node"]["id"], path=edge["node"]["path"], metadata={}
+            datapoint_id=edge["node"]["id"],
+            path=edge["node"]["path"],
+            metadata={},
+            datasource=datasource
         )
         for meta_dict in edge["node"]["metadata"]:
             res.metadata[meta_dict["key"]] = meta_dict["value"]
         return res
 
-    def to_dict(self, ds: "Datasource", metadata_keys: List[str]) -> Dict[str, Any]:
-        res_dict = {
-            "name": self.path,
-            "datapoint_id": self.datapoint_id,
-            "dagshub_download_url": self.download_url(ds),
-        }
+    def to_dict(self, metadata_keys: List[str]) -> Dict[str, Any]:
+        res_dict = {"name": self.path, "datapoint_id": self.datapoint_id, "dagshub_download_url": self.download_url()}
         res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
         return res_dict
 
@@ -123,27 +120,20 @@ class QueryResult:
     @property
     def dataframe(self):
         import pandas as pd
-
         metadata_keys = set()
         for e in self.entries:
             metadata_keys.update(e.metadata.keys())
 
         metadata_keys = list(sorted(metadata_keys))
-        return pd.DataFrame.from_records(
-            [dp.to_dict(self.datasource, metadata_keys) for dp in self.entries]
-        )
+        return pd.DataFrame.from_records([dp.to_dict(metadata_keys) for dp in self.entries])
 
     @staticmethod
-    def from_gql_query(
-        query_resp: Dict[str, Any], datasource: "Datasource"
-    ) -> "QueryResult":
+    def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
         if "edges" not in query_resp:
             return QueryResult([], datasource)
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
-        return QueryResult(
-            [Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource
-        )
+        return QueryResult([Datapoint.from_gql_edge(edge, datasource) for edge in query_resp["edges"]], datasource)
 
     def as_dataset(self, flavor, **kwargs):
         """
@@ -230,16 +220,12 @@ class QueryResult:
         else:
             raise ValueError("supported flavors are torch|tensorflow")
 
-    def download_binary_columns(
-        self, *columns: str, num_proc: int = 32
-    ) -> "QueryResult":
+    def download_binary_columns(self, *columns: str, num_proc: int = 32) -> "QueryResult":
         """
         Downloads data from binary-defined columns
         """
         for column in columns:
-            logger.info(
-                f"Downloading metadata for column {column} with {num_proc} processes"
-            )
+            logger.info(f"Downloading metadata for column {column} with {num_proc} processes")
 
             def extract_blob_url(datapoint: Datapoint, col: str) -> Optional[str]:
                 sha = datapoint.metadata.get(col)

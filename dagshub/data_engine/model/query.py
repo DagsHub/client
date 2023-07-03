@@ -20,6 +20,10 @@ _metadataTypeLookup = {
     bytes: MetadataFieldType.BLOB,
 }
 
+_metadataTypeCustomConverters = {
+    bool: lambda x: x.lower() == "True",
+}
+
 _metadataTypeLookupReverse: Dict[str, Type] = {}
 for k, v in _metadataTypeLookup.items():
     _metadataTypeLookupReverse[v.value] = k
@@ -169,7 +173,8 @@ class DatasourceQuery:
             comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
             key = val["key"]
             value_type = _metadataTypeLookupReverse[val["valueType"]]
-            value = value_type(val["value"])
+            converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
+            value = converter(val["value"])
             node = Node(tag=comparator, data={"field": key, "value": value})
             tree.add_node(node, parent_node)
         elif op_type in ("and", "or"):

@@ -361,3 +361,17 @@ def test_isnull_deserialization(ds):
 def test_isnull_raises_not_on_field(ds):
     with pytest.raises(RuntimeError):
         ds.is_null()
+
+
+def test_false_deserialization(ds):
+    queried = ds["col_bool"] == False
+    serialized = {
+        "filter": {
+            "key": "col_bool",
+            "value": "False",
+            "valueType": "BOOLEAN",
+            "comparator": "EQUAL"
+        }
+    }
+    deserialized = DatasourceQuery.deserialize(serialized)
+    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
