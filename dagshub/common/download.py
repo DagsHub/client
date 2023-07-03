@@ -15,15 +15,14 @@ from dagshub.common.rich_util import get_rich_progress
 
 logger = logging.getLogger(__name__)
 
+DownloadFunctionType = Callable[[str, Path], None]
 
-def _dagshub_download(url: str, location: Union[str, Path], auth: HTTPBearerAuth, skip_if_exists: bool):
+
+def _dagshub_download(url: str, location: Path, auth: HTTPBearerAuth, skip_if_exists: bool):
     logger.debug(f"Download {url} to {location}")
 
     if skip_if_exists and os.path.exists(location):
         return
-
-    if type(location) is str:
-        location = Path(location)
 
     resp = http_request("GET", url, auth=auth)
     try:
@@ -38,19 +37,24 @@ def _dagshub_download(url: str, location: Union[str, Path], auth: HTTPBearerAuth
 
 
 def download_files(files: List[Tuple[str, Union[str, Path]]],
-                   download_fn: Optional[Callable[[str, Union[Path, str]], None]] = None,
+                   download_fn: Optional[DownloadFunctionType] = None,
                    threads=32, skip_if_exists=True):
     """
     Download files using multithreading
 
     Parameters:
         files: iterable of (download_url: str, file_location: str or Path)
-        download_fn: Optional function that will download the file. Needs to receive a single argument of the tuple
+        download_fn: Optional function that will download the file. Needs to receive the two arguments
             If function is not specified, then a default function that downloads a file with DagsHub credentials is used
             CAUTION: function needs to be pickleable since we're using ThreadPool to execute
         threads: number of threads to run this function on
         skip_if_exists: for the default downloader - skip the download if the file exists
     """
+
+    # Convert string paths to Path objects
+    for i, file_tuple in enumerate(files):
+        if type(file_tuple[1]) is str:
+            files[i] = (file_tuple[0], Path(file_tuple[1]))
 
     if download_fn is None:
         token = config.token or get_token(host=config.host)
