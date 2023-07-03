@@ -9,9 +9,7 @@ from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
 
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
-from dagshub.data_engine.clientdagshub.data_engine.client.loaders.base import (
-    DagsHubDataset,
-)
+from dagshub.data_engine.client.loaders.base import DagsHubDataset
 
 
 tf = lazy_load("tensorflow")
