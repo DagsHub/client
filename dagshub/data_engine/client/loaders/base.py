@@ -1,31 +1,17 @@
-import io
 import logging
 from types import FunctionType
 from typing import TYPE_CHECKING, List, Union
 
-import random
 from pathlib import Path
 from multiprocessing import Pool, Process
 
 from dagshub.common.util import lazy_load
-from dagshub.common.download import download_files
 from dagshub.common.api.repo import PathNotFoundError
-
-np = lazy_load("numpy")
-torch = lazy_load("torch")
-tf = lazy_load("tensorflow")
-torchaudio = lazy_load("torchaudio")
-torchvision = lazy_load("torchvision")
-tfds = lazy_load("tensorflow_datasets")
-Image = lazy_load("PIL.Image", source_package="pillow")
-
-if TYPE_CHECKING:
-    import torch
 
 logger = logging.getLogger(__name__)
 
 
-class DagsHubDataset(torch.utils.data.Dataset):
+class DagsHubDataset:
     def __init__(
         self,
         query_result,
@@ -49,19 +35,17 @@ class DagsHubDataset(torch.utils.data.Dataset):
         self.metadata_columns = metadata_columns
         self.entries = query_result.entries
         self.tensorizers = [
-                               lambda x: x,
-                           ] * (
-                               len(metadata_columns) + 1
-                           )  # prevent circular calls
+            lambda x: x,
+        ] * (
+            len(metadata_columns) + 1
+        )  # prevent circular calls
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
         self.savedir = savedir or self.datasource.default_dataset_location
         self.strategy = strategy
 
         self.datasource_root = Path(
-            self.entries[0]
-            .path_in_repo(self.datasource)
-            .as_posix()[: -len(self.entries[0].path)]
+            self.entries[0].path_in_repo().as_posix()[: -len(self.entries[0].path)]
         )
         self.processes = processes
         self.order = None
@@ -118,7 +102,9 @@ class DagsHubDataset(torch.utils.data.Dataset):
 
         return out
 
-    def __getitem__(self, idx: int) -> List[Union[torch.Tensor, tf.Tensor]]:
+    def __getitem__(
+        self, idx: int
+    ):  # -> List[Union[torch.Tensor, tf.Tensor]]:  # type specification in this line makes torch/tf requirements for one another
         return [
             tensorizer(data)
             for tensorizer, data in zip(self.tensorizers, self.get(idx))
@@ -193,99 +179,3 @@ class DagsHubDataset(torch.utils.data.Dataset):
             raise ValueError(
                 "Unable to set tensorizers. Please ensure the number of selected columns equals the number of tensorizers."
             )
-
-
-class PyTorchDataset(DagsHubDataset):
-    def __init__(self, *args, **kwargs):
-        self.tensorlib = TorchTensorizers
-        super().__init__(*args, **kwargs)
-
-
-class TensorFlowDataset(DagsHubDataset):
-    def __init__(self, *args, **kwargs):
-        self.tensorlib = TensorFlowTensorizers
-        super().__init__(*args, **kwargs)
-        self.signature = tuple(
-            tf.TensorSpec.from_tensor(tensor) for tensor in next(self.generator())
-        )
-
-    def generator(self):
-        for idx in range(len(self)):
-            yield self[idx]
-
-
-class PyTorchDataLoader(torch.utils.data.DataLoader):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dataset.order = list(self.sampler)
-        if self.dataset.strategy == "background":
-            Process(target=self.dataset.pull).start()
-
-
-class TensorFlowDataLoader(tf.keras.utils.Sequence):
-    def __init__(self, dataset, batch_size=1, shuffle=True, seed=None):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-
-        if seed:
-            random.seed(seed)
-            np.random.seed(seed)
-
-        self.indices = {}
-        self.on_epoch_end()
-
-        self.dataset.builder.order = self.indices
-        if self.dataset.builder.strategy == "background":
-            Process(target=self.dataset.builder.pull).start()
-
-    def __len__(self) -> int:
-        return self.dataset.__len__() // self.batch_size
-
-    def __getitem__(self, index: int) -> tf.Tensor:
-        indices = self.indices[index * self.batch_size: (index + 1) * self.batch_size]
-        X = []
-        for index in indices:
-            X.append(self.dataset.__getitem__(index))
-        return tf.stack(X)
-
-    def on_epoch_end(self) -> None:
-        self.indices = np.arange(self.dataset.__len__())
-        if self.shuffle:
-            np.random.shuffle(self.indices)
-
-
-class TorchTensorizers:
-    @staticmethod
-    def image(filepath: str) -> torch.Tensor:
-        return torchvision.io.read_image(filepath).type(torch.float)
-
-    @staticmethod
-    def audio(filepath: str) -> torch.Tensor:
-        return torchaudio.load(filepath).type(torch.float)
-
-    @staticmethod
-    def video(filepath: str) -> torch.Tensor:
-        return torchvision.io.read_video(filepath).type(torch.float)
-
-    @staticmethod
-    def numeric(num: Union[float, int]) -> torch.Tensor:
-        return torch.tensor(num, dtype=torch.float)
-
-
-class TensorFlowTensorizers:
-    @staticmethod
-    def image(filepath: str) -> tf.Tensor:
-        return tf.convert_to_tensor(tf.keras.utils.load_img(filepath))
-
-    @staticmethod
-    def audio(filepath: str) -> torch.Tensor:
-        raise NotImplementedError("Coming Soon!")
-
-    @staticmethod
-    def video(filepath: str) -> torch.Tensor:
-        raise NotImplementedError("Coming Soon!")
-
-    @staticmethod
-    def numeric(num: Union[float, int]) -> torch.Tensor:
-        return tf.convert_to_tensor(num)

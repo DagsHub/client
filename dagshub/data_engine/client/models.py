@@ -9,6 +9,8 @@ from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
 
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
+from dagshub.data_engine.client.loaders.base import DagsHubDataset
+
 
 tf = lazy_load("tensorflow")
 
@@ -50,7 +52,7 @@ class Datapoint:
             datapoint_id=edge["node"]["id"],
             path=edge["node"]["path"],
             metadata={},
-            datasource=datasource
+            datasource=datasource,
         )
         for meta_dict in edge["node"]["metadata"]:
             res.metadata[meta_dict["key"]] = meta_dict["value"]
@@ -146,7 +148,8 @@ class QueryResult:
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
         return QueryResult(
-            [Datapoint.from_gql_edge(edge) for edge in query_resp["edges"]], datasource
+            [Datapoint.from_gql_edge(edge, datasource) for edge in query_resp["edges"]],
+            datasource,
         )
 
     def as_dataset(self, flavor, **kwargs):
@@ -161,16 +164,14 @@ class QueryResult:
         processes: number of parallel processes that download the dataset
         tensorizer: auto|image|<function>
         """
-        from .loaders import (
-            DagsHubDataset,
-            PyTorchDataset,
-            TensorFlowDataset,
-        )
-
         flavor = flavor.lower()
         if flavor == "torch":
+            from .loaders.torch import PyTorchDataset
+
             return PyTorchDataset(self, **kwargs)
         elif flavor == "tensorflow":
+            from .loaders.tf import TensorFlowDataset
+
             ds_builder = TensorFlowDataset(self, **kwargs)
             ds = tf.data.Dataset.from_generator(
                 ds_builder.generator, output_signature=ds_builder.signature
@@ -178,6 +179,7 @@ class QueryResult:
             ds.__len__ = lambda: ds_builder.__len__()
             ds.__getitem__ = ds_builder.__getitem__
             ds.builder = ds_builder
+            ds.type = "tensorflow"
             return ds
         else:
             raise ValueError("supported flavors are torch|tensorflow")
@@ -193,30 +195,32 @@ class QueryResult:
         savedir: location at which the dataset is stored
         processes: number of parallel processes that download the dataset
         tensorizer: auto|image|<function>
-        for_dataloader: bool; internal argument, that begins background dataset download after shuffle order is determined for the first epoch; default: False
+        for_dataloader: bool; internal argument, that begins background dataset download after
+                        the shuffle order is determined for the first epoch; default: False
         """
-        from .loaders import (
-            DagsHubDataset,
-            PyTorchDataset,
-            PyTorchDataLoader,
-            TensorFlowDataLoader,
-        )
 
         def keypairs(keys):
             return {key: kwargs[key] for key in keys}
 
-        flavor = flavor.lower() if type(flavor) == str else flavor
-        if type(flavor) == PyTorchDataset:
-            return PyTorchDataLoader(flavor, **kwargs)
-        elif isinstance(flavor, tf.data.Dataset):
-            return TensorFlowDataLoader(flavor, **kwargs)
+        if type(flavor) != str:
+            if flavor.type == "torch":
+                from .loaders.torch import PyTorchDataLoader
+
+                return PyTorchDataLoader(flavor, **kwargs)
+            elif flavor.type == "tensorflow":
+                from .loaders.tf import TensorFlowDataLoader
+
+                return TensorFlowDataLoader(flavor, **kwargs)
 
         kwargs["for_dataloader"] = True
         dataset_kwargs = set(
             list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
         )
         global_kwargs = set(kwargs.keys())
+        flavor = flavor.lower() if type(flavor) == str else flavor
         if flavor == "torch":
+            from .loaders.torch import PyTorchDataLoader
+
             return PyTorchDataLoader(
                 self.as_dataset(
                     flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))
@@ -224,6 +228,8 @@ class QueryResult:
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         elif flavor == "tensorflow":
+            from .loaders.tf import TensorFlowDataLoader
+
             return TensorFlowDataLoader(
                 self.as_dataset(
                     flavor,
@@ -232,7 +238,9 @@ class QueryResult:
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         else:
-            raise ValueError("supported flavors are torch|tensorflow")
+            raise ValueError(
+                "supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>"
+            )
 
     def download_binary_columns(
         self, *columns: str, num_proc: int = 32
