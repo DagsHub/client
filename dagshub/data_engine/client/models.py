@@ -1,7 +1,7 @@
 import enum
 import logging
 import multiprocessing.pool
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import repeat
 from pathlib import Path
 from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional, Tuple
@@ -170,9 +170,27 @@ class DatasetResult:
 
 @dataclass
 class QueryResult:
-    entries: List[Datapoint]
+    _entries: List[Datapoint]
     """ List of downloaded entries."""
     datasource: "Datasource"
+    _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
+
+    def __post_init__(self):
+        self._refresh_lookups()
+
+    @property
+    def entries(self):
+        return self._entries
+
+    @entries.setter
+    def entries(self, value: List[Datapoint]):
+        self._entries = value
+        self._refresh_lookups()
+
+    def _refresh_lookups(self):
+        self._datapoint_path_lookup = {}
+        for e in self.entries:
+            self._datapoint_path_lookup[e.path] = e
 
     @property
     def dataframe(self):
@@ -191,6 +209,18 @@ class QueryResult:
         if query_resp["edges"] is None:
             return QueryResult([], datasource)
         return QueryResult([Datapoint.from_gql_edge(edge, datasource) for edge in query_resp["edges"]], datasource)
+
+    def __getitem__(self, item: Union[str, int, slice]):
+        """
+        Gets datapoint by either its ID (int), or by its path (string)
+        """
+        if type(item) is str:
+            return self._datapoint_path_lookup[item]
+        elif type(item) is int or type(item) is slice:
+            return self.entries[item]
+        else:
+            raise ValueError(
+                f"Can't lookup datapoint using value {item} of type {type(item)}, needs to be either int or str")
 
     def download_binary_columns(self, *columns: str, load_into_memory=True,
                                 cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
