@@ -1,11 +1,10 @@
 import logging
 from types import FunctionType
-from typing import TYPE_CHECKING, List, Union
+from typing import List, Union
 
 from pathlib import Path
 from multiprocessing import Pool, Process
 
-from dagshub.common.util import lazy_load
 from dagshub.common.api.repo import PathNotFoundError
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,6 @@ from multiprocessing import Process
 from typing import TYPE_CHECKING, Union
 
 from dagshub.common.util import lazy_load
-from dagshub.common.download import download_files
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 
 np = lazy_load("numpy")
