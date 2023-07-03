@@ -26,7 +26,8 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
         annotation_fields: fields from which to get annotations
     """
     from fiftyone.utils.labelstudio import import_label_studio_annotation
-    from fiftyone import Detections, Detection, Classification, Classifications, Keypoint, Keypoints
+    from fiftyone import Detections, Detection, Classification, Classifications, Keypoint, Keypoints, Polylines, \
+        Polyline
     for field in annotation_fields:
         annotations = datapoint.metadata.get(field)
         if type(annotations) is not bytes:
@@ -60,6 +61,11 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
                 labels = Keypoints()
                 for a in annotations:
                     labels.keypoints.append(a)
+                labels = [labels]
+            elif ann_type is Polyline:
+                labels = Polylines()
+                for a in annotations:
+                    labels.polylines.append(a)
                 labels = [labels]
             else:
                 labels = annotations
