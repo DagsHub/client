@@ -9,7 +9,9 @@ from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional
 
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
-from dagshub.data_engine.client.loaders.base import DagsHubDataset
+from dagshub.data_engine.clientdagshub.data_engine.client.loaders.base import (
+    DagsHubDataset,
+)
 
 
 tf = lazy_load("tensorflow")
@@ -166,11 +168,11 @@ class QueryResult:
         """
         flavor = flavor.lower()
         if flavor == "torch":
-            from .loaders.torch import PyTorchDataset
+            from dagshub.data_engine.client.loaders.torch import PyTorchDataset
 
             return PyTorchDataset(self, **kwargs)
         elif flavor == "tensorflow":
-            from .loaders.tf import TensorFlowDataset
+            from dagshub.data_engine.client.loaders.tf import TensorFlowDataset
 
             ds_builder = TensorFlowDataset(self, **kwargs)
             ds = tf.data.Dataset.from_generator(
@@ -204,11 +206,11 @@ class QueryResult:
 
         if type(flavor) != str:
             if flavor.type == "torch":
-                from .loaders.torch import PyTorchDataLoader
+                from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 
                 return PyTorchDataLoader(flavor, **kwargs)
             elif flavor.type == "tensorflow":
-                from .loaders.tf import TensorFlowDataLoader
+                from dagshub.data_engine.client.loaders.tf import TensorFlowDataLoader
 
                 return TensorFlowDataLoader(flavor, **kwargs)
 
@@ -219,7 +221,7 @@ class QueryResult:
         global_kwargs = set(kwargs.keys())
         flavor = flavor.lower() if type(flavor) == str else flavor
         if flavor == "torch":
-            from .loaders.torch import PyTorchDataLoader
+            from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 
             return PyTorchDataLoader(
                 self.as_dataset(
@@ -228,7 +230,7 @@ class QueryResult:
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         elif flavor == "tensorflow":
-            from .loaders.tf import TensorFlowDataLoader
+            from dagshub.data_engine.client.loaders.tf import TensorFlowDataLoader
 
             return TensorFlowDataLoader(
                 self.as_dataset(
