@@ -12,7 +12,6 @@ from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 
-
 tf = lazy_load("tensorflow")
 
 if TYPE_CHECKING:
@@ -330,7 +329,7 @@ class QueryResult:
 
     def __getitem__(self, item: Union[str, int, slice]):
         """
-        Gets datapoint by either its ID (int), or by its path (string)
+        Gets datapoint by its path (string) or by its index in the result (or slice)
         """
         if type(item) is str:
             return self._datapoint_path_lookup[item]
@@ -338,7 +337,8 @@ class QueryResult:
             return self.entries[item]
         else:
             raise ValueError(
-                f"Can't lookup datapoint using value {item} of type {type(item)}, needs to be either int or str")
+                f"Can't lookup datapoint using value {item} of type {type(item)}, "
+                f"needs to be either int or str or slice")
 
     def download_binary_columns(self, *columns: str, load_into_memory=True,
                                 cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
