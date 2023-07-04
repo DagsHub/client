@@ -24,7 +24,7 @@ def _dagshub_download(url: str, location: Path, auth: HTTPBearerAuth, skip_if_ex
     if skip_if_exists and os.path.exists(location):
         return
 
-    resp = http_request("GET", url, auth=auth)
+    resp = http_request("GET", url, auth=auth, timeout=600)
     try:
         assert resp.status_code == 200
     except AssertionError:

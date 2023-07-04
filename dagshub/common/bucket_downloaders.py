@@ -37,10 +37,10 @@ def enable_gcs_bucket_downloader(client=None, redownload_existing=False):
         from google.cloud import storage
         client = storage.Client()
 
-    def get_fn(bucket_name, bucket_path) -> IOBase:
+    def get_fn(bucket_name, bucket_path) -> bytes:
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(bucket_path).download_as_bytes()
-        return io.BytesIO(blob)
+        return blob
 
     enable_custom_bucket_downloader(get_fn, redownload_existing)
 
@@ -60,9 +60,9 @@ def enable_s3_bucket_downloader(client=None, redownload_existing=False):
         import boto3
         client = boto3.client("s3")
 
-    def get_fn(bucket, path) -> IOBase:
+    def get_fn(bucket, path) -> bytes:
         resp = client.get_object(Bucket=bucket, Key=path)
-        return resp["Body"]
+        return resp["Body"].read()
 
     enable_custom_bucket_downloader(get_fn, redownload_existing)
 
@@ -70,7 +70,7 @@ def enable_s3_bucket_downloader(client=None, redownload_existing=False):
 bucket_downloader_func: Optional[DownloadFunctionType] = None
 
 
-def enable_custom_bucket_downloader(download_func: Callable[[str, str], IOBase], redownload_existing=False):
+def enable_custom_bucket_downloader(download_func: Callable[[str, str], bytes], redownload_existing=False):
     """
     Enables downloading storage items using a custom function
     The function must receive two arguments: bucket name and a path, and returns the IOBase of the downloaded file
@@ -93,7 +93,7 @@ def enable_custom_bucket_downloader(download_func: Callable[[str, str], IOBase],
         content = download_func(bucket_name, bucket_path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         with save_path.open("wb") as f:
-            f.write(content.read())
+            f.write(content)
 
     global bucket_downloader_func
     bucket_downloader_func = wrap_fn
