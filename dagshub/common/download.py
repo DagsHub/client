@@ -43,7 +43,7 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
     Download files using multithreading
 
     Parameters:
-        files: iterable of (download_url: str, file_location: str or Path)
+        files: list of (download_url: str, file_location: str or Path)
         download_fn: Optional function that will download the file. Needs to receive the two arguments
             If function is not specified, then a default function that downloads a file with DagsHub credentials is used
             CAUTION: function needs to be pickleable since we're using ThreadPool to execute
@@ -67,5 +67,8 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
     with progress:
         with ThreadPoolExecutor(max_workers=threads) as tp:
             futures = [tp.submit(download_fn, url, location) for (url, location) in files]
-            for _ in as_completed(futures):
+            for f in as_completed(futures):
+                exc = f.exception()
+                if exc is not None:
+                    logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
                 progress.update(task, advance=1)
