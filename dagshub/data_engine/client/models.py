@@ -41,6 +41,9 @@ class Datapoint:
     metadata: Dict[str, Any]
     datasource: "Datasource"
 
+    def __getitem__(self, item):
+        return self.metadata[item]
+
     def download_url(self):
         return self.datasource.source.raw_path(self)
 
