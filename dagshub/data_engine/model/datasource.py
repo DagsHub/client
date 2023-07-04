@@ -322,6 +322,9 @@ class Datasource:
                 sample["datapoint_id"] = datapoint.datapoint_id
                 label_func(sample, datapoint, *annotation_columns)
                 for k, v in datapoint.metadata.items():
+                    # TODO: more filtering here, not all columns should be showing up in voxel
+                    if k in annotation_columns:
+                        continue
                     if type(v) is not bytes:
                         sample[k] = v
                 samples.append(sample)
