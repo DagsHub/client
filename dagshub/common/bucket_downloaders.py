@@ -1,5 +1,3 @@
-import io
-from io import IOBase
 from pathlib import Path
 from typing import Tuple, Callable, Optional
 

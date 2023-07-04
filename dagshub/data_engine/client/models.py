@@ -216,6 +216,12 @@ class QueryResult:
             [dp.to_dict(metadata_keys) for dp in self.entries]
         )
 
+    def __len__(self):
+        return len(self.entries)
+
+    def __iter__(self):
+        return self.entries.__iter__()
+
     @staticmethod
     def from_gql_query(
         query_resp: Dict[str, Any], datasource: "Datasource"
