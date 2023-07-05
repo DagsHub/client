@@ -1,2 +1,3 @@
 def test_getitem_metadata(some_datapoint):
-    assert some_datapoint["col0"] == 0
+    for key in some_datapoint.metadata:
+        assert some_datapoint[key] == some_datapoint.metadata[key]

@@ -308,12 +308,7 @@ class Datasource:
         download_args = [(dp.download_url(), dp_path(dp)) for dp in datapoints.entries]
         redownload = kwargs.get("redownload", False)
 
-        # custom for the buckets
-        download_func = None
-        if self.source.source_type == DatasourceType.BUCKET and bucket_downloaders.bucket_downloader_func is not None:
-            download_func = bucket_downloaders.bucket_downloader_func
-
-        download_files(download_args, download_fn=download_func, skip_if_exists=not redownload)
+        download_files(download_args, skip_if_exists=not redownload)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         task = progress.add_task("Generating voxel samples...", total=len(datapoints.entries))
