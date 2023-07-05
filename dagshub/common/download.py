@@ -23,6 +23,48 @@ storage_download_url_regex = regex.compile(
     r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)")
 
 
+def enable_gcs_bucket_downloader(client=None):
+    """
+    Enables downloading storage items using the client, instead of going through DagsHub's server.
+    For custom clients use `enable_custom_bucket_downloader` function
+
+    Args:
+        client: a google.cloud.storage.Client from the `google-cloud-storage` package.
+            If client isn't specified, the default parameterless constructor is used
+    """
+    if client is None:
+        from google.cloud import storage
+        client = storage.Client()
+
+    def get_fn(bucket_name, bucket_path) -> bytes:
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(bucket_path).download_as_bytes()
+        return blob
+
+    add_bucket_downloader("gcs", get_fn)
+
+
+def enable_s3_bucket_downloader(client=None):
+    """
+    Enables downloading storage items using the client, instead of going through DagsHub's server.
+    For custom clients use `enable_custom_bucket_downloader` function
+
+    Args:
+        client: a boto3 S3 client.
+            If client isn't specified, the default parameterless constructor is used
+    """
+
+    if client is None:
+        import boto3
+        client = boto3.client("s3")
+
+    def get_fn(bucket, path) -> bytes:
+        resp = client.get_object(Bucket=bucket, Key=path)
+        return resp["Body"].read()
+
+    add_bucket_downloader("s3", get_fn)
+
+
 def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
     """
     Gets a storage download URL of a dagshub file, returns a tuple of (protocol, bucket, path_in_bucket)

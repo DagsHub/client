@@ -369,10 +369,10 @@ class QueryResult:
             with multiprocessing.pool.ThreadPool(num_proc) as pool:
                 res = pool.starmap(_get_blob, func_args)
 
-            for dp, binary_val in zip(self.entries, res):
-                if binary_val is None:
+            for dp, binary_val_or_path in zip(self.entries, res):
+                if binary_val_or_path is None:
                     continue
-                dp.metadata[column] = binary_val
+                dp.metadata[column] = binary_val_or_path
 
         return self
 
@@ -391,12 +391,12 @@ def _get_blob(url: Optional[str], cache_path: Optional[Path], auth, cache_on_dis
         return None
     assert cache_path is not None
 
-    if str(cache_path).split("/")[-1] != url.split("/")[-1]:
-        raise RuntimeError(f"{cache_path} != {url}")
-
     if cache_on_disk and cache_path.exists():
-        with cache_path.open("rb") as f:
-            return f.read()
+        if return_blob:
+            with cache_path.open("rb") as f:
+                return f.read()
+        else:
+            return cache_path
 
     try:
         # TODO: add retries here
