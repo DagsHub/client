@@ -14,7 +14,6 @@ import rich.progress
 from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
 
-from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
@@ -272,109 +271,18 @@ class Datasource:
             voxel_annotations (List[str]) : List of columns from which to load voxel annotations serialized with
                                         `to_json()`. This will override the labelstudio annotations
         """
-        logger.info("Migrating dataset to voxel51")
-        name = kwargs.get("name", self._source.name)
-        force_download = kwargs.get("force_download", False)
-        # TODO: don't override samples in existing one
-        if fo.dataset_exists(name):
-            ds: fo.Dataset = fo.load_dataset(name)
-        else:
-            ds: fo.Dataset = fo.Dataset(name)
-        # ds.persistent = True
-
-        dataset_location = Path(kwargs.get("files_location", self.default_dataset_location))
-        os.makedirs(dataset_location, exist_ok=True)
-        logger.info("Downloading files...")
-
-        if "voxel_annotations" in kwargs:
-            annotation_columns = kwargs["voxel_annotations"]
-            label_func = add_voxel_annotations
-        else:
-            annotation_columns = self.annotation_columns
-            label_func = add_ls_annotations
-
-        # Load the dataset from the query
-        datapoints = self.all().download_binary_columns(*annotation_columns)
-
-        if not force_download:
-            self._check_downloaded_dataset_size(datapoints)
-
-        redownload = kwargs.get("redownload", False)
-        datapoints.download_files(self.default_dataset_location, redownload=redownload)
-
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        task = progress.add_task("Generating voxel samples...", total=len(datapoints.entries))
-
-        samples: List["fo.Sample"] = []
-
-        with progress:
-            for datapoint in datapoints.entries:
-                filepath = self.default_dataset_location / datapoint.path_in_repo
-                sample = fo.Sample(filepath=filepath)
-                sample["dagshub_download_url"] = datapoint.download_url
-                sample["datapoint_id"] = datapoint.datapoint_id
-                label_func(sample, datapoint, *annotation_columns)
-                for k, v in datapoint.metadata.items():
-                    # TODO: more filtering here, not all columns should be showing up in voxel
-                    if k in annotation_columns:
-                        continue
-                    if type(v) is not bytes:
-                        sample[k] = v
-                samples.append(sample)
-                progress.update(task, advance=1, refresh=True)
-
-        ds.add_samples(samples)
-        return ds
+        return self.all().to_voxel51_dataset(**kwargs)
 
     @property
     def default_dataset_location(self) -> Path:
         return Path(
             sanitize_filepath(os.path.join(Path.home(), "dagshub", "datasets", self.source.repo, str(self.source.id))))
 
-    def visualize(self, **kwargs):
-        set_voxel_envvars()
-
-        ds = self.to_voxel51_dataset(**kwargs)
-
-        sess = fo.launch_app(ds)
-        # Launch the server for plugin interaction
-        plugin_server_module.run_plugin_server(sess, self, self.source.revision)
-
-        return sess
+    def visualize(self, **kwargs) -> "fo.Session":
+        return self.all().visualize(**kwargs)
 
     def columns(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
-
-    @staticmethod
-    def _check_downloaded_dataset_size(datapoints: "QueryResult"):
-        download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
-        dp_size = Datasource._calculate_datapoint_size(datapoints)
-        if dp_size is not None and dp_size > download_size_prompt_threshold:
-            prompt = f"You're about to download {sizeof_fmt(dp_size)} of images locally."
-            should_download = prompt_user(prompt)
-            if not should_download:
-                msg = "Downloading voxel dataset cancelled"
-                logger.warning(msg)
-                raise RuntimeError(msg)
-
-    @staticmethod
-    def _calculate_datapoint_size(datapoints: "QueryResult") -> Optional[int]:
-        sum_size = 0
-        has_sum_field = False
-        all_have_sum_field = True
-        size_field = "size"
-        for dp in datapoints.entries:
-            if size_field in dp.metadata:
-                has_sum_field = True
-                sum_size += dp.metadata[size_field]
-            else:
-                all_have_sum_field = False
-        if not has_sum_field:
-            logger.warning("None of the datapoints had a size field, can't calculate size of the downloading dataset")
-            return None
-        if not all_have_sum_field:
-            logger.warning("Not every datapoint has a size field, size calculations might be wrong")
-        return sum_size
 
     def annotate_in_labelstudio(self):
         """
