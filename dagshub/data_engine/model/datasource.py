@@ -309,9 +309,9 @@ class Datasource:
 
         with progress:
             for datapoint in datapoints.entries:
-                filepath = self.default_dataset_location / datapoint.path_in_repo()
+                filepath = self.default_dataset_location / datapoint.path_in_repo
                 sample = fo.Sample(filepath=filepath)
-                sample["dagshub_download_url"] = datapoint.download_url()
+                sample["dagshub_download_url"] = datapoint.download_url
                 sample["datapoint_id"] = datapoint.datapoint_id
                 label_func(sample, datapoint, *annotation_columns)
                 for k, v in datapoint.metadata.items():
@@ -408,7 +408,7 @@ class Datasource:
                 req_dict["download_url"] = dp["download_url"]
             else:
                 req_dict["id"] = dp.datapoint_id
-                req_dict["download_url"] = dp.download_url()
+                req_dict["download_url"] = dp.download_url
             req_data["datapoints"].append(req_dict)
 
         init_url = multi_urljoin(self.source.repoApi.data_engine_url, "annotations/init")

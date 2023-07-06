@@ -45,9 +45,11 @@ class Datapoint:
     def __getitem__(self, item):
         return self.metadata[item]
 
+    @property
     def download_url(self):
         return self.datasource.source.raw_path(self)
 
+    @property
     def path_in_repo(self):
         return self.datasource.source.file_path(self)
 
@@ -67,7 +69,7 @@ class Datapoint:
         res_dict = {
             "name": self.path,
             "datapoint_id": self.datapoint_id,
-            "dagshub_download_url": self.download_url(),
+            "dagshub_download_url": self.download_url,
         }
         res_dict.update({key: self.metadata.get(key) for key in metadata_keys})
         return res_dict
@@ -116,6 +118,38 @@ class Datapoint:
             return content
         else:
             raise ValueError(f"Can't extract blob metadata from value {current_value} of type {type(current_value)}")
+
+    def download_file(self, target: Optional[Union[PathLike, str]] = None, keep_source_prefix=True,
+                      redownload=False) -> PathLike:
+        """
+        Downloads the datapoint to the target_dir directory
+        Args:
+            target_dir: Where to download the file (either a directory, or the full path).
+                If not specified, then downloads to ~/dagshub/datasets/<user>/<repo>/<ds_id>
+            keep_source_prefix: If True, includes the prefix of the datasource in the download path
+                Useful for cases where the download path is the root of the repository
+            redownload: Whether to redownload a file if it exists on the filesystem already
+                NOTE: We don't do any hashsum checks, so if it's possible that the file has been updated, turn it on
+        Returns:
+            Path to the downloaded file
+        """
+
+        target_path = self.datasource.default_dataset_location if target is None else Path(target).expanduser()
+
+        # Check if the specified path looks like a file
+        # by checking if there's an extension, or it's an already existing file
+        n = target_path.name
+        target_is_already_file = (target_path.exists() and target_path.is_file()) or (
+            "." in n and not n.startswith("."))
+
+        if not target_is_already_file:
+            if keep_source_prefix:
+                target_path = target_path / self.path_in_repo
+            else:
+                target_path = target_path / self.path
+
+        download_files([(self.download_url, target_path)], skip_if_exists=not redownload)
+        return target_path
 
     @property
     def blob_cache_location(self):
@@ -393,16 +427,16 @@ class QueryResult:
             Path to the directory with the downloaded files
         """
 
-        target_path = self.datasource.default_dataset_location if target_dir is None else Path(target_dir)
+        target_path = self.datasource.default_dataset_location if target_dir is None else Path(target_dir).expanduser()
         logger.warning(f"Downloading {len(self.entries)} files to {str(target_path)}")
 
         def dp_path(dp: Datapoint):
             if keep_source_prefix:
-                return target_path / dp.path_in_repo()
+                return target_path / dp.path_in_repo
             else:
                 return target_path / dp.path
 
-        download_args = [(dp.download_url(), dp_path(dp)) for dp in self.entries]
+        download_args = [(dp.download_url, dp_path(dp)) for dp in self.entries]
 
         download_files(download_args, skip_if_exists=not redownload)
         return target_path

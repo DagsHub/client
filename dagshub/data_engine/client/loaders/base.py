@@ -44,7 +44,7 @@ class DagsHubDataset:
         self.strategy = strategy
 
         self.datasource_root = Path(
-            self.entries[0].path_in_repo().as_posix()[: -len(self.entries[0].path)]
+            self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)]
         )
         self.processes = processes
         self.order = None

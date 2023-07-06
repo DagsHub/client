@@ -159,14 +159,23 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
     if download_fn is None:
         download_fn = partial(_download_wrapper, skip_if_exists=skip_if_exists)
 
-    progress = get_rich_progress(rich.progress.MofNCompleteColumn(), transient=False)
-    task = progress.add_task("Downloading files...", total=len(files))
+    if len(files) > 1:
+        # Multiple files - multithreaded download
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn(), transient=False)
+        task = progress.add_task("Downloading files...", total=len(files))
 
-    with progress:
-        with ThreadPoolExecutor(max_workers=threads) as tp:
-            futures = [tp.submit(download_fn, url, location) for (url, location) in files]
-            for f in as_completed(futures):
-                exc = f.exception()
-                if exc is not None:
-                    logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
-                progress.update(task, advance=1)
+        with progress:
+            with ThreadPoolExecutor(max_workers=threads) as tp:
+                futures = [tp.submit(download_fn, url, location) for (url, location) in files]
+                for f in as_completed(futures):
+                    exc = f.exception()
+                    if exc is not None:
+                        logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
+                    progress.update(task, advance=1)
+    else:
+        # Single file - don't bother with the multithreading, just download the file
+        url, location = files[0]
+        try:
+            download_fn(url, location)
+        except Exception as exc:
+            logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
