@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 
 import inspect
 from itertools import repeat
+from os import PathLike
 from pathlib import Path
 from typing import Dict, Any, List, Union, TYPE_CHECKING, Optional, Tuple
 
+from dagshub.common.download import download_files
 from dagshub.common.util import lazy_load
 from dagshub.common.helpers import http_request
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
@@ -375,6 +377,35 @@ class QueryResult:
                 dp.metadata[column] = binary_val_or_path
 
         return self
+
+    def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
+                       redownload=False) -> PathLike:
+        """
+        Downloads the query result to the target_dir directory
+        Args:
+            target_dir: Where to download the files.
+                If not specified, then downloads to ~/dagshub/datasets/<user>/<repo>/<ds_id>
+            keep_source_prefix: If True, includes the prefix of the datasource in the download path
+                Useful for cases where the download path is the root of the repository
+            redownload: Whether to redownload a file if it exists on the filesystem already
+                NOTE: We don't do any hashsum checks, so if it's possible that the file has been updated, turn it on
+        Returns:
+            Path to the directory with the downloaded files
+        """
+
+        target_path = self.datasource.default_dataset_location if target_dir is None else Path(target_dir)
+        logger.warning(f"Downloading {len(self.entries)} files to {str(target_path)}")
+
+        def dp_path(dp: Datapoint):
+            if keep_source_prefix:
+                return target_path / dp.path_in_repo()
+            else:
+                return target_path / dp.path
+
+        download_args = [(dp.download_url(), dp_path(dp)) for dp in self.entries]
+
+        download_files(download_args, skip_if_exists=not redownload)
+        return target_path
 
 
 def _get_blob(url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk, return_blob) -> Optional[

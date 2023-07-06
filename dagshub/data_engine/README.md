@@ -160,6 +160,37 @@ df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
 # Now "binary_1" and "binary_2" have the actual blobs
 ```
 
+### Downloading files
+
+You can download all the datapoints in the result of the query by calling the `download_files` function:
+
+```python
+qr = ds.all()
+qr.download_files(target_dir=...)
+```
+
+If `target_dir` is not specified, downloads to the `~/dagshub/datasets/<user>/<repo>/<ds_id>` directory.
+This is the same directory where we download files for voxel visualization
+
+**NOTE**: if you're using a bucket as a datapoint source, and you have credentials for the S3/GCS client,
+you can enable the bucket downloader, and the download functions will download the files using the bucket client,
+instead of our servers
+
+```python
+from dagshub.common.download import enable_s3_bucket_downloader, enable_gcs_bucket_downloader
+
+# S3
+enable_s3_bucket_downloader()
+# GCS
+enable_gcs_bucket_downloader()
+
+# You can also use a custom client, if the default auth is not set up
+import boto3
+
+client = boto3.client("s3", endpoint_url=...)
+enable_s3_bucket_downloader(client)
+```
+
 ## Querying
 
 We're striving to support

@@ -299,15 +299,8 @@ class Datasource:
         if not force_download:
             self._check_downloaded_dataset_size(datapoints)
 
-        logger.warning(f"Downloading {len(datapoints.entries)} files to {dataset_location}")
-
-        def dp_path(dp: Datapoint):
-            return dataset_location / dp.path_in_repo()
-
-        download_args = [(dp.download_url(), dp_path(dp)) for dp in datapoints.entries]
         redownload = kwargs.get("redownload", False)
-
-        download_files(download_args, skip_if_exists=not redownload)
+        datapoints.download_files(self.default_dataset_location, redownload=redownload)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         task = progress.add_task("Generating voxel samples...", total=len(datapoints.entries))
@@ -316,7 +309,8 @@ class Datasource:
 
         with progress:
             for datapoint in datapoints.entries:
-                sample = fo.Sample(filepath=dp_path(datapoint))
+                filepath = self.default_dataset_location / datapoint.path_in_repo()
+                sample = fo.Sample(filepath=filepath)
                 sample["dagshub_download_url"] = datapoint.download_url()
                 sample["datapoint_id"] = datapoint.datapoint_id
                 label_func(sample, datapoint, *annotation_columns)
