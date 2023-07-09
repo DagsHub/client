@@ -56,11 +56,6 @@ def temp_dir() -> str:
             file.write("This is an example file.")
 
         yield folder_path
-        try:
-            os.remove(file_path)
-            os.removedirs(folder_path)
-        except (OSError, FileNotFoundError):
-            pass
 
 
 def test_upload_dataset_closes_files(mock_api: MockApi, upload_repo: Repo, test_file: str):
