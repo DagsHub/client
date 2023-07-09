@@ -26,7 +26,6 @@ REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 DEFAULT_DATA_DIR_NAME = 'data'
-DEFAULT_REMOTE_PATH = "/data/src/"
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -198,7 +197,15 @@ class Repo:
 
         """
         if os.path.isdir(local_path):
-            dir_to_upload = self.directory(remote_path if remote_path is not None else DEFAULT_REMOTE_PATH)
+            if remote_path is None:
+                abspath = os.path.abspath(local_path)
+                cwd = os.getcwd()
+                if abspath.startswith(cwd):
+                    remote_path = os.path.relpath(abspath, cwd)
+                else:
+                    remote_path = os.path.basename(abspath)
+            remote_path = remote_path.replace(os.sep, '/')
+            dir_to_upload = self.directory(remote_path)
             dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
         else:
             file_to_upload = DataSet.get_file(local_path, remote_path)
