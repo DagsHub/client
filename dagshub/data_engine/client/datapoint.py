@@ -39,7 +39,7 @@ class Datapoint:
 
     def to_dict(self, metadata_keys: List[str]) -> Dict[str, Any]:
         res_dict = {
-            "name": self.path,
+            "path": self.path,
             "datapoint_id": self.datapoint_id,
             "dagshub_download_url": self.download_url,
         }

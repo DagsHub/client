@@ -227,7 +227,7 @@ class QueryResult:
         return self
 
     def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
-                       redownload=False) -> PathLike:
+                       redownload=False, path_field: Optional[str] = None) -> PathLike:
         """
         Downloads the query result to the target_dir directory
         Args:
@@ -237,6 +237,10 @@ class QueryResult:
                 Useful for cases where the download path is the root of the repository
             redownload: Whether to redownload a file if it exists on the filesystem already
                 NOTE: We don't do any hashsum checks, so if it's possible that the file has been updated, turn it on
+            path_field: If you want to download files from a field other than the datapoint's path.
+                NOTE: the path still needs to be in the same datasource
+                and have the same format as the path of the datapoint,
+                for now you can't download arbitrary paths/urls
         Returns:
             Path to the directory with the downloaded files
         """
@@ -245,12 +249,19 @@ class QueryResult:
         logger.warning(f"Downloading {len(self.entries)} files to {str(target_path)}")
 
         def dp_path(dp: Datapoint):
-            if keep_source_prefix:
-                return target_path / dp.path_in_repo
+            if path_field is not None:
+                path_val = dp.metadata.get(path_field)
+                if path_val is None:
+                    return None
             else:
-                return target_path / dp.path
+                path_val = dp.path
 
-        download_args = [(dp.download_url, dp_path(dp)) for dp in self.entries]
+            if keep_source_prefix:
+                return target_path / self.datasource.source.source_prefix / path_val
+            else:
+                return target_path / path_val
+
+        download_args = [(dp.download_url, dp_path(dp)) for dp in self.entries if dp_path(dp) is not None]
 
         download_files(download_args, skip_if_exists=not redownload)
         return target_path

@@ -97,16 +97,19 @@ class DatasourceState:
         path = self._extract_path(path).strip("/")
         return self.root_raw_path + "/" + path
 
+    @property
+    def source_prefix(self) -> PurePosixPath:
+        parts = self.path_parts()
+        if "prefix" in parts:
+            return PurePosixPath(parts["prefix"].strip("/"))
+        else:
+            return PurePosixPath()
+
     def file_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> PurePosixPath:
         """
         Returns the generic path of the path in the repo (adds prefix)
         """
-        parts = self.path_parts()
-        if "prefix" in parts:
-            prefix = PurePosixPath(parts["prefix"].strip("/"))
-        else:
-            prefix = PurePosixPath()
-        return prefix / self._extract_path(path)
+        return self.source_prefix / self._extract_path(path)
 
     def blob_path(self, sha: str) -> str:
         """
