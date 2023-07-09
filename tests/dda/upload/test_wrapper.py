@@ -16,7 +16,7 @@ def test_file() -> str:
     yield filepath
     try:
         os.remove(filepath)
-    except OSError:
+    except (OSError, FileNotFoundError):
         pass
 
 
@@ -37,7 +37,7 @@ def test_dirs() -> str:
         os.remove(filepath1)
         os.remove(filepath2)
         os.removedirs(folder_path)
-    except OSError:
+    except (OSError, FileNotFoundError):
         pass
 
 
@@ -59,7 +59,7 @@ def temp_dir() -> str:
         try:
             os.remove(file_path)
             os.removedirs(folder_path)
-        except OSError:
+        except (OSError, FileNotFoundError):
             pass
 
 
