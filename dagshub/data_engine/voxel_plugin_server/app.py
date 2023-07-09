@@ -6,6 +6,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+from dagshub.data_engine.voxel_plugin_server.routes.datasource import get_fields
 from dagshub.data_engine.voxel_plugin_server.routes.label_studio import to_labelstudio
 from dagshub.data_engine.voxel_plugin_server.routes.voxel import save_dataset
 
@@ -28,4 +29,5 @@ app = Starlette(debug=True,
                     Route("/", homepage),
                     Route("/labelstudio/", to_labelstudio, methods=["POST"]),
                     Route("/save_dataset/", save_dataset, methods=["POST"]),
+                    Route("/datasource/fields", get_fields)
                 ])
