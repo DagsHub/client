@@ -6,6 +6,7 @@ import posixpath
 import urllib
 from http import HTTPStatus
 from io import IOBase
+from pathlib import Path
 from typing import Union, Tuple, BinaryIO, Dict
 
 import httpx
@@ -26,7 +27,6 @@ REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
 DEFAULT_DATA_DIR_NAME = 'data'
-DEFAULT_REMOTE_PATH = "/data/src/"
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -182,7 +182,7 @@ class Repo:
         self,
         local_path: Union[str, IOBase],
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        remote_path=None,
+        remote_path: str = None,
         **kwargs,
     ):
         """
@@ -190,18 +190,26 @@ class Repo:
         It takes a file as an argument and logs the response status code and content.
 
 
-        :param file (str): Specify the file to be uploaded
-        :param commit_message (str): Specify a commit message
-        :param path (str): Specify the path to upload the file to
+        :param local_path: Specify the file to be uploaded
+        :param commit_message: Specify a commit message
+        :param remote_path: Specify the path to upload the file to
         :param **kwargs: Pass in any additional parameters that are required for the upload function
         :return: None
 
         """
-        if os.path.isdir(local_path):
-            dir_to_upload = self.directory(remote_path if remote_path is not None else DEFAULT_REMOTE_PATH)
-            dir_to_upload.add_dir(local_path, commit_message=commit_message, **kwargs)
+        local_path = Path(local_path).resolve()
+        if local_path.is_dir():
+            if remote_path is None:
+                try:
+                    remote_path = local_path.relative_to(Path.cwd().resolve())
+                except ValueError:
+                    # local_path is outside cwd, use only its basename
+                    remote_path = local_path.name
+            remote_path = Path(remote_path).as_posix()
+            dir_to_upload = self.directory(remote_path)
+            dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
         else:
-            file_to_upload = DataSet.get_file(local_path, remote_path)
+            file_to_upload = DataSet.get_file(str(local_path), remote_path)
             self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
     def upload_files(
@@ -413,13 +421,13 @@ class DataSet:
                             if len(self.files) >= upload_file_number:
                                 file_counter += len(self.files)
                                 self.commit(commit_message, **upload_kwargs)
-                                progress.update(folder_task, advance=len(self.files))
-                                progress.update(total_task, completed=file_counter)
+                                progress.update(folder_task, advance=len(self.files), refresh=True)
+                                progress.update(total_task, completed=file_counter, refresh=True)
                     if len(self.files) >= upload_file_number:
                         file_counter += len(self.files)
                         self.commit(commit_message, **upload_kwargs)
-                        progress.update(folder_task, advance=len(self.files))
-                        progress.update(total_task, completed=file_counter)
+                        progress.update(folder_task, advance=len(self.files), refresh=True)
+                        progress.update(total_task, completed=file_counter, refresh=True)
                 progress.remove_task(folder_task)
 
             if len(self.files) > 0:
