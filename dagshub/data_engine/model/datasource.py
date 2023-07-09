@@ -94,11 +94,20 @@ class Datasource:
             logger.warning("Starting slices is not implemented for now")
         return self._source.client.sample(self, end, include_metadata=True)
 
-    def head(self) -> "QueryResult":
+    def head(self, size=100) -> "QueryResult":
+        """
+        Executes the query and returns a QueryResult object containing first <size> datapoints
+
+        Args:
+            size: how many datapoints to get. Default is 100
+        """
         self._check_preprocess()
-        return self._source.client.head(self)
+        return self._source.client.head(self, size)
 
     def all(self) -> "QueryResult":
+        """
+        Executes the query and returns a QueryResult object containing all datapoints
+        """
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 

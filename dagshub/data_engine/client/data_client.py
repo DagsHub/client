@@ -57,8 +57,10 @@ class DataClient:
         res = self._exec(q, params)
         return dacite.from_dict(DatasourceResult, res["createDatasource"], config=_dacite_config)
 
-    def head(self, datasource: Datasource) -> QueryResult:
-        resp = self._datasource_query(datasource, True, self.HEAD_QUERY_SIZE)
+    def head(self, datasource: Datasource, size: Optional[int] = None) -> QueryResult:
+        if size is None:
+            size = self.HEAD_QUERY_SIZE
+        resp = self._datasource_query(datasource, True, size)
         return QueryResult.from_gql_query(resp, datasource)
 
     def sample(self, datasource: Datasource, n: Optional[int], include_metadata: bool) -> QueryResult:
