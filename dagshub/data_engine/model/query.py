@@ -21,7 +21,7 @@ _metadataTypeLookup = {
 }
 
 _metadataTypeCustomConverters = {
-    bool: lambda x: x.lower() == "True",
+    bool: lambda x: x.lower() == "true",
 }
 
 _metadataTypeLookupReverse: Dict[str, Type] = {}

@@ -26,7 +26,7 @@ def get_dataset(repo: str, name: Optional[str] = None, id: Optional[Union[int, s
     sources = _get_datasets(repo, name, id)
     if len(sources) == 0:
         raise DatasetNotFoundError(repo, id, name)
-    return sources[0]
+    return sources[-1]
 
 
 def _get_datasets(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None) -> List[Datasource]:
