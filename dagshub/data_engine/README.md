@@ -391,4 +391,12 @@ logging.basicConfig(level=logging.DEBUG)
 # Your code after
 ```
 
+### Visualizing with voxel raises errors about javascript or nonserializable strawberry annotations
+
+Make sure that you do a force reinstall of voxel, some of the dependencies aren't getting updated in order
+
+```bash
+$ pip install --upgrade --force-reinstall fiftyone
+```
+
 
