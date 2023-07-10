@@ -172,7 +172,7 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
                     if exc is not None:
                         logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
                     progress.update(task, advance=1)
-    else:
+    elif len(files) == 1:
         # Single file - don't bother with the multithreading, just download the file
         url, location = files[0]
         try:

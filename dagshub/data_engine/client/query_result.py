@@ -31,6 +31,10 @@ else:
 logger = logging.getLogger(__name__)
 
 
+class VisualizeError(Exception):
+    pass
+
+
 @dataclass
 class QueryResult:
     _entries: List[Datapoint]
@@ -279,6 +283,8 @@ class QueryResult:
             voxel_annotations (List[str]) : List of columns from which to load voxel annotations serialized with
                                         `to_json()`. This will override the labelstudio annotations
         """
+        if len(self.entries) == 0:
+            raise VisualizeError("No datapoints to visualize")
         logger.info("Migrating dataset to voxel51")
         name = kwargs.get("name", self.datasource.source.name)
         force_download = kwargs.get("force_download", False)
