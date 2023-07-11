@@ -52,8 +52,11 @@ class Datapoint:
 
         Args:
             column: where to get the blob from
-            cache_on_disk: whether to store the downloaded blob on the disk or not
-            store_value: whether to store the blob in the field after acquiring it
+            cache_on_disk: whether to store the downloaded blob on disk.
+                If you store the blob on disk, it means that it won't need to be re-downloaded in the future.
+                The contents of datapoint[column] will change to be the path of the blob on the disk.
+            store_value: whether to store the blob in memory on the field attached to this datapoint,
+                which will make its bytes directly retrievable using datapoint[column]
         """
         current_value = self.metadata[column]
 
