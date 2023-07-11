@@ -265,7 +265,16 @@ class QueryResult:
             else:
                 return target_path / path_val
 
-        download_args = [(dp.download_url, dp_path(dp)) for dp in self.entries if dp_path(dp) is not None]
+        def dp_url(dp: Datapoint):
+            if path_field is not None:
+                path_val = dp.metadata.get(path_field)
+                if path_val is None:
+                    return None
+                return self.datasource.source.raw_path(path_val)
+            else:
+                return dp.download_url
+
+        download_args = [(dp_url(dp), dp_path(dp)) for dp in self.entries if dp_path(dp) is not None]
 
         download_files(download_args, skip_if_exists=not redownload)
         return target_path

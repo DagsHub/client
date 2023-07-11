@@ -96,7 +96,8 @@ class GqlQueries:
         ).fields([
             "id",
             "name",
-            "datasource {id name rootUrl integrationStatus preprocessingStatus type}",
+            "datasource {id name rootUrl integrationStatus preprocessingStatus "
+            "metadataFields {name valueType multiple} type}",
             "datasetQuery",
         ]).generate()
         return q

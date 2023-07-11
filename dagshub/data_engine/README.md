@@ -107,7 +107,7 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
 
 We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being
 added.
-So, while you don't need to declare a schema in advance, a typed schema gets created automatically and you can't push
+So, while you don't need to declare a schema in advance, a typed schema gets created automatically, and you can't push
 mismatched data types to an existing field.
 We're considering allowing a more declarative typing system for this in the future.
 
