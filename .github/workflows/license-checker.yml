@@ -3,8 +3,14 @@ name: Check licenses
 on:
   push:
     branches: [ "main", "master" ]
+    paths:
+    - setup.py
+    - requirements*.txt
   pull_request:
     branches: [ "main", "master" ]
+    paths:
+    - setup.py
+    - requirements*.txt
 
 jobs:
   check-licenses:
