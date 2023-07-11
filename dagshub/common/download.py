@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 DownloadFunctionType = Callable[[str, Path], None]
 
 storage_download_url_regex = regex.compile(
-    r".*/api/v1/repos/(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)/storage/raw/(?P<proto>s3|gcs)/"
+    r".*/api/v1/repos/(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)/storage/raw/(?P<proto>s3|gs)/"
     r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)")
 
 
@@ -41,7 +41,7 @@ def enable_gcs_bucket_downloader(client=None):
         blob = bucket.blob(bucket_path).download_as_bytes()
         return blob
 
-    add_bucket_downloader("gcs", get_fn)
+    add_bucket_downloader("gs", get_fn)
 
 
 def enable_s3_bucket_downloader(client=None):
@@ -93,7 +93,7 @@ _bucket_downloader_map: Dict[str, BucketDownloaderFuncType] = {}
 _default_downloader: Optional[Callable[[str], bytes]] = None
 
 
-def add_bucket_downloader(proto: Literal["gcs", "s3"], func: BucketDownloaderFuncType):
+def add_bucket_downloader(proto: Literal["gs", "s3"], func: BucketDownloaderFuncType):
     if proto in _bucket_downloader_map:
         logger.warning(f"Protocol {proto} already has a custom downloader function specified, overwriting it")
     _bucket_downloader_map[proto] = func
