@@ -6,8 +6,14 @@ name: Check licenses
 on:
   push:
     branches: [ "dataengine-poc", "main" ]
+    paths:
+    - setup.py
+    - requirements*.txt
   pull_request:
     branches: [ "dataengine-poc", "main" ]
+    paths:
+    - setup.py
+    - requirements*.txt
 
 jobs:
   check-licenses:
