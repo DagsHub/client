@@ -153,11 +153,23 @@ df = ds.head().dataframe
 
 Blob fields are not downloaded by default, instead we return the hash of the field.
 
-In order to download the data, use the `download_binary_columns(*columns)` function of the QueryResult
+To get the contents of blob fields, you would usually want to iterate over the query result and run `get_blob`:
+```python
+for datapoint in ds.all():
+  blob_bytes = datapoint.get_blob('blob-field-name')
+```
+See the docstring for `get_blob` for different options on whether to load the blob into memory permanently, 
+whether to cache it permanently on disk, etc.  
+By default, after running `get_blob` without custom arguments, it will get saved to disk, its bytes content will be
+returned, and the contents of the `datapoint['blob-field-name']` metadata field will change from the hash of the blob
+to its path on disk instead.
+
+If instead you want to load the bytes content of blob fields into the Pandas dataframe, 
+you can do taht using the `download_binary_columns(*columns)` function of the QueryResult
 
 ```python
 df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
-# Now "binary_1" and "binary_2" have the actual blobs
+# Now "binary_1" and "binary_2" have the actual blob bytes
 ```
 
 ### Downloading files
