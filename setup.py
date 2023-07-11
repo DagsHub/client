@@ -32,7 +32,8 @@ install_requires = [
     "httpx~=0.23.0",
     "GitPython>=3.1.29",
     "rich[jupyter]~=13.1.0",
-    "dacite~=1.8.0",
+    # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
+    "dacite~=1.6.0",
     "tenacity~=8.2.2",
     "gql-query-builder~=0.1.7",
     "gql[requests]",
