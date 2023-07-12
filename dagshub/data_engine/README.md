@@ -165,10 +165,10 @@ returned, and the contents of the `datapoint['blob-field-name']` metadata field 
 to its path on disk instead.
 
 If instead you want to download blob fields for the entire dataset at once, 
-you can do that using the `download_binary_columns(*columns)` function of the QueryResult:
+you can do that using the `get_blob_columns(*columns)` function of the QueryResult:
 
 ```python
-df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
+df = ds.all().get_blob_columns("binary_1", "binary_2").dataframe
 # Now "binary_1" and "binary_2" columns have the paths to the downloaded blob files
 ```
 
