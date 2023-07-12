@@ -82,7 +82,7 @@ install_hooks()
 That’s it! You now have streaming access to all your project files.
 
 **Note:** You can stream files from a spesific branch or commit by setting the `branch` parameter.
- 
+
 
 To see an example of this that actually runs, check out the Colab below:
 
@@ -147,7 +147,7 @@ Upload a single file to any location in your repository, including DVC directori
 
 #### Usage
 ```bash
-dagshub upload <repo_owner>/<repo_name> <local_file_path> <path_in_remote>
+dagshub upload <repo_owner>/<repo_name> <local_file_path> [<path_in_remote> (optional)]
 ```
 
 **Options**
@@ -168,19 +168,21 @@ DVC.**
 Basic usage example is as follows:
 
 ```python
-from dagshub.upload import Repo
+from dagshub import upload
 
-repo = Repo("<repo_owner>", "<repo_name>")  # Optional: username, password, token, branch
-
-# Upload a single file to a repository in one line
-repo.upload(local_path="<local_file_path>", remote_path="<path_in_remote>",
-            versioning=”dvc”)  # Optional: versioning, new_branch, commit_message
+upload("<repo_owner>/<repo_name>", local_path="<path_to_file_or_dir_to_upload>")
+# Optional: remote_path, commit_message, username, password, token, branch, commit_message, versioning
+# For a full list of potential options, see dagshub.upload.wrapper.Repo.upload_files
 ```
 
-This will upload a single file to DagsHub, which will be tracked by DVC.
+This will upload a single file or directory to DagsHub, which will be tracked by DVC.
 
-You can also upload multiple files with the Python client, by using:
+You can also customize this behavior, and upload multiple files programmatically with the Python client, by using:
+
 ```python
+from dagshub.upload import Repo
+repo = Repo("<repo_owner", "<repo_name>")
+
 # Upload multiple files to a dvc folder in a repository with a single commit
 ds = repo.directory("<name_of_remote_folder")
 
@@ -192,8 +194,6 @@ ds.add(file=f, path="<path_in_remote>")
 ds.add(file="<local_file_path>", path="<path_in_remote>")
 ds.commit("<commit_message>", versioning="dvc")
 ```
-
-This will upload a folder with multiple files simultaneously, with a custom commit message to your DagsHub repo.
 
 ## Experiment Tracking Logger
 
