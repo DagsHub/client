@@ -293,7 +293,7 @@ class Datasource:
     def columns(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
-    def annotate_in_labelstudio(self):
+    def annotate(self):
         """
         Sends all datapoints in the datasource for annotation to labelstudio
         """
