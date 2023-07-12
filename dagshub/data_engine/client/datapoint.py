@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Tuple, Optional, Union, List, Dict, Any
+from typing import Tuple, Optional, Union, List, Dict, Any, Callable
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
 
+_generated_fields: Dict[str, Callable[["Datapoint"], Any]] = {
+    "path": lambda dp: dp.path,
+    "datapoint_id": lambda dp: dp.datapoint_id,
+    "dagshub_download_url": lambda dp: dp.download_url,
+}
 
 @dataclass
 class Datapoint:
@@ -15,6 +20,9 @@ class Datapoint:
     datasource: "Datasource"
 
     def __getitem__(self, item):
+        gen_field = _generated_fields.get(item)
+        if gen_field is not None:
+            return gen_field(self)
         return self.metadata[item]
 
     @property
