@@ -21,6 +21,7 @@ from dagshub.upload.errors import determine_upload_api_error
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
+FILES_UI_URL = "{owner}/{reponame}/src/{branch}/{path}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 DEFAULT_DATASET_COMMIT_MESSAGE = "Initial dataset commit"
 REPO_CREATE_URL = "api/v1/user/repos"
@@ -324,16 +325,32 @@ class Repo:
         """
         The get_request_url function returns the URL for uploading a file to DagsHub.
 
-        :param directory (str): the path to a directory within this repo on DagsHub.
+        :param directory: the path to a directory within this repo on DagsHub.
             For example, if you have created your repo in such a
             way that it has two directories named data and models,
             then you could pass one of these strings into this function as an argument.
         :return: The url for uploading a file
 
         """
+        return self.get_repo_url(CONTENT_UPLOAD_URL, directory)
+
+    def get_files_ui_url(self, directory):
+        """
+        The get_files_ui_url function returns the URL for seeing the uploaded files on DagsHub.
+
+        :param directory: the path to a directory within this repo on DagsHub.
+            For example, if you have created your repo in such a
+            way that it has two directories named data and models,
+            then you could pass one of these strings into this function as an argument.
+        :return: The url that you can navigate to in your browser to see the files
+
+        """
+        return self.get_repo_url(FILES_UI_URL, directory)
+
+    def get_repo_url(self, url_format, directory):
         return urllib.parse.urljoin(
             self.host,
-            CONTENT_UPLOAD_URL.format(
+            url_format.format(
                 owner=self.owner,
                 reponame=self.name,
                 branch=self.branch,
@@ -435,7 +452,8 @@ class DataSet:
                 self.commit(commit_message, **upload_kwargs)
                 progress.update(total_task, completed=file_counter)
 
-        log_message(f"Directory upload complete, uploaded {file_counter} files", logger)
+        log_message(f"Directory upload complete, uploaded {file_counter} files"
+                    f" to {self.repo.get_files_ui_url(self.directory)}", logger)
 
     @staticmethod
     def _clean_directory_name(directory: str):
