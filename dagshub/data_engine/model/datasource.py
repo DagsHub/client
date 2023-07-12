@@ -297,10 +297,10 @@ class Datasource:
         """
         Sends all datapoints in the datasource for annotation to labelstudio
         """
-        self.annotate_datapoints_in_labelstudio(self.all().entries)
+        self.send_datapoints_to_annotation(self.all().entries)
 
-    def annotate_datapoints_in_labelstudio(self, datapoints: Union[List[Datapoint], List[Dict]], open_project=True) -> \
-        Optional[str]:
+    def send_datapoints_to_annotation(self, datapoints: Union[List[Datapoint], List[Dict]],
+                                      open_project=True) -> Optional[str]:
         """
         Sends datapoints to annotations in Label Studio
 
