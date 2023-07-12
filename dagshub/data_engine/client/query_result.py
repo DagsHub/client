@@ -194,8 +194,8 @@ class QueryResult:
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
                 f"needs to be either int or str or slice")
 
-    def download_binary_columns(self, *columns: str, load_into_memory=True,
-                                cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+    def get_blob_columns(self, *columns: str, load_into_memory=False,
+                         cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
         """
         Downloads data from binary-defined columns
 
@@ -229,6 +229,13 @@ class QueryResult:
                 dp.metadata[column] = binary_val_or_path
 
         return self
+
+    def download_binary_columns(self, *columns: str, load_into_memory=True,
+                                cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+        """
+        deprecated: Use get_blob_columns instead.
+        """
+        return self.get_blob_columns(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk, num_proc=num_proc)
 
     def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
                        redownload=False, path_field: Optional[str] = None) -> PathLike:
