@@ -3,9 +3,11 @@
 ## The overall idea
 
 * You can define paths in your repo or bucket as datasources - collections of files and their metadata.
-* A datasource is like a giant table of metadata, where one column is the filepath and the other columns are metadata that
+* A datasource is like a giant table of metadata, where one column (field) is the filepath and the other columns are
+  metadata that
   either gets added automatically by DagsHub or that you can attach and modify whenever you want.
-* DagsHub gives a pandas-like Python client to query this giant metadata table and return only matching files from your datasource.
+* DagsHub gives a pandas-like Python client to query this giant metadata table and return only matching files from your
+  datasource.
 * Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
 
 
@@ -153,12 +155,27 @@ df = ds.head().dataframe
 
 Blob fields are not downloaded by default, instead we return the hash of the field.
 
-In order to download the data, use the `download_binary_columns(*columns)` function of the QueryResult
+To get the contents of blob fields, you would usually want to iterate over the query result and run `get_blob`:
+```python
+for datapoint in ds.all():
+  blob_bytes = datapoint.get_blob('blob-field-name')
+```
+
+See the docstring for `get_blob` for different options on whether to load the blob into memory permanently,
+whether to cache it permanently on disk, etc.
+By default, after running `get_blob` without custom arguments, it will get saved to disk, its bytes content will be
+returned, and the contents of the `datapoint['blob-field-name']` metadata field will change from the hash of the blob
+to its path on disk instead.
+
+If instead you want to download blob fields for the entire dataset at once,
+you can do that using the `get_blob_fields(*fields)` function of the QueryResult:
 
 ```python
-df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
-# Now "binary_1" and "binary_2" have the actual blobs
+df = ds.all().get_blob_fields("binary_1", "binary_2").dataframe
+# Now "binary_1" and "binary_2" fields have the paths to the downloaded blob files
 ```
+
+This is **more efficient** than iterating over the datapoints one at a time, since we parallelize the downloads.
 
 ### Downloading files
 
@@ -227,7 +244,8 @@ ds2 = ds[(ds["episode"] > 5) & (ds["has_baby_yoda"] == True)]
 
 ### Caveats:
 
-- **You can only compare with primitives. Comparisons between columns are not allowed yet. Let us know if you need this.**
+- **You can only compare with primitives. Comparisons between fields are not allowed yet. Let us know if you need this.
+  **
 - The Python `in` syntax isn't supported: `"aaa" in df["col"]` doesn't work, you need to use `df["col"].contains("aaa")`
 - Due to the order of execution for binary operators, if you use them, you need to wrap the other comparisons in
   parentheses
@@ -241,7 +259,7 @@ filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[ds["has_baby_yoda"] == True]
 ```
 
-Instead, it's preferred to have all the columns be addressed by the variable you address:
+Instead, it's preferred to have all the fields be addressed by the variable you address:
 
 ```python
 # INSTEAD THIS IS PREFERRED
