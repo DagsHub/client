@@ -27,11 +27,6 @@ def create_from_repo(repo: str, name: str, path: str, revision: Optional[str] = 
     return Datasource(source)
 
 
-def create_from_dataset(repo: str, name: str, dataset_name: str) -> Datasource:
-    source = _create_datasource_state(repo, name, DatasourceType.CUSTOM, dataset_name)
-    return Datasource(source)
-
-
 def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None, **kwargs) -> Datasource:
     """
     Additional kwargs:
@@ -61,6 +56,5 @@ def _create_datasource_state(repo: str, name: str, source_type: DatasourceType, 
 __all__ = [
     create_from_bucket,
     create_from_repo,
-    create_from_dataset,
     get_datasource,
 ]
