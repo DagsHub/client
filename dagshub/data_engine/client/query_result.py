@@ -194,29 +194,29 @@ class QueryResult:
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
                 f"needs to be either int or str or slice")
 
-    def get_blob_columns(self, *columns: str, load_into_memory=False,
-                         cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+    def get_blob_fields(self, *fields: str, load_into_memory=False,
+                        cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
         """
-        Downloads data from binary-defined columns
+        Downloads data from blob fields
 
         Args:
-            columns: list of binary columns to download blobs for
+            fields: list of binary fields to download blobs for
             load_into_memory: Whether to load the blobs into the datapoints, or just store them on disk
-                If True : the datapoints' specified columns will contain the blob data
-                If False: the datapoints' specified columns will contain Path objects to the file of the downloaded blob
+                If True : the datapoints' specified fields will contain the blob data
+                If False: the datapoints' specified fields will contain Path objects to the file of the downloaded blob
             cache_on_disk: Whether to cache the blobs on disk or not (valid only if load_into_memory is set to True)
                 Cache location is `~/dagshub/datasets/<user>/<repo>/<datasource_id>/.metadata_blobs/`
         """
         if not load_into_memory:
             assert cache_on_disk
-        for column in columns:
-            logger.info(f"Downloading metadata for column {column} with {num_proc} processes")
+        for field in fields:
+            logger.info(f"Downloading metadata for field {field} with {num_proc} processes")
             cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
 
             if cache_on_disk:
                 cache_location.mkdir(parents=True, exist_ok=True)
 
-            blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(column), self.entries))
+            blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(field), self.entries))
             auth = self.datasource.source.repoApi.auth
             func_args = zip(map(lambda bu: bu[0], blob_urls), map(lambda bu: bu[1], blob_urls), repeat(auth),
                             repeat(cache_on_disk), repeat(load_into_memory))
@@ -226,7 +226,7 @@ class QueryResult:
             for dp, binary_val_or_path in zip(self.entries, res):
                 if binary_val_or_path is None:
                     continue
-                dp.metadata[column] = binary_val_or_path
+                dp.metadata[field] = binary_val_or_path
 
         return self
 
@@ -235,7 +235,8 @@ class QueryResult:
         """
         deprecated: Use get_blob_columns instead.
         """
-        return self.get_blob_columns(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk, num_proc=num_proc)
+        return self.get_blob_fields(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk,
+                                    num_proc=num_proc)
 
     def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
                        redownload=False, path_field: Optional[str] = None) -> PathLike:
@@ -296,7 +297,7 @@ class QueryResult:
             files_location (str|PathLike): path to the location where to download the local files
                 default: ~/dagshub_datasets/user/repo/ds_name/
             redownload (bool): Redownload files, replacing the ones that might exist on the filesystem
-            voxel_annotations (List[str]) : List of columns from which to load voxel annotations serialized with
+            voxel_annotations (List[str]) : List of fields from which to load voxel annotations serialized with
                                         `to_json()`. This will override the labelstudio annotations
         """
         if len(self.entries) == 0:
@@ -316,14 +317,14 @@ class QueryResult:
         logger.info("Downloading files...")
 
         if "voxel_annotations" in kwargs:
-            annotation_columns = kwargs["voxel_annotations"]
+            annotation_fields = kwargs["voxel_annotations"]
             label_func = add_voxel_annotations
         else:
-            annotation_columns = self.datasource.annotation_columns
+            annotation_fields = self.datasource.annotation_fields
             label_func = add_ls_annotations
 
         # Load the annotation fields
-        self.download_binary_columns(*annotation_columns)
+        self.download_binary_columns(*annotation_fields)
 
         if not force_download:
             self._check_downloaded_dataset_size()
@@ -342,10 +343,10 @@ class QueryResult:
                 sample = fo.Sample(filepath=filepath)
                 sample["dagshub_download_url"] = datapoint.download_url
                 sample["datapoint_id"] = datapoint.datapoint_id
-                label_func(sample, datapoint, *annotation_columns)
+                label_func(sample, datapoint, *annotation_fields)
                 for k, v in datapoint.metadata.items():
-                    # TODO: more filtering here, not all columns should be showing up in voxel
-                    if k in annotation_columns:
+                    # TODO: more filtering here, not all fields should be showing up in voxel
+                    if k in annotation_fields:
                         continue
                     if type(v) is not bytes:
                         sample[k] = v
