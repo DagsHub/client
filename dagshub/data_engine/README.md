@@ -164,13 +164,15 @@ By default, after running `get_blob` without custom arguments, it will get saved
 returned, and the contents of the `datapoint['blob-field-name']` metadata field will change from the hash of the blob
 to its path on disk instead.
 
-If instead you want to load the bytes content of blob fields into the Pandas dataframe, 
-you can do taht using the `download_binary_columns(*columns)` function of the QueryResult
+If instead you want to download blob fields for the entire dataset at once, 
+you can do that using the `download_binary_columns(*columns)` function of the QueryResult:
 
 ```python
 df = ds.all().download_binary_columns("binary_1", "binary_2").dataframe
-# Now "binary_1" and "binary_2" have the actual blob bytes
+# Now "binary_1" and "binary_2" columns have the paths to the downloaded blob files
 ```
+
+This is **more efficient** than iterating over the datapoints one at a time, since we parallelize the downloads.
 
 ### Downloading files
 
