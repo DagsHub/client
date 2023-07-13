@@ -84,6 +84,7 @@ def create_repo(
     :param org_name (str): Organization name to be the repository owner
     :param description (str): Description for the repository
     :param private (bool): Flag to indicate the repository is going to be private
+    :param auto_init (bool): Pass true to create an initial commit with README, .gitignore and LICENSE.
     :param gitignores (str): Which gitignore template(s) to use (comma separated string)
     :param license (str): Which license file to use
     :param readme (str): Readme file path to upload
