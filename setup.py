@@ -49,6 +49,13 @@ if sys.version_info.major == 3 and sys.version_info.minor == 7:
         "cached-property==1.5.2"
     ]
 
+packages = setuptools.find_packages(exclude=["tests", "tests.*"])
+data_files = [("dagshub", [
+    "dagshub/data_engine/voxel_plugin_server/plugins/dagshub/dist/index.umd.js",
+    "dagshub/data_engine/voxel_plugin_server/plugins/dagshub/fiftyone.yaml",
+    "dagshub/data_engine/voxel_plugin_server/plugins/dagshub/package.json",
+])]
+
 setuptools.setup(
     name="dagshub",
     version=get_version("dagshub/__init__.py"),
@@ -58,7 +65,8 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/DagsHub/client",
-    packages=setuptools.find_packages(),
+    packages=packages,
+    data_files=data_files,
     install_requires=install_requires,
     classifiers=[
         "Programming Language :: Python :: 3",
