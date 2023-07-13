@@ -1,0 +1,1 @@
+recursive-include dagshub/data_engine/voxel_plugin_server/plugins *
