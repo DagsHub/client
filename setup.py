@@ -60,6 +60,8 @@ setuptools.setup(
     url="https://github.com/DagsHub/client",
     packages=setuptools.find_packages(),
     install_requires=install_requires,
+    package_dir={"": "dagshub/data_engine/voxel_plugin_server/plugins"},
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
