@@ -8,7 +8,7 @@ import webbrowser
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator, Set
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Iterator, Set, ContextManager
 
 import rich.progress
 from dataclasses_json import dataclass_json, config
@@ -118,8 +118,7 @@ class Datasource:
                 f"Datasource {self.source.name} is currently in the progress of rescanning. "
                 f"Values might change if you requery later")
 
-    @contextmanager
-    def metadata_context(self) -> Iterator["MetadataContextManager"]:
+    def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
         Returns a metadata context, that you can upload metadata through via update_metadata
         Once the context is exited, all metadata is uploaded in one batch
@@ -128,10 +127,16 @@ class Datasource:
             ctx.update_metadata(["file1", "file2"], {"key1": True, "key2": "value"})
 
         """
-        self.source.get_from_dagshub()
-        ctx = MetadataContextManager(self)
-        yield ctx
-        self._upload_metadata(ctx.get_metadata_entries())
+
+        # Need to have the context manager inside a wrapper to satisfy MyPy + PyCharm type hinter
+        @contextmanager
+        def func():
+            self.source.get_from_dagshub()
+            ctx = MetadataContextManager(self)
+            yield ctx
+            self._upload_metadata(ctx.get_metadata_entries())
+
+        return func()
 
     def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
         """
@@ -155,7 +160,7 @@ class Datasource:
     def _df_to_metadata(df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None,
                         multivalue_fields=set()) -> List[
         DatapointMetadataUpdateEntry]:
-        res = []
+        res: List[DatapointMetadataUpdateEntry] = []
         if path_column is None:
             path_column = df.columns[0]
         elif type(path_column) is str:
@@ -395,12 +400,16 @@ class Datasource:
 
     def __eq__(self, other: object):
         self._test_not_comparing_other_ds(other)
+        if other is None:
+            return self.is_null()
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
         return self.add_query_op("eq", other)
 
     def __ne__(self, other: object):
         self._test_not_comparing_other_ds(other)
+        if other is None:
+            return self.is_not_null()
         if not isinstance(other, (int, float, str)):
             raise NotImplementedError
         return self.add_query_op("eq", other).add_query_op("not")
