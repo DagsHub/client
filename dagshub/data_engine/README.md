@@ -296,16 +296,17 @@ from `torch` and `tensorflow` frameworks. The data is streamed using the DagsHub
 ## Sample Usage
 
 ```python
-dataset_tr = query_result.as_dataset(flavor='torch', strategy='background', processes = 9000)
-dataset_tf = query_result.as_dataset('tensorflow', savedir='/tmp/.dataset/' metadata_columns=['file_depth', 'clf'], strategy='preload')
+dataset_tr = query_result.as_ml_dataset(flavor='torch', strategy='background', processes=9000)
+dataset_tf = query_result.as_ml_dataset('tensorflow', savedir='/tmp/.dataset/',
+                                        metadata_columns=['file_depth', 'clf'], strategy='preload')
 
-dataloader = query_result.as_dataloader('torch', tensorizers='auto')
-dataloader = query_result.as_dataloader(dataset_tr, tensorizers='image')
-dataloader = query_result.as_dataloader('tensorflow', tensorizers=[lambda x: x])
-dataloader = query_result.as_dataloader(dataset_tf, tensorizers=['video', 'image', 'numeric'])
+dataloader = query_result.as_ml_dataloader('torch', tensorizers='auto')
+dataloader = query_result.as_ml_dataloader(dataset_tr, tensorizers='image')
+dataloader = query_result.as_ml_dataloader('tensorflow', tensorizers=[lambda x: x])
+dataloader = query_result.as_ml_dataloader(dataset_tf, tensorizers=['video', 'image', 'numeric'])
 
 for X, y in dataloader:
-    # some training here
+# some training here
 ```
 
 For details regarding potential kwarg options, run `help(<class>)` in a python runtime.

@@ -108,7 +108,7 @@ class Datapoint:
         """
         Downloads the datapoint to the target_dir directory
         Args:
-            target_dir: Where to download the file (either a directory, or the full path).
+            target: Where to download the file (either a directory, or the full path).
                 If not specified, then downloads to ~/dagshub/datasets/<user>/<repo>/<ds_id>
             keep_source_prefix: If True, includes the prefix of the datasource in the download path
                 Useful for cases where the download path is the root of the repository

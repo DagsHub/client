@@ -91,8 +91,10 @@ class QueryResult:
             datasource,
         )
 
-    def as_dataset(self, flavor, **kwargs):
+    def as_ml_dataset(self, flavor, **kwargs):
         """
+        Convert the QueryResult into a dataset for a machine learning framework
+
         ARGS:
         flavor: torch|tensorflow
 
@@ -123,8 +125,10 @@ class QueryResult:
         else:
             raise ValueError("supported flavors are torch|tensorflow")
 
-    def as_dataloader(self, flavor, **kwargs):
+    def as_ml_dataloader(self, flavor, **kwargs):
         """
+        Convert the QueryResult into a dataloader for a machine learning framework
+
         ARGS:
         flavor: torch|tensorflow
 
@@ -161,7 +165,7 @@ class QueryResult:
             from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 
             return PyTorchDataLoader(
-                self.as_dataset(
+                self.as_ml_dataset(
                     flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))
                 ),
                 **keypairs(global_kwargs - dataset_kwargs),
@@ -170,7 +174,7 @@ class QueryResult:
             from dagshub.data_engine.client.loaders.tf import TensorFlowDataLoader
 
             return TensorFlowDataLoader(
-                self.as_dataset(
+                self.as_ml_dataset(
                     flavor,
                     **keypairs(global_kwargs.intersection(dataset_kwargs)),
                 ),
