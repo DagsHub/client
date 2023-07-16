@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType])
+dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType])
 
 
 class DataClient:
@@ -55,7 +55,7 @@ class DataClient:
             ds_type=ds.source_type
         )
         res = self._exec(q, params)
-        return dacite.from_dict(DatasourceResult, res["createDatasource"], config=_dacite_config)
+        return dacite.from_dict(DatasourceResult, res["createDatasource"], config=dacite_config)
 
     def head(self, datasource: Datasource, size: Optional[int] = None) -> QueryResult:
         if size is None:
@@ -152,7 +152,7 @@ class DataClient:
         res = self._exec(q, params)["datasource"]
         if res is None:
             return []
-        return [dacite.from_dict(DatasourceResult, val, config=_dacite_config)
+        return [dacite.from_dict(DatasourceResult, val, config=dacite_config)
                 for val in res]
 
     def delete_datasource(self, datasource: Datasource):
@@ -190,5 +190,5 @@ class DataClient:
         if res is None:
             return []
 
-        return [dacite.from_dict(DatasetResult, val, config=_dacite_config)
+        return [dacite.from_dict(DatasetResult, val, config=dacite_config)
                 for val in res]

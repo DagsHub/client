@@ -49,7 +49,7 @@ async def get_voxel_filters(request: Request) -> List[VoxelFilterState]:
     return filters
 
 
-_generated_fields = ["dagshub_download_url"]
+_generated_fields = ["dagshub_download_url", "filepath", "id", "datapoint_id", "datapoint_path"]
 
 
 def sanitize_voxel_filter(sess: "fo.Session", filters: List[VoxelFilterState]):

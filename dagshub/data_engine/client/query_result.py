@@ -343,6 +343,7 @@ class QueryResult:
                 sample = fo.Sample(filepath=filepath)
                 sample["dagshub_download_url"] = datapoint.download_url
                 sample["datapoint_id"] = datapoint.datapoint_id
+                sample["datapoint_path"] = datapoint.path
                 label_func(sample, datapoint, *annotation_fields)
                 for k, v in datapoint.metadata.items():
                     # TODO: more filtering here, not all fields should be showing up in voxel
