@@ -123,7 +123,7 @@ def to_log_level(verbosity):
 @cli.command()
 @click.argument("repo", callback=validate_repo)
 @click.argument("filename", type=click.Path(exists=True))
-@click.argument("target")
+@click.argument("target", required=False)
 @click.option("-m", "--message", help="Commit message for the upload")
 @click.option("-b", "--branch", help="Branch to upload the file to")
 @click.option("--update", is_flag=True, help="Force update existing files/directories")
@@ -146,10 +146,15 @@ def upload(ctx,
            versioning,
            **kwargs):
     """
-    Upload FILENAME to REPO at location TARGET
-    [Unlike git push, we upload your data to DagsHub once and don't sync the repo state]
+    Upload FILENAME to REPO at location TARGET.
+
+    FILENAME can be a directory.
+
     REPO should be of the form <owner>/<repo-name>, i.e nirbarazida/yolov6.
+
     TARGET should include the full path inside the repo, including the filename itself.
+    If TARGET is omitted, it defaults to using the relative path to FILENAME from current working directory,
+    or the filename itself if it's not relative to the current working directory.
     """
     config.host = host or ctx.obj["host"] or config.host
     config.quiet = quiet or ctx.obj["quiet"]

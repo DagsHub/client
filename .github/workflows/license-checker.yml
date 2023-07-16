@@ -5,12 +5,12 @@ name: Check licenses
 
 on:
   push:
-    branches: [ "dataengine-poc", "main" ]
+    branches: [ "master", "main", "dataengine-poc" ]
     paths:
     - setup.py
     - requirements*.txt
   pull_request:
-    branches: [ "dataengine-poc", "main" ]
+    branches: [ "master", "main", "dataengine-poc" ]
     paths:
     - setup.py
     - requirements*.txt

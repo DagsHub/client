@@ -84,6 +84,7 @@ def create_repo(
     :param org_name (str): Organization name to be the repository owner
     :param description (str): Description for the repository
     :param private (bool): Flag to indicate the repository is going to be private
+    :param auto_init (bool): Pass true to create an initial commit with README, .gitignore and LICENSE.
     :param gitignores (str): Which gitignore template(s) to use (comma separated string)
     :param license (str): Which license file to use
     :param readme (str): Readme file path to upload
@@ -144,6 +145,33 @@ def create_repo(
     return Repo(
         owner=repo["owner"]["login"], name=repo["name"], token=token, branch="main"
     )
+
+
+def validate_owner_repo(owner_repo: str) -> Tuple[str, str]:
+    parts = owner_repo.split("/")
+    if len(parts) != 2:
+        raise ValueError("repo needs to be in the format <repo-owner>/<repo-name>")
+    return parts[0], parts[1]
+
+
+def upload(
+    repo: str,
+    local_path: Union[str, IOBase],
+    commit_message=DEFAULT_COMMIT_MESSAGE,
+    remote_path: str = None,
+    **kwargs,
+):
+    """
+    Convenience wrapper around Repo.upload
+    :param repo: Repo identifier in the form <username>/<reponame>
+    :param local_path: Specify the file or directory to be uploaded
+    :param commit_message: Specify an optional commit message
+    :param remote_path: Specify the path to upload the file to. Defaults to the relative path to the local_path.
+    :param kwargs: Pass in any additional parameters that are required for the upload function
+    """
+    owner, repo = validate_owner_repo(repo)
+    repo = Repo(owner, repo)
+    repo.upload(local_path, commit_message=commit_message, remote_path=remote_path, **kwargs)
 
 
 class Repo:
