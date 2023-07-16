@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 
 from dagshub.data_engine.model.query import DatasourceQuery
 from dagshub.data_engine.voxel_plugin_server.models import VoxelFilterState
+from dagshub.data_engine.voxel_plugin_server.routes.util import error_handler
 from dagshub.data_engine.voxel_plugin_server.utils import get_plugin_state
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@error_handler
 async def save_dataset(request: Request):
     plugin_state = get_plugin_state(request)
     data = await request.json()

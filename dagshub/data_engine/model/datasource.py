@@ -311,7 +311,7 @@ class Datasource:
         Returns the URL of the created LS workspace
         """
         if len(datapoints) == 0:
-            logger.warning("No datapoints provided to be sent to labelstudio")
+            logger.warning("No datapoints provided to be sent to annotation")
             return None
         req_data = {
             "datasource_id": self.source.id,

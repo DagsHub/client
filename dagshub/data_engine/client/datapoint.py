@@ -1,16 +1,20 @@
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Tuple, Optional, Union, List, Dict, Any, Callable
+from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
+
+if TYPE_CHECKING:
+    from dagshub.data_engine.model.datasource import Datasource
 
 _generated_fields: Dict[str, Callable[["Datapoint"], Any]] = {
     "path": lambda dp: dp.path,
     "datapoint_id": lambda dp: dp.datapoint_id,
     "dagshub_download_url": lambda dp: dp.download_url,
 }
+
 
 @dataclass
 class Datapoint:

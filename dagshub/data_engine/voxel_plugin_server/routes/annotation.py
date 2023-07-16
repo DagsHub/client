@@ -3,11 +3,13 @@ import logging
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from dagshub.data_engine.voxel_plugin_server.routes.util import error_handler
 from dagshub.data_engine.voxel_plugin_server.utils import get_plugin_state
 
 logger = logging.getLogger(__name__)
 
 
+@error_handler
 async def to_annotate(request: Request):
     plugin_state = get_plugin_state(request)
 
