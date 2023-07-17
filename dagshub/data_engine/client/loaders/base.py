@@ -166,7 +166,7 @@ class DagsHubDataset:
         elif datatypes in ["image", "audio", "video"]:
             return [
                 getattr(self.tensorlib, datatypes),
-            ] * len(self.metadata_columns) + 1
+            ] * (len(self.metadata_columns) + 1)
         elif (
             type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1
         ):
