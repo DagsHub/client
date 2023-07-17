@@ -1,6 +1,6 @@
 import inspect
 import logging
-import multiprocessing
+import multiprocessing.pool
 from dataclasses import field, dataclass
 from itertools import repeat
 from os import PathLike
