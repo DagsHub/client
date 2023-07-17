@@ -175,7 +175,6 @@ class DataClient:
     def save_dataset(self, datasource: Datasource, name: str):
         q = GqlMutations.save_dataset()
 
-        assert not datasource.get_query().is_empty
         assert name is not None
 
         params = GqlMutations.save_dataset_params(datasource_id=datasource.source.id,
