@@ -77,6 +77,9 @@ class QueryResult:
     def __iter__(self):
         return self.entries.__iter__()
 
+    def __repr__(self):
+        return f"QueryResult of datasource {self.datasource.source.name} with {len(self.entries)} datapoint(s)"
+
     @staticmethod
     def from_gql_query(
         query_resp: Dict[str, Any], datasource: "Datasource"
