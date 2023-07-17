@@ -1,8 +1,10 @@
 import pytest
 
-from dagshub.data_engine.client.models import MetadataFieldSchema, MetadataFieldType, QueryResult, Datapoint
-from dagshub.data_engine.model import datasources
+from dagshub.data_engine.client.models import MetadataFieldSchema, MetadataFieldType
+from dagshub.data_engine import datasources
+from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource import Datasource
+from dagshub.data_engine.model.query_result import QueryResult
 
 
 @pytest.fixture

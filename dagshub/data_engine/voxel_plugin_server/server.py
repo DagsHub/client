@@ -1,16 +1,13 @@
 import asyncio
 import logging
-
-from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
-from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from threading import Thread
 from typing import TYPE_CHECKING, Optional
 
-from hypercorn.config import Config
 from hypercorn.asyncio import serve
+from hypercorn.config import Config
 
-from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.voxel_plugin_server.app import app
+from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
 
 logger = logging.getLogger(__name__)
 

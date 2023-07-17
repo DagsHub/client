@@ -1,6 +1,5 @@
 import pytest
 
-from dagshub.data_engine.model import datasources
 from dagshub.data_engine.model.datasource import (
     Datasource,
 )

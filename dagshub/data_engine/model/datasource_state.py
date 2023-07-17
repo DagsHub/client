@@ -6,8 +6,9 @@ from typing import Optional, Union, Mapping, Any, Dict, List
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceType, Datapoint, DatasourceResult, PreprocessingStatus, \
+from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, \
     MetadataFieldSchema
+from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
 try:

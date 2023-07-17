@@ -1,7 +1,6 @@
 import inspect
 import logging
 import multiprocessing
-import os
 from dataclasses import field, dataclass
 from itertools import repeat
 from os import PathLike
@@ -15,7 +14,7 @@ from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.annotation.voxel_conversion import add_voxel_annotations, add_ls_annotations
-from dagshub.data_engine.client.datapoint import Datapoint, _get_blob
+from dagshub.data_engine.model.datapoint import Datapoint, _get_blob
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 

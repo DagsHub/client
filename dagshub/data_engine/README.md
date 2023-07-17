@@ -20,7 +20,8 @@ Let Kirill know if the README is not up to date and he will update
 ### Creating
 
 ```python
-from dagshub.data_engine.model import datasources
+
+from dagshub.data_engine import datasources
 
 # Create a datasource from a connected storage bucket.
 # You need to first connect the bucket to the repo using repo settings -> integrations.
@@ -59,7 +60,8 @@ ds_list = datasources.get_datasources("simon/baby-yoda-segmentation-dataset")
 To get a specific datasource use `datasources.get_datasource` function
 
 ```python
-from dagshub.data_engine.model import datasources
+
+from dagshub.data_engine import datasources
 
 # Can accept either name argument, or id argument
 ds = datasources.get_datasource("simon/baby-yoda-segmentation-dataset", name="bucket-ds")
@@ -281,7 +283,8 @@ ds.save_dataset("my-cool-dataset")
 In order to get the dataset back next time, do this:
 
 ```python
-from dagshub.data_engine.model import datasets
+
+from dagshub.data_engine import datasets
 
 ds = datasets.get_dataset("user/repo", "my-cool-dataset")
 ```

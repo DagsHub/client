@@ -1,13 +1,9 @@
 import enum
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any, List, Union, Optional
 
 from dataclasses_json import dataclass_json, config
-
-from .datapoint import Datapoint  # noqa
-from .query_result import QueryResult  # noqa
 
 logger = logging.getLogger(__name__)
 
