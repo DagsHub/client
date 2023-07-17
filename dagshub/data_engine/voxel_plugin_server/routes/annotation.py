@@ -20,7 +20,7 @@ async def to_annotate(request: Request):
         return JSONResponse({"error": "Selection empty"}, status_code=400)
     for sample in selected:
         req_dicts.append({
-            "id": sample["datapoint_id"],
+            "datapoint_id": sample["datapoint_id"],
             "download_url": sample["dagshub_download_url"],
         })
     print(f"Sending to annotation: {req_dicts}")
