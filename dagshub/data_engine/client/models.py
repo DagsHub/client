@@ -30,8 +30,8 @@ class IntegrationStatus(enum.Enum):
 class PreprocessingStatus(enum.Enum):
     READY = "READY"
     IN_PROGRESS = "IN_PROGRESS"
+    AUTO_SCAN_IN_PROGRESS = "AUTO_SCAN_IN_PROGRESS"
     FAILED = "FAILED"
-    UNKNOWN = ""  # TODO: delete once it's returned consistently
 
 
 class DatasourceType(enum.Enum):

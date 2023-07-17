@@ -110,7 +110,8 @@ class Datasource:
 
     def _check_preprocess(self):
         self.source.get_from_dagshub()
-        if self.source.preprocessing_status == PreprocessingStatus.IN_PROGRESS:
+        if (self.source.preprocessing_status == PreprocessingStatus.IN_PROGRESS or
+            self.source.preprocessing_status == PreprocessingStatus.AUTO_SCAN_IN_PROGRESS):
             logger.warning(
                 f"Datasource {self.source.name} is currently in the progress of rescanning. "
                 f"Values might change if you requery later")
