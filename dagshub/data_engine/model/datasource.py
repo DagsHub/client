@@ -25,6 +25,7 @@ from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.query_result import QueryResult
+    from dagshub.data_engine.model.datasource_state import DatasourceState
     import fiftyone as fo
     import pandas
 else:
@@ -59,7 +60,7 @@ class Datasource:
         self.serialize_gql_query_input()
 
     @property
-    def source(self):
+    def source(self) -> "DatasourceState":
         return self._source
 
     def clear_query(self):
@@ -258,9 +259,6 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def __str__(self):
-        return f"<Dataset source:{self._source}, query: {self._query}>"
-
     def save_dataset(self, name: str):
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
@@ -293,7 +291,8 @@ class Datasource:
     def visualize(self, **kwargs) -> "fo.Session":
         return self.all().visualize(**kwargs)
 
-    def columns(self) -> List[MetadataFieldSchema]:
+    @property
+    def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
     def send_to_annotation(self):
@@ -343,6 +342,12 @@ class Datasource:
         if open_project:
             webbrowser.open_new_tab(link)
         return link
+
+    def __repr__(self):
+        res = f"Datasource {self.source.name}"
+        res += f"\n\tRepo: {self.source.repo}, path: {self.source.path}"
+        res += f"\n\t{self._query}"
+        return res + "\n"
 
     """ FUNCTIONS RELATED TO QUERYING
     These are functions that overload operators on the DataSet, so you can do pandas-like filtering
