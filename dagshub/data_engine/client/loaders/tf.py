@@ -47,10 +47,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
 
     def __getitem__(self, index: int) -> tf.Tensor:
         indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
-        X = []
-        for index in indices:
-            X.append(self.dataset.__getitem__(index))
-        return tf.stack(X)
+        return [self.dataset.__getitem__(index) for index in indices]
 
     def on_epoch_end(self) -> None:
         self.indices = np.arange(self.dataset.__len__())
