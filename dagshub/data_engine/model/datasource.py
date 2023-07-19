@@ -232,10 +232,19 @@ class Datasource:
                 return
         self.source.client.delete_datasource(self)
 
-    def generate_datapoints(self):
+    def scan_source(self):
         """
         This function fires a call to the backend to rescan the datapoints.
-        Call this function whenever you updated/new files and want the changes to show up in the datasource metadata
+        Call this function whenever you uploaded new files and want the new files to appear when querying the datasource,
+        Or if you changed existing file contents and want their metadata to be updated automatically.
+
+        Notes about automatically scanned metadata:
+        1. Only new datapoints (files) will be added.
+           If files were removed from the source, their metadata will still remain,
+           and they will still be returned from queries on the datasource.
+           An API to actively remove metadata will be available soon.
+        2. Some metadata fields will be automatically scanned and updated by DagsHub based on this scan -
+           currently only "size" (bytes), but more metadata fields will be added automatically in the future.
         """
         logger.debug("Rescanning datasource")
         self.source.client.scan_datasource(self)
