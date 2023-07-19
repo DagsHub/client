@@ -46,10 +46,18 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         return self.dataset.__len__() // self.batch_size
 
     def __getitem__(self, index: int) -> tf.Tensor:
-        samples = [self.dataset.__getitem__(index) for index in self.indices[index * self.batch_size : (index + 1) * self.batch_size]]
-        batch = [[] for _ in range(len(samples[0]))] # [[]] * len(samples[0]) creates lists shallowly
+        samples = [
+            self.dataset.__getitem__(index)
+            for index in self.indices[
+                index * self.batch_size : (index + 1) * self.batch_size
+            ]
+        ]
+        batch = [
+            [] for _ in range(len(samples[0]))
+        ]  # [[]] * len(samples[0]) creates lists shallowly
         for sample in samples:
-            for idx, tensor in enumerate(sample): batch[idx].append(tensor)
+            for idx, tensor in enumerate(sample):
+                batch[idx].append(tensor)
 
         return [tf.stack(column) for column in batch]
 
