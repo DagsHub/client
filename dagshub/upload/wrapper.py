@@ -154,7 +154,7 @@ def validate_owner_repo(owner_repo: str) -> Tuple[str, str]:
     return parts[0], parts[1]
 
 
-def upload(
+def upload_files(
     repo: str,
     local_path: Union[str, IOBase],
     commit_message=DEFAULT_COMMIT_MESSAGE,
