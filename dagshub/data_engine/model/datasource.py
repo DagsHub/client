@@ -16,6 +16,7 @@ import rich.progress
 from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
 
+from dagshub.common import rich_console
 import dagshub.common.config
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
@@ -373,28 +374,39 @@ class Datasource:
             webbrowser.open_new_tab(link)
         return link
 
-    def wait_until_ready(self, max_wait_time=None):
+    def wait_until_ready(self, max_wait_time=300, fail_on_timeout=True):
         """
        Blocks until the datasource preprocessing is complete
 
        Args:
            max_wait_time (int): Maximum time to wait in seconds
        """
+        start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
+        http_request("GET", start_workspace_url, auth=self.source.repoApi.auth)
+
         start = time.time()
-        logger.info("Waiting for datasource preprocessing to complete")
+        spinner = rich_console.status("Waiting for datasource preprocessing to complete...")
+        spinner.start()
         if max_wait_time:
-            logger.info(f"Maximum waiting time set to {max_wait_time} seconds")
+            rich_console.log(f"Maximum waiting time set to {int(max_wait_time/60)} minutes")
         while True:
             self.source.get_from_dagshub()
             if self.source.preprocessing_status == PreprocessingStatus.READY:
+                spinner.stop()
                 return
 
             if self.source.preprocessing_status == PreprocessingStatus.FAILED:
+                spinner.stop()
                 raise RuntimeError("Datasource preprocessing failed")
 
             if max_wait_time is not None and (time.time() - start) > max_wait_time:
-                logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed")
-                return
+                spinner.stop()
+                if fail_on_timeout:
+                    raise RuntimeError(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                else:
+                    logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                    return
+
             time.sleep(1)
 
 

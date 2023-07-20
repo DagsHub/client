@@ -281,6 +281,13 @@ class RepoAPI:
             "data-engine"
         )
 
+    @cached_property
+    def annotations_url(self) -> str:
+        return multi_urljoin(
+            self.repo_api_url,
+            "annotations"
+        )
+
     def commit_url(self, sha) -> str:
         """
         URL of a commit in the repo
