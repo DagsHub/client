@@ -353,33 +353,34 @@ class Datasource:
        Args:
            max_wait_time (int): Maximum time to wait in seconds
        """
-        start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
-        http_request("GET", start_workspace_url, auth=self.source.repoApi.auth)
+        try:
+            # Start LS workspace to save time later in the flow
+            start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
+            http_request("GET", start_workspace_url, auth=self.source.repoApi.auth)
+        except:
+            pass
 
         start = time.time()
-        spinner = rich_console.status("Waiting for datasource preprocessing to complete...")
-        spinner.start()
         if max_wait_time:
             rich_console.log(f"Maximum waiting time set to {int(max_wait_time/60)} minutes")
-        while True:
-            self.source.get_from_dagshub()
-            if self.source.preprocessing_status == PreprocessingStatus.READY:
-                spinner.stop()
-                return
-
-            if self.source.preprocessing_status == PreprocessingStatus.FAILED:
-                spinner.stop()
-                raise RuntimeError("Datasource preprocessing failed")
-
-            if max_wait_time is not None and (time.time() - start) > max_wait_time:
-                spinner.stop()
-                if fail_on_timeout:
-                    raise RuntimeError(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
-                else:
-                    logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+        spinner = rich_console.status("Waiting for datasource preprocessing to complete...")
+        with spinner:
+            while True:
+                self.source.get_from_dagshub()
+                if self.source.preprocessing_status == PreprocessingStatus.READY:
                     return
 
-            time.sleep(1)
+                if self.source.preprocessing_status == PreprocessingStatus.FAILED:
+                    raise RuntimeError("Datasource preprocessing failed")
+
+                if max_wait_time is not None and (time.time() - start) > max_wait_time:
+                    if fail_on_timeout:
+                        raise RuntimeError(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                    else:
+                        logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                        return
+
+                time.sleep(1)
 
 
     def __repr__(self):
