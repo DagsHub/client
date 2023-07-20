@@ -2,6 +2,8 @@ import base64
 import gzip
 import json
 import logging
+import time
+
 import math
 import os.path
 import webbrowser
@@ -370,6 +372,31 @@ class Datasource:
         if open_project:
             webbrowser.open_new_tab(link)
         return link
+
+    def wait_until_ready(self, max_wait_time=None):
+        """
+       Blocks until the datasource preprocessing is complete
+
+       Args:
+           max_wait_time (int): Maximum time to wait in seconds
+       """
+        start = time.time()
+        logger.info("Waiting for datasource preprocessing to complete")
+        if max_wait_time:
+            logger.info(f"Maximum waiting time set to {max_wait_time} seconds")
+        while True:
+            self.source.get_from_dagshub()
+            if self.source.preprocessing_status == PreprocessingStatus.READY:
+                return
+
+            if self.source.preprocessing_status == PreprocessingStatus.FAILED:
+                raise RuntimeError("Datasource preprocessing failed")
+
+            if max_wait_time is not None and (time.time() - start) > max_wait_time:
+                logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed")
+                return
+            time.sleep(1)
+
 
     def __repr__(self):
         res = f"Datasource {self.source.name}"
