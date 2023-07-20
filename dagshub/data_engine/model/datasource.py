@@ -310,13 +310,14 @@ class Datasource:
         """
         self.send_datapoints_to_annotation(self.all().entries)
 
-    def send_datapoints_to_annotation(self, datapoints: Union[List[Datapoint], List[Dict]],
+    def send_datapoints_to_annotation(self, datapoints: Union[List[Datapoint], QueryResult, List[Dict]],
                                       open_project=True) -> Optional[str]:
         """
         Sends datapoints to annotations in Label Studio
 
         Args:
-        datapoints : either a list of Datapoints or dicts that have "id" and "downloadurl" fields
+        datapoints : Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
+                     A QueryResult can also function as a list of Datapoint.
         open_project : specifies whether the link to the returned LS project should be opened from Python
 
         Returns the URL of the created LS workspace
