@@ -244,7 +244,7 @@ class Datasource:
            and they will still be returned from queries on the datasource.
            An API to actively remove metadata will be available soon.
         2. Some metadata fields will be automatically scanned and updated by DagsHub based on this scan -
-           currently only "size" (bytes), but more metadata fields will be added automatically in the future.
+           the list of automatic metadata fields is growing frequently!
         """
         logger.debug("Rescanning datasource")
         self.source.client.scan_datasource(self)
