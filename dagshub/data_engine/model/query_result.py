@@ -193,8 +193,10 @@ class QueryResult:
         """
         if type(item) is str:
             return self._datapoint_path_lookup[item]
-        elif type(item) is int or type(item) is slice:
+        elif type(item) is int:
             return self.entries[item]
+        elif type(item) is slice:
+            return QueryResult(_entries=self.entries[item], datasource=self.datasource)
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
