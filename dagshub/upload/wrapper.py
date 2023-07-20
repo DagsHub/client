@@ -3,14 +3,16 @@ import json
 import logging
 import os
 import posixpath
+import time
 import urllib
 from http import HTTPStatus
 from io import IOBase
 from pathlib import Path
-from typing import Union, Tuple, BinaryIO, Dict
+from typing import Union, Tuple, BinaryIO, Dict, Optional
 
 import httpx
 import rich.progress
+import rich.status
 
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
@@ -202,6 +204,10 @@ class Repo:
 
         self._api = RepoAPI(f"{owner}/{name}", host=self.host, auth=self.auth)
 
+        # For mirror uploading: store the last revision for which we uploaded
+        # When the last revision changes, that means the sync has been complete and we can upload a new batch
+        self._last_upload_revision: Optional[str] = None
+
         if self.branch is None:
             logger.debug("Branch wasn't provided. Fetching default branch...")
             self.branch = self._api.default_branch
@@ -266,6 +272,9 @@ class Repo:
         :return: None
         """
 
+        if self._api.is_mirror:
+            self._poll_mirror_up_to_date()
+
         data = {
             "commit_choice": "direct",
             "commit_summary": commit_message,
@@ -294,6 +303,9 @@ class Repo:
             timeout=None,
         )
         self._log_upload_details(data, res, files)
+        # 204 means nothing was added, so if we're in the mirror we can upload the next batch immediately
+        if self._api.is_mirror and res.status_code == 204:
+            self._last_upload_revision = None
 
     def _log_upload_details(self, data, res, files):
         """
@@ -319,6 +331,41 @@ class Repo:
             raise determine_upload_api_error(res)
         else:
             log_message("Upload finished successfully!", logger)
+
+    def _poll_mirror_up_to_date(self):
+        """
+        Synchronization lock for the mirrored repository uploading
+        Since the upload is being done "through" DagsHub,
+            and we rely on the change first showing up on the original repo, then being synced back to us,
+            there is a possibility of uploading a new batch before the sync has been completed,
+            during which the DagsHub repo is out of date with the original mirror.
+        This is a client-side fix made to mitigate this.
+        We poll for the change in the revision and compare it to the revision we had when we last uploaded
+        When the revision changes, that means the sync has been completed and we can upload a new batch
+        """
+        if not self._api.is_mirror:
+            return
+        # Initial state - assume we can upload
+        if self._last_upload_revision is None:
+            self._last_upload_revision = self._api.last_commit_sha(self.branch)
+            return
+
+        poll_interval = 1.0   # seconds
+        poll_timeout = 600.0
+        start_time = time.time()
+
+        with rich.status.Status("Waiting for the mirror to sync", console=rich_console):
+            while True:
+                new_revision = self._api.last_commit_sha(self.branch)
+                if new_revision == self._last_upload_revision:
+                    if time.time() - start_time > poll_timeout:
+                        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
+                                       f"Trying to push anyway, which might not work.")
+                        return
+                    time.sleep(poll_interval)
+                else:
+                    self._last_upload_revision = new_revision
+                    return
 
     @property
     def auth(self):
