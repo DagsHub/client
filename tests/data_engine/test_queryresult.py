@@ -21,4 +21,3 @@ def test_getitem_slice_returns_query_result(query_result):
     assert len(qr) == math.ceil(len(query_result) / 2)
     for i in range(len(qr)):
         assert qr[i].datapoint_id is query_result[i * 2].datapoint_id
-
