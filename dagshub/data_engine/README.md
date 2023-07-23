@@ -280,6 +280,13 @@ ds = datasets.get_dataset("user/repo", "my-cool-dataset")
 
 You'll get back the dataset and can continue working from where you left off
 
+
+## Deleting a datasource
+
+```python
+ds.delete_source()
+```
+
 # Datasets and Dataloaders
 
 To close the pipeline from a filtered dataset to beginning training, you can leverage datasets and dataloaders
@@ -370,17 +377,12 @@ voxel_session.wait(-1)
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
 
-## Deleting a datasource
 
-```python
-ds.delete_source()
-```
-
-## Contributing
+# Contributing
 
 Feel free to add whatever issues you get into the issue tracker on the repository
 
-## Known issues
+# Known issues
 
 - No deleting of metadata yet
 - Works only on data in the repository you specified. For now you can't create a datasource in one repo and use data
@@ -390,7 +392,7 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
   probably
   (with unexpected results)
 
-## Troubleshooting
+# Troubleshooting
 
 It's VERY useful for us if you can turn on debug logging and report with that.
 That way we can see the executing queries and their results
