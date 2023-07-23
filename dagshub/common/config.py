@@ -38,3 +38,6 @@ quiet = bool(os.environ.get(DAGSHUB_QUIET_KEY, False))
 
 # DVC config templates
 CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"
+
+RECOMMENDED_ANNOTATE_LIMIT_KEY = "RECOMMENDED_ANNOTATE_LIMIT"
+recommended_annotate_limit = os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 1e5)
