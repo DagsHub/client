@@ -168,9 +168,9 @@ DVC.**
 Basic usage example is as follows:
 
 ```python
-from dagshub import upload
+from dagshub import upload_files
 
-upload("<repo_owner>/<repo_name>", local_path="<path_to_file_or_dir_to_upload>")
+upload_files("<repo_owner>/<repo_name>", local_path="<path_to_file_or_dir_to_upload>")
 # Optional: remote_path, commit_message, username, password, token, branch, commit_message, versioning
 # For a full list of potential options, see dagshub.upload.wrapper.Repo.upload_files
 ```
