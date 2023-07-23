@@ -103,7 +103,7 @@ class DagsHubDataset:
 
     def __getitem__(
         self, idx: int
-    ) -> List[Union["torch.Tensor", "tf.Tensor"]]:
+    ) -> List[Union["torch.Tensor", "tf.Tensor"]]:   # noqa: F821
         return [
             tensorizer(data)
             for tensorizer, data in zip(self.tensorizers, self.get(idx))
