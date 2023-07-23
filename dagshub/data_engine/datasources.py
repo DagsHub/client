@@ -1,13 +1,11 @@
 import logging
-import urllib.parse
 from typing import Optional, Union, List
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceType
 from dagshub.data_engine.model.datasource import Datasource
-from dagshub.data_engine.model.datasource_state import DatasourceState
+from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
 from dagshub.data_engine.model.errors import DatasourceNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -28,24 +26,12 @@ def create_datasource(repo: str, name: str, path: str, revision: Optional[str] =
     :return The created datasource
     """
 
-    parsed = urllib.parse.urlparse(path)
-
-    if parsed.scheme == "" \
-        and parsed.hostname == "" \
-        and parsed.query == "" \
-        and parsed.params == "" \
-        and parsed.fragment == "":
-        return create_from_repo(repo, name, path=parsed.path, revision=revision)
-
-    elif parsed.scheme != "" and parsed.hostname != "":
-        # Bucket URL
-        if parsed.query != "" or parsed.params != "" or parsed.fragment != "":
-            raise ValueError("Invalid bucket URL: ", path)
-        if revision != "":
+    if path_regexes[DatasourceType.BUCKET].fullmatch(path):
+        if revision is not None:
             raise ValueError("revision cannot be used together with bucket URLs")
         return create_from_bucket(repo, name, bucket_url=path)
-
-    raise ValueError("Invalid path used, format could not be determined: ", path)
+    else:
+        return create_from_repo(repo, name, path=path, revision=revision)
 
 
 create = create_datasource

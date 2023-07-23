@@ -19,7 +19,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 path_regexes = {
-    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w\-]+)(?P<prefix>/.*)?"),
+    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w\-._]+)(?P<prefix>/.*)?"),
     DatasourceType.REPOSITORY: re.compile(r"repo://(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)(?P<prefix>/.*)?"),
 }
 
