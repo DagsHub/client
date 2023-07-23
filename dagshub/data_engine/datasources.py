@@ -106,6 +106,3 @@ __all__ = [
     get,
     get_or_create,
 ]
-
-if __name__ == '__main__':
-    create_datasource('sasi', 'adg', 'adgadg')
