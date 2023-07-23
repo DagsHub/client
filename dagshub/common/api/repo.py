@@ -223,6 +223,10 @@ class RepoAPI:
     def default_branch(self) -> str:
         return self.get_repo_info().default_branch
 
+    @cached_property
+    def id(self) -> int:
+        return self.get_repo_info().id
+
     @property
     def full_name(self) -> str:
         return f"{self.owner}/{self.repo_name}"
