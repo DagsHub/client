@@ -3,7 +3,12 @@ import os.path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
-from typing import Tuple, Callable, Optional, List, Union, Dict, Literal
+from typing import Tuple, Callable, Optional, List, Union, Dict
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 import re
 import rich.progress
