@@ -384,7 +384,7 @@ class Datasource:
         try:
             # Start LS workspace to save time later in the flow
             start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
-            http_request("GET", start_workspace_url, auth=self.source.repoApi.auth)
+            http_request("POST", start_workspace_url, auth=self.source.repoApi.auth)
         except:
             pass
 
