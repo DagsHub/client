@@ -116,4 +116,5 @@ __all__ = [
     create_from_repo,
     get_datasource,
     get,
+    get_or_create,
 ]
