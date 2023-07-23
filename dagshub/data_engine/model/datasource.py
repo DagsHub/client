@@ -14,6 +14,7 @@ import rich.progress
 from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
 
+import dagshub.common.config
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
@@ -304,27 +305,44 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
+    def annotate(self) -> Optional[str]:
+        """
+        Sends all datapoints in the datasource for annotation in Label Studio.
+        It's recommended to not send a huge amount of datapoints to be annotated at once, to avoid overloading
+        The Label Studio workspace.
+
+        :return: Link to open Label Studio in the browser
+        """
+        return self.all().annotate()
+
     def send_to_annotation(self):
         """
-        Sends all datapoints in the datasource for annotation to labelstudio
+        deprecated, see annotate()
         """
-        self.send_datapoints_to_annotation(self.all().entries)
+        return self.annotate()
 
     def send_datapoints_to_annotation(self, datapoints: Union[List[Datapoint], QueryResult, List[Dict]],
-                                      open_project=True) -> Optional[str]:
+                                      open_project=True, ignore_warning=True) -> Optional[str]:
         """
         Sends datapoints to annotations in Label Studio
 
-        Args:
-        datapoints : Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
+        :param datapoints: Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
                      A QueryResult can also function as a list of Datapoint.
-        open_project : specifies whether the link to the returned LS project should be opened from Python
-
-        Returns the URL of the created LS workspace
+        :param open_project: Specifies whether the link to the returned LS project should be opened from Python
+        :param ignore_warning: Suppress any non-lethal warnings that require user input
+        :return: Link to open Label Studio in the browser
         """
         if len(datapoints) == 0:
             logger.warning("No datapoints provided to be sent to annotation")
             return None
+        elif len(datapoints) > dagshub.common.config.recommended_annotate_limit and not ignore_warning:
+            force = prompt_user(f"You are attempting to annotate {len(datapoints)} datapoints at once - it's "
+                                f"recommended to only annotate up to "
+                                f"{dagshub.common.config.recommended_annotate_limit} "
+                                f"datapoints at a time.")
+            if not force:
+                return ""
+
         req_data = {
             "datasource_id": self.source.id,
             "datapoints": []

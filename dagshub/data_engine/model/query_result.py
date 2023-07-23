@@ -405,11 +405,13 @@ class QueryResult:
 
         return sess
 
-    def annotate(self, open_project: bool) -> Optional[str]:
+    def annotate(self, open_project=True, ignore_warning=True) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 
         :param open_project: Whether to automatically open the returned URL in your browser
+        :param ignore_warning: Suppress any non-lethal warnings that require user input
         :return The URL of the created Label Studio workspace
         """
-        return self.datasource.send_datapoints_to_annotation(self.entries, open_project=open_project)
+        return self.datasource.send_datapoints_to_annotation(self.entries,
+                                                             open_project=open_project, ignore_warning=ignore_warning)
