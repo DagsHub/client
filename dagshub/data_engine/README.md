@@ -1,4 +1,4 @@
-# Data Engine (codename Data Shepherd) preliminary docs
+# Dagshub Data Engine documentation
 
 ## The overall idea
 
@@ -11,10 +11,6 @@
 * Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
 
 
-## Warning: The interface for everything is still in development and is subject to big changes.
-
-Let Kirill know if the README is not up to date and he will update
-
 ## Creating/Getting a datasource
 
 ### Creating
@@ -25,15 +21,12 @@ from dagshub.data_engine import datasources
 
 # Create a datasource from a connected storage bucket.
 # You need to first connect the bucket to the repo using repo settings -> integrations.
-ds = datasources.create_from_bucket("simon/baby-yoda-segmentation-dataset", "bucket-ds", "s3://data-bucket/prefix")
+ds = datasources.get_or_create("simon/baby-yoda-segmentation-dataset", "bucket-ds", "s3://data-bucket/prefix")
 
 # OR
-# Create a datasource from a path in the repo
-ds = datasources.create_from_repo("simon/baby-yoda-segmentation-dataset", "path-ds", "path/to/dir")
+# Create a datasource from a path in the repo (last argument is the revision)
+ds = datasources.get_or_create("simon/baby-yoda-segmentation-dataset", "path-ds", "path/to/dir", "main")
 ```
-
-If the datasource with name `bucket-ds` already exists, we will throw an error, so on further uses you need to get a
-datasource.
 
 Shortly after creating the datasource, the DagsHub system will start scanning it for files and automatically adding some
 metadata fields that we can infer automatically, such as file size.
@@ -103,10 +96,6 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
 - Boolean
 - String
 - Blobs (need to be of type `bytes`)
-- Planned, not implemented yet:
-  - JSON
-  - Label Studio format annotations
-  - Images
 - ** Please let us know about other metadata types you'd like to use and why **
 
 We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being
@@ -140,13 +129,13 @@ At any point during working/querying, you can get the points that exist in the d
 
 ```python
 # Get first 100 entries
-head = ds.head()
+head = ds.head(100)
 # Get all entries
 all = ds.all()
 ```
 
 The returned objects carry the returned datapoints + metadata.
-If you're more used to working pandas dataframes, you can get a dataframe back by using the dataframe property:
+If you're more used to working with pandas dataframes, you can get a dataframe back by using the dataframe property:
 
 ```python
 df = ds.head().dataframe
@@ -173,7 +162,7 @@ If instead you want to download blob fields for the entire dataset at once,
 you can do that using the `get_blob_fields(*fields)` function of the QueryResult:
 
 ```python
-df = ds.all().get_blob_fields("binary_1", "binary_2").dataframe
+df = ds.all().get_blob_fields("binary_1", "binary_2", load_into_memory=True).dataframe
 # Now "binary_1" and "binary_2" fields have the paths to the downloaded blob files
 ```
 
