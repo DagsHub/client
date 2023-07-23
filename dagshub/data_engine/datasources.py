@@ -30,18 +30,19 @@ def create_datasource(repo: str, name: str, path: str, revision: Optional[str] =
 
     parsed = urllib.parse.urlparse(path)
 
-    if parsed.scheme == "" \
-        and parsed.hostname == "" \
-        and parsed.query == "" \
-        and parsed.params == "" \
-        and parsed.fragment == "":
+    if parsed.path \
+       and not parsed.scheme \
+       and not parsed.hostname \
+       and not parsed.query \
+       and not parsed.params \
+       and not parsed.fragment:
         return create_from_repo(repo, name, path=parsed.path, revision=revision)
 
-    elif parsed.scheme != "" and parsed.hostname != "":
+    elif parsed.scheme and parsed.hostname:
         # Bucket URL
-        if parsed.query != "" or parsed.params != "" or parsed.fragment != "":
+        if parsed.query or parsed.params or parsed.fragment:
             raise ValueError("Invalid bucket URL: ", path)
-        if revision != "":
+        if revision:
             raise ValueError("revision cannot be used together with bucket URLs")
         return create_from_bucket(repo, name, bucket_url=path)
 
