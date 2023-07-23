@@ -38,3 +38,12 @@ quiet = bool(os.environ.get(DAGSHUB_QUIET_KEY, False))
 
 # DVC config templates
 CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"
+
+RECOMMENDED_ANNOTATE_LIMIT_KEY = "RECOMMENDED_ANNOTATE_LIMIT"
+recommended_annotate_limit = os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 1e5)
+
+DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE"
+dataengine_metadata_upload_batch_size = os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, 15000)
+
+DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
+disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ

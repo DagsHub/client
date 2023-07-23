@@ -52,6 +52,32 @@ def get_project_root(root):
     return Path(root)
 
 
+def sizeof_fmt(num, suffix="B"):
+    """
+    Shoutout to https://stackoverflow.com/a/1094933
+    """
+    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
+        if abs(num) < 1024.0:
+            return f"{num:3.1f}{unit}{suffix}"
+        num /= 1024.0
+    return f"{num:.1f}Yi{suffix}"
+
+
+def prompt_user(prompt, default=False) -> bool:
+    """
+    Prompt the user for input.
+    Asks them the provided prompt + Are you sure [letters].
+    Default value can be specified with the `default` args.
+    """
+    prompt_letters = "[y/(N)]" if not default else "[(Y)/n]"
+    prompt += f"\nAre you sure {prompt_letters}: "
+
+    prompt_response = input(prompt).lower()
+    if prompt_response not in ["y", "n"]:
+        return default
+    return prompt_response == "y"
+
+
 def log_message(msg, logger=None):
     """
     Logs message to the info of the logger + prints, unless the printing was suppressed

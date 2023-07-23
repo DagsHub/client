@@ -29,18 +29,27 @@ install_requires = [
     "fusepy>=3",
     "appdirs>=1.4.4",
     "click>=8.0.4",
-    "httpx==0.22.0",
+    "httpx~=0.23.0",
     "GitPython>=3.1.29",
     "rich[jupyter]~=13.1.0",
-    "dacite~=1.8.0",
+    # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
+    "dacite~=1.6.0",
     "tenacity~=8.2.2",
+    "gql[requests]",
+    "dataclasses-json",
+    "pandas",
+    "treelib~=1.6.4",
+    "pathvalidate~=3.0.0",
 ]
 
 # Polyfills for Python 3.7
 if sys.version_info.major == 3 and sys.version_info.minor == 7:
     install_requires += [
-        "cached-property==1.5.2"
+        "cached-property==1.5.2",
+        "typing_extensions",
     ]
+
+packages = setuptools.find_packages(exclude=["tests", "tests.*"])
 
 setuptools.setup(
     name="dagshub",
@@ -51,8 +60,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/DagsHub/client",
-    packages=setuptools.find_packages(),
+    packages=packages,
     install_requires=install_requires,
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

@@ -50,7 +50,7 @@ def temp_dir() -> str:
 
 def test_upload_dataset_closes_files(mock_api: MockApi, upload_repo: Repo, test_file: str):
     ds = upload_repo.directory("subdir")
-    file_handle = open(test_file)
+    file_handle = open(test_file, "rb")
     ds.add(file_handle, "filepath.txt")
     ds.commit()
     assert file_handle.closed
