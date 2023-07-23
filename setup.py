@@ -35,7 +35,6 @@ install_requires = [
     # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
     "dacite~=1.6.0",
     "tenacity~=8.2.2",
-    "gql-query-builder~=0.1.7",
     "gql[requests]",
     "dataclasses-json",
     "pandas",
