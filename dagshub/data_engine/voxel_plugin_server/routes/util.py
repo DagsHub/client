@@ -15,7 +15,7 @@ def error_handler(route):
     async def wrapped(*args, **kwargs):
         try:
             return await route(*args, **kwargs)
-        except:
+        except:  # noqa
             traceback.print_exc()
             return Response(traceback.format_exc(), status_code=500)
 

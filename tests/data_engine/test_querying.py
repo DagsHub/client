@@ -363,7 +363,7 @@ def test_isnull_raises_not_on_field(ds):
 
 
 def test_false_deserialization(ds):
-    queried = ds["col_bool"] == False
+    queried = ds["col_bool"] == False   # noqa
     serialized = {
         "filter": {
             "key": "col_bool",

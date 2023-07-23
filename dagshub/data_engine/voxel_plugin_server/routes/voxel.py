@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List
 
 import dacite
 from starlette.requests import Request

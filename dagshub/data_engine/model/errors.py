@@ -11,8 +11,8 @@ class WrongOrderError(Exception):
 
 class DatasetFieldComparisonError(Exception):
     def __str__(self):
-        return f"Can't compare two fields in a dataset between each other.\r\n" \
-               f"Querying only supports comparisons with primitives (int/str/float)"
+        return "Can't compare two fields in a dataset between each other.\r\n" \
+               "Querying only supports comparisons with primitives (int/str/float)"
 
 
 class WrongOperatorError(Exception):

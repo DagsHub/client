@@ -215,14 +215,14 @@ class QueryResult:
         """
         if not load_into_memory:
             assert cache_on_disk
-        for field in fields:
-            logger.info(f"Downloading metadata for field {field} with {num_proc} processes")
+        for fld in fields:
+            logger.info(f"Downloading metadata for field {fld} with {num_proc} processes")
             cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
 
             if cache_on_disk:
                 cache_location.mkdir(parents=True, exist_ok=True)
 
-            blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(field), self.entries))
+            blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(fld), self.entries))
             auth = self.datasource.source.repoApi.auth
             func_args = zip(map(lambda bu: bu[0], blob_urls), map(lambda bu: bu[1], blob_urls), repeat(auth),
                             repeat(cache_on_disk), repeat(load_into_memory))
@@ -232,7 +232,7 @@ class QueryResult:
             for dp, binary_val_or_path in zip(self.entries, res):
                 if binary_val_or_path is None:
                     continue
-                dp.metadata[field] = binary_val_or_path
+                dp.metadata[fld] = binary_val_or_path
 
         return self
 

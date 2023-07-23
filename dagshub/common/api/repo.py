@@ -16,7 +16,6 @@ import dacite
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from urllib.parse import urljoin, quote
 
 from dagshub.common.helpers import http_request
 
@@ -147,7 +146,8 @@ class RepoAPI:
             raise RuntimeError(error_msg)
 
         content = res.json()
-        if type(content) == dict: content = [content, ]
+        if type(content) == dict:
+            content = [content]
         return [dacite.from_dict(ContentAPIEntry, entry) for entry in content]
 
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:

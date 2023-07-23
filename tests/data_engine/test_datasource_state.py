@@ -1,5 +1,5 @@
 from dagshub.data_engine.client.models import DatasourceType
-from dagshub.data_engine.model.datasource_state import path_regexes, DatasourceState, InvalidPathFormatError
+from dagshub.data_engine.model.datasource_state import DatasourceState, InvalidPathFormatError
 import pytest
 
 

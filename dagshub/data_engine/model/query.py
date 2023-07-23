@@ -80,7 +80,7 @@ class DatasourceQuery:
             self._column_filter = None
         elif op == "isnull":
             # Can only do isnull on the column filter, if we got here, there's something wrong
-            raise RuntimeError(f"is_null operation can only be done on a column (e.g. ds['col1'].is_null())")
+            raise RuntimeError("is_null operation can only be done on a column (e.g. ds['col1'].is_null())")
         elif op == "not":
             new_tree = Tree()
             not_node = new_tree.create_node("not")

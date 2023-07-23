@@ -234,7 +234,7 @@ class Datasource:
     def scan_source(self):
         """
         This function fires a call to the backend to rescan the datapoints.
-        Call this function whenever you uploaded new files and want the new files to appear when querying the datasource,
+        Call this function whenever you uploaded new files and want them to appear when querying the datasource,
         Or if you changed existing file contents and want their metadata to be updated automatically.
 
         Notes about automatically scanned metadata:

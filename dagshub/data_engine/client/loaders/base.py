@@ -34,10 +34,10 @@ class DagsHubDataset:
         self.metadata_columns = metadata_columns
         self.entries = query_result.entries
         self.tensorizers = [
-            lambda x: x,
-        ] * (
-            len(metadata_columns) + 1
-        )  # prevent circular calls
+                               lambda x: x,
+                           ] * (
+                               len(metadata_columns) + 1
+                           )  # prevent circular calls
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
         self.savedir = savedir or self.datasource.default_dataset_location
@@ -103,7 +103,7 @@ class DagsHubDataset:
 
     def __getitem__(
         self, idx: int
-    ):  # -> List[Union[torch.Tensor, tf.Tensor]]:  # type specification in this line makes torch/tf requirements for one another
+    ) -> List[Union["torch.Tensor", "tf.Tensor"]]:
         return [
             tensorizer(data)
             for tensorizer, data in zip(self.tensorizers, self.get(idx))
@@ -141,7 +141,7 @@ class DagsHubDataset:
             logger.warning("`tensorizers` set to 'auto'; guessing the datatypes")
             tensorizers = []
 
-            ## naive pass
+            # naive pass
             for idx, entry in enumerate(self.get(0)):
                 if not idx or self.metadata_columns[idx - 1] in self.file_columns:
                     extension = entry.split("/")[-1].split(".")[-1]
@@ -153,14 +153,17 @@ class DagsHubDataset:
                         tensorizers.append(self.tensorlib.image)
                     else:
                         raise ValueError(
-                            "Unable to automatically detect the datatypes. Please manually set a list of tensorizers, \
-                                        either with string arguments image|video|audio, or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
+                            "Unable to automatically detect the datatypes. "
+                            "Please manually set a list of tensorizers, either with string arguments image|video|audio,"
+                            " or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
                         )
                 elif type(entry) in [int, float]:
                     tensorizers.append(self.tensorlib.numeric)
                 else:
                     raise ValueError(
-                        "Unable to automatically tensorize non-numeric metadata. Please menually setup a list of tensorizers, either with string arguments image|video|audio, or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
+                        "Unable to automatically tensorize non-numeric metadata. "
+                        "Please manually setup a list of tensorizers, either with string arguments image|video|audio, "
+                        "or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
                     )
             return tensorizers
         elif datatypes in ["image", "audio", "video"]:
@@ -176,5 +179,6 @@ class DagsHubDataset:
             ]
         else:
             raise ValueError(
-                "Unable to set tensorizers. Please ensure the number of selected columns equals the number of tensorizers."
+                "Unable to set tensorizers. "
+                "Please ensure the number of selected columns equals the number of tensorizers."
             )

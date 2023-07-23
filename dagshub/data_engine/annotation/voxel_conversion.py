@@ -1,6 +1,5 @@
 import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,7 +42,7 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
                 try:
                     converted = import_label_studio_annotation(res)
                     annotations.append(converted)
-                except:
+                except Exception:
                     logger.warning(f"Couldn't convert LS annotation {ann} to voxel annotation")
 
             # Group the annotations of a similar type together
