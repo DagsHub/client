@@ -1,6 +1,7 @@
 import json
 from typing import List, Optional, Union
 
+from dagshub.common.analytics import send_analytics_event
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine.model.datasource import Datasource
@@ -30,6 +31,7 @@ def get_dataset(repo: str, name: Optional[str] = None, id: Optional[Union[int, s
 
 
 def _get_datasets(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None) -> List[Datasource]:
+    send_analytics_event("Client_DataEngine_getDatasets")
     client = DataClient(repo)
     sources = client.get_datasets(id, name)
     return [_from_gql_result(repo, source) for source in sources]

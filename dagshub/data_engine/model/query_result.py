@@ -9,11 +9,13 @@ from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union
 
 import rich.progress
 
+from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.annotation.voxel_conversion import add_voxel_annotations, add_ls_annotations
+from dagshub.data_engine.client.models import DatasourceType
 from dagshub.data_engine.model.datapoint import Datapoint, _get_blob
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
@@ -144,6 +146,8 @@ class QueryResult:
                         the shuffle order is determined for the first epoch; default: False
         """
 
+        send_analytics_event("Client_DataEngine_DataLoaderInitialized", repo=self.datasource.source.repoApi)
+
         def keypairs(keys):
             return {key: kwargs[key] for key in keys}
 
@@ -243,6 +247,7 @@ class QueryResult:
         """
         deprecated: Use get_blob_columns instead.
         """
+        send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
         return self.get_blob_fields(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk,
                                     num_proc=num_proc)
 
@@ -267,6 +272,11 @@ class QueryResult:
 
         target_path = self.datasource.default_dataset_location if target_dir is None else Path(target_dir).expanduser()
         logger.warning(f"Downloading {len(self.entries)} files to {str(target_path)}")
+
+        if self.datasource.source.source_type == DatasourceType.BUCKET:
+            send_analytics_event("Client_DataEngine_downloadDatapointsFromBucket", repo=self.datasource.source.repoApi)
+        else:
+            send_analytics_event("Client_DataEngine_downloadDatapoints", repo=self.datasource.source.repoApi)
 
         def dp_path(dp: Datapoint):
             if path_field is not None:
@@ -397,6 +407,8 @@ class QueryResult:
     def visualize(self, **kwargs):
         set_voxel_envvars()
 
+        send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
+
         ds = self.to_voxel51_dataset(**kwargs)
 
         sess = fo.launch_app(ds)
@@ -413,5 +425,7 @@ class QueryResult:
         :param ignore_warning: Suppress any non-lethal warnings that require user input
         :return The URL of the created Label Studio workspace
         """
+        send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
+
         return self.datasource.send_datapoints_to_annotation(self.entries,
                                                              open_project=open_project, ignore_warning=ignore_warning)

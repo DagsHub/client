@@ -10,6 +10,7 @@ import dagshub.auth
 import dagshub.common.config
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, IntegrationStatus, \
     PreprocessingStatus, DatasetResult, MetadataFieldType
@@ -122,6 +123,9 @@ class DataClient:
 
     def _datasource_query(self, datasource: Datasource, include_metadata: bool, limit: Optional[int] = None,
                           after: Optional[str] = None):
+
+        send_analytics_event("Client_DataEngine_QueryRun", repo=datasource.source.repoApi)
+
         q = GqlQueries.datasource_query(include_metadata)
 
         params = GqlQueries.datasource_query_params(

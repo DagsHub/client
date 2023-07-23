@@ -2,6 +2,7 @@ import logging
 import urllib.parse
 from typing import Optional, Union, List
 
+from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasourceType
@@ -92,6 +93,7 @@ def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int
 
 
 def get_datasources(repo: str) -> List[Datasource]:
+    send_analytics_event("Client_DataEngine_getDatasources")
     client = DataClient(repo)
     sources = client.get_datasources(None, None)
     return [Datasource(DatasourceState.from_gql_result(repo, source)) for source in sources]

@@ -18,6 +18,7 @@ from pathvalidate import sanitize_filepath
 
 from dagshub.common import rich_console
 import dagshub.common.config
+from dagshub.common.analytics import send_analytics_event
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
@@ -104,6 +105,7 @@ class Datasource:
             size: how many datapoints to get. Default is 100
         """
         self._check_preprocess()
+        send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
         return self._source.client.head(self, size)
 
     def all(self) -> "QueryResult":
@@ -135,6 +137,7 @@ class Datasource:
         @contextmanager
         def func():
             self.source.get_from_dagshub()
+            send_analytics_event("Client_DataEngine_addEnrichments", repo=self.source.repoApi)
             ctx = MetadataContextManager(self)
             yield ctx
             self._upload_metadata(ctx.get_metadata_entries())
@@ -150,6 +153,7 @@ class Datasource:
         If path_column is not specified, the first column is used as the datapoints
         """
         self.source.get_from_dagshub()
+        send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
         self._upload_metadata(self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields()))
 
     def _get_multivalue_fields(self) -> Set[str]:
@@ -278,6 +282,8 @@ class Datasource:
         That way you can persist and share your queries on the backend
         You can get the dataset back by calling `datasources.get_dataset(repo, name)`
         """
+        send_analytics_event("Client_DataEngine_QuerySaved", repo=self.source.repoApi)
+
         self.source.client.save_dataset(self, name)
         log_message(f"Dataset {name} saved")
 
