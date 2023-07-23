@@ -1,7 +1,7 @@
 import functools
 from typing import Optional, Any, Dict, Union
 
-from gql_query_builder import GqlQuery
+from dagshub.data_engine.client.query_builder import GqlQuery
 
 
 class GqlQueries:
