@@ -193,8 +193,10 @@ class QueryResult:
         """
         if type(item) is str:
             return self._datapoint_path_lookup[item]
-        elif type(item) is int or type(item) is slice:
+        elif type(item) is int:
             return self.entries[item]
+        elif type(item) is slice:
+            return QueryResult(_entries=self.entries[item], datasource=self.datasource)
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
@@ -402,3 +404,14 @@ class QueryResult:
         plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
 
         return sess
+
+    def annotate(self, open_project=True, ignore_warning=True) -> Optional[str]:
+        """
+        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
+
+        :param open_project: Whether to automatically open the returned URL in your browser
+        :param ignore_warning: Suppress any non-lethal warnings that require user input
+        :return The URL of the created Label Studio workspace
+        """
+        return self.datasource.send_datapoints_to_annotation(self.entries,
+                                                             open_project=open_project, ignore_warning=ignore_warning)
