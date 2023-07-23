@@ -59,7 +59,7 @@ def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = Non
     try:
         return get_datasource(repo, name)
     except DatasourceNotFoundError:
-        return get_or_create(repo, name, path, revision)
+        return create_datasource(repo, name, path, revision)
 
 
 def create_from_bucket(repo: str, name: str, bucket_url: str) -> Datasource:
