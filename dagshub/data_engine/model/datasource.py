@@ -2,6 +2,8 @@ import base64
 import gzip
 import json
 import logging
+import time
+
 import math
 import os.path
 import webbrowser
@@ -14,6 +16,7 @@ import rich.progress
 from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
 
+from dagshub.common import rich_console
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
@@ -351,6 +354,43 @@ class Datasource:
         if open_project:
             webbrowser.open_new_tab(link)
         return link
+
+    def wait_until_ready(self, max_wait_time=300, fail_on_timeout=True):
+        """
+       Blocks until the datasource preprocessing is complete
+
+       Args:
+           max_wait_time (int): Maximum time to wait in seconds
+       """
+        try:
+            # Start LS workspace to save time later in the flow
+            start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
+            http_request("POST", start_workspace_url, auth=self.source.repoApi.auth)
+        except:
+            pass
+
+        start = time.time()
+        if max_wait_time:
+            rich_console.log(f"Maximum waiting time set to {int(max_wait_time/60)} minutes")
+        spinner = rich_console.status("Waiting for datasource preprocessing to complete...")
+        with spinner:
+            while True:
+                self.source.get_from_dagshub()
+                if self.source.preprocessing_status == PreprocessingStatus.READY:
+                    return
+
+                if self.source.preprocessing_status == PreprocessingStatus.FAILED:
+                    raise RuntimeError("Datasource preprocessing failed")
+
+                if max_wait_time is not None and (time.time() - start) > max_wait_time:
+                    if fail_on_timeout:
+                        raise RuntimeError(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                    else:
+                        logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                        return
+
+                time.sleep(1)
+
 
     def __repr__(self):
         res = f"Datasource {self.source.name}"
