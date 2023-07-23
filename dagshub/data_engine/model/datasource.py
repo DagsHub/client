@@ -324,7 +324,7 @@ class Datasource:
         """
         return self.annotate()
 
-    def send_datapoints_to_annotation(self, datapoints: Union[List[Datapoint], QueryResult, List[Dict]],
+    def send_datapoints_to_annotation(self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]],
                                       open_project=True, ignore_warning=False) -> Optional[str]:
         """
         Sends datapoints to annotations in Label Studio
