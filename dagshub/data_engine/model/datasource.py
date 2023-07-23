@@ -256,7 +256,7 @@ class Datasource:
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
-        upload_batch_size = 15000
+        upload_batch_size = dagshub.common.config.dataengine_metadata_upload_batch_size
         total_entries = len(metadata_entries)
         total_task = progress.add_task(f"Uploading metadata (batch size {upload_batch_size})...",
                                        total=total_entries)
@@ -374,23 +374,28 @@ class Datasource:
             webbrowser.open_new_tab(link)
         return link
 
+    def _launch_annotation_workspace(self):
+        try:
+            start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
+            http_request("POST", start_workspace_url, auth=self.source.repoApi.auth)
+        except: # noqa
+            pass
+
     def wait_until_ready(self, max_wait_time=300, fail_on_timeout=True):
         """
        Blocks until the datasource preprocessing is complete
 
        Args:
            max_wait_time (int): Maximum time to wait in seconds
+           fail_on_timeout: Whether to raise a RuntimeError or continue if the scan does not complete on time
        """
-        try:
-            # Start LS workspace to save time later in the flow
-            start_workspace_url = multi_urljoin(self.source.repoApi.annotations_url, "start")
-            http_request("POST", start_workspace_url, auth=self.source.repoApi.auth)
-        except:
-            pass
+
+        # Start LS workspace to save time later in the flow
+        self._launch_annotation_workspace()
 
         start = time.time()
         if max_wait_time:
-            rich_console.log(f"Maximum waiting time set to {int(max_wait_time/60)} minutes")
+            rich_console.log(f"Maximum waiting time set to {int(max_wait_time / 60)} minutes")
         spinner = rich_console.status("Waiting for datasource preprocessing to complete...")
         with spinner:
             while True:
@@ -403,13 +408,14 @@ class Datasource:
 
                 if max_wait_time is not None and (time.time() - start) > max_wait_time:
                     if fail_on_timeout:
-                        raise RuntimeError(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                        raise RuntimeError(
+                            f"Time limit of {max_wait_time} seconds reached before processing was completed.")
                     else:
-                        logger.warning(f"Time limit of {max_wait_time} seconds reached before processing was completed.")
+                        logger.warning(
+                            f"Time limit of {max_wait_time} seconds reached before processing was completed.")
                         return
 
                 time.sleep(1)
-
 
     def __repr__(self):
         res = f"Datasource {self.source.name}"
