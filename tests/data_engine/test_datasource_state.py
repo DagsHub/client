@@ -64,6 +64,7 @@ def test_repo_regex_incorrect(in_str):
         ("s3://bucket", "s3", "bucket", None),
         ("gs://bucket/prefix", "gs", "bucket", "/prefix"),
         ("s3://bucket/longer/prefix", "s3", "bucket", "/longer/prefix"),
+        ("s3://bucket_with.weird-chars/longer/prefix", "s3", "bucket_with.weird-chars", "/longer/prefix"),
     ]
 )
 def test_bucket_regex(in_str, schema, bucket, prefix):
