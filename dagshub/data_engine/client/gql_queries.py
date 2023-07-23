@@ -7,7 +7,7 @@ from dagshub.data_engine.client.query_builder import GqlQuery
 class GqlQueries:
 
     @staticmethod
-    @functools.lru_cache
+    @functools.lru_cache()
     def datasource() -> str:
         q = GqlQuery().operation(
             "query",
@@ -41,7 +41,7 @@ class GqlQueries:
         }
 
     @staticmethod
-    @functools.lru_cache
+    @functools.lru_cache()
     def datasource_query(include_metadata: bool) -> str:
         metadata_fields = "metadata { key value }" if include_metadata else ""
         q = GqlQuery().operation(
@@ -78,7 +78,7 @@ class GqlQueries:
         }
 
     @staticmethod
-    @functools.lru_cache
+    @functools.lru_cache()
     def dataset() -> str:
         q = GqlQuery().operation(
             "query",

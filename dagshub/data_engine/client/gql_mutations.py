@@ -9,7 +9,7 @@ from dagshub.data_engine.client.models import DatasourceType
 class GqlMutations:
 
     @staticmethod
-    @functools.lru_cache
+    @functools.lru_cache()
     def create_datasource():
         q = GqlQuery().operation(
             "mutation",
@@ -45,7 +45,7 @@ class GqlMutations:
         }
 
     @staticmethod
-    @functools.lru_cache
+    @functools.lru_cache()
     def update_metadata():
         q = GqlQuery().operation(
             "mutation",
