@@ -134,7 +134,8 @@ class DagsHubDataset:
                     data = self.repo.get_file(f"{self.datasource_root}/{path}")
                 else:
                     data = self.repo.get_storage_file(
-                        f"{'/'.join(list(self.datasource.source.path_parts().values())[:2])}/{self.datasource_root}/{path}"
+                        f"{'/'.join(list(self.datasource.source.path_parts().values())[:2])}"
+                        f"/{self.datasource_root}/{path}"
                     )
 
                 filepath = self.savedir / path
