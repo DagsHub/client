@@ -34,15 +34,15 @@ class DagsHubDataset:
         self.metadata_columns = metadata_columns
         self.entries = query_result.entries
         self.tensorizers = [
-                               lambda x: x,
-                           ] * (
-                               len(metadata_columns) + 1
-                           )  # prevent circular calls
+            lambda x: x,
+        ] * (
+            len(metadata_columns) + 1
+        )  # prevent circular calls
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
         self.savedir = savedir or self.datasource.default_dataset_location
         self.strategy = strategy
-        self.source = self.datasource.source.path.split('://')[0]
+        self.source = self.datasource.source.path.split("://")[0]
 
         self.datasource_root = Path(
             self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)]
@@ -104,7 +104,7 @@ class DagsHubDataset:
 
     def __getitem__(
         self, idx: int
-    ) -> List[Union["torch.Tensor", "tf.Tensor"]]:   # noqa: F821
+    ) -> List[Union["torch.Tensor", "tf.Tensor"]]:  # noqa: F821
         return [
             tensorizer(data)
             for tensorizer, data in zip(self.tensorizers, self.get(idx))
@@ -130,8 +130,12 @@ class DagsHubDataset:
         for path in paths:
             (self.savedir / Path(path).parent).mkdir(parents=True, exist_ok=True)
             if not (self.savedir / path).is_file():
-                if self.source == 'repo': data = self.repo.get_file(f"{self.datasource_root}/{path}")
-                else: data = self.repo.get_storage_file(f"{'/'.join(list(self.datasource.source.path_parts().values())[:2])}/{self.datasource_root}/{path}")
+                if self.source == "repo":
+                    data = self.repo.get_file(f"{self.datasource_root}/{path}")
+                else:
+                    data = self.repo.get_storage_file(
+                        f"{'/'.join(list(self.datasource.source.path_parts().values())[:2])}/{self.datasource_root}/{path}"
+                    )
 
                 filepath = self.savedir / path
                 with open(filepath, "wb") as file:
