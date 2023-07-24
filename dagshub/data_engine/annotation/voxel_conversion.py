@@ -45,6 +45,8 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
                 except Exception:
                     logger.warning(f"Couldn't convert LS annotation {ann} to voxel annotation")
 
+            if len(annotations) == 0:
+                continue
             # Group the annotations of a similar type together
             # For now assuming there's no mixing and matching
             ann_type = type(annotations[0])
