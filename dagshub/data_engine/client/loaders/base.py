@@ -42,6 +42,7 @@ class DagsHubDataset:
         self.repo = self.datasource.source.repoApi
         self.savedir = savedir or self.datasource.default_dataset_location
         self.strategy = strategy
+        self.source = self.datasource.source.path.split('://')[0]
 
         self.datasource_root = Path(
             self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)]
@@ -129,7 +130,9 @@ class DagsHubDataset:
         for path in paths:
             (self.savedir / Path(path).parent).mkdir(parents=True, exist_ok=True)
             if not (self.savedir / path).is_file():
-                data = self.repo.get_file(f"{self.datasource_root}/{path}")
+                if self.source == 'repo': data = self.repo.get_file(f"{self.datasource_root}/{path}")
+                else: data = self.repo.get_storage_file(f"{'/'.join(list(self.datasource.source.path_parts().values())[:2])}/{self.datasource_root}/{path}")
+
                 filepath = self.savedir / path
                 with open(filepath, "wb") as file:
                     file.write(data)
