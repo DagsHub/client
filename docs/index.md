@@ -5,7 +5,7 @@ Direct Data Access (DDA), a component to let you stream and upload your data.
 
 This Readme is divided into segments based on functionality:
 1. [Installation & Setup](#installation-and-setup)
-2. [Data Engine](/data_engine)
+2. [Data Engine](data_engine/)
 3. [Data Streaming](#data-streaming)
 4. [Data Upload](#data-upload)
 5. [Experiment Tracking](#experiment-tracking-logger)
