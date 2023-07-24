@@ -75,7 +75,7 @@ class DataClient:
         left = n
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        total_task = progress.add_task("Downloading datapoints...", total=left)
+        total_task = progress.add_task("Downloading metadata...", total=left)
 
         with progress:
             while has_next_page and left > 0:
@@ -100,7 +100,7 @@ class DataClient:
         #       On next queries adjust depending on the amount of metadata columns
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        total_task = progress.add_task("Downloading datapoints...", total=None)
+        total_task = progress.add_task("Downloading metadata...", total=None)
 
         with progress:
             while has_next_page:
