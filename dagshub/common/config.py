@@ -21,7 +21,7 @@ DAGSHUB_QUIET_KEY = "DAGSHUB_QUIET"
 
 parsed_host = urlparse(os.environ.get(HOST_KEY, DEFAULT_HOST))
 hostname = parsed_host.hostname
-host = parsed_host.geturl()
+host = parsed_host.geturl().rstrip("/")
 client_id = os.environ.get(CLIENT_ID_KEY, DEFAULT_CLIENT_ID)
 cache_location = os.environ.get(
     TOKENS_CACHE_LOCATION_KEY, DEFAULT_TOKENS_CACHE_LOCATION
