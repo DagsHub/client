@@ -307,10 +307,12 @@ class Repo:
         if self._api.is_mirror and res.status_code == 204:
             self._last_upload_revision = None
 
-    def _log_upload_details(self, data, res, files):
+    @staticmethod
+    def _log_upload_details(data, res, files):
         """
         The _log_upload_details function logs the request URL, data, and files.
-        It then logs the response status code and content. If the response is not 200(OK), it raises an error.
+        It then logs the response status code and content.
+        If the response is not 200(OK), or 204(NoContent) it raises an error.
 
 
 
@@ -327,10 +329,12 @@ class Repo:
             f"Files:\n{json.dumps(list(map(str, files)), indent=4)}"
         )
 
-        if res.status_code != HTTPStatus.OK:
-            raise determine_upload_api_error(res)
-        else:
+        if res.status_code == HTTPStatus.OK:
             log_message("Upload finished successfully!", logger)
+        elif res.status_code == HTTPStatus.NO_CONTENT:
+            log_message("Upload successful, content was identical and no new commit was created", logger)
+        else:
+            raise determine_upload_api_error(res)
 
     def _poll_mirror_up_to_date(self):
         """

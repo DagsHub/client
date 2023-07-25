@@ -1,0 +1,9 @@
+
+name: dagshub
+author: DagsHub
+version: "1.0.0"
+description: DagsHub integration plugin for Voxel51
+fiftyone:
+  version: "*"
+operators:
+  - open_dagshub_panel

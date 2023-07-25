@@ -2,6 +2,7 @@ import logging
 
 from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse, StorageAPIEntry, \
     ContentAPIEntry, StorageContentAPIResult
+from dagshub.common.util import multi_urljoin
 
 try:
     from functools import cached_property
@@ -15,7 +16,6 @@ import dacite
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
-from urllib.parse import urljoin, quote
 
 from dagshub.common.helpers import http_request
 
@@ -145,7 +145,10 @@ class RepoAPI:
             logger.debug(res.content)
             raise RuntimeError(error_msg)
 
-        return [dacite.from_dict(ContentAPIEntry, entry) for entry in res.json()]
+        content = res.json()
+        if type(content) == dict:
+            content = [content]
+        return [dacite.from_dict(ContentAPIEntry, entry) for entry in content]
 
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
         """
@@ -221,6 +224,10 @@ class RepoAPI:
         return self.get_repo_info().default_branch
 
     @cached_property
+    def id(self) -> int:
+        return self.get_repo_info().id
+
+    @cached_property
     def is_mirror(self) -> bool:
         return self.get_repo_info().mirror
 
@@ -242,7 +249,7 @@ class RepoAPI:
         Base URL for making all API request for the repos.
         Format: https://dagshub.com/api/v1/repos/user/repo
         """
-        return _multi_urljoin(
+        return multi_urljoin(
             self.host,
             "api/v1/repos",
             self.owner,
@@ -255,7 +262,7 @@ class RepoAPI:
         URL of the repo on DagsHub
         Format: https://dagshub.com/user/repo
         """
-        return _multi_urljoin(
+        return multi_urljoin(
             self.host,
             self.owner,
             self.repo_name
@@ -266,10 +273,27 @@ class RepoAPI:
         URL of a branch on the repo
         Format: https://dasghub.com/api/v1/repos/user/repo/branches/branch
         """
-        return _multi_urljoin(
+        return multi_urljoin(
             self.repo_api_url,
             "branches",
             branch
+        )
+
+    @cached_property
+    def data_engine_url(self) -> str:
+        """
+        URL of data engine
+        """
+        return multi_urljoin(
+            self.repo_api_url,
+            "data-engine"
+        )
+
+    @cached_property
+    def annotations_url(self) -> str:
+        return multi_urljoin(
+            self.repo_api_url,
+            "annotations"
         )
 
     def commit_url(self, sha) -> str:
@@ -277,7 +301,7 @@ class RepoAPI:
         URL of a commit in the repo
         Format: https://dagshub.com/api/v1/repos/user/repo/commits/sha
         """
-        return _multi_urljoin(
+        return multi_urljoin(
             self.repo_api_url,
             "commits",
             sha
@@ -290,7 +314,7 @@ class RepoAPI:
         """
         if revision is None:
             revision = self.default_branch
-        return _multi_urljoin(
+        return multi_urljoin(
             self.repo_api_url,
             "content",
             revision,
@@ -304,7 +328,7 @@ class RepoAPI:
         """
         if revision is None:
             revision = self.default_branch
-        return _multi_urljoin(
+        return multi_urljoin(
             self.repo_api_url,
             "raw",
             revision,
@@ -317,7 +341,7 @@ class RepoAPI:
         path example: s3/bucket-name/path/in/bucket
         Format: https://dagshub.com/api/v1/repos/user/repo/storage/content/path
         """
-        return _multi_urljoin(
+        return multi_urljoin(
             self.repo_api_url,
             "storage/content",
             path
@@ -329,7 +353,7 @@ class RepoAPI:
         path example: s3/bucket-name/path/in/bucket
         Format: https://dagshub.com/api/v1/repos/user/repo/storage/raw/path
         """
-        return _multi_urljoin(
+        return multi_urljoin(
             self.repo_api_url,
             "storage/raw",
             path
@@ -340,7 +364,7 @@ class RepoAPI:
         URL for getting connected storages
         Format: https://dagshub.com/api/v1/repos/user/repo/storage
         """
-        return _multi_urljoin(self.repo_api_url, "storage")
+        return multi_urljoin(self.repo_api_url, "storage")
 
     @staticmethod
     def parse_repo(repo: str) -> Tuple[str, str]:
@@ -349,8 +373,3 @@ class RepoAPI:
         if len(parts) != 2:
             raise WrongRepoFormatError("repo needs to be in the format <repo-owner>/<repo-name>")
         return parts[0], parts[1]
-
-
-def _multi_urljoin(*parts):
-    """Shoutout to https://stackoverflow.com/a/55722792"""
-    return urljoin(parts[0] + "/", "/".join(quote(part.strip("/"), safe="/") for part in parts[1:]))
