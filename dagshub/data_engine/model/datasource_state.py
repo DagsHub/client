@@ -53,6 +53,8 @@ class DatasourceState:
         self.repoApi = RepoAPI(self.repo)
         if hasattr(self, "source_type") and self.source_type == DatasourceType.REPOSITORY:
             self.revision = self.path_parts()["revision"]
+        if not hasattr(self, "metadata_fields"):
+            self.metadata_fields = []
 
     @property
     def revision(self) -> str:
