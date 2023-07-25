@@ -46,7 +46,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
 
     if not url:
         if repo_name is not None and repo_owner is not None:
-            url = urllib.parse.urljoin(host, f'{repo_owner}/{repo_name}')
+            url = urllib.parse.urljoin(f'{host}/', f'{repo_owner}/{repo_name}')
         elif dvc:
             for remote in git.Repo(root).remotes:
                 if host in remote.url:
@@ -69,7 +69,7 @@ def init(repo_name=None, repo_owner=None, url=None, root=None,
     bearer = HTTPBearerAuth(token)
 
     # Configure repository
-    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
+    res = http_request("GET", urllib.parse.urljoin(f'{host}/', config.REPO_INFO_URL.format(
         owner=repo_owner,
         reponame=repo_name)), auth=bearer)
     if res.status_code == 404:
