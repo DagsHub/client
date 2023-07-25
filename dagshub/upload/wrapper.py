@@ -290,10 +290,8 @@ class Repo:
                     "new_branch_name": new_branch,
                 }
             )
-            # Drop the upload revision because we're sure this is a new branch
-            self._last_upload_revision = None
-
-        if self._api.is_mirror:
+        elif self._api.is_mirror:
+            # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
             self._poll_mirror_up_to_date()
 
         if force:
