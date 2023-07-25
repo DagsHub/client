@@ -272,9 +272,6 @@ class Repo:
         :return: None
         """
 
-        if self._api.is_mirror:
-            self._poll_mirror_up_to_date()
-
         data = {
             "commit_choice": "direct",
             "commit_summary": commit_message,
@@ -290,6 +287,11 @@ class Repo:
                     "new_branch_name": new_branch,
                 }
             )
+            # Drop the upload revision because we're sure this is a new branch
+            self._last_upload_revision = None
+
+        if self._api.is_mirror:
+            self._poll_mirror_up_to_date()
 
         if force:
             data["last_commit"] = self._api.last_commit_sha(self.branch)
@@ -354,7 +356,7 @@ class Repo:
             self._last_upload_revision = self._api.last_commit_sha(self.branch)
             return
 
-        poll_interval = 1.0   # seconds
+        poll_interval = 1.0  # seconds
         poll_timeout = 600.0
         start_time = time.time()
 
