@@ -307,7 +307,7 @@ class Repo:
         )
         self._log_upload_details(data, res, files)
         # 204 means nothing was added, so if we're in the mirror we can upload the next batch immediately
-        if self._api.is_mirror and res.status_code == 204:
+        if new_branch is None and self._api.is_mirror and res.status_code == 204:
             self._last_upload_revision = None
 
     @staticmethod
