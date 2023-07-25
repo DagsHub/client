@@ -184,6 +184,9 @@ class Repo:
         """
         Repo class constructor. If branch is not provided, then default branch is used.
 
+        WARNING: this class is not thread safe.
+        Uploading files in parallel can lead to unexpected outcomes
+
         :param owner (str): Store the username of the user who owns this repository
         :param name (str): Identify the repository
         :param username (str): Set the username to none if it is not provided
