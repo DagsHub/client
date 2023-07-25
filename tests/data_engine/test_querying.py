@@ -408,4 +408,4 @@ def test_false_deserialization(ds):
 def test_throws_on_nonexistent_field(ds):
     add_int_fields(ds, "col1")
     with pytest.raises(FieldNotFoundError):
-        _ = ds["col2"] == 5
+        _ = ds["nonexistent_field"] == 5

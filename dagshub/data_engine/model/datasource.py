@@ -431,7 +431,7 @@ class Datasource:
         res = f"Datasource {self.source.name}"
         res += f"\n\tRepo: {self.source.repo}, path: {self.source.path}"
         res += f"\n\t{self._query}"
-        res += f"\n\tFields:"
+        res += "\n\tFields:"
         for f in self.fields:
             res += f"\n\t\t{f}"
         return res + "\n"
