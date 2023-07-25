@@ -19,6 +19,15 @@ class WrongOperatorError(Exception):
     pass
 
 
+class FieldNotFoundError(Exception):
+    def __init__(self, field: str):
+        super().__init__()
+        self.field = field
+
+    def __str__(self):
+        return f"Field {self.field} does not exist on this datasource"
+
+
 class DatasourceAlreadyExistsError(Exception):
     def __init__(self, datasource):
         super().__init__()

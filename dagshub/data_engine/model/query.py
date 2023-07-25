@@ -66,8 +66,8 @@ class DatasourceQuery:
 
     def __repr__(self):
         if self.is_empty:
-            return "<Query: empty>"
-        return f"<Query: {self.to_dict()}>"
+            return "Query: empty"
+        return f"Query: {self.to_dict()}"
 
     @property
     def column_filter(self) -> Optional[str]:

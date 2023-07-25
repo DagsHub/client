@@ -3,11 +3,13 @@ import pytest
 from dagshub.data_engine.model.datasource import (
     Datasource,
 )
-from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError
+from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError, FieldNotFoundError
 from dagshub.data_engine.model.query import DatasourceQuery
+from tests.data_engine.util import add_int_fields, add_string_fields, add_float_fields, add_boolean_fields
 
 
 def test_query_single_column(ds):
+    add_int_fields(ds, "column1")
     column_name = "column1"
     ds2 = ds[column_name]
     assert type(ds2) is Datasource
@@ -17,6 +19,7 @@ def test_query_single_column(ds):
 
 
 def test_simple_filter(ds):
+    add_int_fields(ds, "column1")
     ds2 = ds[ds["column1"] > 5]
     q = ds2.get_query()
     expected = {"gt": {"data": {"field": "column1", "value": 5}}}
@@ -24,6 +27,7 @@ def test_simple_filter(ds):
 
 
 def test_composite_filter(ds):
+    add_int_fields(ds, "col1", "col2")
     ds2 = ds[(ds["col1"] > 5) & (ds["col2"] <= 3)]
     expected = {
         "and": {
@@ -43,6 +47,9 @@ def test_complexer_filter(ds):
     """
     This one has contains and some more composition
     """
+    add_int_fields(ds, "col1", "col2")
+    add_string_fields(ds, "col3")
+    add_float_fields(ds, "col4")
     ds2 = ds[
         ((ds["col1"] > 5) & (ds["col2"] <= 3))
         | ds["col3"].contains("aaa")
@@ -85,6 +92,7 @@ def test_complexer_filter(ds):
 
 
 def test_query_chaining(ds):
+    add_int_fields(ds, "aaa", "bbb")
     ds2 = ds[ds["aaa"] > 5]
     ds3 = ds2[ds2["bbb"] <= 5]
     expected = {
@@ -100,17 +108,22 @@ def test_query_chaining(ds):
 
 
 def test_error_on_bad_order(ds):
+    add_int_fields(ds, "col1", "col2")
     # Have to do that because binary operators take precedence over numericals
     with pytest.raises(WrongOrderError):
         _ = ds["col1"] > 5 & ds["col2"] == 5
 
 
 def test_error_on_ds_comparison(ds):
+    add_int_fields(ds, "col1", "col2")
     with pytest.raises(DatasetFieldComparisonError):
         _ = ds["col1"] == ds["col2"]
 
 
 def test_serialization(ds):
+    add_int_fields(ds, "col1", "col2")
+    add_string_fields(ds, "col3")
+    add_float_fields(ds, "col4")
     ds2 = ds[
         ((ds["col1"] > 5) & (ds["col2"] <= 3))
         | ds["col3"].contains("aaa")
@@ -164,6 +177,9 @@ def test_serialization(ds):
 
 
 def test_deserialization_complex(ds):
+    add_int_fields(ds, "col1", "col2")
+    add_string_fields(ds, "col3")
+    add_float_fields(ds, "col4")
     queried = ds[
         ((ds["col1"] > 5) & (ds["col2"] <= 3))
         | ds["col3"].contains("aaa")
@@ -219,6 +235,7 @@ def test_deserialization_complex(ds):
 
 
 def test_not_equals(ds):
+    add_string_fields(ds, "col1")
     queried = ds[ds["col1"] != "aaa"]
     expected = {
         "not": {
@@ -234,6 +251,8 @@ def test_not_equals(ds):
 
 
 def test_not_and(ds):
+    add_string_fields(ds, "col1")
+    add_int_fields(ds, "col2")
     queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
     expected = {
         "not": {
@@ -255,6 +274,7 @@ def test_not_and(ds):
 
 
 def test_not_serialization(ds):
+    add_string_fields(ds, "col1")
     queried = ds[ds["col1"] != "aaa"]
     expected = {
         "filter": {
@@ -269,6 +289,8 @@ def test_not_serialization(ds):
 
 
 def test_nand_serialization(ds):
+    add_string_fields(ds, "col1")
+    add_int_fields(ds, "col2")
     queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
     expected = {
         "and": [
@@ -291,6 +313,8 @@ def test_nand_serialization(ds):
 
 
 def test_nand_deserialization(ds):
+    add_string_fields(ds, "col1")
+    add_int_fields(ds, "col2")
     queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
     serialized = {
         "and": [
@@ -314,6 +338,7 @@ def test_nand_deserialization(ds):
 
 
 def test_isnull(ds):
+    add_string_fields(ds, "col1")
     queried = ds["col1"].is_null()
     expected = {
         "isnull": {"data": {"field": "col1", "value": ""}},
@@ -322,6 +347,7 @@ def test_isnull(ds):
 
 
 def test_isnull_int(ds):
+    add_int_fields(ds, "col_int")
     queried = ds["col_int"].is_null()
     expected = {
         "isnull": {"data": {"field": "col_int", "value": int()}},
@@ -330,6 +356,7 @@ def test_isnull_int(ds):
 
 
 def test_isnull_serialization(ds):
+    add_string_fields(ds, "col1")
     queried = ds["col1"].is_null()
     expected = {
         "filter": {
@@ -344,6 +371,7 @@ def test_isnull_serialization(ds):
 
 
 def test_isnull_deserialization(ds):
+    add_string_fields(ds, "col1")
     queried = ds["col1"].is_null()
     serialized = {
         "filter": {
@@ -363,7 +391,8 @@ def test_isnull_raises_not_on_field(ds):
 
 
 def test_false_deserialization(ds):
-    queried = ds["col_bool"] == False   # noqa
+    add_boolean_fields(ds, "col_bool")
+    queried = ds["col_bool"] == False  # noqa
     serialized = {
         "filter": {
             "key": "col_bool",
@@ -374,3 +403,9 @@ def test_false_deserialization(ds):
     }
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+
+
+def test_throws_on_nonexistent_field(ds):
+    add_int_fields(ds, "col1")
+    with pytest.raises(FieldNotFoundError):
+        _ = ds["col2"] == 5

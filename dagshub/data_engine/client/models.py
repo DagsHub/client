@@ -59,6 +59,9 @@ class MetadataFieldSchema:
     )
     multiple: bool
 
+    def __repr__(self):
+        return f"{self.name} ({self.valueType.value})"
+
 
 @dataclass
 class DatasourceResult:
