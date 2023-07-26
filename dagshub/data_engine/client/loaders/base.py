@@ -81,10 +81,22 @@ class DagsHubDataset:
             [self.entries[0].metadata[col] for col in self.metadata_columns],
         ):
             try:
-                if self.source == 'repo':
+                if self.source == "repo":
                     self.repo.list_path((self.datasource_root / str(value)).as_posix())
                 else:
-                    self.repo.list_storage_path((Path('/'.join(list(self.datasource.source.path_parts().values())[:2])) / self.datasource_root / str(value)).as_posix())
+                    self.repo.list_storage_path(
+                        (
+                            Path(
+                                "/".join(
+                                    list(self.datasource.source.path_parts().values())[
+                                        :2
+                                    ]
+                                )
+                            )
+                            / self.datasource_root
+                            / str(value)
+                        ).as_posix()
+                    )
                 res.append(column)
             except PathNotFoundError:
                 pass

@@ -177,7 +177,7 @@ class RepoAPI:
 
             content = res.json()
             if 'entries' not in content:
-                content = {'entries': [content,], 'next_token': None}
+                content = {'entries': [content, ], 'next_token': None}
             return dacite.from_dict(StorageContentAPIResult, content)
 
         entries = []
