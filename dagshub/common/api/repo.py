@@ -163,7 +163,6 @@ class RepoAPI:
 
         url = self.storage_content_api_url(path)
         has_next_page = True
-        f = True
 
         def _get():
             res = self._http_request("GET", url, params=params)
