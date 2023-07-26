@@ -19,13 +19,13 @@ def send_analytics_event(event_name: str, repo: Optional[Union[int, "RepoAPI"]] 
             event_data["repo_id"] = repo
         else:
             event_data["repo_id"] = repo.id
-    t = Thread(target=_send, args=(event_data,), daemon=True)
+    host = config.host
+    token = config.token or get_token(host=host)
+    t = Thread(target=_send, args=(event_data, host, token), daemon=True)
     t.start()
 
 
-def _send(event_data: Dict[str, Any]):
-    host = config.host
-    token = config.token or get_token(host=host)
+def _send(event_data: Dict[str, Any], host: str, token: str):
     url = f"{host}/api/internal/trackAnalyticsEvent"
 
     http_request("POST", url, data=event_data, auth=HTTPBearerAuth(token))
