@@ -43,7 +43,7 @@ For more details on the different functions of the client, check out the docs se
 3. [Data Upload](https://github.com/DagsHub/client/blob/master/docs/index.md#data-upload)
 4. [Experiment Tracking](https://github.com/DagsHub/client/blob/master/docs/index.md#experiment-tracking-logger)
     1. [Autologging](https://github.com/DagsHub/client/blob/master/docs/index.md#autologging-integrations-with-ml-frameworks)
-5. [Data Engine](https://github.com/DagsHub/client/blob/master/docs/data_engine.md) 
+5. [Data Engine](https://github.com/DagsHub/client/blob/master/docs/data_engine.md)
 
 Some functionality is supported only in Python.
 
@@ -80,5 +80,10 @@ You can dive into the expanded [documentation](docs/index.md), to learn more abo
 experiment tracking with DagsHub
 
 ---
+
+
+### Analytics
+To improve your experience, we collect analytics on client usage. If you want to disable analytics collection,
+set the `DAGSHUB_DISABLE_ANALYTICS` environment variable to any value.
 
 Made with 🐶 by [DagsHub](https://dagshub.com/).
