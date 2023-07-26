@@ -336,6 +336,8 @@ class Repo:
             log_message("Upload finished successfully!", logger)
         elif res.status_code == HTTPStatus.NO_CONTENT:
             log_message("Upload successful, content was identical and no new commit was created", logger)
+        elif res.status_code < 400:
+            log_message(f"Got unknown successful status code {res.status_code}")
         else:
             raise determine_upload_api_error(res)
 
