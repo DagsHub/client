@@ -290,9 +290,9 @@ class Repo:
                     "new_branch_name": new_branch,
                 }
             )
-        elif self._api.is_mirror:
-            # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
-            self._poll_mirror_up_to_date()
+        # elif self._api.is_mirror:
+        #     # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
+        #     self._poll_mirror_up_to_date()
 
         if force:
             data["last_commit"] = self._api.last_commit_sha(self.branch)
