@@ -34,7 +34,7 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
         if type(annotations) is not bytes:
             return
         ann_dict = json.loads(annotations.decode())
-        for ann in ann_dict["annotations"]:
+        for ann in ann_dict.get("annotations", {}):
             if "result" not in ann:
                 continue
             annotations = []
