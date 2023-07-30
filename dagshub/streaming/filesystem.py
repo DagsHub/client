@@ -17,7 +17,7 @@ import dacite
 from httpx import Response
 from tenacity import retry, retry_if_result, stop_after_attempt, wait_exponential, before_sleep_log, RetryError
 
-from dagshub.common import config
+from dagshub.common import config, is_inside_notebook, is_inside_colab
 from dagshub.common.api.repo import RepoAPI, CommitNotFoundError
 from dagshub.common.api.responses import ContentAPIEntry, StorageContentAPIResult
 from dagshub.common.helpers import http_request, get_project_root
@@ -689,7 +689,7 @@ class DagsHubFilesystem:
             #  Cannot use a dict as the source of truth because type hints rely on
             #  __get_unpatched inferring the right type
             self.__class__.__unpatched = {
-                'open': io.open,
+                'open': builtins.open,
                 'stat': os.stat,
                 'listdir': os.listdir,
                 'scandir': os.scandir,
@@ -697,6 +697,17 @@ class DagsHubFilesystem:
             }
             if PRE_PYTHON3_11:
                 self.__class__.__unpatched["pathlib_open"] = _pathlib.open
+
+        # IPython patches io.open to its own override, so we need to overwrite that also
+        # More at _modified_open function in IPython sources:
+        # https://github.com/ipython/ipython/blob/main/IPython/core/interactiveshell.py
+        if is_inside_notebook() and not is_inside_colab():
+            import IPython.core.interactiveshell
+            instance = IPython.core.interactiveshell.InteractiveShell._instance  # noqa
+            if instance is not None and hasattr(instance, "user_ns") and "open" in instance.user_ns:
+                self.__class__.__unpatched["notebook_open"] = instance.user_ns["open"]
+                instance.user_ns["open"] = self.open
+
         io.open = builtins.open = self.open
         os.stat = self.stat
         os.listdir = self.listdir
@@ -728,6 +739,13 @@ class DagsHubFilesystem:
                 _pathlib.stat = cls.__unpatched['stat']
                 _pathlib.listdir = cls.__unpatched['listdir']
                 _pathlib.scandir = cls.__unpatched['scandir']
+
+            if "notebook_open" in cls.__unpatched:
+                import IPython.core.interactiveshell
+                instance = IPython.core.interactiveshell.InteractiveShell._instance # noqa
+                if instance is not None and hasattr(instance, "user_ns"):
+                    instance.user_ns["open"] = cls.__unpatched["notebook_open"]
+
         if DagsHubFilesystem.hooked_instance is not None:
             DagsHubFilesystem.hooked_instance.cleanup()
             DagsHubFilesystem.hooked_instance = None
@@ -752,7 +770,7 @@ class DagsHubFilesystem:
 
     @property
     def __open(self):
-        return self.__get_unpatched('open', io.open)
+        return self.__get_unpatched('open', builtins.open)
 
     @property
     def __stat(self):
