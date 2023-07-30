@@ -1,5 +1,6 @@
 import logging
 import os.path
+import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
@@ -171,12 +172,21 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
 
         with progress:
             with ThreadPoolExecutor(max_workers=threads) as tp:
+
+                def cancel_download(*args):
+                    logger.warning("Interrupt received - shutting down downloader")
+                    tp.shutdown(wait=False, cancel_futures=True)
+
+                orig_interrupt = signal.signal(signal.SIGINT, cancel_download)
                 futures = [tp.submit(download_fn, url, location) for (url, location) in files]
                 for f in as_completed(futures):
                     exc = f.exception()
                     if exc is not None:
                         logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
                     progress.update(task, advance=1)
+
+                signal.signal(signal.SIGINT, orig_interrupt)
+
     elif len(files) == 1:
         # Single file - don't bother with the multithreading, just download the file
         url, location = files[0]
