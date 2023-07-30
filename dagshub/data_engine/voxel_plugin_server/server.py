@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
 
+from dagshub.common import is_inside_colab
 from dagshub.data_engine.voxel_plugin_server.app import app
 from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
 
@@ -41,8 +42,10 @@ class PluginServer:
 
     def set_dataset_config(self, session: "fo.Session"):
         session.config.plugins["dagshub"] = {
-            "server": self.server_address
+            "server": self.server_address,
+            "in_colab": is_inside_colab(),
         }
+        session.refresh()
 
     async def start_serve(self):
         self.set_state(self._state)
