@@ -364,13 +364,10 @@ class Repo:
         """
         if not self._api.is_mirror:
             return
-        # Initial state - assume we can upload
-        if self._last_upload_revision is None:
-            self._last_upload_revision = self._api.last_commit_sha(self.branch)
-            return
 
-        # Previous upload didn't change anything - skip
-        if not self._last_upload_had_changes:
+        # Initial state - assume we can upload
+        # Also can upload if last upload didn't have any changes
+        if self._last_upload_revision is None or not self._last_upload_had_changes:
             return
 
         poll_interval = 1.0  # seconds
@@ -378,16 +375,14 @@ class Repo:
         start_time = time.time()
 
         with rich.status.Status("Waiting for the mirror to sync", console=rich_console):
-            while True:
+            while time.time() - start_time > poll_timeout:
                 new_revision = self._api.last_commit_sha(self.branch)
                 if new_revision == self._last_upload_revision:
-                    if time.time() - start_time > poll_timeout:
-                        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
-                                       f"Trying to push anyway, which might not work.")
-                        return
                     time.sleep(poll_interval)
                 else:
                     return
+        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
+                       f"Trying to push anyway, which might not work.")
 
     @property
     def auth(self):
