@@ -8,7 +8,7 @@ import urllib
 from http import HTTPStatus
 from io import IOBase
 from pathlib import Path
-from typing import Union, Tuple, BinaryIO, Dict, Optional
+from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List
 
 import httpx
 import rich.progress
@@ -36,6 +36,8 @@ s = httpx.Client()
 s.timeout = config.http_timeout
 s.follow_redirects = True
 s.headers.update(config.requests_headers)
+
+FileUploadStruct = Tuple[os.PathLike, BinaryIO]
 
 
 def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
@@ -210,6 +212,7 @@ class Repo:
         # For mirror uploading: store the last revision for which we uploaded
         # When the last revision changes, that means the sync has been complete and we can upload a new batch
         self._last_upload_revision: Optional[str] = None
+        self._last_upload_had_changes: bool = False
 
         if self.branch is None:
             logger.debug("Branch wasn't provided. Fetching default branch...")
@@ -252,27 +255,28 @@ class Repo:
 
     def upload_files(
         self,
-        files,
-        directory_path="",
-        commit_message=DEFAULT_COMMIT_MESSAGE,
-        versioning="auto",
-        new_branch=None,
-        last_commit=None,
-        force=False,
+        files: List[FileUploadStruct],
+        directory_path: str = "",
+        commit_message: str = DEFAULT_COMMIT_MESSAGE,
+        versioning: str = "auto",
+        new_branch: str = None,
+        last_commit: str = None,
+        force: bool = False,
     ):
         """
         The upload_files function uploads a list of files to the specified directory.
 
-
-        :param files (list(str)): Pass the files that are to be uploaded
-        :param directory_path (str): Indicate the path of the directory in which we want to upload our files
-        :param commit_message (str): Set the commit message
-        :param versioning (str): Which versioning system to use to upload a file.
-            Possible options: git, dvc, auto (best effort guess)
-        :param new_branch (str): Create a new branch
-        :param last_commit (str): Tell the server that we want to upload a file without committing it
-        :param force (bool): Force the upload of a file even if it is already present on the server
-        :return: None
+        Args:
+            files: List of Tuples of (path in repo, binaryIO) of files to upload
+            directory_path: Directory in repo relative to which to upload files
+            commit_message: Commit message
+            versioning: Which versioning system to use to upload a file.
+                Possible options: git, dvc, auto (best effort guess)
+            new_branch: Create a new branch with the name of the passed argument
+            last_commit: Consistency argument - last revision of the files you want to upgrade.
+                Exists to prevent accidental overwrites
+            force (bool): Force the upload of a file even if it is already present on the server.
+                Sets last_commit to be the tip of the branch
         """
 
         data = {
@@ -290,12 +294,14 @@ class Repo:
                     "new_branch_name": new_branch,
                 }
             )
-        # elif self._api.is_mirror:
-        #     # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
-        #     self._poll_mirror_up_to_date()
+        elif self._api.is_mirror:
+            # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
+            self._poll_mirror_up_to_date()
+
+        self._last_upload_revision = self._api.last_commit_sha(self.branch)
 
         if force:
-            data["last_commit"] = self._api.last_commit_sha(self.branch)
+            data["last_commit"] = self._last_upload_revision
 
         log_message(f'Uploading files ({len(files)}) to "{self._api.full_name}"...', logger)
         res = s.put(
@@ -306,24 +312,23 @@ class Repo:
             timeout=None,
         )
         self._log_upload_details(data, res, files)
-        # 204 means nothing was added, so if we're in the mirror we can upload the next batch immediately
-        if new_branch is None and self._api.is_mirror and res.status_code == 204:
-            self._last_upload_revision = None
 
-    @staticmethod
-    def _log_upload_details(data, res, files):
+        # The ETag header contains the hash of the uploaded commit,
+        # check against the one we have to determine if anything changed
+        if "ETag" in res.headers:
+            new_tip = res.headers["ETag"]
+            self._last_upload_had_changes = new_tip != self._last_upload_revision
+
+    def _log_upload_details(self, data: Dict[str, Any], res: httpx.Response, files):
         """
-        The _log_upload_details function logs the request URL, data, and files.
-        It then logs the response status code and content.
-        If the response is not 200(OK), or 204(NoContent) it raises an error.
+        The _log_upload_details function debug logs the request URL, data, and files.
+        It also prints for the user the status of their upload if it was successful
+        If the response is 4xx/5xx it raises an error.
 
-
-
-        :param data (str): Pass the data that will be uploaded to the server
-        :param res (dict): Store the response from the server
-        :param files (list(str)): Pass the files that are going to be uploaded
-        :return: None
-
+        Args:
+            data: Executed request's body
+            res: Server's response
+            files: Uploaded file contents
         """
 
         logger.debug(
@@ -333,10 +338,15 @@ class Repo:
         )
 
         if res.status_code == HTTPStatus.OK:
+            if "ETag" in res.headers:
+                new_tip = res.headers["ETag"]
+                if new_tip == self._last_upload_revision:
+                    log_message("Upload successful, content was identical and no new commit was created", logger)
+                    return
             log_message("Upload finished successfully!", logger)
         elif res.status_code == HTTPStatus.NO_CONTENT:
             log_message("Upload successful, content was identical and no new commit was created", logger)
-        elif res.status_code < 400:
+        elif 200 < res.status_code < 300:
             log_message(f"Got unknown successful status code {res.status_code}")
         else:
             raise determine_upload_api_error(res)
@@ -354,9 +364,10 @@ class Repo:
         """
         if not self._api.is_mirror:
             return
+
         # Initial state - assume we can upload
-        if self._last_upload_revision is None:
-            self._last_upload_revision = self._api.last_commit_sha(self.branch)
+        # Also can upload if last upload didn't have any changes
+        if self._last_upload_revision is None or not self._last_upload_had_changes:
             return
 
         poll_interval = 1.0  # seconds
@@ -364,17 +375,14 @@ class Repo:
         start_time = time.time()
 
         with rich.status.Status("Waiting for the mirror to sync", console=rich_console):
-            while True:
+            while time.time() - start_time < poll_timeout:
                 new_revision = self._api.last_commit_sha(self.branch)
                 if new_revision == self._last_upload_revision:
-                    if time.time() - start_time > poll_timeout:
-                        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
-                                       f"Trying to push anyway, which might not work.")
-                        return
                     time.sleep(poll_interval)
                 else:
-                    self._last_upload_revision = new_revision
                     return
+        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
+                       f"Trying to push anyway, which might not work.")
 
     @property
     def auth(self):
@@ -558,7 +566,7 @@ class DataSet:
         return posixpath.normpath(directory)
 
     @staticmethod
-    def get_file(file: Union[str, IOBase], path: os.PathLike = None) -> Tuple[os.PathLike, BinaryIO]:
+    def get_file(file: Union[str, IOBase], path: os.PathLike = None) -> FileUploadStruct:
         """
         The get_file function is a helper function that takes in either a string or an IOBase object and returns
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
