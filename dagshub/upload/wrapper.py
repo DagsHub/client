@@ -375,7 +375,7 @@ class Repo:
         start_time = time.time()
 
         with rich.status.Status("Waiting for the mirror to sync", console=rich_console):
-            while time.time() - start_time > poll_timeout:
+            while time.time() - start_time < poll_timeout:
                 new_revision = self._api.last_commit_sha(self.branch)
                 if new_revision == self._last_upload_revision:
                     time.sleep(poll_interval)
