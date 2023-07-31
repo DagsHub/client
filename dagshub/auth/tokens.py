@@ -114,6 +114,16 @@ def _get_token_storage(**kwargs):
 
 
 def get_token(**kwargs):
+    """
+    Gets a DagsHub token, by default if no token is found authenticates with OAuth
+
+    Kwargs:
+        host (str): URL of a dagshub instance (defaults to dagshub.com)
+        cache_location (str): Location of the cache file with the token (defaults to <cache_dir>/dagshub/tokens)
+        fail_if_no_token (bool): What to do if token is not found.
+            If set to False (default), goes through OAuth flow
+            If set to True, throws a RuntimeError
+    """
     return _get_token_storage(**kwargs).get_token(**kwargs)
 
 
