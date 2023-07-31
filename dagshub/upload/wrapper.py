@@ -540,7 +540,6 @@ class DataSet:
                     if "commit_message" in upload_kwargs:
                         del upload_kwargs["commit_message"]
 
-
                     if len(files) > 0:
                         for filename in files:
                             rel_file_path = posixpath.join(root, filename)
