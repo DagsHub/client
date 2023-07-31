@@ -214,6 +214,8 @@ class Repo:
         self._last_upload_revision: Optional[str] = None
         self._last_upload_had_changes: bool = False
 
+        self.current_progress: Optional[rich.progress.Progress] = None
+
         if self.branch is None:
             logger.debug("Branch wasn't provided. Fetching default branch...")
             self.branch = self._api.default_branch
@@ -278,6 +280,9 @@ class Repo:
             force (bool): Force the upload of a file even if it is already present on the server.
                 Sets last_commit to be the tip of the branch
         """
+
+        # Truncate the commit message because the max we allow is 100 symbols
+        commit_message = commit_message[:100]
 
         data = {
             "commit_choice": "direct",
@@ -374,13 +379,27 @@ class Repo:
         poll_timeout = 600.0
         start_time = time.time()
 
-        with rich.status.Status("Waiting for the mirror to sync", console=rich_console):
-            while time.time() - start_time < poll_timeout:
-                new_revision = self._api.last_commit_sha(self.branch)
-                if new_revision == self._last_upload_revision:
-                    time.sleep(poll_interval)
-                else:
-                    return
+        if self.current_progress is not None:
+            task = self.current_progress.add_task("Waiting for the mirror to sync", total=None)
+
+            def finish():
+                self.current_progress.remove_task(task)
+        else:
+            status = rich.status.Status("Waiting for the mirror to sync", console=rich_console)
+            status.start()
+
+            def finish():
+                status.stop()
+
+        while time.time() - start_time < poll_timeout:
+            new_revision = self._api.last_commit_sha(self.branch)
+            if new_revision == self._last_upload_revision:
+                time.sleep(poll_interval)
+            else:
+                finish()
+                return
+
+        finish()
         logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
                        f"Trying to push anyway, which might not work.")
 
@@ -502,50 +521,55 @@ class DataSet:
         file_counter = 0
 
         progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
+                                          rich.progress.MofNCompleteColumn(),
                                           console=rich_console, transient=True, disable=config.quiet)
-        total_task = progress.add_task("Uploading files...")
+        total_task = progress.add_task("Uploading files...", total=None)
+        self.repo.current_progress = progress
 
         # If user hasn't specified versioning, then assume we're uploading dvc (this makes most sense for folders)
         if "versioning" not in upload_kwargs:
             upload_kwargs["versioning"] = "dvc"
 
-        with progress:
-            for root, dirs, files in os.walk(local_path):
-                folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
+        try:
+            with progress:
+                for root, dirs, files in os.walk(local_path):
+                    folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
 
-                if commit_message is None:
-                    commit_message = upload_kwargs.get("commit_message", f"Commit data points in folder {root}")
-                if "commit_message" in upload_kwargs:
-                    del upload_kwargs["commit_message"]
+                    if commit_message is None:
+                        commit_message = upload_kwargs.get("commit_message", f"Commit data points in folder {root}")
+                    if "commit_message" in upload_kwargs:
+                        del upload_kwargs["commit_message"]
 
-                if len(files) > 0:
-                    for filename in files:
-                        rel_file_path = posixpath.join(root, filename)
-                        rel_remote_file_path = rel_file_path.replace(local_path, "")
-                        if (
-                            glob_exclude == ""
-                            or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
-                        ):
-                            self.add(file=rel_file_path, path=rel_remote_file_path)
-                            if len(self.files) >= upload_file_number:
-                                file_counter += len(self.files)
-                                self.commit(commit_message, **upload_kwargs)
-                                progress.update(folder_task, advance=len(self.files), refresh=True)
-                                progress.update(total_task, completed=file_counter, refresh=True)
-                    if len(self.files) >= upload_file_number:
-                        file_counter += len(self.files)
-                        self.commit(commit_message, **upload_kwargs)
-                        progress.update(folder_task, advance=len(self.files), refresh=True)
-                        progress.update(total_task, completed=file_counter, refresh=True)
-                progress.remove_task(folder_task)
+                    if len(files) > 0:
+                        for filename in files:
+                            rel_file_path = posixpath.join(root, filename)
+                            rel_remote_file_path = rel_file_path.replace(local_path, "")
+                            if (
+                                glob_exclude == ""
+                                or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
+                            ):
+                                self.add(file=rel_file_path, path=rel_remote_file_path)
+                                if len(self.files) >= upload_file_number:
+                                    file_counter += len(self.files)
+                                    self.commit(commit_message, **upload_kwargs)
+                                    progress.update(folder_task, advance=len(self.files), refresh=True)
+                                    progress.update(total_task, completed=file_counter, refresh=True)
+                        if len(self.files) >= upload_file_number:
+                            file_counter += len(self.files)
+                            self.commit(commit_message, **upload_kwargs)
+                            progress.update(folder_task, advance=len(self.files), refresh=True)
+                            progress.update(total_task, completed=file_counter, refresh=True)
+                    progress.remove_task(folder_task)
 
-            if len(self.files) > 0:
-                file_counter += len(self.files)
-                self.commit(commit_message, **upload_kwargs)
-                progress.update(total_task, completed=file_counter)
+                if len(self.files) > 0:
+                    file_counter += len(self.files)
+                    self.commit(commit_message, **upload_kwargs)
+                    progress.update(total_task, completed=file_counter)
 
-        log_message(f"Directory upload complete, uploaded {file_counter} files"
-                    f" to {self.repo.get_files_ui_url(self.directory)}", logger)
+            log_message(f"Directory upload complete, uploaded {file_counter} files"
+                        f" to {self.repo.get_files_ui_url(self.directory)}", logger)
+        finally:
+            self.repo.current_progress = None
 
     @staticmethod
     def _clean_directory_name(directory: str):
