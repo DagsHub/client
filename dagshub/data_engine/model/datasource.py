@@ -289,9 +289,9 @@ class Datasource:
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
-        Creates a voxel51 dataset that can be used with `fo.launch_app()` to run it
+        Creates a voxel51 dataset that can be used with `fo.launch_app()` to visualize it
 
-        Args:
+        Kwargs:
             name (str): name of the dataset (by default uses the same name as the datasource)
             force_download (bool): download the dataset even if the size of the files is bigger than 100MB
             files_location (str|PathLike): path to the location where to download the local files
