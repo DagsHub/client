@@ -230,6 +230,10 @@ class RepoAPI:
     def id(self) -> int:
         return self.get_repo_info().id
 
+    @cached_property
+    def is_mirror(self) -> bool:
+        return self.get_repo_info().mirror
+
     @property
     def full_name(self) -> str:
         return f"{self.owner}/{self.repo_name}"

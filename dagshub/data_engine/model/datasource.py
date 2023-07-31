@@ -375,7 +375,10 @@ class Datasource:
             return None
         link = resp.json()["link"]
 
-        log_message(f"Open {link} to start working on your annotation project")
+        # Do a raw print so it works in colab/jupyter
+        print("Open the following link to start working on your annotation project:")
+        print(link)
+
         if open_project:
             webbrowser.open_new_tab(link)
         return link
