@@ -372,7 +372,7 @@ class QueryResult:
                 samples.append(sample)
                 progress.update(task, advance=1, refresh=True)
 
-        ds.add_samples(samples)
+        ds.merge_samples(samples)
         return ds
 
     def _check_downloaded_dataset_size(self):
