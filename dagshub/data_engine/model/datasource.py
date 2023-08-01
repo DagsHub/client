@@ -209,6 +209,9 @@ class Datasource:
                         # Don't override bytes if they're not bytes - probably just undownloaded values
                         if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
                             continue
+                        # Pandas quirk - integers are floats on the backend
+                        if value_type == MetadataFieldType.INTEGER:
+                            sub_val = int(sub_val)
                         if type(sub_val) is bytes:
                             sub_val = MetadataContextManager.wrap_bytes(sub_val)
                         res.append(DatapointMetadataUpdateEntry(
@@ -226,6 +229,9 @@ class Datasource:
                     # Don't override bytes if they're not bytes - probably just undownloaded values
                     if value_type == MetadataFieldType.BLOB and type(val) is not bytes:
                         continue
+                    # Pandas quirk - integers are floats on the backend
+                    if value_type == MetadataFieldType.INTEGER:
+                        val = int(val)
                     if type(val) is bytes:
                         val = MetadataContextManager.wrap_bytes(val)
                     res.append(DatapointMetadataUpdateEntry(
