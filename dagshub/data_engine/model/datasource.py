@@ -163,8 +163,7 @@ class Datasource:
                 res.add(col.name)
         return res
 
-    @staticmethod
-    def _df_to_metadata(df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None,
+    def _df_to_metadata(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None,
                         multivalue_fields=set()) -> List[
         DatapointMetadataUpdateEntry]:
         res: List[DatapointMetadataUpdateEntry] = []
@@ -179,6 +178,8 @@ class Datasource:
         # objects are actually mixed and not guaranteed to be string, but this should cover most use cases
         if df.dtypes[path_column] != "object":
             raise RuntimeError(f"Column {path_column} doesn't have strings")
+
+        field_value_types = {f.name: f.valueType for f in self.fields}
 
         for _, row in df.iterrows():
             datapoint = row[path_column]
@@ -201,7 +202,13 @@ class Datasource:
                             if update_entry.key == key:
                                 update_entry.allowMultiple = True
                     for sub_val in val:
-                        value_type = _metadataTypeLookup[type(sub_val)]
+                        value_type = field_value_types.get(key)
+                        if value_type is None:
+                            value_type = _metadataTypeLookup[type(sub_val)]
+                            field_value_types[key] = value_type
+                        # Don't override bytes if they're not bytes - probably just undownloaded values
+                        if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
+                            continue
                         if type(sub_val) is bytes:
                             sub_val = MetadataContextManager.wrap_bytes(sub_val)
                         res.append(DatapointMetadataUpdateEntry(
@@ -212,7 +219,13 @@ class Datasource:
                             allowMultiple=True
                         ))
                 else:
-                    value_type = _metadataTypeLookup[type(val)]
+                    value_type = field_value_types.get(key)
+                    if value_type is None:
+                        value_type = _metadataTypeLookup[type(val)]
+                        field_value_types[key] = value_type
+                    # Don't override bytes if they're not bytes - probably just undownloaded values
+                    if value_type == MetadataFieldType.BLOB and type(val) is not bytes:
+                        continue
                     if type(val) is bytes:
                         val = MetadataContextManager.wrap_bytes(val)
                     res.append(DatapointMetadataUpdateEntry(
@@ -574,14 +587,17 @@ class Datasource:
 
 
 class MetadataContextManager:
-    def __init__(self, dataset: Datasource):
-        self._dataset = dataset
+    def __init__(self, datasource: Datasource):
+        self._datasource = datasource
         self._metadata_entries: List[DatapointMetadataUpdateEntry] = []
-        self._multivalue_fields = dataset._get_multivalue_fields()
+        self._multivalue_fields = datasource._get_multivalue_fields()
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
         if isinstance(datapoints, str):
             datapoints = [datapoints]
+
+        field_value_types = {f.name: f.valueType for f in self._datasource.fields}
+
         for dp in datapoints:
             for k, v in metadata.items():
                 if v is None:
@@ -597,7 +613,15 @@ class MetadataContextManager:
                             if e.key == k:
                                 e.allowMultiple = True
                     for sub_val in v:
-                        value_type = _metadataTypeLookup[type(sub_val)]
+
+                        value_type = field_value_types.get(k)
+                        if value_type is None:
+                            value_type = _metadataTypeLookup[type(sub_val)]
+                            field_value_types[k] = value_type
+                        # Don't override bytes if they're not bytes - probably just undownloaded values
+                        if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
+                            continue
+
                         if type(v) is bytes:
                             sub_val = self.wrap_bytes(sub_val)
                         self._metadata_entries.append(DatapointMetadataUpdateEntry(
@@ -610,7 +634,15 @@ class MetadataContextManager:
                         ))
 
                 else:
-                    value_type = _metadataTypeLookup[type(v)]
+
+                    value_type = field_value_types.get(k)
+                    if value_type is None:
+                        value_type = _metadataTypeLookup[type(v)]
+                        field_value_types[k] = value_type
+                    # Don't override bytes if they're not bytes - probably just undownloaded values
+                    if value_type == MetadataFieldType.BLOB and type(v) is not bytes:
+                        continue
+
                     if type(v) is bytes:
                         v = self.wrap_bytes(v)
                     self._metadata_entries.append(DatapointMetadataUpdateEntry(
