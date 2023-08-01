@@ -16,10 +16,10 @@ def metadata_df():
     return pd.DataFrame.from_dict(data_dict)
 
 
-def test_default_behavior(metadata_df):
+def test_default_behavior(ds, metadata_df):
     print(metadata_df.dtypes)
 
-    actual = Datasource._df_to_metadata(metadata_df)
+    actual = Datasource._df_to_metadata(ds, metadata_df)
     expected = [
         DatapointMetadataUpdateEntry("test1", "key1", "1", MetadataFieldType.INTEGER),
         DatapointMetadataUpdateEntry("test1", "key2", "4.0", MetadataFieldType.FLOAT),
@@ -35,8 +35,8 @@ def test_default_behavior(metadata_df):
 
 
 @pytest.mark.parametrize("column", ["key3", 3])
-def test_column_arg(metadata_df, column):
-    actual = Datasource._df_to_metadata(metadata_df, column)
+def test_column_arg(ds, metadata_df, column):
+    actual = Datasource._df_to_metadata(ds, metadata_df, column)
     expected = [
         DatapointMetadataUpdateEntry("7", "file", "test1", MetadataFieldType.STRING),
         DatapointMetadataUpdateEntry("7", "key1", "1", MetadataFieldType.INTEGER),
@@ -51,19 +51,19 @@ def test_column_arg(metadata_df, column):
     assert expected == actual
 
 
-def test_fails_with_nonstring_path(metadata_df):
+def test_fails_with_nonstring_path(ds, metadata_df):
     with pytest.raises(Exception):
-        Datasource._df_to_metadata(metadata_df, "key2")
+        Datasource._df_to_metadata(ds, metadata_df, "key2")
 
 
-def test_fails_out_of_bounds(metadata_df):
+def test_fails_out_of_bounds(ds, metadata_df):
     with pytest.raises(Exception):
-        Datasource._df_to_metadata(metadata_df, 10)
+        Datasource._df_to_metadata(ds, metadata_df, 10)
 
 
-def test_fails_nonexistent_field(metadata_df):
+def test_fails_nonexistent_field(ds, metadata_df):
     with pytest.raises(Exception):
-        Datasource._df_to_metadata(metadata_df, "dgsdfgsdg")
+        Datasource._df_to_metadata(ds, metadata_df, "dgsdfgsdg")
 
 
 def test_binary_metadata(ds):
