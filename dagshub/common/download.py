@@ -177,7 +177,14 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
                     logger.warning("Interrupt received - shutting down downloader")
                     tp.shutdown(wait=False, cancel_futures=True)
 
-                orig_interrupt = signal.signal(signal.SIGINT, cancel_download)
+                orig_interrupt = None
+                try:
+                    orig_interrupt = signal.signal(signal.SIGINT, cancel_download)
+                # ValueError means the function is not running from the main thread.
+                # TODO: figure out a workaround
+                except ValueError:
+                    pass
+
                 futures = [tp.submit(download_fn, url, location) for (url, location) in files]
                 for f in as_completed(futures):
                     exc = f.exception()
@@ -185,7 +192,8 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
                         logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
                     progress.update(task, advance=1)
 
-                signal.signal(signal.SIGINT, orig_interrupt)
+                if orig_interrupt is not None:
+                    signal.signal(signal.SIGINT, orig_interrupt)
 
     elif len(files) == 1:
         # Single file - don't bother with the multithreading, just download the file

@@ -43,3 +43,17 @@ async def update_metadata(request: Request):
         ctx.update_metadata(datapoints, {req_data.field.name: req_data.value})
 
     return JSONResponse("OK")
+
+
+@error_handler
+async def refresh_dataset(request: Request):
+    plugin_state = get_plugin_state(request)
+    ds = plugin_state.datasource
+    voxel_sess = plugin_state.voxel_session
+    current_dataset = voxel_sess.dataset
+
+    updated_dataset = ds.to_voxel51_dataset(name=current_dataset.name, force_download=True)
+    updated_dataset.save()
+    voxel_sess.refresh()
+
+    return JSONResponse("OK")

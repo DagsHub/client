@@ -44,6 +44,7 @@ class PluginServer:
         session.config.plugins["dagshub"] = {
             "server": self.server_address,
             "in_colab": is_inside_colab(),
+            "datasource_name": self._state.datasource.source.name,
         }
         session.refresh()
 

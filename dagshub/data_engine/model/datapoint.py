@@ -5,6 +5,7 @@ from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECK
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
+from dagshub.data_engine.client.models import MetadataFieldType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -45,8 +46,15 @@ class Datapoint:
             metadata={},
             datasource=datasource,
         )
+
+        float_fields = {f.name for f in datasource.fields if f.valueType == MetadataFieldType.FLOAT}
+
         for meta_dict in edge["node"]["metadata"]:
-            res.metadata[meta_dict["key"]] = meta_dict["value"]
+            key = meta_dict["key"]
+            value = meta_dict["value"]
+            if key in float_fields:
+                value = float(value)
+            res.metadata[key] = value
         return res
 
     def to_dict(self, metadata_keys: List[str]) -> Dict[str, Any]:
