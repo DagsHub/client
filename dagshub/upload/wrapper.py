@@ -17,7 +17,7 @@ import rich.status
 import dagshub.auth
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config, rich_console
-from dagshub.common.api.repo import RepoAPI
+from dagshub.common.api.repo import RepoAPI, BranchNotFoundError
 from dagshub.common.helpers import log_message
 from dagshub.upload.errors import determine_upload_api_error
 
@@ -212,7 +212,8 @@ class Repo:
         # For mirror uploading: store the last revision for which we uploaded
         # When the last revision changes, that means the sync has been complete and we can upload a new batch
         self._last_upload_revision: Optional[str] = None
-        self._last_upload_had_changes: bool = False
+        self._last_upload_had_changes = False
+        self._uploading_to_new_branch = False
 
         if self.branch is None:
             logger.debug("Branch wasn't provided. Fetching default branch...")
@@ -298,7 +299,18 @@ class Repo:
             # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
             self._poll_mirror_up_to_date()
 
-        self._last_upload_revision = self._api.last_commit_sha(self.branch)
+        # Unset the new branch upload flag if it was set
+        # (do that only after mirror poll so commit 2 on a new branch pushes correctly)
+        if self._uploading_to_new_branch:
+            self._uploading_to_new_branch = False
+
+        try:
+            self._last_upload_revision = self._api.last_commit_sha(self.branch)
+        # New branch does not have a commit yet, so "last_upload_revision" will be None initially
+        # NOTE: checking for new_branch is not enough, because it doesn't take into account
+        # uploading to completely blank repos
+        except BranchNotFoundError:
+            self._uploading_to_new_branch = True
 
         if force:
             data["last_commit"] = self._last_upload_revision
@@ -367,7 +379,8 @@ class Repo:
 
         # Initial state - assume we can upload
         # Also can upload if last upload didn't have any changes
-        if self._last_upload_revision is None or not self._last_upload_had_changes:
+        if not self._uploading_to_new_branch and (
+            self._last_upload_revision is None or not self._last_upload_had_changes):
             return
 
         poll_interval = 1.0  # seconds
@@ -376,7 +389,12 @@ class Repo:
 
         with rich.status.Status("Waiting for the mirror to sync", console=rich_console):
             while time.time() - start_time < poll_timeout:
-                new_revision = self._api.last_commit_sha(self.branch)
+                try:
+                    new_revision = self._api.last_commit_sha(self.branch)
+                except BranchNotFoundError:
+                    # New branch that didn't get back to DagsHub yet
+                    time.sleep(poll_interval)
+                    continue
                 if new_revision == self._last_upload_revision:
                     time.sleep(poll_interval)
                 else:
