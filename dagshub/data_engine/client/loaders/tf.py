@@ -26,10 +26,20 @@ class TensorFlowDataset(DagsHubDataset):
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
-    def __init__(self, dataset, batch_size=1, shuffle=True, seed=None):
+    def __init__(
+        self,
+        dataset,
+        batch_size=1,
+        shuffle=True,
+        seed=None,
+        pre_hook=lambda x: x,
+        post_hook=lambda x: x,
+    ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.pre_hook = pre_hook
+        self.post_hook = post_hook
 
         if seed:
             random.seed(seed)
@@ -46,6 +56,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
         return self.dataset.__len__() // self.batch_size
 
     def __getitem__(self, index: int) -> tf.Tensor:
+        index = self.pre_hook(index)
         samples = [
             self.dataset.__getitem__(index)
             for index in self.indices[
@@ -59,7 +70,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
             for idx, tensor in enumerate(sample):
                 batch[idx].append(tensor)
 
-        return [tf.stack(column) for column in batch]
+        return self.post_hook([tf.stack(column) for column in batch])
 
     def on_epoch_end(self) -> None:
         self.indices = np.arange(self.dataset.__len__())
