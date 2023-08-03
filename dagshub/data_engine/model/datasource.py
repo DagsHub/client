@@ -446,8 +446,9 @@ class Datasource:
                 time.sleep(1)
 
     def has_field(self, field_name: str):
+        reserved_searchable_fields = ["path"]
         fields = (f.name for f in self.fields)
-        return field_name in fields
+        return field_name in reserved_searchable_fields or field_name in fields
 
     def __repr__(self):
         res = f"Datasource {self.source.name}"

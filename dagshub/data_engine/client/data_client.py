@@ -62,7 +62,14 @@ class DataClient:
     def head(self, datasource: Datasource, size: Optional[int] = None) -> QueryResult:
         if size is None:
             size = self.HEAD_QUERY_SIZE
-        resp = self._datasource_query(datasource, True, size)
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        total_task = progress.add_task("Downloading metadata...", total=size)
+
+        with progress:
+            resp = self._datasource_query(datasource, True, size)
+            progress.update(total_task, advance=size, refresh=True)
+
         return QueryResult.from_gql_query(resp, datasource)
 
     def sample(self, datasource: Datasource, n: Optional[int], include_metadata: bool) -> QueryResult:
