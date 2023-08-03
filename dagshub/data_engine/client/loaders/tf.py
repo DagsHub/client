@@ -22,7 +22,7 @@ class TensorFlowDataset(DagsHubDataset):
 
     def generator(self):
         for idx in range(len(self)):
-            yield self[idx]
+            yield tuple(self[idx])
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
