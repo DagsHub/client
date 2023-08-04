@@ -81,7 +81,10 @@ class DagsHubDataset:
             [self.entries[0].metadata[col] for col in self.metadata_columns],
         ):
             try:
-                if self.source == "repo":
+                if (
+                    self.datasource.source.source_type
+                    == self.datasource.source.source_type.REPOSITORY
+                ):
                     self.repo.list_path((self.datasource_root / str(value)).as_posix())
                 else:
                     self.repo.list_storage_path(

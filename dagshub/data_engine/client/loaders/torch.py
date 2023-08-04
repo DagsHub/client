@@ -1,6 +1,6 @@
 from multiprocessing import Process
-from typing import TYPE_CHECKING, Union
 from dagshub.common.util import lazy_load
+from typing import TYPE_CHECKING, Union, Any
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 
 torch = lazy_load("torch")
@@ -18,12 +18,41 @@ class PyTorchDataset(DagsHubDataset, torch.utils.data.Dataset):
         self.type = "torch"
 
 
-class PyTorchDataLoader(torch.utils.data.DataLoader):
-    def __init__(self, *args, **kwargs):
+class _BaseDataLoaderIter:
+    def __next__(self) -> Any:
+        return self.post_hook(super().__next__())
+
+
+class _SingleProcessDataLoaderIter(
+    _BaseDataLoaderIter, torch.utils.data.dataloader._SingleProcessDataLoaderIter
+):
+    def __init__(self, *args, post_hook, **kwargs):
+        self.post_hook = post_hook
         super().__init__(*args, **kwargs)
+
+
+class _MultiProcessingDataLoaderIter(
+    _BaseDataLoaderIter, torch.utils.data.dataloader._MultiProcessingDataLoaderIter
+):
+    def __init__(self, *args, post_hook, **kwargs):
+        self.post_hook = post_hook
+        super().__init__(*args, **kwargs)
+
+
+class PyTorchDataLoader(torch.utils.data.DataLoader):
+    def __init__(self, *args, post_hook=lambda x: x, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.post_hook = post_hook
         self.dataset.order = list(self.sampler)
         if self.dataset.strategy == "background":
             Process(target=self.dataset.pull).start()
+
+    def _get_iterator(self) -> "_BaseDataLoaderIter":
+        if self.num_workers == 0:
+            return _SingleProcessDataLoaderIter(self, post_hook=self.post_hook)
+        else:
+            self.check_worker_number_rationality()
+            return _MultiProcessingDataLoaderIter(self, post_hook=self.post_hook)
 
 
 class Tensorizers:
