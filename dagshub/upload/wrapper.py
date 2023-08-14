@@ -293,14 +293,7 @@ class Repo:
             "is_dvc_dir": directory_path != "" and versioning != "git",
         }
 
-        if new_branch is not None:
-            data.update(
-                {
-                    "commit_choice": "commit-to-new-branch",
-                    "new_branch_name": new_branch,
-                }
-            )
-        elif self._api.is_mirror:
+        if self._api.is_mirror and new_branch is not None:
             # If not uploading to a new branch, and we're in a mirror - wait for the sync to complete
             self._poll_mirror_up_to_date()
 
@@ -309,6 +302,8 @@ class Repo:
         if self._uploading_to_new_branch:
             self._uploading_to_new_branch = False
 
+        upload_url = self.get_request_url(directory_path)
+
         try:
             self._last_upload_revision = self._api.last_commit_sha(self.branch)
         # New branch does not have a commit yet, so "last_upload_revision" will be None initially
@@ -316,13 +311,26 @@ class Repo:
         # uploading to completely blank repos
         except BranchNotFoundError:
             self._uploading_to_new_branch = True
+            log_message(
+                f"Uploading to a new branch {self.branch}, "
+                f"splitting it off from the default branch {self._api.default_branch}", logger)
+            upload_url = self.get_request_url(directory=directory_path, branch=self._api.default_branch)
+            new_branch = self.branch
+
+        if new_branch is not None:
+            data.update(
+                {
+                    "commit_choice": "commit-to-new-branch",
+                    "new_branch_name": new_branch,
+                }
+            )
 
         if force:
             data["last_commit"] = self._last_upload_revision
 
         log_message(f'Uploading files ({len(files)}) to "{self._api.full_name}"...', logger)
         res = s.put(
-            self.get_request_url(directory_path),
+            upload_url,
             data=data,
             files=[("files", file) for file in files],
             auth=self.auth,
@@ -450,7 +458,7 @@ class Repo:
         """
         return DataSet(self, path)
 
-    def get_request_url(self, directory):
+    def get_request_url(self, directory, branch=None):
         """
         The get_request_url function returns the URL for uploading a file to DagsHub.
 
@@ -458,10 +466,12 @@ class Repo:
             For example, if you have created your repo in such a
             way that it has two directories named data and models,
             then you could pass one of these strings into this function as an argument.
+        :param branch: branch to which upload file.
+            Default is None, which uses the branch set on object creation
         :return: The url for uploading a file
 
         """
-        return self.get_repo_url(CONTENT_UPLOAD_URL, directory)
+        return self.get_repo_url(CONTENT_UPLOAD_URL, directory, branch)
 
     def get_files_ui_url(self, directory):
         """
@@ -476,13 +486,15 @@ class Repo:
         """
         return self.get_repo_url(FILES_UI_URL, directory)
 
-    def get_repo_url(self, url_format, directory):
+    def get_repo_url(self, url_format, directory, branch=None):
+        if branch is None:
+            branch = self.branch
         return urllib.parse.urljoin(
             self.host,
             url_format.format(
                 owner=self.owner,
                 reponame=self.name,
-                branch=self.branch,
+                branch=branch,
                 path=urllib.parse.quote(directory, safe=""),
             ),
         )
