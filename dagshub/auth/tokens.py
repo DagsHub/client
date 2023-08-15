@@ -7,11 +7,19 @@ from typing import Optional, Dict, List
 import yaml
 
 from dagshub.auth import oauth
+from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.helpers import http_request
+from dagshub.common.util import multi_urljoin
 
 logger = logging.getLogger(__name__)
 
 APP_TOKEN_TYPE = "app-token"
+
+
+class InvalidTokenError(Exception):
+    def __str__(self):
+        print("The token is not a valid DagsHub token")
 
 
 class TokenStorage:
@@ -26,8 +34,13 @@ class TokenStorage:
             self.__token_cache = self._load_cache_file()
         return self.__token_cache
 
-    def add_token(self, token: Dict, host: str = None):
+    def add_token(self, token: Dict, host: str = None, skip_validation = False):
         host = host or config.host
+
+        if not skip_validation:
+            if not TokenStorage.is_valid_token(token["access_token"], host):
+                raise InvalidTokenError
+
         if host not in self._token_cache:
             self._token_cache[host] = []
         self._token_cache[host].append(token)
@@ -88,6 +101,27 @@ class TokenStorage:
     def _get_empty_cache_dict():
         return {"version": config.TOKENS_CACHE_SCHEMA_VERSION}
 
+    @staticmethod
+    def is_valid_token(token: str, host: str) -> bool:
+        """
+        Check for token validity
+
+        Args:
+            token: token to check validity
+            host: which host to connect against
+        """
+        host = host or config.host
+        check_url = multi_urljoin(host, "api/v1/user")
+        auth = HTTPBearerAuth(token)
+        resp = http_request("GET", check_url, auth=auth)
+
+        try:
+            assert resp.status_code == 200
+            assert "login" in resp.json()
+            return True
+        except AssertionError:
+            return False
+
     def _store_cache_file(self):
         logger.debug(f"Dumping OAuth token cache to {self.cache_location}")
         try:
@@ -139,4 +173,4 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 def add_oauth_token(host: Optional[str] = None, **kwargs):
     host = host or config.host
     token = oauth.oauth_flow(host)
-    _get_token_storage(**kwargs).add_token(token, host)
+    _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)
