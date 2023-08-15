@@ -121,6 +121,7 @@ class TokenStorage:
                 )
                 good_token = oauth.oauth_flow(host, **kwargs)
                 tokens.append(good_token)
+                good_token_set.add(good_token["access_token"])
                 # Save the cache
                 self._token_cache[host] = tokens
                 self._store_cache_file()
