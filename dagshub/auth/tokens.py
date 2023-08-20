@@ -3,13 +3,14 @@ import logging
 import os
 import threading
 import traceback
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from typing import Optional, Dict, List, Set
 
 import yaml
 
 from dagshub.auth import oauth
-from dagshub.auth.token_auth import HTTPBearerAuth
+from dagshub.auth.token_auth import HTTPBearerAuth, DagshubTokenABC
 from dagshub.common import config
 from dagshub.common.helpers import http_request
 from dagshub.common.util import multi_urljoin
@@ -30,7 +31,7 @@ class TokenStorage:
         self.cache_location = cache_location
         self.__token_cache: Optional[Dict[str, List[Dict]]] = None
 
-        # We check tokens only once for validity, so as to not do a lot of redundant requests
+        # We check tokens only once for validity, so we don't do a lot of redundant requests
         #   maybe there is a point to re-evaluate them once in a while
         self._known_good_tokens: Dict[str, Set[str]] = defaultdict(lambda: set())
 
@@ -68,15 +69,25 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
-    def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
+    def get_authenticator(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
         """
-        This function does following:
-        - Iterates over all tokens in the cache for the provided host
-        - Finds a first valid token and returns it
-        - If it finds an invalid token, it deletes it from the cache
+        Returns the authenticator object, that can renegotiate tokens in case of failure
+        """
+        raise NotImplementedError
 
-        We're using a set of known good tokens to skip rechecking for token validity every time
+    def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
         """
+         This function does following:
+         - Iterates over all tokens in the cache for the provided host
+         - Finds a first valid token and returns it
+         - If it finds an invalid token, it deletes it from the cache
+
+         We're using a set of known good tokens to skip rechecking for token validity every time
+         """
+
+        # TODO: add a lock here so the access to the token storage is single threaded
+        # TODO: warn on timed tokens
+        # TODO: different token types
 
         def token_priority_sort_fn(token_dict):
             # app tokens - biggest priority
@@ -131,6 +142,14 @@ class TokenStorage:
                     self._store_cache_file()
 
             return good_token["access_token"]
+
+    def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
+        """
+        Return the raw token string
+        This is a lower level method that cannot do renegotiations, we only return the token itself here.
+        Used mainly for setting environment variables, for example for MLflow
+        """
+        return self.get_token_object(host, fail_if_no_token).token_text
 
     @staticmethod
     def _is_expired(token: Dict[str, str]) -> bool:
@@ -226,6 +245,10 @@ def get_token(**kwargs):
 
 
 def add_app_token(token: str, host: Optional[str] = None, **kwargs):
+    """
+    Adds an application token to the token cache.
+    This is a long-lived token that you can add/revoke in your profile settings on DagsHub
+    """
     token_dict = {
         "access_token": token,
         "token_type": APP_TOKEN_TYPE,
@@ -235,6 +258,11 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 
 
 def add_oauth_token(host: Optional[str] = None, **kwargs):
+    """
+    Launches the OAuth flow that generates a short-lived token.
+    This will open a new browser window, so this is not a CI/headless friendly function.
+    Consider using `add_app_token` or setting the `DAGSHUB_USER_TOKEN` env var in those cases.
+    """
     host = host or config.host
     token = oauth.oauth_flow(host)
     _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)
