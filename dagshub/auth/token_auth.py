@@ -1,6 +1,8 @@
+import datetime
 from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, Generator, TYPE_CHECKING
 
+import dateutil.parser
 from httpx import Request, Response, Auth
 
 if TYPE_CHECKING:
@@ -21,6 +23,10 @@ class DagshubAuthenticator(Auth):
         yield self.token(request)
 
 
+class TokenDeserializationError(Exception):
+    ...
+
+
 class DagshubTokenABC(metaclass=ABCMeta):
     token_type = "NONE"
 
@@ -28,46 +34,86 @@ class DagshubTokenABC(metaclass=ABCMeta):
         request.headers["Authorization"] = f"Bearer {self.token_text}"
         return request
 
+    @staticmethod
     @abstractmethod
-    def deserialize(self, values: Dict[str, Any]):
+    def deserialize(values: Dict[str, Any]):
         ...
 
     @abstractmethod
     def serialize(self) -> Dict[str, Any]:
         ...
 
-    @abstractmethod
     @property
+    @abstractmethod
     def token_text(self) -> str:
+        ...
+
+    @property
+    @abstractmethod
+    def is_expired(self) -> bool:
         ...
 
 
 class OauthDagshubToken(DagshubTokenABC):
     token_type = "bearer"
 
-    def serialize(self) -> Dict[str, Any]:
-        raise NotImplementedError
+    def __init__(self, token_value: str, expiry_date: datetime.datetime):
+        self.token_value = token_value
+        self.expiry_date = expiry_date
 
-    def deserialize(self, values: Dict[str, Any]):
-        raise NotImplementedError
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            "access_token": self.token_value,
+            "expiry": self.expiry_date.isoformat(),
+            "token_type": self.token_type,
+        }
+
+    @staticmethod
+    def deserialize(values: Dict[str, Any]):
+        token_value = values["access_token"]
+        expiry_date = values["expiry"]
+        expiry_date = dateutil.parser.parse(expiry_date)
+        return OauthDagshubToken(token_value, expiry_date)
 
     @property
     def token_text(self) -> str:
-        raise NotImplementedError
+        return self.token_value
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expiry_date < datetime.datetime.now(tz=self.expiry_date.tzinfo)
+
+    def __repr__(self):
+        return f"Dagshub OAuth token, valid until {self.expiry_date}"
 
 
 class AppDagshubToken(DagshubTokenABC):
     token_type = "app-token"
 
-    def serialize(self) -> Dict[str, Any]:
-        raise NotImplementedError
+    def __init__(self, token_value: str):
+        self.token_value = token_value
 
-    def deserialize(self, values: Dict[str, Any]):
-        raise NotImplementedError
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            "access_token": self.token_value,
+            "expiry": "never",
+            "token_type": self.token_type,
+        }
+
+    @staticmethod
+    def deserialize(values: Dict[str, Any]):
+        return AppDagshubToken(values["access_token"])
 
     @property
     def token_text(self) -> str:
-        raise NotImplementedError
+        return self.token_value
+
+    @property
+    def is_expired(self) -> bool:
+        return False
+
+    def __repr__(self):
+        return "Dagshub App token"
 
 
 class HTTPBearerAuth(Auth):
