@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import threading
 import traceback
 from collections import defaultdict
 from typing import Optional, Dict, List, Set
@@ -32,6 +33,8 @@ class TokenStorage:
         # We check tokens only once for validity, so as to not do a lot of redundant requests
         #   maybe there is a point to re-evaluate them once in a while
         self._known_good_tokens: Dict[str, Set[str]] = defaultdict(lambda: set())
+
+        self._token_access_lock = threading.RLock()
 
     @property
     def _token_cache(self):
@@ -81,52 +84,53 @@ class TokenStorage:
                 return -1
             return 0
 
-        host = host or config.host
-        tokens = self._token_cache.get(host, [])
+        with self._token_access_lock:
+            host = host or config.host
+            tokens = self._token_cache.get(host, [])
 
-        had_changes = False  # For saving if we invalidate some tokens
-        good_token_set = self._known_good_tokens[host]
-        good_token = None
-        token_queue = list(sorted(tokens, key=token_priority_sort_fn))
+            had_changes = False  # For saving if we invalidate some tokens
+            good_token_set = self._known_good_tokens[host]
+            good_token = None
+            token_queue = list(sorted(tokens, key=token_priority_sort_fn))
 
-        for token_dict in token_queue:
-            token = token_dict["access_token"]
-            if token in good_token_set:
-                good_token = token_dict
-            # Check token validity
-            elif self.is_valid_token(token, host):
-                good_token = token_dict
-                good_token_set.add(token)
-            # Remove invalid token from the cache
-            else:
-                logger.debug(f"Removing invalid token {token_dict}")
-                tokens.remove(token_dict)
-                had_changes = True
-            if good_token is not None:
-                break
+            for token_dict in token_queue:
+                token = token_dict["access_token"]
+                if token in good_token_set:
+                    good_token = token_dict
+                # Check token validity
+                elif self.is_valid_token(token, host):
+                    good_token = token_dict
+                    good_token_set.add(token)
+                # Remove invalid token from the cache
+                else:
+                    logger.debug(f"Removing invalid token {token_dict}")
+                    tokens.remove(token_dict)
+                    had_changes = True
+                if good_token is not None:
+                    break
 
-        # Save the cache
-        if had_changes:
-            self._token_cache[host] = tokens
-            self._store_cache_file()
-
-        if good_token is None:
-            if fail_if_no_token:
-                raise RuntimeError(
-                    f"No valid tokens found for host '{host}'.\n"
-                    "Log into DagsHub by executing `dagshub login` in your terminal")
-            else:
-                logger.debug(
-                    f"No valid tokens found for host '{host}'. Authenticating with OAuth"
-                )
-                good_token = oauth.oauth_flow(host, **kwargs)
-                tokens.append(good_token)
-                good_token_set.add(good_token["access_token"])
-                # Save the cache
+            # Save the cache
+            if had_changes:
                 self._token_cache[host] = tokens
                 self._store_cache_file()
 
-        return good_token["access_token"]
+            if good_token is None:
+                if fail_if_no_token:
+                    raise RuntimeError(
+                        f"No valid tokens found for host '{host}'.\n"
+                        "Log into DagsHub by executing `dagshub login` in your terminal")
+                else:
+                    logger.debug(
+                        f"No valid tokens found for host '{host}'. Authenticating with OAuth"
+                    )
+                    good_token = oauth.oauth_flow(host, **kwargs)
+                    tokens.append(good_token)
+                    good_token_set.add(good_token["access_token"])
+                    # Save the cache
+                    self._token_cache[host] = tokens
+                    self._store_cache_file()
+
+            return good_token["access_token"]
 
     @staticmethod
     def _is_expired(token: Dict[str, str]) -> bool:
