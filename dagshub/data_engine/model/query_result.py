@@ -219,6 +219,7 @@ class QueryResult:
             cache_on_disk: Whether to cache the blobs on disk or not (valid only if load_into_memory is set to True)
                 Cache location is `~/dagshub/datasets/<user>/<repo>/<datasource_id>/.metadata_blobs/`
         """
+        send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
         if not load_into_memory:
             assert cache_on_disk
         for fld in fields:
@@ -245,9 +246,8 @@ class QueryResult:
     def download_binary_columns(self, *columns: str, load_into_memory=True,
                                 cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
         """
-        deprecated: Use get_blob_columns instead.
+        deprecated: Use get_blob_fields instead.
         """
-        send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
         return self.get_blob_fields(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk,
                                     num_proc=num_proc)
 
