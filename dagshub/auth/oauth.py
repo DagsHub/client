@@ -1,5 +1,5 @@
 import hashlib
-from typing import Optional, Dict
+from typing import Optional
 import logging
 import urllib
 import uuid

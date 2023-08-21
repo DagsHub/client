@@ -14,9 +14,10 @@ class DagshubAuthenticator(Auth):
     This class contains a token + flow on how to re-init the token in case of failure
     """
 
-    def __init__(self, token: "DagshubTokenABC", token_storage: "TokenStorage"):
+    def __init__(self, token: "DagshubTokenABC", token_storage: "TokenStorage", host: str):
         self.token = token
         self.token_storage = token_storage
+        self.host = host
 
     def auth_flow(self, request: Request) -> Generator[Request, Response, None]:
         # TODO: failure mode recovery
