@@ -33,7 +33,7 @@ class TokenStorage:
 
         # We check tokens only once for validity, so we don't do a lot of redundant requests
         #   maybe there is a point to re-evaluate them once in a while
-        self._known_good_tokens: Dict[str, Set[str]] = defaultdict(lambda: set())
+        self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = defaultdict(lambda: set())
 
         self._token_access_lock = threading.RLock()
 
@@ -85,15 +85,8 @@ class TokenStorage:
          We're using a set of known good tokens to skip rechecking for token validity every time
          """
 
-        # TODO: add a lock here so the access to the token storage is single threaded
         # TODO: warn on timed tokens
         # TODO: different token types
-
-        def token_priority_sort_fn(token_dict):
-            # app tokens - biggest priority
-            if token_dict["token_type"] == APP_TOKEN_TYPE:
-                return -1
-            return 0
 
         with self._token_access_lock:
             host = host or config.host
@@ -102,21 +95,33 @@ class TokenStorage:
             had_changes = False  # For saving if we invalidate some tokens
             good_token_set = self._known_good_tokens[host]
             good_token = None
-            token_queue = list(sorted(tokens, key=token_priority_sort_fn))
+            token_queue = list(sorted(tokens, key=lambda t: t.priority))
 
-            for token_dict in token_queue:
-                token = token_dict["access_token"]
+            def remove_token(t):
+                nonlocal had_changes
+                logger.debug(f"Removing invalid token {t}")
+                tokens.remove(t)
+                try:
+                    good_token_set.remove(t)
+                except KeyError:
+                    pass
+                had_changes = True
+
+            for token in token_queue:
+                if token.is_expired:
+                    remove_token(token)
+                    continue
+
                 if token in good_token_set:
-                    good_token = token_dict
+                    good_token = token
+                    break
                 # Check token validity
                 elif self.is_valid_token(token, host):
-                    good_token = token_dict
+                    good_token = token
                     good_token_set.add(token)
                 # Remove invalid token from the cache
                 else:
-                    logger.debug(f"Removing invalid token {token_dict}")
-                    tokens.remove(token_dict)
-                    had_changes = True
+                    remove_token(token)
                 if good_token is not None:
                     break
 
@@ -125,6 +130,8 @@ class TokenStorage:
                 self._token_cache[host] = tokens
                 self._store_cache_file()
 
+            # Couldn't manage to find a good token after the search
+            # Either go through the oauth flow, or throw a runtime error
             if good_token is None:
                 if fail_if_no_token:
                     raise RuntimeError(
@@ -136,12 +143,12 @@ class TokenStorage:
                     )
                     good_token = oauth.oauth_flow(host, **kwargs)
                     tokens.append(good_token)
-                    good_token_set.add(good_token["access_token"])
+                    good_token_set.add(good_token)
                     # Save the cache
                     self._token_cache[host] = tokens
                     self._store_cache_file()
 
-            return good_token["access_token"]
+            return good_token
 
     def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
         """
@@ -187,9 +194,9 @@ class TokenStorage:
             return False
 
     def _load_cache_file(self) -> Dict[str, List[DagshubTokenABC]]:
-        logger.debug(f"Loading OAuth token cache from {self.cache_location}")
+        logger.debug(f"Loading token cache from {self.cache_location}")
         if not os.path.exists(self.cache_location):
-            logger.debug("OAuth token cache file doesn't exist")
+            logger.debug("Token cache file doesn't exist")
             return {}
         try:
             with open(self.cache_location) as f:
@@ -200,7 +207,7 @@ class TokenStorage:
                 raise RuntimeError(f"Don't know how to parse token schema {version}")
         except Exception:
             logger.error(
-                f"Error while loading DagsHub OAuth token cache: {traceback.format_exc()}"
+                f"Error while loading DagsHub token cache: {traceback.format_exc()}"
             )
             raise
 
@@ -228,7 +235,7 @@ class TokenStorage:
         return res
 
     def _store_cache_file(self):
-        logger.debug(f"Dumping OAuth token cache to {self.cache_location}")
+        logger.debug(f"Dumping token cache to {self.cache_location}")
         try:
             dirpath = os.path.dirname(self.cache_location)
             if not os.path.exists(dirpath):
@@ -240,7 +247,7 @@ class TokenStorage:
                 yaml.dump(dict_to_dump, f, yaml.Dumper)
         except Exception:
             logger.error(
-                f"Error while storing DagsHub OAuth token cache: {traceback.format_exc()}"
+                f"Error while storing DagsHub token cache: {traceback.format_exc()}"
             )
             raise
 

@@ -29,6 +29,8 @@ class TokenDeserializationError(Exception):
 
 class DagshubTokenABC(metaclass=ABCMeta):
     token_type = "NONE"
+    # Decides which token is giving out first to the user
+    priority = 10000
 
     def __call__(self, request: Request) -> Request:
         request.headers["Authorization"] = f"Bearer {self.token_text}"
@@ -54,8 +56,9 @@ class DagshubTokenABC(metaclass=ABCMeta):
         ...
 
 
-class OauthDagshubToken(DagshubTokenABC):
+class OAuthDagshubToken(DagshubTokenABC):
     token_type = "bearer"
+    priority = 1
 
     def __init__(self, token_value: str, expiry_date: datetime.datetime):
         self.token_value = token_value
@@ -72,8 +75,11 @@ class OauthDagshubToken(DagshubTokenABC):
     def deserialize(values: Dict[str, Any]):
         token_value = values["access_token"]
         expiry_date = values["expiry"]
-        expiry_date = dateutil.parser.parse(expiry_date)
-        return OauthDagshubToken(token_value, expiry_date)
+        try:
+            expiry_date = dateutil.parser.parse(expiry_date)
+        except dateutil.parser.ParserError as ex:
+            raise TokenDeserializationError from ex
+        return OAuthDagshubToken(token_value, expiry_date)
 
     @property
     def token_text(self) -> str:
@@ -89,6 +95,7 @@ class OauthDagshubToken(DagshubTokenABC):
 
 class AppDagshubToken(DagshubTokenABC):
     token_type = "app-token"
+    priority = 0
 
     def __init__(self, token_value: str):
         self.token_value = token_value
