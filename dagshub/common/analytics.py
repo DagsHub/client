@@ -20,7 +20,7 @@ def send_analytics_event(event_name: str, repo: Optional[Union[int, "RepoAPI"]] 
         else:
             event_data["repo_id"] = repo.id
     host = config.host
-    token = config.token or get_token(host=host)
+    token = get_token(host=host)
     t = Thread(target=_send, args=(event_data, host, token), daemon=True)
     t.start()
 

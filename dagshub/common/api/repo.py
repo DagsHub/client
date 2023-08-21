@@ -56,7 +56,7 @@ class RepoAPI:
         self.host = host if host is not None else config.host
 
         if auth is None:
-            self.auth = HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
+            self.auth = dagshub.auth.get_authenticator(host=host)
         else:
             self.auth = auth
 
