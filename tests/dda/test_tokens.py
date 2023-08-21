@@ -27,7 +27,10 @@ def valid_token_side_effect(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture
 def token_api(mock_api):
-    dagshub.common.config.token = None  # Disable the env var token for these tests explicitly
+    # Disable the env var token for these tests explicitly
+    old_token_val = dagshub.common.config.token
+    dagshub.common.config.token = None
+
     mock_api.get("https://dagshub.com/api/v1/user").mock(side_effect=valid_token_side_effect)
 
     mock_api.post("https://dagshub.com/api/v1/middleman").mock(httpx.Response(200, json="code"))
@@ -40,6 +43,8 @@ def token_api(mock_api):
     }
     mock_api.post("https://dagshub.com/api/v1/access_token").mock(httpx.Response(200, json=good_auth_token))
     yield mock_api
+
+    dagshub.common.config.token = old_token_val
 
 
 @pytest.fixture
