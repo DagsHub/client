@@ -11,7 +11,7 @@ from httpx import Auth
 
 from dagshub.auth import oauth
 from dagshub.auth.token_auth import HTTPBearerAuth, DagshubTokenABC, TokenDeserializationError, AppDagshubToken, \
-    EnvVarDagshubToken
+    EnvVarDagshubToken, DagshubAuthenticator
 from dagshub.common import config
 from dagshub.common.helpers import http_request
 from dagshub.common.util import multi_urljoin
@@ -75,7 +75,9 @@ class TokenStorage:
         """
         Returns the authenticator object, that can renegotiate tokens in case of failure
         """
-        raise NotImplementedError
+        host = host or config.host
+        token = self.get_token_object(host, fail_if_no_token, **kwargs)
+        return DagshubAuthenticator(token, token_storage=self, host=host)
 
     def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
         """

@@ -15,13 +15,17 @@ class DagshubAuthenticator(Auth):
     """
 
     def __init__(self, token: "DagshubTokenABC", token_storage: "TokenStorage", host: str):
-        self.token = token
-        self.token_storage = token_storage
-        self.host = host
+        self._token = token
+        self._token_storage = token_storage
+        self._host = host
 
     def auth_flow(self, request: Request) -> Generator[Request, Response, None]:
         # TODO: failure mode recovery
-        yield self.token(request)
+        yield self._token(request)
+
+    @property
+    def token_text(self) -> str:
+        return self._token.token_text
 
 
 class TokenDeserializationError(Exception):
