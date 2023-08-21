@@ -71,7 +71,7 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
-    def get_authenticator(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
+    def get_authenticator(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubAuthenticator:
         """
         Returns the authenticator object, that can renegotiate tokens in case of failure
         """
@@ -269,7 +269,7 @@ def _get_token_storage(**kwargs):
     return _token_storage
 
 
-def get_authenticator(**kwargs):
+def get_authenticator(**kwargs) -> DagshubAuthenticator:
     """
     Get an authenticator object.
     This object can be used as auth argument for the httpx requests

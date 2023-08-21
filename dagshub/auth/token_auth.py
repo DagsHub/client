@@ -1,9 +1,11 @@
 import datetime
 from abc import ABCMeta, abstractmethod
-from typing import Any, Dict, Generator, TYPE_CHECKING
+from typing import Any, Dict, Generator, TYPE_CHECKING, Optional
 
 import dateutil.parser
 from httpx import Request, Response, Auth
+
+from dagshub.common import config
 
 if TYPE_CHECKING:
     from dagshub.auth.tokens import TokenStorage
@@ -134,9 +136,9 @@ class EnvVarDagshubToken(DagshubTokenABC):
     token_type = "env-var"
     priority = -1
 
-    def __init__(self, token_value: str, host: str):
+    def __init__(self, token_value: str, host: Optional[str] = None):
         self.token_value = token_value
-        self.host = host
+        self.host = host or config.host
 
     def serialize(self) -> Dict[str, Any]:
         raise RuntimeError("Can't serialize env var token")
