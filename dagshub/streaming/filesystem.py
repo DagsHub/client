@@ -386,11 +386,11 @@ class DagsHubFilesystem:
                 if not (flags & os.O_RDONLY):
                     open_mode = "a"
                 logger.debug("fs.os_open - trying to materialize path")
-                self.open(path.relative_path, mode=open_mode).close()
+                self.open(path.absolute_path, mode=open_mode).close()
                 logger.debug("fs.os_open - successfully materialized path")
             except FileNotFoundError:
                 logger.debug("fs.os_open - failed to materialize path, os.open will throw")
-        return os.open(path.relative_path, flags, mode, dir_fd=dir_fd)
+        return os.open(path.absolute_path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *args, dir_fd=None, follow_symlinks=True):
         # FD passthrough
