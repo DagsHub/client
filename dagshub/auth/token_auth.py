@@ -35,7 +35,7 @@ class DagshubAuthenticator(Auth):
         """
         # TODO: NEED TO COME UP WITH A WAY TO RENEGOTIATE HERE SOMEHOW
         # PROBABLY NEED TO CHECK FOR requests' REQUEST HERE
-        self._token(request)
+        return self._token(request)
 
 
 class TokenDeserializationError(Exception):
