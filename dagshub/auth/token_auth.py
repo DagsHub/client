@@ -29,6 +29,14 @@ class DagshubAuthenticator(Auth):
     def token_text(self) -> str:
         return self._token.token_text
 
+    def __call__(self, request):
+        """
+        Forward the call to the token
+        """
+        # TODO: NEED TO COME UP WITH A WAY TO RENEGOTIATE HERE SOMEHOW
+        # PROBABLY NEED TO CHECK FOR requests' REQUEST HERE
+        self._token(request)
+
 
 class TokenDeserializationError(Exception):
     ...
@@ -36,8 +44,7 @@ class TokenDeserializationError(Exception):
 
 class DagshubTokenABC(metaclass=ABCMeta):
     token_type = "NONE"
-    # Decides which token is giving out first to the user
-    priority = 10000
+    priority = 10000  # Decides which token is given out first to the user
 
     def __call__(self, request: Request) -> Request:
         request.headers["Authorization"] = f"Bearer {self.token_text}"

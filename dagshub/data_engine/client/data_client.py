@@ -8,7 +8,6 @@ from gql.transport.requests import RequestsHTTPTransport
 
 import dagshub.auth
 import dagshub.common.config
-from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
@@ -39,7 +38,7 @@ class DataClient:
 
     def _init_client(self):
         url = f"{self.host}/api/v1/repos/{self.repo}/data-engine/graphql"
-        auth = HTTPBearerAuth(config.token or dagshub.auth.get_token(host=self.host))
+        auth = dagshub.auth.get_authenticator(host=self.host)
         transport = RequestsHTTPTransport(url=url, auth=auth)
         client = gql.Client(transport=transport)
         return client

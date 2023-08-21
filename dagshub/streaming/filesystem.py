@@ -234,17 +234,14 @@ class DagsHubFilesystem:
     @property
     def auth(self):
         import dagshub.auth
-        from dagshub.auth.token_auth import HTTPBearerAuth
 
         if self.username is not None and self.password is not None:
             return self.username, self.password
 
         try:
-            token = self.token or dagshub.auth.get_token()
+            return dagshub.auth.get_authenticator()
         except dagshub.auth.OauthNonInteractiveShellException:
             logger.debug("Failed to perform OAuth in a non interactive shell")
-        if token is not None:
-            return HTTPBearerAuth(token)
 
         # Try to fetch credentials from the git credential file
         proc = subprocess.run(['git', 'credential', 'fill'],
