@@ -6,6 +6,8 @@ from functools import partial
 from pathlib import Path
 from typing import Tuple, Callable, Optional, List, Union, Dict
 
+from httpx import Auth
+
 try:
     from typing import Literal
 except ImportError:
@@ -14,9 +16,7 @@ except ImportError:
 import re
 import rich.progress
 
-from dagshub.auth import get_token
-from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config
+from dagshub.auth import get_authenticator
 from dagshub.common.helpers import http_request
 from dagshub.common.rich_util import get_rich_progress
 
@@ -82,7 +82,7 @@ def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
     return groups["proto"], groups["bucket"], groups["path"]
 
 
-def _dagshub_download(url: str, auth: HTTPBearerAuth) -> bytes:
+def _dagshub_download(url: str, auth: Auth) -> bytes:
     resp = http_request("GET", url, auth=auth, timeout=600)
     try:
         assert resp.status_code == 200
@@ -136,8 +136,8 @@ def _ensure_default_downloader_exists():
     """
     global _default_downloader
     if _default_downloader is None:
-        token = config.token or get_token(host=config.host)
-        _default_downloader = partial(_dagshub_download, auth=HTTPBearerAuth(token=token))
+        auth = get_authenticator()
+        _default_downloader = partial(_dagshub_download, auth=auth)
 
 
 def download_files(files: List[Tuple[str, Union[str, Path]]],
