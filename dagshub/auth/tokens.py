@@ -7,9 +7,11 @@ from collections import defaultdict
 from typing import Optional, Dict, List, Set, Union
 
 import yaml
+from httpx import Auth
 
 from dagshub.auth import oauth
-from dagshub.auth.token_auth import HTTPBearerAuth, DagshubTokenABC, TokenDeserializationError, AppDagshubToken
+from dagshub.auth.token_auth import HTTPBearerAuth, DagshubTokenABC, TokenDeserializationError, AppDagshubToken, \
+    EnvVarDagshubToken
 from dagshub.common import config
 from dagshub.common.helpers import http_request
 from dagshub.common.util import multi_urljoin
@@ -85,11 +87,11 @@ class TokenStorage:
          We're using a set of known good tokens to skip rechecking for token validity every time
          """
 
-        # TODO: warn on timed tokens
-        # TODO: different token types
+        host = host or config.host
+        if host == config.host and config.token is not None:
+            return EnvVarDagshubToken(config.token, host)
 
         with self._token_access_lock:
-            host = host or config.host
             tokens = self._token_cache.get(host, [])
 
             had_changes = False  # For saving if we invalidate some tokens
@@ -171,7 +173,7 @@ class TokenStorage:
         return is_expired
 
     @staticmethod
-    def is_valid_token(token: str, host: str) -> bool:
+    def is_valid_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> bool:
         """
         Check for token validity
 
@@ -181,7 +183,10 @@ class TokenStorage:
         """
         host = host or config.host
         check_url = multi_urljoin(host, "api/v1/user")
-        auth = HTTPBearerAuth(token)
+        if type(token) is str:
+            auth = HTTPBearerAuth(token)
+        else:
+            auth = token
         resp = http_request("GET", check_url, auth=auth)
 
         try:
@@ -262,9 +267,33 @@ def _get_token_storage(**kwargs):
     return _token_storage
 
 
-def get_token(**kwargs):
+def get_authenticator(**kwargs):
+    """
+    Get an authenticator object.
+    This object can be used as auth argument for the httpx requests
+
+    The authenticator has renegotiation logic in case where a token gets invalidated
+    """
+    return _get_token_storage(**kwargs).get_authenticator(**kwargs)
+
+
+def get_token_object(**kwargs):
     """
     Gets a DagsHub token, by default if no token is found authenticates with OAuth
+
+    Kwargs:
+        host (str): URL of a dagshub instance (defaults to dagshub.com)
+        cache_location (str): Location of the cache file with the token (defaults to <cache_dir>/dagshub/tokens)
+        fail_if_no_token (bool): What to do if token is not found.
+            If set to False (default), goes through OAuth flow
+            If set to True, throws a RuntimeError
+    """
+    return _get_token_storage(**kwargs).get_token_object(**kwargs)
+
+
+def get_token(**kwargs):
+    """
+    Gets a DagsHub token text, by default if no token is found authenticates with OAuth
 
     Kwargs:
         host (str): URL of a dagshub instance (defaults to dagshub.com)

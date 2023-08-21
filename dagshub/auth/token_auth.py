@@ -64,6 +64,8 @@ class OAuthDagshubToken(DagshubTokenABC):
         self.token_value = token_value
         self.expiry_date = expiry_date
 
+    # TODO: override the call function to warn about how much lifetime the token has
+
     def serialize(self) -> Dict[str, Any]:
         return {
             "access_token": self.token_value,
@@ -121,6 +123,33 @@ class AppDagshubToken(DagshubTokenABC):
 
     def __repr__(self):
         return "Dagshub App token"
+
+
+class EnvVarDagshubToken(DagshubTokenABC):
+    token_type = "env-var"
+    priority = -1
+
+    def __init__(self, token_value: str, host: str):
+        self.token_value = token_value
+        self.host = host
+
+    def serialize(self) -> Dict[str, Any]:
+        raise RuntimeError("Can't serialize env var token")
+
+    @staticmethod
+    def deserialize(values: Dict[str, Any]):
+        raise RuntimeError("Can't deserialize env var token")
+
+    @property
+    def token_text(self) -> str:
+        return self.token_value
+
+    @property
+    def is_expired(self) -> bool:
+        return False
+
+    def __repr__(self):
+        return f"Dagshub Env Var token for host {self.host}"
 
 
 class HTTPBearerAuth(Auth):
