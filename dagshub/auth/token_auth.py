@@ -1,4 +1,5 @@
 import datetime
+import logging
 from abc import ABCMeta, abstractmethod
 from typing import Any, Dict, Generator, TYPE_CHECKING, Optional
 
@@ -9,6 +10,8 @@ from dagshub.common import config
 
 if TYPE_CHECKING:
     from dagshub.auth.tokens import TokenStorage
+
+logger = logging.getLogger(__name__)
 
 
 class DagshubAuthenticator(Auth):
@@ -23,7 +26,23 @@ class DagshubAuthenticator(Auth):
 
     def auth_flow(self, request: Request) -> Generator[Request, Response, None]:
         # TODO: failure mode recovery
-        yield self._token(request)
+        response = yield self._token(request)
+        if response.status_code == 401:
+            if self.can_renegotiate():
+                logger.warning("Request to DagsHub has failed, getting a new token")
+                self.renegotiate_token()
+                yield self._token(request)
+            elif not self._token_storage.is_valid_token(self._token, self._host):
+                logger.warning("Your DagsHub token is no longer valid!")
+
+    def can_renegotiate(self):
+        # Env var tokens cannot renegotiate, every other token type can
+        return not type(self._token) is EnvVarDagshubToken
+
+    def renegotiate_token(self):
+        if not self._token_storage.is_valid_token(self._token, self._host):
+            self._token_storage.invalidate_token(self._token, self._host)
+        self._token = self._token_storage.get_token_object(self._host)
 
     @property
     def token_text(self) -> str:
@@ -32,9 +51,12 @@ class DagshubAuthenticator(Auth):
     def __call__(self, request):
         """
         Forward the call to the token
+        This is for the codebases that don't rely on httpx
+        This one does not have automatic renegotiation!!!
+
+        TODO: need to figure out how to renegotiate in the requests library.
+        Probably take a look at how they do NTLM
         """
-        # TODO: NEED TO COME UP WITH A WAY TO RENEGOTIATE HERE SOMEHOW
-        # PROBABLY NEED TO CHECK FOR requests' REQUEST HERE
         return self._token(request)
 
 

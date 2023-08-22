@@ -61,6 +61,10 @@ class TokenStorage:
     def add_token(self, token: DagshubTokenABC, host: str = None, skip_validation=False):
         host = host or config.host
 
+        if self._token_already_exists(token.token_text, host):
+            logger.warning("The added token already exists in the token cache, skipping")
+            return
+
         if not skip_validation:
             if not TokenStorage.is_valid_token(token.token_text, host):
                 raise InvalidTokenError
@@ -164,6 +168,13 @@ class TokenStorage:
         Used mainly for setting environment variables, for example for MLflow
         """
         return self.get_token_object(host, fail_if_no_token).token_text
+
+    def _token_already_exists(self, token_text: str, host: str):
+        for token in self._token_cache.get(host, []):
+            if token.token_text == token_text:
+                return True
+        return False
+
 
     @staticmethod
     def _is_expired(token: Dict[str, str]) -> bool:
