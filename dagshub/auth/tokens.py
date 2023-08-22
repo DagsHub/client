@@ -70,6 +70,23 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
+    def invalidate_token(self, token: DagshubTokenABC, host: str = None):
+        host = host or config.host
+
+        try:
+            if host in self._token_cache:
+                tokens = self._token_cache[host]
+                tokens.remove(token)
+
+                if host in self._known_good_tokens:
+                    good_token_set = self._known_good_tokens[host]
+                    if token in good_token_set:
+                        good_token_set.remove(token)
+
+                self._store_cache_file()
+        except ValueError:
+            logger.warning(f"Token {token} does not exist in the storage")
+
     def get_authenticator(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubAuthenticator:
         """
         Returns the authenticator object, that can renegotiate tokens in case of failure
@@ -95,26 +112,16 @@ class TokenStorage:
         with self._token_access_lock:
             tokens = self._token_cache.get(host, [])
 
-            had_changes = False  # For saving if we invalidate some tokens
             if host not in self._known_good_tokens:
                 self._known_good_tokens[host] = set()
             good_token_set = self._known_good_tokens[host]
             good_token = None
             token_queue = list(sorted(tokens, key=lambda t: t.priority))
 
-            def remove_token(t):
-                nonlocal had_changes
-                logger.debug(f"Removing invalid token {t}")
-                tokens.remove(t)
-                try:
-                    good_token_set.remove(t)
-                except KeyError:
-                    pass
-                had_changes = True
-
             for token in token_queue:
                 if token.is_expired:
-                    remove_token(token)
+                    self.invalidate_token(token, host)
+                    good_token_set = self._known_good_tokens[host]
 
                 if token in good_token_set:
                     good_token = token
@@ -125,15 +132,10 @@ class TokenStorage:
                     good_token_set.add(token)
                 # Remove invalid token from the cache
                 else:
-                    pass
-                    remove_token(token)
+                    self.invalidate_token(token, host)
+                    good_token_set = self._known_good_tokens[host]
                 if good_token is not None:
                     break
-
-            # Save the cache
-            if had_changes:
-                self._token_cache[host] = tokens
-                self._store_cache_file()
 
             # Couldn't manage to find a good token after the search
             # Either go through the oauth flow, or throw a runtime error
@@ -264,7 +266,7 @@ class TokenStorage:
         # Don't pickle the lock. This will make it so multiple authenticators might request for tokens at the same time
         # This can lead to e.g. multiple OAuth requests firing at the same time, which is not desirable
         # However, I'm not sure of a good way to solve it
-        del(d["_token_access_lock"])
+        del (d["_token_access_lock"])
         return d
 
     def __setstate__(self, state):
