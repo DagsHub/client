@@ -3,7 +3,6 @@ import logging
 import os
 import threading
 import traceback
-from collections import defaultdict
 from typing import Optional, Dict, List, Set, Union
 
 import yaml
@@ -35,7 +34,7 @@ class TokenStorage:
 
         # We check tokens only once for validity, so we don't do a lot of redundant requests
         #   maybe there is a point to re-evaluate them once in a while
-        self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = defaultdict(lambda: set())
+        self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = {}
 
         self._token_access_lock = threading.RLock()
 
@@ -97,6 +96,8 @@ class TokenStorage:
             tokens = self._token_cache.get(host, [])
 
             had_changes = False  # For saving if we invalidate some tokens
+            if host not in self._known_good_tokens:
+                self._known_good_tokens[host] = set()
             good_token_set = self._known_good_tokens[host]
             good_token = None
             token_queue = list(sorted(tokens, key=lambda t: t.priority))
@@ -114,7 +115,6 @@ class TokenStorage:
             for token in token_queue:
                 if token.is_expired:
                     remove_token(token)
-                    continue
 
                 if token in good_token_set:
                     good_token = token
@@ -125,6 +125,7 @@ class TokenStorage:
                     good_token_set.add(token)
                 # Remove invalid token from the cache
                 else:
+                    pass
                     remove_token(token)
                 if good_token is not None:
                     break
@@ -257,6 +258,18 @@ class TokenStorage:
                 f"Error while storing DagsHub token cache: {traceback.format_exc()}"
             )
             raise
+
+    def __getstate__(self):
+        d = self.__dict__
+        # Don't pickle the lock. This will make it so multiple authenticators might request for tokens at the same time
+        # This can lead to e.g. multiple OAuth requests firing at the same time, which is not desirable
+        # However, I'm not sure of a good way to solve it
+        del(d["_token_access_lock"])
+        return d
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self._token_access_lock = threading.RLock()
 
 
 _token_storage: Optional[TokenStorage] = None

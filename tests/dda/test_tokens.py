@@ -148,3 +148,13 @@ def test_env_var_tokens_gets_returned_no_matter_what(token_cache, valid_token):
         assert actual.token_text == val
     finally:
         dagshub.common.config.token = old_val
+
+
+# The authenticator needs to be picklable in order to work in multiprocess environment
+def test_authenticator_is_picklable(token_cache, valid_token):
+    import pickle
+    token_cache.add_token(valid_token, skip_validation=True)
+    auth = token_cache.get_authenticator()
+    pickled_auth = pickle.dumps(auth)
+    unpickled_auth = pickle.loads(pickled_auth)
+    assert auth.token_text == unpickled_auth.token_text
