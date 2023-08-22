@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union
 
 import rich.progress
 
+from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user
@@ -207,7 +208,7 @@ class QueryResult:
                 f"needs to be either int or str or slice")
 
     def get_blob_fields(self, *fields: str, load_into_memory=False,
-                        cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+                        cache_on_disk=True, num_proc: int = config.download_threads) -> "QueryResult":
         """
         Downloads data from blob fields
 
