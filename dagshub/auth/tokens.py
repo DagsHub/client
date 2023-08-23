@@ -178,7 +178,6 @@ class TokenStorage:
                 return True
         return False
 
-
     @staticmethod
     def _is_expired(token: Dict[str, str]) -> bool:
         if "expiry" not in token:

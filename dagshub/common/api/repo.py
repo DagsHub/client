@@ -14,7 +14,6 @@ from typing import Optional, Tuple, Any, List
 import dacite
 
 import dagshub.auth
-from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 
 from dagshub.common.helpers import http_request
