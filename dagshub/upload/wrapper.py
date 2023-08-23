@@ -15,7 +15,7 @@ import rich.progress
 import rich.status
 
 import dagshub.auth
-from dagshub.auth.token_auth import HTTPBearerAuth
+from dagshub.auth.token_auth import EnvVarDagshubToken
 from dagshub.common import config, rich_console
 from dagshub.common.api.repo import RepoAPI, BranchNotFoundError
 from dagshub.common.helpers import log_message
@@ -99,19 +99,16 @@ def create_repo(
     if template == "":
         template = "none"
 
-    import dagshub.auth
-    from dagshub.auth.token_auth import HTTPBearerAuth
-
     host = host or config.host
 
     username = config.username
     password = config.password
+    token = None
     if username is not None and password is not None:
         auth = username, password
     else:
-        token = config.token or dagshub.auth.get_token()
-        if token is not None:
-            auth = HTTPBearerAuth(token)
+        auth = dagshub.auth.get_authenticator()
+        token = auth.token_text
 
     if auth is None:
         raise RuntimeError("You can't create a repository without being authenticated.")
@@ -147,7 +144,8 @@ def create_repo(
 
     repo = res.json()
     return Repo(
-        owner=repo["owner"]["login"], name=repo["name"], token=token, branch="main"
+        owner=repo["owner"]["login"], name=repo["name"], username=username, password=password,
+        token=token, branch="main"
     )
 
 
@@ -433,18 +431,17 @@ class Repo:
     def auth(self):
         """
         The auth function is used to authenticate the user with the dagshub API.
-            It takes in a username and password, or token as arguments. If both are provided,
-            it will use the username and password combination to
-            get a token from dagshub's authentication server.
-            Otherwise, if only a token is provided it will be used for authentication.
+            Username and password take priority for authentication, then token.
+            If none were provided, it goes through the usual token flow involving the token cache
 
         :return: The HTTPAuth object
 
         """
         if self.username is not None and self.password is not None:
             return httpx.BasicAuth(self.username, self.password)
-        token = self.token or dagshub.auth.get_token()
-        return HTTPBearerAuth(token)
+        if self.token:
+            return EnvVarDagshubToken(self.token)
+        return dagshub.auth.get_authenticator()
 
     def directory(self, path):
         """

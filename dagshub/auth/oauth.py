@@ -1,11 +1,12 @@
 import hashlib
-from typing import Optional, Dict
+from typing import Optional
 import logging
 import urllib
 import uuid
 import httpx
 import webbrowser
 
+from dagshub.auth.token_auth import OAuthDagshubToken
 from dagshub.common import config, rich_console
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 def oauth_flow(
     host: str,
     client_id: Optional[str] = None
-) -> Dict:
+) -> OAuthDagshubToken:
 
     host = host.strip("/")
     dagshub_url = urllib.parse.urljoin(host, "login/oauth")
@@ -56,7 +57,7 @@ def oauth_flow(
         raise Exception(
             f"Error while getting OAuth token: HTTP {res.status_code}, Body: {res.json()}"
         )
-    token = res.json()
+    token = OAuthDagshubToken.deserialize(res.json())
 
     logger.debug(f"Got token: {token}")
     return token
