@@ -8,6 +8,8 @@ from typing import Tuple, Callable, Optional, List, Union, Dict
 
 from httpx import Auth
 
+from dagshub.common import config
+
 try:
     from typing import Literal
 except ImportError:
