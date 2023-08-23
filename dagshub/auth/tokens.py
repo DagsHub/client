@@ -58,8 +58,11 @@ class TokenStorage:
             logger.info("Removed expired tokens from the token cache")
             self._store_cache_file()
 
-    def add_token(self, token: DagshubTokenABC, host: str = None, skip_validation=False):
+    def add_token(self, token: Union[str, DagshubTokenABC], host: str = None, skip_validation=False):
         host = host or config.host
+
+        if type(token) is str:
+            token = AppDagshubToken(token)
 
         if self._token_already_exists(token.token_text, host):
             logger.warning("The added token already exists in the token cache, skipping")
