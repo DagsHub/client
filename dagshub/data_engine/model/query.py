@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 from treelib import Tree, Node
 
 from dagshub.data_engine.client.models import MetadataFieldType
+from dagshub.data_engine.dtypes import Int, String, Blob, Bool, Float
 from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:
@@ -14,10 +15,15 @@ logger = logging.getLogger(__name__)
 
 _metadataTypeLookup = {
     int: MetadataFieldType.INTEGER,
+    Int: MetadataFieldType.INTEGER,
     bool: MetadataFieldType.BOOLEAN,
+    Bool: MetadataFieldType.BOOLEAN,
     float: MetadataFieldType.FLOAT,
+    Float: MetadataFieldType.FLOAT,
     str: MetadataFieldType.STRING,
+    String: MetadataFieldType.STRING,
     bytes: MetadataFieldType.BLOB,
+    Blob: MetadataFieldType.BLOB,
 }
 
 _metadataTypeCustomConverters = {

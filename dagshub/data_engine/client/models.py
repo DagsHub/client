@@ -58,6 +58,7 @@ class MetadataFieldSchema:
         )
     )
     multiple: bool
+    tags: List[str]
 
     def __repr__(self):
         return f"{self.name} ({self.valueType.value})"

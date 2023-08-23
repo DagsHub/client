@@ -51,6 +51,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
             encoder=lambda val: val.value
         )
     )
+    tags: List[str]
     allowMultiple: bool = False
 
 
@@ -657,6 +658,7 @@ class MetadataContextManager:
                         key=k,
                         value=str(v),
                         valueType=value_type,
+                        tags=v.tags if hasattr(v, 'tags') else [],
                         # todo: preliminary type check
                         allowMultiple=k in self._multivalue_fields
                     ))
