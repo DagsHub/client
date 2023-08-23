@@ -1,8 +1,12 @@
+import logging
+
 import appdirs
 import os
 from urllib.parse import urlparse
 from dagshub import __version__
 from httpx._client import USER_AGENT
+
+logger = logging.getLogger(__name__)
 
 HOST_KEY = "DAGSHUB_CLIENT_HOST"
 DEFAULT_HOST = "https://dagshub.com"
@@ -47,3 +51,11 @@ dataengine_metadata_upload_batch_size = os.environ.get(DATAENGINE_METADATA_UPLOA
 
 DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
 disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ
+
+DOWNLOAD_THREADS_KEY = "DAGSHUB_DOWNLOAD_THREADS"
+DEFAULT_DOWNLOAD_THREADS = 32
+download_threads = os.environ.get(DOWNLOAD_THREADS_KEY, DEFAULT_DOWNLOAD_THREADS)
+
+if download_threads > DEFAULT_DOWNLOAD_THREADS:
+    logger.warning(f"Number of download threads was set to {download_threads}. "
+                   f"We recommend lowering the value if you get met with rate limits")

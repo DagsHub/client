@@ -142,7 +142,7 @@ def _ensure_default_downloader_exists():
 
 def download_files(files: List[Tuple[str, Union[str, Path]]],
                    download_fn: Optional[DownloadFunctionType] = None,
-                   threads=32, skip_if_exists=True):
+                   threads=config.download_threads, skip_if_exists=True):
     """
     Download files using multithreading
 
@@ -152,7 +152,7 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
             download url and Path where to save the file
             If function is not specified, then a default function that downloads a file with DagsHub credentials is used
             CAUTION: function needs to be pickleable since we're using ThreadPool to execute
-        threads: number of threads to run this function on, default 32
+        threads: number of threads to run this function on, defaults to the config value of download_threads (32)
         skip_if_exists: skip the download if the file exists (only for the default downloader)
     """
     _ensure_default_downloader_exists()
