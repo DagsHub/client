@@ -51,7 +51,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
             encoder=lambda val: val.value
         )
     )
-    tags: List[str]
+    tags: Optional[List[str]] = None
     allowMultiple: bool = False
 
 
@@ -648,17 +648,17 @@ class MetadataContextManager:
                         value_type = _metadataTypeLookup[type(v)]
                         field_value_types[k] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
-                    if value_type == MetadataFieldType.BLOB and type(v) is not bytes:
+                    if value_type == MetadataFieldType.BLOB and type(v) is not bytes and type(v.value) is not bytes:
                         continue
 
-                    if type(v) is bytes:
-                        v = self.wrap_bytes(v)
+                    # if type(v) is bytes:
+                    encoded_value = self.wrap_bytes(v) if type(v) is bytes else self.wrap_bytes(v.value) if type(v.value) is bytes else v
                     self._metadata_entries.append(DatapointMetadataUpdateEntry(
                         url=dp,
                         key=k,
-                        value=str(v),
+                        value=str(encoded_value),
                         valueType=value_type,
-                        tags=v.tags if hasattr(v, 'tags') else [],
+                        tags=v.tags if hasattr(v, 'tags') else None,
                         # todo: preliminary type check
                         allowMultiple=k in self._multivalue_fields
                     ))

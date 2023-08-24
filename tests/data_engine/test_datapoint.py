@@ -1,7 +1,8 @@
 import pytest
 from dagshub.data_engine import dtypes
 from dagshub.data_engine.dtypes import ReservedTags
-from dagshub.data_engine.model.datasource import MetadataContextManager
+from dagshub.data_engine.client.models import MetadataFieldType
+from dagshub.data_engine.model.datasource import MetadataContextManager, DatapointMetadataUpdateEntry
 
 
 def test_getitem_metadata(some_datapoint):
@@ -10,12 +11,17 @@ def test_getitem_metadata(some_datapoint):
 
 def test_add_annotation(ds):
     ctx = MetadataContextManager(ds)
-    value = 5
-    ctx.update_metadata("aaa", {"key1": dtypes.Int(value).as_annotation()})
+    data = "aaa".encode()
+    encoded_data = MetadataContextManager.wrap_bytes(data)
+
+    ctx.update_metadata("aaa", {"key1": dtypes.Blob(data).as_annotation()})
     entries = ctx.get_metadata_entries()
 
     assert len(entries) == 1
     assert ReservedTags.ANNOTATION.value in entries[0].tags # There should be a nicer way to check if an entry is an annotation
+
+    expected = DatapointMetadataUpdateEntry("aaa", "key1", encoded_data, MetadataFieldType.BLOB, tags=[ReservedTags.ANNOTATION.value])
+    assert entries == [expected]
 
 def test_add_random_tag(ds):
     ctx = MetadataContextManager(ds)
