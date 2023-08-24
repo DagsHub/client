@@ -1,5 +1,6 @@
 import pytest
 from dagshub.data_engine import dtypes
+from dagshub.data_engine.dtypes import ReservedTags
 from dagshub.data_engine.model.datasource import MetadataContextManager
 
 
@@ -14,7 +15,7 @@ def test_add_annotation(ds):
     entries = ctx.get_metadata_entries()
 
     assert len(entries) == 1
-    assert "annotation" in entries[0].tags
+    assert ReservedTags.ANNOTATION.value in entries[0].tags # There should be a nicer way to check if an entry is an annotation
 
 def test_add_random_tag(ds):
     ctx = MetadataContextManager(ds)
