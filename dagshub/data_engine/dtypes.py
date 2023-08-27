@@ -1,7 +1,9 @@
 import enum
 
+
 class ReservedTags(enum.Enum):
     ANNOTATION = "annotation"
+
 
 class DagshubDataType:
     def __init__(self, value):
@@ -24,14 +26,18 @@ class DagshubDataType:
 class Int(DagshubDataType):
     pass
 
+
 class String(DagshubDataType):
     pass
+
 
 class Blob(DagshubDataType):
     pass
 
+
 class Float(DagshubDataType):
     pass
+
 
 class Bool(DagshubDataType):
     pass
