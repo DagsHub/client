@@ -1,4 +1,4 @@
-setuptools==68.0.0
+setuptools==68.1.2
 pytest==7.4.0
 respx==0.20.2
 pytest-git==1.7.0
