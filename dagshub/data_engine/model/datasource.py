@@ -652,7 +652,11 @@ class MetadataContextManager:
                         continue
 
                     # if type(v) is bytes:
-                    encoded_value = self.wrap_bytes(v) if type(v) is bytes else self.wrap_bytes(v.value) if hasattr(v, 'tags') and type(v.value) is bytes else v
+                    if hasattr(v, 'tags'):
+                        encoded_value = self.wrap_bytes(v.value) if type(v.value) is bytes else v.value
+                    else:
+                        encoded_value = self.wrap_bytes(v) if type(v) is bytes else  v
+
                     self._metadata_entries.append(DatapointMetadataUpdateEntry(
                         url=dp,
                         key=k,
