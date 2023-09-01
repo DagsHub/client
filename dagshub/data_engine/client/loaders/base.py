@@ -40,7 +40,7 @@ class DagsHubDataset:
         )  # prevent circular calls
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
-        self.savedir = savedir or self.datasource.default_dataset_location
+        self.savedir = Path(savedir) if savedir else self.datasource.default_dataset_location
         self.strategy = strategy
         self.source = self.datasource.source.path.split("://")[0]
 
