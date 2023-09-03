@@ -7,7 +7,7 @@ try:
 except ImportError:
     from cached_property import cached_property
 
-storage_schemas = ["s3", "gs"]
+storage_schemas = ["s3", "gs", "azure"]
 
 
 @dataclass

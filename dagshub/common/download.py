@@ -73,6 +73,31 @@ def enable_s3_bucket_downloader(client=None):
     add_bucket_downloader("s3", get_fn)
 
 
+def enable_azure_container_downloader(account_url, client=None):
+    """
+    Enables downloading storage items using the azure client, instead of going through DagsHub's server.
+    For custom clients use `enable_custom_bucket_downloader` function.
+
+    Args:
+        account_url: an azure storage account url, of the form "https://<storage-account-name>.blob.core.windows.net"
+        client: a boto3 S3 client.
+            If client isn't specified, the default parameterless constructor is used.
+            If specified, account_url is disregarded, and the client is used.
+    """
+    import io
+    if client is None:
+        from azure.storage.blob import BlobServiceClient
+        from azure.identity import DefaultAzureCredential
+        client = BlobServiceClient(account_url, credential=DefaultAzureCredential())
+
+    def get_fn(bucket, path) -> bytes:
+        blob_client = client.get_blob_client(container=bucket, blob=path)
+        stream = io.BytesIO()
+        blob_client.download_blob().readinto(stream)
+        return stream
+
+    add_bucket_downloader("azure", get_fn)
+
 def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
     """
     Gets a storage download URL of a dagshub file, returns a tuple of (protocol, bucket, path_in_bucket)
@@ -101,7 +126,7 @@ _bucket_downloader_map: Dict[str, BucketDownloaderFuncType] = {}
 _default_downloader: Optional[Callable[[str], bytes]] = None
 
 
-def add_bucket_downloader(proto: Literal["gs", "s3"], func: BucketDownloaderFuncType):
+def add_bucket_downloader(proto: Literal["gs", "s3", "azure"], func: BucketDownloaderFuncType):
     if proto in _bucket_downloader_map:
         logger.warning(f"Protocol {proto} already has a custom downloader function specified, overwriting it")
     _bucket_downloader_map[proto] = func
