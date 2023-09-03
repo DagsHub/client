@@ -98,6 +98,7 @@ def enable_azure_container_downloader(account_url, client=None):
 
     add_bucket_downloader("azure", get_fn)
 
+
 def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
     """
     Gets a storage download URL of a dagshub file, returns a tuple of (protocol, bucket, path_in_bucket)
