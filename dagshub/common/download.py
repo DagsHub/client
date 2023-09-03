@@ -80,7 +80,7 @@ def enable_azure_container_downloader(account_url, client=None):
 
     Args:
         account_url: an azure storage account url, of the form "https://<storage-account-name>.blob.core.windows.net"
-        client: a boto3 S3 client.
+        client: preconfigured azure.storage.blob.BlobServiceClient
             If client isn't specified, the default parameterless constructor is used.
             If specified, account_url is disregarded, and the client is used.
     """
