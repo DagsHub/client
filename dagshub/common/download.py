@@ -73,7 +73,7 @@ def enable_s3_bucket_downloader(client=None):
     add_bucket_downloader("s3", get_fn)
 
 
-def enable_azure_container_downloader(account_url, client=None):
+def enable_azure_container_downloader(account_url=None, client=None):
     """
     Enables downloading storage items using the azure client, instead of going through DagsHub's server.
     For custom clients use `enable_custom_bucket_downloader` function.
@@ -84,6 +84,9 @@ def enable_azure_container_downloader(account_url, client=None):
             If client isn't specified, the default parameterless constructor is used.
             If specified, account_url is disregarded, and the client is used.
     """
+    if account_url is None and client is None:
+        raise TypeError("missing required argument 'account_url' or 'client'")
+
     import io
     if client is None:
         from azure.storage.blob import BlobServiceClient
