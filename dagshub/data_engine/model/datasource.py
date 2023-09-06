@@ -27,6 +27,7 @@ from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError, \
     FieldNotFoundError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup, _metadataTypeLookupReverse
+from dagshub.data_engine.dtypes import DagshubDataType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.query_result import QueryResult
@@ -643,19 +644,18 @@ class MetadataContextManager:
 
                 else:
 
+
                     value_type = field_value_types.get(k)
+                    raw_value = v.value if isinstance(v, DagshubDataType) else v
+
                     if value_type is None:
-                        value_type = _metadataTypeLookup[type(v)]
+                        value_type = _metadataTypeLookup[type(raw_value)]
                         field_value_types[k] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
-                    if value_type == MetadataFieldType.BLOB and type(v) is not bytes and type(v.value) is not bytes:
+                    if value_type == MetadataFieldType.BLOB and type(raw_value) is not bytes:
                         continue
 
-                    # if type(v) is bytes:
-                    if hasattr(v, 'tags'):
-                        encoded_value = self.wrap_bytes(v.value) if type(v.value) is bytes else v.value
-                    else:
-                        encoded_value = self.wrap_bytes(v) if type(v) is bytes else  v
+                    encoded_value = self.wrap_bytes(raw_value) if type(raw_value) is bytes else raw_value
 
                     self._metadata_entries.append(DatapointMetadataUpdateEntry(
                         url=dp,

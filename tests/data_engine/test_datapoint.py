@@ -12,7 +12,7 @@ def test_getitem_metadata(some_datapoint):
 def test_add_annotation(ds):
     ctx = MetadataContextManager(ds)
     data = "aaa".encode()
-    encoded_data = MetadataContextManager.wrap_bytes(data)
+    encoded_data = str(MetadataContextManager.wrap_bytes(data))
 
     ctx.update_metadata("aaa", {"key1": dtypes.Blob(data).as_annotation()})
     entries = ctx.get_metadata_entries()

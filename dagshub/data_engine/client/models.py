@@ -51,6 +51,7 @@ class MetadataFieldType(enum.Enum):
 @dataclass_json
 @dataclass
 class MetadataFieldSchema:
+    # This should match the GraphQL schema: MetadataFieldProps
     name: str
     valueType: MetadataFieldType = field(
         metadata=config(

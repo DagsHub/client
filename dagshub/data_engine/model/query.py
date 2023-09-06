@@ -15,15 +15,10 @@ logger = logging.getLogger(__name__)
 
 _metadataTypeLookup = {
     int: MetadataFieldType.INTEGER,
-    Int: MetadataFieldType.INTEGER,
     bool: MetadataFieldType.BOOLEAN,
-    Bool: MetadataFieldType.BOOLEAN,
     float: MetadataFieldType.FLOAT,
-    Float: MetadataFieldType.FLOAT,
     str: MetadataFieldType.STRING,
-    String: MetadataFieldType.STRING,
     bytes: MetadataFieldType.BLOB,
-    Blob: MetadataFieldType.BLOB,
 }
 
 _metadataTypeCustomConverters = {
