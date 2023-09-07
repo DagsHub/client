@@ -86,6 +86,7 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning='g
             with open(out_path, 'w') as file:
                 file.write(json.dumps(notebook_ipynb["ipynb"], indent=4))
         else:
+            log_message("Saving only the execution history for the notebook in Jupyter environments", logger)
             get_ipython().run_line_magic('notebook', out_path)
 
         repo = Repo(owner, repo, branch=branch)
