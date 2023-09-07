@@ -2,7 +2,7 @@ import datetime
 import json
 import logging
 import tempfile
-from pathlib import PosixPath
+from pathlib import Path, PurePosixPath
 from socket import gethostname, gethostbyname
 
 import httpx
@@ -59,10 +59,11 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning='g
         return
 
     # Handle file path
-    file_path = PosixPath(path)
+    file_path = Path(path)
     if file_path.name != "." and "." not in file_path.name:
         file_path /= _default_notebook_name()
     file_path = "/" / file_path
+    remote_path = PurePosixPath("/") / file_path.as_posix()
 
     # Handle commit message
     if commit_message is None:
@@ -79,14 +80,17 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning='g
         out_path = f"{tmp}/{file_path.name}"
         if _inside_colab():
             from google.colab import _message  # If inside colab, this import is guaranteed
+            notebook_ipynb = _message.blocking_request("get_ipynb")
+            if notebook_ipynb is None or "ipynb" not in notebook_ipynb:
+                raise RuntimeError("Couldn't get notebook data from colab.")
             with open(out_path, 'w') as file:
-                file.write(json.dumps(_message.blocking_request('get_ipynb')["ipynb"], indent=4))
+                file.write(json.dumps(notebook_ipynb["ipynb"], indent=4))
         else:
             get_ipython().run_line_magic('notebook', out_path)
 
         repo = Repo(owner, repo, branch=branch)
         repo.upload(out_path,
-                    remote_path=file_path.as_posix(),
+                    remote_path=remote_path.as_posix(),
                     commit_message=commit_message,
                     versioning=versioning,
                     force=True)
