@@ -26,6 +26,7 @@ CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
 FILES_UI_URL = "{owner}/{reponame}/src/{branch}/{path}"
 DEFAULT_COMMIT_MESSAGE = "Upload files using DagsHub client"
 DEFAULT_DATASET_COMMIT_MESSAGE = "Initial dataset commit"
+README_FILE_NAME = "README.md"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
@@ -50,11 +51,17 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     :param private (bool): Flag to indicate the repository is going to be private
     :return : Repo object of the repository created
     """
-    repo = create_repo(repo_name, org_name=org_name, private=private)
+    import os
+    path_to_readme = os.path.join(*[os.getcwd() ,repo_name, README_FILE_NAME])
+    path_to_readme = path_to_readme if os.path.exists(path_to_readme) else None
+
+    repo = dagshub.upload.create_repo(repo_name, org_name=org_name, private=private)
+    
+    if path_to_readme:
+      repo.upload(path_to_readme, commit_message=DEFAULT_DATASET_COMMIT_MESSAGE)
     dir = repo.directory(repo_name)
     dir.add_dir(local_path, glob_exclude, commit_message=DEFAULT_DATASET_COMMIT_MESSAGE)
     return repo
-
 
 def add_dataset_to_repo(repo,
                         local_path,
