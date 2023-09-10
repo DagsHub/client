@@ -12,7 +12,7 @@ from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus, DatasetResult, MetadataFieldType
+    PreprocessingStatus, DatasetResult, MetadataFieldType, ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
@@ -174,12 +174,12 @@ class DataClient:
         params = GqlMutations.delete_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
 
-    def scan_datasource(self, datasource: Datasource):
+    def scan_datasource(self, datasource: Datasource, options: Optional[List[ScanOption]]):
         q = GqlMutations.scan_datasource()
 
         assert datasource.source.id is not None
 
-        params = GqlMutations.scan_datasource_params(datasource_id=datasource.source.id)
+        params = GqlMutations.scan_datasource_params(datasource_id=datasource.source.id, options=options)
         return self._exec(q, params)
 
     def save_dataset(self, datasource: Datasource, name: str):
