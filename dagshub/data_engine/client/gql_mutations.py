@@ -1,9 +1,9 @@
 import functools
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 
 from dagshub.data_engine.client.query_builder import GqlQuery
 
-from dagshub.data_engine.client.models import DatasourceType
+from dagshub.data_engine.client.models import DatasourceType, ScanOption
 
 
 class GqlMutations:
@@ -110,11 +110,13 @@ class GqlMutations:
             name="scanDatasource",
             input={
                 "$id": "ID!",
+                "$options": "[ScanOption]",
             }
         ).query(
             "scanDatasource",
             input={
                 "id": "$id",
+                "options": "$options",
             }
         ).fields([
             "id",
@@ -127,10 +129,10 @@ class GqlMutations:
         return q
 
     @staticmethod
-    @functools.lru_cache()
-    def scan_datasource_params(datasource_id: Union[int, str]):
+    def scan_datasource_params(datasource_id: Union[int, str], options: Optional[List[ScanOption]]):
         return {
             "id": datasource_id,
+            "options": options,
         }
 
     @staticmethod
