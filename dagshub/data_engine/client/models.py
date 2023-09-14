@@ -57,12 +57,6 @@ class MetadataFieldSchema:
     def __repr__(self):
         return f"{self.name} ({self.valueType.value})"
 
-    def __init__(self, name):
-        self.name = name
-        self.tags = []
-        self.multiple = False
-        self.valueType = None
-
     def set_annotation_field(self):
         self.tags.append(ReservedTags.ANNOTATION.value)
         return self
@@ -76,7 +70,7 @@ class MetadataFieldSchema:
         return self
 
     def is_annotation(self):
-        return ReservedTags.ANNOTATION.value in self.tags
+        return ReservedTags.ANNOTATION.value in self.tags if self.tags else False
 
 
 @dataclass

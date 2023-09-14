@@ -89,7 +89,10 @@ class Datasource:
                 return field
 
         new_field = MetadataFieldSchema(
-            name=name
+            name=name,
+            tags = [],
+            multiple = False,
+            valueType = None
         )
         self.source.metadata_fields.append(new_field)
         return new_field
