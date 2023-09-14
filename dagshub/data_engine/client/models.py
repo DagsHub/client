@@ -41,6 +41,9 @@ class DatasourceType(enum.Enum):
     CUSTOM = "CUSTOM"
 
 
+class ScanOption(str, enum.Enum):
+    FORCE_REGENERATE_AUTO_SCAN_VALUES = "FORCE_REGENERATE_AUTO_SCAN_VALUES"
+
 @dataclass_json
 @dataclass
 class MetadataFieldSchema:

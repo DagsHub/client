@@ -1,11 +1,13 @@
-__version__ = "0.3.5"
+__version__ = "0.3.6_3"
 from .logger import DAGsHubLogger, dagshub_logger
 from .common.init import init
 from .upload.wrapper import upload_files
+from . import notebook
 
 __all__ = [
     DAGsHubLogger,
     dagshub_logger,
     init,
-    upload_files
+    upload_files,
+    notebook.save_notebook,
 ]

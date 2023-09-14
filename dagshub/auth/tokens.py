@@ -36,7 +36,7 @@ class TokenStorage:
         #   maybe there is a point to re-evaluate them once in a while
         self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = {}
 
-        self._token_access_lock = threading.RLock()
+        self.__token_access_lock = threading.RLock()
 
     @property
     def _token_cache(self):
@@ -44,6 +44,12 @@ class TokenStorage:
             self.__token_cache = self._load_cache_file()
             self.remove_expired_tokens()
         return self.__token_cache
+
+    @property
+    def _token_access_lock(self):
+        if not hasattr(self, "__token_access_lock"):
+            self.__token_access_lock = threading.RLock()
+        return self.__token_access_lock
 
     def remove_expired_tokens(self):
         had_changes = False
@@ -279,12 +285,13 @@ class TokenStorage:
         # Don't pickle the lock. This will make it so multiple authenticators might request for tokens at the same time
         # This can lead to e.g. multiple OAuth requests firing at the same time, which is not desirable
         # However, I'm not sure of a good way to solve it
-        del (d["_token_access_lock"])
+        access_lock_key = f"_{self.__class__.__name__}__token_access_lock"
+        if access_lock_key in d:
+            del (d[access_lock_key])
         return d
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self._token_access_lock = threading.RLock()
 
 
 _token_storage: Optional[TokenStorage] = None

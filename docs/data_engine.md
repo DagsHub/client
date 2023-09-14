@@ -185,12 +185,15 @@ you can enable the bucket downloader, and the download functions will download t
 instead of our servers
 
 ```python
-from dagshub.common.download import enable_s3_bucket_downloader, enable_gcs_bucket_downloader
+from dagshub.common.download import enable_s3_bucket_downloader, enable_gcs_bucket_downloader, enable_azure_container_downloader
 
 # S3
 enable_s3_bucket_downloader()
 # GCS
 enable_gcs_bucket_downloader()
+# Azure Blob Storage
+account_url = "https://<storage-account-name>.blob.core.windows.net"
+enable_azure_container_downloader(account_url=account_url)
 
 # You can also use a custom client, if the default auth is not set up
 import boto3

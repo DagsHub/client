@@ -31,8 +31,6 @@ def test_define_field(ds):
     assert len(ds.fields) == 1
     assert ds.fields[0].is_annotation()
 
-    # assert ReservedTags.ANNOTATION.value in entries[0].tags # There should be a nicer way to check if an entry is an annotation
-
 def test_update_fields_in_batch(ds):
     ds.metadata_field("Yuval's Annotations").set_type(dtypes.Int()).set_annotation_field()
     ds.metadata_field("Ido's Annotations")
