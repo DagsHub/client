@@ -116,8 +116,7 @@ class Datasource:
 
     @property
     def annotation_fields(self) -> List[str]:
-        # TODO: once the annotation type is implemented, expose those columns here
-        return ["annotation"]
+        return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
         return {
