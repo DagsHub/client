@@ -12,7 +12,8 @@ from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus, DatasetResult, MetadataFieldType
+    PreprocessingStatus, DatasetResult
+from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, FieldMetadataUpdate

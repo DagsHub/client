@@ -2,6 +2,7 @@ import enum
 import logging
 from dataclasses import dataclass, field
 from typing import Any, List, Union, Optional
+from ..dtypes import DagshubDataType, MetadataFieldType
 
 from dataclasses_json import dataclass_json, config
 
@@ -40,15 +41,6 @@ class DatasourceType(enum.Enum):
     CUSTOM = "CUSTOM"
 
 
-class MetadataFieldType(enum.Enum):
-    BOOLEAN = "BOOLEAN"
-    INTEGER = "INTEGER"
-    FLOAT = "FLOAT"
-    STRING = "STRING"
-    BLOB = "BLOB"
-    UNDEFINED = "UNDEFINED"
-
-
 @dataclass_json
 @dataclass
 class MetadataFieldSchema:
@@ -64,6 +56,27 @@ class MetadataFieldSchema:
 
     def __repr__(self):
         return f"{self.name} ({self.valueType.value})"
+
+    def __init__(self, name):
+        self.name = name
+        self.tags = []
+        self.multiple = False
+
+    def set_annotation_field(self):
+        self.tags.append(ReservedTags.ANNOTATION.value)
+        return self
+
+    def set_type(self, fieldDataType: DagshubDataType):
+        self.valueType = fieldDataType.get_corressponding_field_type()
+        return self
+
+    def update(self):
+        # datasource.source.client.update_metadata_fields(datasource, [FieldMetadataUpdate(name="test", tags=[])])
+        return self
+        pass
+
+    def is_annotation(self):
+        return ReservedTags.ANNOTATION.value in self.tags
 
 
 @dataclass
@@ -83,3 +96,7 @@ class DatasetResult:
     name: str
     datasource: DatasourceResult
     datasetQuery: str
+
+
+class ReservedTags(enum.Enum):
+    ANNOTATION = "annotation"

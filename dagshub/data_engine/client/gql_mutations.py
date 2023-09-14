@@ -95,7 +95,7 @@ class GqlMutations:
             "datapoints": datapoints,
         }
 
-    def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: Any):
+    def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: List[Dict[str, Any]]):
         return {
             "datasource": datasource_id,
             "props": metadata_field_props

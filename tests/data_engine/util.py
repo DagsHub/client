@@ -1,4 +1,5 @@
-from dagshub.data_engine.client.models import MetadataFieldType, MetadataFieldSchema
+from dagshub.data_engine.client.models import MetadataFieldSchema
+from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datasource import Datasource
 
 
