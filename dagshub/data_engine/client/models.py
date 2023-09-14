@@ -71,9 +71,8 @@ class MetadataFieldSchema:
         self.valueType = fieldDataType.get_corressponding_field_type()
         return self
 
-    def update(self):
-        # datasource.source.client.update_metadata_fields(datasource, [FieldMetadataUpdate(name="test", tags=[])])
-        # To be implemented
+    def update(self, ds: "Datasource"):
+        ds.source.client.update_metadata_fields_2(ds, [(self.name, self.tags, self.valueType)])
         return self
 
     def is_annotation(self):

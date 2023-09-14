@@ -24,16 +24,6 @@ def test_add_annotation(ds):
     expected = DatapointMetadataUpdateEntry("aaa", "key1", encoded_data, MetadataFieldType.BLOB, tags=[ReservedTags.ANNOTATION.value])
     assert entries == [expected]
 
-# def test_add_random_tag(ds):
-#     ctx = MetadataContextManager(ds)
-#     value = 5
-#     tag_name = "random"
-#     ctx.update_metadata("aaa", {"V1.0.0": dtypes.Int(value).tag(tag_name)})
-#     entries = ctx.get_metadata_entries()
-#
-#     assert len(entries) == 1
-#     assert tag_name in entries[0].tags
-
 def test_define_field(ds):
 
     ds.metadata_field("Yuval's Annotations").set_type(dtypes.Int()).set_annotation_field()

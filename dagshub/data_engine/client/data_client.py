@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
+from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Tuple
 
 import dacite
 import gql
@@ -170,6 +170,9 @@ class DataClient:
 
 
         return self._exec(q, params)
+
+    def update_metadata_fields_2(self, datasource: Datasource, metadata_field_props: List[Tuple]):
+        return self.update_metadata_fields(datasource, [FieldMetadataUpdate(name=props[0], tags=props[1], valueType=props[2]) for props in metadata_field_props])
 
 
     def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
