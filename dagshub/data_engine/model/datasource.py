@@ -60,10 +60,11 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 class FieldMetadataUpdate(json.JSONEncoder):
     name: str
     tags: List[str]
-    # valueType: MetadataType!
-    # multiple: Boolean
-    # format:
-    # whatever
+    valueType: MetadataFieldType = field(
+        metadata=config(
+            encoder=lambda val: val.value if val else None
+        )
+    )
 
 
 class Datasource:
@@ -96,7 +97,7 @@ class Datasource:
     def update_fields(self):
         self.source.client.update_metadata_fields(
             self,
-            [FieldMetadataUpdate(name=f.name, tags=f.tags) for f in self.source.metadata_fields]
+            [FieldMetadataUpdate(name=f.name, tags=f.tags, valueType=f.valueType) for f in self.fields]
         )
 
     def clear_query(self):

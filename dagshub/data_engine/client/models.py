@@ -61,6 +61,7 @@ class MetadataFieldSchema:
         self.name = name
         self.tags = []
         self.multiple = False
+        self.valueType = None
 
     def set_annotation_field(self):
         self.tags.append(ReservedTags.ANNOTATION.value)
@@ -72,8 +73,8 @@ class MetadataFieldSchema:
 
     def update(self):
         # datasource.source.client.update_metadata_fields(datasource, [FieldMetadataUpdate(name="test", tags=[])])
+        # To be implemented
         return self
-        pass
 
     def is_annotation(self):
         return ReservedTags.ANNOTATION.value in self.tags
