@@ -15,7 +15,7 @@ from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, 
     PreprocessingStatus, DatasetResult, MetadataFieldType
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, FieldMetadataUpdate
 from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
@@ -155,6 +155,21 @@ class DataClient:
         )
 
         return self._exec(q, params)
+
+    def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[FieldMetadataUpdate]):
+        q = GqlMutations.update_metadata_field()
+
+        assert datasource.source.id is not None
+        # assert len(entries) > 0
+
+        params = GqlMutations.update_metadata_fields_params(
+            datasource_id=datasource.source.id,
+            metadata_field_props=[e.to_dict() for e in metadata_field_props]
+        )
+
+
+        return self._exec(q, params)
+
 
     def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
         q = GqlQueries.datasource()

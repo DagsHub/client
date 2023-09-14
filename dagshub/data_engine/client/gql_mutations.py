@@ -64,6 +64,26 @@ class GqlMutations:
             "path",
         ]).generate()
         return q
+    @staticmethod
+    @functools.lru_cache()
+    def update_metadata_field():
+        q = GqlQuery().operation(
+            "mutation",
+            name="updateMetadataFieldProps",
+            input={
+                "$datasource": "ID!",
+                "$props": "[MetadataFieldPropsInput!]!"
+            }
+        ).query(
+            "updateMetadata",
+            input={
+                "datasource": "$datasource",
+                "props": "$props"
+            }
+        ).fields([
+            "name",
+        ]).generate()
+        return q
 
     @staticmethod
     def update_metadata_params(datasource_id: Union[int, str], datapoints: List[Dict[str, Any]]):
@@ -71,6 +91,13 @@ class GqlMutations:
             "datasource": datasource_id,
             "datapoints": datapoints,
         }
+
+    def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: Any):
+        return {
+            "datasource": datasource_id,
+            "props": metadata_field_props
+        }
+
 
     @staticmethod
     @functools.lru_cache()

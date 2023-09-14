@@ -46,6 +46,7 @@ class MetadataFieldType(enum.Enum):
     FLOAT = "FLOAT"
     STRING = "STRING"
     BLOB = "BLOB"
+    UNDEFINED = "UNDEFINED"
 
 
 @dataclass_json

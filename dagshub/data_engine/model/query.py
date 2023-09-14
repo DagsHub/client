@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 from treelib import Tree, Node
 
 from dagshub.data_engine.client.models import MetadataFieldType
-from dagshub.data_engine.dtypes import Int, String, Blob, Bool, Float
 from dagshub.data_engine.model.errors import WrongOperatorError
 
 if TYPE_CHECKING:

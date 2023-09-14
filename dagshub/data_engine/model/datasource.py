@@ -1,4 +1,5 @@
 import base64
+import enum
 import gzip
 import json
 import logging
@@ -27,7 +28,6 @@ from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError, \
     FieldNotFoundError
 from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup, _metadataTypeLookupReverse
-from dagshub.data_engine.dtypes import DagshubDataType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.query_result import QueryResult
@@ -39,6 +39,42 @@ else:
     fo = lazy_load("fiftyone")
 
 logger = logging.getLogger(__name__)
+
+class ReservedTags(enum.Enum):
+    ANNOTATION = "annotation"
+
+class MetadataField:
+
+    def __init__(self, name):
+        self.name = name
+        self._tags = []
+        # format ...
+
+    def set_annotation_field(self):
+        self._tags.append(ReservedTags.ANNOTATION.value)
+        return self
+
+    def is_annotation(self):
+        return ReservedTags.ANNOTATION in self._tags
+
+class Int(MetadataField):
+    pass
+
+
+class String(MetadataField):
+    pass
+
+
+class Blob(MetadataField):
+    pass
+
+
+class Float(MetadataField):
+    pass
+
+
+class Bool(MetadataField):
+    pass
 
 
 @dataclass_json
@@ -52,8 +88,19 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
             encoder=lambda val: val.value
         )
     )
-    tags: Optional[List[str]] = None
+    # tags: Optional[List[str]] = None
     allowMultiple: bool = False
+
+@dataclass_json
+@dataclass
+class FieldMetadataUpdate(json.JSONEncoder):
+    name: str
+    # tags: MetadataField = field(metadata=config(
+    #     encoder=lambda val: val._tags
+    # ))
+    tags: List[str]
+    # format:
+    # whatever
 
 
 class Datasource:
@@ -69,6 +116,17 @@ class Datasource:
     @property
     def source(self) -> "DatasourceState":
         return self._source
+
+    # gets or creates a metadata field
+    def metadata_field(self, name: str, field_type: MetadataFieldType):
+        # self.source.metadata_fields
+        for field in self.source.metadata_fields:
+            if field.name == name:
+                return field
+
+        new_field = MetadataField(name)
+        self.fields.append(new_field)
+        return new_field
 
     def clear_query(self):
         """
@@ -644,28 +702,47 @@ class MetadataContextManager:
 
                 else:
 
-
                     value_type = field_value_types.get(k)
-                    raw_value = v.value if isinstance(v, DagshubDataType) else v
-
                     if value_type is None:
-                        value_type = _metadataTypeLookup[type(raw_value)]
+                        value_type = _metadataTypeLookup[type(v)]
                         field_value_types[k] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
-                    if value_type == MetadataFieldType.BLOB and type(raw_value) is not bytes:
+                    if value_type == MetadataFieldType.BLOB and type(v) is not bytes:
                         continue
 
-                    encoded_value = self.wrap_bytes(raw_value) if type(raw_value) is bytes else raw_value
+                    if type(v) is bytes:
+                        v = self.wrap_bytes(v)
 
-                    self._metadata_entries.append(DatapointMetadataUpdateEntry(
+                    new_or_updated_entry = DatapointMetadataUpdateEntry(
                         url=dp,
                         key=k,
-                        value=str(encoded_value),
+                        value=str(v),
                         valueType=value_type,
-                        tags=v.tags if hasattr(v, 'tags') else None,
+                        # tags=v.tags if hasattr(v, 'tags') else None,
                         # todo: preliminary type check
-                        allowMultiple=k in self._multivalue_fields
-                    ))
+                        allowMultiple=k in self._multivalue_fields,
+                        # field_data=MetadataField()
+                    )
+                    if k in [entry.key for entry in self._metadata_entries]:
+                        self._metadata_entries.append(new_or_updated_entry)
+
+    def metadata_field(self, field_name: str) -> MetadataField:
+        for e in self._metadata_entries:
+            if e.key == field_name:
+                return e.field_data
+
+        # else, create a new MetadataField
+        self._metadata_entries.append(DatapointMetadataUpdateEntry(
+            field_data=MetadataField(),
+            url="",
+            key=field_name,
+            value="",
+            valueType=str,
+            # tags=v.tags if hasattr(v, 'tags') else None,
+            # todo: preliminary type check
+            allowMultiple=False
+        ))
+        return self._metadata_entries[-1].field_data
 
     @staticmethod
     def wrap_bytes(val: bytes) -> str:
