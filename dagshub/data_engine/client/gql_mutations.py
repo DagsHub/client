@@ -75,13 +75,16 @@ class GqlMutations:
                 "$props": "[MetadataFieldPropsInput!]!"
             }
         ).query(
-            "updateMetadata",
+            "updateMetadataFieldProps",
             input={
                 "datasource": "$datasource",
                 "props": "$props"
             }
         ).fields([
             "name",
+            "valueType",
+            "multiple",
+            "tags",
         ]).generate()
         return q
 
