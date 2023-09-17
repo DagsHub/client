@@ -87,8 +87,9 @@ def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
 @click.option("--token", help="Login using a specified token")
 @click.option("--host", help="DagsHub instance to which you want to login")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.option("--temporary", is_flag=True, help="Generate only a short lived token, that will expire after 24h")
 @click.pass_context
-def login(ctx, token, host, quiet):
+def login(ctx, token, host, quiet, temporary):
     """
     Initiate an Oauth authentication process. This process will generate and cache a short-lived token in your
     local machine, to allow you to perform actions that require authentication. After running `dagshub login` you can
@@ -102,6 +103,9 @@ def login(ctx, token, host, quiet):
     else:
         dagshub.auth.add_oauth_token(host)
         rich_console.print(":white_check_mark: OAuth token added")
+        if not temporary:
+            dagshub.auth.add_permanent_token(host)
+            rich_console.print(":white_check_mark: Permanent token added")
 
 
 def validate_repo(ctx, param, value):

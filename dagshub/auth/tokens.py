@@ -3,8 +3,11 @@ import logging
 import os
 import threading
 import traceback
+import urllib
+from http import HTTPStatus
 from typing import Optional, Dict, List, Set, Union
 
+import requests
 import yaml
 from httpx import Auth
 
@@ -18,6 +21,7 @@ from dagshub.common.util import multi_urljoin
 logger = logging.getLogger(__name__)
 
 APP_TOKEN_TYPE = "app-token"
+CLIENT_TOKEN_NAME = "client"
 
 
 class InvalidTokenError(Exception):
@@ -108,12 +112,15 @@ class TokenStorage:
         token = self.get_token_object(host, fail_if_no_token, **kwargs)
         return DagshubAuthenticator(token, token_storage=self, host=host)
 
-    def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
+    def get_token_object(self, host: str = None,
+                         fail_if_no_token: bool = False,
+                         generate_permanent_token: bool = True, **kwargs) -> DagshubTokenABC:
         """
          This function does following:
          - Iterates over all tokens in the cache for the provided host
          - Finds a first valid token and returns it
          - If it finds an invalid token, it deletes it from the cache
+         - If token is generated through OAuth, create and apply permanent token
 
          We're using a set of known good tokens to skip rechecking for token validity every time
          """
@@ -163,11 +170,15 @@ class TokenStorage:
                     )
                     good_token = oauth.oauth_flow(host, **kwargs)
                     tokens.append(good_token)
-                    good_token_set.add(good_token)
+                    if generate_permanent_token:
+                        permanent_token = _generate_permanent_token(good_token)
+                        if permanent_token is None:
+                            logger.warning("Could not generate permanent token")
+                        tokens.append(permanent_token)
                     # Save the cache
                     self._token_cache[host] = tokens
                     self._store_cache_file()
-
+                    # Use oauth token to set a permanent token if not disabled
             return good_token
 
     def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
@@ -360,3 +371,24 @@ def add_oauth_token(host: Optional[str] = None, **kwargs):
     host = host or config.host
     token = oauth.oauth_flow(host)
     _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)
+
+
+def add_permanent_token(host: Optional[str] = None, **kwargs):
+    token = get_token_object(host=host, **kwargs)
+    # todo: if a permanent token already exists and is valid, skip the next step
+    perm = _generate_permanent_token(token)
+    _get_token_storage(**kwargs).add_token(perm, host, skip_validation=True)
+
+
+def _generate_permanent_token(auth: DagshubTokenABC) -> str:
+    host = config.host
+    tokens_path = "api/v1/user/tokens"
+    tokens_url = urllib.parse.urljoin(host, tokens_path)
+    token_data = {"name": CLIENT_TOKEN_NAME}
+    logger.debug(f"Generating token with data {token_data}")
+    res = requests.post(tokens_url, data=token_data, auth=auth)
+    if res.status_code == HTTPStatus.CREATED:
+        return res.json()["sha1"]
+    else:
+        logger.debug(f"Failed generation token with status code: {res.status_code}")
+    return None
