@@ -64,6 +64,7 @@ class GqlMutations:
             "path",
         ]).generate()
         return q
+
     @staticmethod
     @functools.lru_cache()
     def update_metadata_field():
@@ -100,7 +101,6 @@ class GqlMutations:
             "datasource": datasource_id,
             "props": metadata_field_props
         }
-
 
     @staticmethod
     @functools.lru_cache()

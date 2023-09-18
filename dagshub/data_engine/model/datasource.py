@@ -54,6 +54,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     )
     allowMultiple: bool = False
 
+
 @dataclass_json
 @dataclass
 class FieldMetadataUpdate(json.JSONEncoder):
@@ -89,9 +90,9 @@ class Datasource:
 
         new_field = MetadataFieldSchema(
             name=name,
-            tags = [],
-            multiple = False,
-            valueType = None
+            tags=[],
+            multiple=False,
+            valueType=None
         )
         self.source.metadata_fields.append(new_field)
         return new_field

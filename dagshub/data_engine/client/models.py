@@ -1,10 +1,13 @@
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Union, Optional
-from ..dtypes import DagshubDataType, MetadataFieldType
+from typing import Any, List, Union, Optional, TYPE_CHECKING
 
 from dataclasses_json import dataclass_json, config
+from dagshub.data_engine.dtypes import MetadataFieldType, DagshubDataType
+
+if TYPE_CHECKING:
+    from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,7 @@ class DatasourceType(enum.Enum):
 class ScanOption(str, enum.Enum):
     FORCE_REGENERATE_AUTO_SCAN_VALUES = "FORCE_REGENERATE_AUTO_SCAN_VALUES"
 
+
 @dataclass_json
 @dataclass
 class MetadataFieldSchema:
@@ -64,8 +68,8 @@ class MetadataFieldSchema:
         self.tags.append(ReservedTags.ANNOTATION.value)
         return self
 
-    def set_type(self, fieldDataType: DagshubDataType):
-        self.valueType = fieldDataType.get_corressponding_field_type()
+    def set_type(self, field_data_type: DagshubDataType):
+        self.valueType = field_data_type.get_corresponding_field_type()
         return self
 
     def update(self, ds: "Datasource"):

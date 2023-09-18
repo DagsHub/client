@@ -169,12 +169,12 @@ class DataClient:
             metadata_field_props=[e.to_dict() for e in metadata_field_props]
         )
 
-
         return self._exec(q, params)
 
     def update_metadata_fields_2(self, datasource: Datasource, metadata_field_props: List[Tuple]):
-        return self.update_metadata_fields(datasource, [FieldMetadataUpdate(name=props[0], tags=props[1], valueType=props[2]) for props in metadata_field_props])
-
+        return self.update_metadata_fields(datasource,
+                                           [FieldMetadataUpdate(name=props[0], tags=props[1], valueType=props[2]) for
+                                            props in metadata_field_props])
 
     def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
         q = GqlQueries.datasource()

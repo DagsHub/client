@@ -1,4 +1,3 @@
-import pytest
 from dagshub.data_engine import dtypes
 from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datasource import MetadataContextManager, DatapointMetadataUpdateEntry
@@ -7,6 +6,7 @@ from dagshub.data_engine.model.datasource import MetadataContextManager, Datapoi
 def test_getitem_metadata(some_datapoint):
     for key in some_datapoint.metadata:
         assert some_datapoint[key] == some_datapoint.metadata[key]
+
 
 def test_add_annotation(ds):
     ctx = MetadataContextManager(ds)
@@ -19,17 +19,20 @@ def test_add_annotation(ds):
     entries = ctx.get_metadata_entries()
 
     assert len(entries) == 1
-    assert ReservedTags.ANNOTATION.value in entries[0].tags # There should be a nicer way to check if an entry is an annotation
+    assert ReservedTags.ANNOTATION.value in entries[
+        0].tags  # There should be a nicer way to check if an entry is an annotation
 
-    expected = DatapointMetadataUpdateEntry("aaa", "key1", encoded_data, MetadataFieldType.BLOB, tags=[ReservedTags.ANNOTATION.value])
+    expected = DatapointMetadataUpdateEntry("aaa", "key1", encoded_data, MetadataFieldType.BLOB,
+                                            tags=[ReservedTags.ANNOTATION.value])
     assert entries == [expected]
 
-def test_define_field(ds):
 
+def test_define_field(ds):
     ds.metadata_field("Yuval's Annotations").set_type(dtypes.Int()).set_annotation_field()
 
     assert len(ds.fields) == 1
     assert ds.fields[0].is_annotation()
+
 
 def test_update_fields_in_batch(ds):
     ds.metadata_field("Yuval's Annotations").set_type(dtypes.Int()).set_annotation_field()

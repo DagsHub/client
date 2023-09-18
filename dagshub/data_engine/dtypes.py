@@ -1,4 +1,6 @@
 import enum
+
+
 class MetadataFieldType(enum.Enum):
     BOOLEAN = "BOOLEAN"
     INTEGER = "INTEGER"
@@ -6,32 +8,36 @@ class MetadataFieldType(enum.Enum):
     STRING = "STRING"
     BLOB = "BLOB"
 
+
 class DagshubDataType:
-    def get_corressponding_field_type(self):
-        return self._corressponding_field_type
+    _corresponding_field_type = None
+
+    def get_corresponding_field_type(self):
+        return self._corresponding_field_type
+
     pass
 
 
 class Int(DagshubDataType):
-    _corressponding_field_type = MetadataFieldType.INTEGER
+    _corresponding_field_type = MetadataFieldType.INTEGER
     pass
 
 
 class String(DagshubDataType):
-    _corressponding_field_type = MetadataFieldType.STRING
+    _corresponding_field_type = MetadataFieldType.STRING
     pass
 
 
 class Blob(DagshubDataType):
-    _corressponding_field_type = MetadataFieldType.BLOB
+    _corresponding_field_type = MetadataFieldType.BLOB
     pass
 
 
 class Float(DagshubDataType):
-    _corressponding_field_type = MetadataFieldType.FLOAT
+    _corresponding_field_type = MetadataFieldType.FLOAT
     pass
 
 
 class Bool(DagshubDataType):
-    _corressponding_field_type = MetadataFieldType.BOOLEAN
+    _corresponding_field_type = MetadataFieldType.BOOLEAN
     pass
