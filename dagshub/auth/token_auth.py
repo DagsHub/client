@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class token_storage(Auth):
+class DagshubAuthenticator(Auth):
     """
     This class contains a token + flow on how to re-init the token in case of failure
     """
