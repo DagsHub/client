@@ -33,7 +33,6 @@ class DataClient:
     FULL_LIST_PAGE_SIZE = 5000
 
     def __init__(self, repo: str):
-        # TODO: add project authentication here
         self.repo = repo
         self.host = config.host
         self.client = self._init_client()

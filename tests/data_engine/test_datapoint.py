@@ -19,8 +19,8 @@ def test_add_annotation(ds):
     entries = ctx.get_metadata_entries()
 
     assert len(entries) == 1
-    assert ReservedTags.ANNOTATION.value in entries[
-        0].tags  # There should be a nicer way to check if an entry is an annotation
+    # There should be a nicer way to check if an entry is an annotation
+    assert ReservedTags.ANNOTATION.value in entries[0].tags
 
     expected = DatapointMetadataUpdateEntry("aaa", "key1", encoded_data, MetadataFieldType.BLOB,
                                             tags=[ReservedTags.ANNOTATION.value])
