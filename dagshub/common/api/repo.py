@@ -174,7 +174,10 @@ class RepoAPI:
                 logger.debug(res.content)
                 raise RuntimeError(error_msg)
 
-            return dacite.from_dict(StorageContentAPIResult, res.json())
+            content = res.json()
+            if 'entries' not in content:
+                content = {'entries': [content, ], 'next_token': None}
+            return dacite.from_dict(StorageContentAPIResult, content)
 
         entries = []
 
