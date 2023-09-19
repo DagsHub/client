@@ -20,8 +20,17 @@ _metadataTypeLookup = {
     bytes: MetadataFieldType.BLOB,
 }
 
+
+def bytes_deserializer(val: str) -> bytes:
+    if val.startswith('b"') or val.startswith("b'"):
+        return val[2:-1].encode()
+    # Fallback - encode whatever we got from the server
+    return val.encode()
+
+
 _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
+    bytes: bytes_deserializer,
 }
 
 _metadataTypeLookupReverse: Dict[str, Type] = {}
