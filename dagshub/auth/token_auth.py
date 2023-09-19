@@ -105,7 +105,8 @@ class OAuthDagshubToken(DagshubTokenABC):
     def serialize(self) -> Dict[str, Any]:
         return {
             "access_token": self.token_value,
-            "expiry": self.expiry_date.isoformat(),
+            # ISO format without the timezone info to keep compatible with the older versions
+            "expiry": self.expiry_date.replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "token_type": self.token_type,
         }
 
