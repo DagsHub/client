@@ -1,13 +1,10 @@
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Union, Optional, TYPE_CHECKING
+from typing import Any, List, Union, Optional
 
 from dataclasses_json import dataclass_json, config
-from dagshub.data_engine.dtypes import MetadataFieldType, DagshubDataType
-
-if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasource import Datasource
+from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +86,3 @@ class DatasetResult:
     datasource: DatasourceResult
     datasetQuery: str
 
-
-class ReservedTags(enum.Enum):
-    ANNOTATION = "annotation"

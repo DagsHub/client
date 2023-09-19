@@ -2,8 +2,9 @@ import enum
 from abc import ABCMeta
 from typing import List
 
-from dagshub.data_engine.client.models import ReservedTags
 
+class ReservedTags(enum.Enum):
+    ANNOTATION = "annotation"
 
 # These are the base primitives that the data engine database is capable of storing
 class MetadataFieldType(enum.Enum):

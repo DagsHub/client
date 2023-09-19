@@ -1,8 +1,8 @@
 import logging
 from typing import TYPE_CHECKING, Type, Union, List
 
-from dagshub.data_engine.client.models import MetadataFieldSchema, ReservedTags
-from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType
+from dagshub.data_engine.client.models import MetadataFieldSchema
+from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.schema_util import metadataTypeLookup
 
 if TYPE_CHECKING:
