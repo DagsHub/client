@@ -1,6 +1,11 @@
 import enum
+from abc import ABCMeta
+from typing import List
+
+from dagshub.data_engine.client.models import ReservedTags
 
 
+# These are the base primitives that the data engine database is capable of storing
 class MetadataFieldType(enum.Enum):
     BOOLEAN = "BOOLEAN"
     INTEGER = "INTEGER"
@@ -9,35 +14,43 @@ class MetadataFieldType(enum.Enum):
     BLOB = "BLOB"
 
 
-class DagshubDataType:
-    _corresponding_field_type = None
-
-    def get_corresponding_field_type(self):
-        return self._corresponding_field_type
-
-    pass
+# Inheritors of this ABC define custom types
+# They are backed by a primitive type, but they also may have additional tags, describing specialized behavior
+class DagshubDataType(metaclass=ABCMeta):
+    """
+    Attributes:
+        backing_field_type: primitive type in the data engine database
+        custom_tags: additional tags applied to this type
+    """
+    backing_field_type: MetadataFieldType = None
+    custom_tags: List[str] = None
 
 
 class Int(DagshubDataType):
-    _corresponding_field_type = MetadataFieldType.INTEGER
-    pass
+    backing_field_type = MetadataFieldType.INTEGER
 
 
 class String(DagshubDataType):
-    _corresponding_field_type = MetadataFieldType.STRING
-    pass
+    backing_field_type = MetadataFieldType.STRING
 
 
 class Blob(DagshubDataType):
-    _corresponding_field_type = MetadataFieldType.BLOB
-    pass
+    backing_field_type = MetadataFieldType.BLOB
 
 
 class Float(DagshubDataType):
-    _corresponding_field_type = MetadataFieldType.FLOAT
-    pass
+    backing_field_type = MetadataFieldType.FLOAT
 
 
 class Bool(DagshubDataType):
-    _corresponding_field_type = MetadataFieldType.BOOLEAN
-    pass
+    backing_field_type = MetadataFieldType.BOOLEAN
+
+
+class LabelStudioAnnotation(DagshubDataType):
+    backing_field_type = MetadataFieldType.BLOB
+    custom_tags = [ReservedTags.ANNOTATION.value]
+
+
+class Voxel51Annotation(DagshubDataType):
+    backing_field_type = MetadataFieldType.BLOB
+    custom_tags = [ReservedTags.ANNOTATION.value]

@@ -4,29 +4,17 @@ from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 
 from treelib import Tree, Node
 
-from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError
+from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
 
-_metadataTypeLookup = {
-    int: MetadataFieldType.INTEGER,
-    bool: MetadataFieldType.BOOLEAN,
-    float: MetadataFieldType.FLOAT,
-    str: MetadataFieldType.STRING,
-    bytes: MetadataFieldType.BLOB,
-}
-
 _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
 }
-
-_metadataTypeLookupReverse: Dict[str, Type] = {}
-for k, v in _metadataTypeLookup.items():
-    _metadataTypeLookupReverse[v.value] = k
 
 
 class FieldFilterOperand(enum.Enum):
@@ -134,10 +122,10 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
-            value_type = _metadataTypeLookup[type(value)].value
+            value_type = metadataTypeLookup[type(value)].value
             if value_type is None:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
-                                   f"Supported types: {list(_metadataTypeLookup.keys())}")
+                                   f"Supported types: {list(metadataTypeLookup.keys())}")
             return {
                 "filter": {
                     "key": key,
@@ -174,7 +162,7 @@ class DatasourceQuery:
         if op_type == "filter":
             comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
             key = val["key"]
-            value_type = _metadataTypeLookupReverse[val["valueType"]]
+            value_type = metadataTypeLookupReverse[val["valueType"]]
             converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
             value = converter(val["value"])
             node = Node(tag=comparator, data={"field": key, "value": value})

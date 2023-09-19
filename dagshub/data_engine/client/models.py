@@ -62,19 +62,10 @@ class MetadataFieldSchema:
     tags: Optional[List[str]]
 
     def __repr__(self):
-        return f"{self.name} ({self.valueType.value})"
-
-    def set_annotation_field(self):
-        self.tags.append(ReservedTags.ANNOTATION.value)
-        return self
-
-    def set_type(self, field_data_type: DagshubDataType):
-        self.valueType = field_data_type.get_corresponding_field_type()
-        return self
-
-    def update(self, ds: "Datasource"):
-        ds.source.client.update_metadata_fields_2(ds, [(self.name, self.tags, self.valueType)])
-        return self
+        res = f"{self.name} ({self.valueType.value})"
+        if self.tags is not None and len(self.tags) > 0:
+            res += f" with tags: {self.tags}"
+        return res
 
     def is_annotation(self):
         return ReservedTags.ANNOTATION.value in self.tags if self.tags else False

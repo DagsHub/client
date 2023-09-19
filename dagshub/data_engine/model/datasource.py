@@ -27,7 +27,9 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import WrongOperatorError, WrongOrderError, DatasetFieldComparisonError, \
     FieldNotFoundError
-from dagshub.data_engine.model.query import DatasourceQuery, _metadataTypeLookup, _metadataTypeLookupReverse
+from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
+from dagshub.data_engine.model.query import DatasourceQuery
+from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.query_result import QueryResult
@@ -96,6 +98,9 @@ class Datasource:
         )
         self.source.metadata_fields.append(new_field)
         return new_field
+
+    def apply_field_changes(self, field_changes: List[MetadataFieldBuilder]):
+        raise NotImplementedError
 
     def update_fields(self):
         self.source.client.update_metadata_fields(
@@ -238,7 +243,7 @@ class Datasource:
                     for sub_val in val:
                         value_type = field_value_types.get(key)
                         if value_type is None:
-                            value_type = _metadataTypeLookup[type(sub_val)]
+                            value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[key] = value_type
                         # Don't override bytes if they're not bytes - probably just undownloaded values
                         if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
@@ -258,7 +263,7 @@ class Datasource:
                 else:
                     value_type = field_value_types.get(key)
                     if value_type is None:
-                        value_type = _metadataTypeLookup[type(val)]
+                        value_type = metadataTypeLookup[type(val)]
                         field_value_types[key] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
                     if value_type == MetadataFieldType.BLOB and type(val) is not bytes:
@@ -579,7 +584,7 @@ class Datasource:
 
     def is_null(self):
         field = self._get_filtering_field()
-        value_type = _metadataTypeLookupReverse[field.valueType.value]
+        value_type = metadataTypeLookupReverse[field.valueType.value]
         return self.add_query_op("isnull", value_type())
 
     def is_not_null(self):
@@ -659,7 +664,7 @@ class MetadataContextManager:
 
                         value_type = field_value_types.get(k)
                         if value_type is None:
-                            value_type = _metadataTypeLookup[type(sub_val)]
+                            value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[k] = value_type
                         # Don't override bytes if they're not bytes - probably just undownloaded values
                         if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
@@ -680,7 +685,7 @@ class MetadataContextManager:
 
                     value_type = field_value_types.get(k)
                     if value_type is None:
-                        value_type = _metadataTypeLookup[type(v)]
+                        value_type = metadataTypeLookup[type(v)]
                         field_value_types[k] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
                     if value_type == MetadataFieldType.BLOB and type(v) is not bytes:
