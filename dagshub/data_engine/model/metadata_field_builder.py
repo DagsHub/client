@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 from typing import TYPE_CHECKING, Type, Union, List
 
@@ -23,6 +24,10 @@ class MetadataFieldBuilder:
         self._field_name = field_name
 
         preexisting_schema = next(filter(lambda f: f.name == field_name, datasource.fields), None)
+
+        # Make a copy of the dataclass, so we don't change the base schema
+        if preexisting_schema is not None:
+            preexisting_schema = dataclasses.replace(preexisting_schema)
 
         self._schema = preexisting_schema
         self.already_exists = self._schema is not None

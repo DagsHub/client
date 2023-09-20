@@ -678,18 +678,14 @@ class MetadataContextManager:
                     if type(v) is bytes:
                         v = self.wrap_bytes(v)
 
-                    new_or_updated_entry = DatapointMetadataUpdateEntry(
+                    self._metadata_entries.append(DatapointMetadataUpdateEntry(
                         url=dp,
                         key=k,
                         value=str(v),
                         valueType=value_type,
-                        # tags=v.tags if hasattr(v, 'tags') else None,
                         # todo: preliminary type check
-                        allowMultiple=k in self._multivalue_fields,
-                        # field_data=MetadataField()
-                    )
-                    if k in [entry.key for entry in self._metadata_entries]:
-                        self._metadata_entries.append(new_or_updated_entry)
+                        allowMultiple=k in self._multivalue_fields
+                    ))
 
     @staticmethod
     def wrap_bytes(val: bytes) -> str:
