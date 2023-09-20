@@ -28,7 +28,8 @@ class MetadataFieldBuilder:
         # Make a copy of the dataclass, so we don't change the base schema
         if preexisting_schema is not None:
             preexisting_schema = dataclasses.replace(preexisting_schema)
-            preexisting_schema.tags = preexisting_schema.tags.copy()
+            if preexisting_schema.tags is not None:
+                preexisting_schema.tags = preexisting_schema.tags.copy()
 
         self._schema = preexisting_schema
         self.already_exists = self._schema is not None
@@ -56,13 +57,13 @@ class MetadataFieldBuilder:
                 multiple=False,
                 tags=[]
             )
-            if issubclass(t, DagshubDataType):
+            if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._schema.tags = t.custom_tags.copy()
         else:
             if backing_type != self._schema.valueType:
                 raise ValueError("Can't change a type of an already existing field "
                                  f"(changing from {self._schema.valueType.value} to {backing_type.value})")
-            if issubclass(t, DagshubDataType):
+            if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._add_tags(t.custom_tags)
 
         return self
