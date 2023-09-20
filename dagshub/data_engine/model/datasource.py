@@ -125,7 +125,7 @@ class Datasource:
                 f"Datasource {self.source.name} is currently in the progress of rescanning. "
                 f"Values might change if you requery later")
 
-    def metadata_field(self, field_name: str):
+    def metadata_field(self, field_name: str) -> MetadataFieldBuilder:
         """
         Returns a builder for a metadata field.
         The builder can be used to change properties of a field or create a new field altogether

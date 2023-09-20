@@ -28,6 +28,7 @@ class MetadataFieldBuilder:
         # Make a copy of the dataclass, so we don't change the base schema
         if preexisting_schema is not None:
             preexisting_schema = dataclasses.replace(preexisting_schema)
+            preexisting_schema.tags = preexisting_schema.tags.copy()
 
         self._schema = preexisting_schema
         self.already_exists = self._schema is not None
@@ -35,11 +36,11 @@ class MetadataFieldBuilder:
     @property
     def schema(self) -> MetadataFieldSchema:
         if self._schema is None:
-            raise ValueError(f"Field {self._field_name} is a new field. "
-                             f"Make sure to set_type() the field before setting any other properties")
+            raise RuntimeError(f"Field {self._field_name} is a new field. "
+                               "Make sure to set_type() the field before setting any other properties")
         return self._schema
 
-    def set_type(self, t: Union[Type, DagshubDataType]):
+    def set_type(self, t: Union[Type, DagshubDataType]) -> "MetadataFieldBuilder":
         """
         Set the type of the field.
         The type can be either a Python primitive supported by the Data Engine (str, bool, int, float, bytes)
@@ -53,22 +54,25 @@ class MetadataFieldBuilder:
                 name=self._field_name,
                 valueType=backing_type,
                 multiple=False,
-                tags=None
+                tags=[]
             )
-            if isinstance(t, DagshubDataType):
-                self._schema.tags = t.custom_tags
+            if issubclass(t, DagshubDataType):
+                self._schema.tags = t.custom_tags.copy()
         else:
             if backing_type != self._schema.valueType:
                 raise ValueError("Can't change a type of an already existing field "
                                  f"(changing from {self._schema.valueType.value} to {backing_type.value})")
-            if isinstance(t, DagshubDataType):
+            if issubclass(t, DagshubDataType):
                 self._add_tags(t.custom_tags)
 
-    def set_annotation(self, is_annotation: bool = True):
+        return self
+
+    def set_annotation(self, is_annotation: bool = True) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as annotation field
         """
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
+        return self
 
     def _set_or_unset(self, tag, is_set):
         if is_set:
@@ -91,13 +95,13 @@ class MetadataFieldBuilder:
 
     @staticmethod
     def _get_backing_type(t: Union[Type, DagshubDataType]) -> MetadataFieldType:
+        if issubclass(t, DagshubDataType):
+            return t.backing_field_type
+
         if type(t) == type:
             if t not in metadataTypeLookup.keys():
                 raise ValueError(f"Primitive type {type(t)} is not supported")
             return metadataTypeLookup[t]
-
-        if isinstance(t, DagshubDataType):
-            return t.backing_field_type
 
         raise ValueError(f"{t} of type ({type(t)}) is not a valid primitive type or DagshubDataType")
 
