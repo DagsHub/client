@@ -144,13 +144,18 @@ class DatasourceQuery:
             key = node.data["field"]
             value = node.data["value"]
             value_type = _metadataTypeLookup[type(value)].value
+            if type(value) is bytes:
+                # TODO: this will need to probably be changed when we allow actual binary field comparisons
+                value = value.decode("utf-8")
+            else:
+                value = str(value)
             if value_type is None:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
                                    f"Supported types: {list(_metadataTypeLookup.keys())}")
             return {
                 "filter": {
                     "key": key,
-                    "value": str(value),
+                    "value": value,
                     "valueType": value_type,
                     "comparator": query_op.value,
                 }

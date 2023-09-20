@@ -416,7 +416,8 @@ def test_throws_on_nonexistent_field(ds):
     ("b''", bytes()),
     ('b""', bytes()),
     ("b'abcd'", "abcd".encode("utf-8")),
-    ("abcd", "abcd".encode("utf-8"))
+    ("abcd", "abcd".encode("utf-8")),
+    ("", bytes()),
 ])
 def test_bytes_deserializer(string_value, expected):
     actual = bytes_deserializer(string_value)
@@ -430,7 +431,7 @@ def test_blob_deserialization(ds):
     serialized = {
         "filter": {
             "key": "field_blob",
-            "value": "b''",
+            "value": "",
             "valueType": "BLOB",
             "comparator": "IS_NULL"
         }
