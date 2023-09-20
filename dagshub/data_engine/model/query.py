@@ -20,8 +20,17 @@ _metadataTypeLookup = {
     bytes: MetadataFieldType.BLOB,
 }
 
+
+def bytes_deserializer(val: str) -> bytes:
+    if val.startswith('b"') or val.startswith("b'"):
+        return val[2:-1].encode()
+    # Fallback - encode whatever we got from the server
+    return val.encode()
+
+
 _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
+    bytes: bytes_deserializer,
 }
 
 _metadataTypeLookupReverse: Dict[str, Type] = {}
@@ -135,13 +144,18 @@ class DatasourceQuery:
             key = node.data["field"]
             value = node.data["value"]
             value_type = _metadataTypeLookup[type(value)].value
+            if type(value) is bytes:
+                # TODO: this will need to probably be changed when we allow actual binary field comparisons
+                value = value.decode("utf-8")
+            else:
+                value = str(value)
             if value_type is None:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
                                    f"Supported types: {list(_metadataTypeLookup.keys())}")
             return {
                 "filter": {
                     "key": key,
-                    "value": str(value),
+                    "value": value,
                     "valueType": value_type,
                     "comparator": query_op.value,
                 }

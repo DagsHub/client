@@ -4,8 +4,9 @@ from dagshub.data_engine.model.datasource import (
     Datasource,
 )
 from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError, FieldNotFoundError
-from dagshub.data_engine.model.query import DatasourceQuery
-from tests.data_engine.util import add_int_fields, add_string_fields, add_float_fields, add_boolean_fields
+from dagshub.data_engine.model.query import DatasourceQuery, bytes_deserializer
+from tests.data_engine.util import add_int_fields, add_string_fields, add_float_fields, add_boolean_fields, \
+    add_blob_fields
 
 
 def test_query_single_column(ds):
@@ -409,3 +410,31 @@ def test_throws_on_nonexistent_field(ds):
     add_int_fields(ds, "col1")
     with pytest.raises(FieldNotFoundError):
         _ = ds["nonexistent_field"] == 5
+
+
+@pytest.mark.parametrize("string_value, expected", [
+    ("b''", bytes()),
+    ('b""', bytes()),
+    ("b'abcd'", "abcd".encode("utf-8")),
+    ("abcd", "abcd".encode("utf-8")),
+    ("", bytes()),
+])
+def test_bytes_deserializer(string_value, expected):
+    actual = bytes_deserializer(string_value)
+    assert actual == expected
+
+
+def test_blob_deserialization(ds):
+    add_blob_fields(ds, "field_blob")
+    queried = ds["field_blob"].is_null()
+
+    serialized = {
+        "filter": {
+            "key": "field_blob",
+            "value": "",
+            "valueType": "BLOB",
+            "comparator": "IS_NULL"
+        }
+    }
+    deserialized = DatasourceQuery.deserialize(serialized)
+    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
