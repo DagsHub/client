@@ -35,6 +35,12 @@ class MetadataFieldBuilder:
         return self._schema
 
     def set_type(self, t: Union[Type, DagshubDataType]):
+        """
+        Set the type of the field.
+        The type can be either a Python primitive supported by the Data Engine (str, bool, int, float, bytes)
+        Or it can be a DagshubDataType inheritor (found in dagshub.data_engine.dtypes)
+            The DataType inheritors can define additional tags on top of just the basic backing type
+        """
         backing_type = self._get_backing_type(t)
 
         if self._schema is None:
@@ -54,6 +60,9 @@ class MetadataFieldBuilder:
                 self._add_tags(t.custom_tags)
 
     def set_annotation(self, is_annotation: bool = True):
+        """
+        Mark or unmark the field as annotation field
+        """
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
 
     def _set_or_unset(self, tag, is_set):
@@ -63,15 +72,15 @@ class MetadataFieldBuilder:
             self._remove_tag(tag)
 
     def _add_tags(self, tags: List[str]):
-        if self._schema.tags is None:
-            self._schema.tags = []
-        self._schema.tags.extend(tags)
+        if self.schema.tags is None:
+            self.schema.tags = []
+        self.schema.tags.extend(tags)
 
     def _remove_tag(self, tag: str):
-        if self._schema.tags is None:
+        if self.schema.tags is None:
             return
         try:
-            self._schema.tags.remove(tag)
+            self.schema.tags.remove(tag)
         except ValueError:
             logger.warning(f"Tag {tag} doesn't exist on the field, nothing to delete")
 
@@ -88,4 +97,7 @@ class MetadataFieldBuilder:
         raise ValueError(f"{t} of type ({type(t)}) is not a valid primitive type or DagshubDataType")
 
     def apply(self):
+        """
+        Apply the outgoing changes to the metadata field
+        """
         self.datasource.apply_field_changes([self])

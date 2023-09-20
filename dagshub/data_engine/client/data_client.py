@@ -12,12 +12,12 @@ from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus, DatasetResult
+    PreprocessingStatus, DatasetResult, MetadataFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, FieldMetadataUpdate
+from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
 from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
@@ -157,7 +157,7 @@ class DataClient:
 
         return self._exec(q, params)
 
-    def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[FieldMetadataUpdate]):
+    def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
         q = GqlMutations.update_metadata_field()
 
         assert datasource.source.id is not None
@@ -169,11 +169,6 @@ class DataClient:
         )
 
         return self._exec(q, params)
-
-    def update_metadata_fields_2(self, datasource: Datasource, metadata_field_props: List[Tuple]):
-        return self.update_metadata_fields(datasource,
-                                           [FieldMetadataUpdate(name=props[0], tags=props[1], valueType=props[2]) for
-                                            props in metadata_field_props])
 
     def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
         q = GqlQueries.datasource()

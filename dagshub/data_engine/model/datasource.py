@@ -57,18 +57,6 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     allowMultiple: bool = False
 
 
-@dataclass_json
-@dataclass
-class FieldMetadataUpdate(json.JSONEncoder):
-    name: str
-    tags: List[str]
-    valueType: MetadataFieldType = field(
-        metadata=config(
-            encoder=lambda val: val.value if val else None
-        )
-    )
-
-
 class Datasource:
 
     def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None):
@@ -82,31 +70,6 @@ class Datasource:
     @property
     def source(self) -> "DatasourceState":
         return self._source
-
-    # gets or creates a metadata field
-    def metadata_field(self, name: str):
-        # self.source.metadata_fields
-        for field in self.source.metadata_fields:
-            if field.name == name:
-                return field
-
-        new_field = MetadataFieldSchema(
-            name=name,
-            tags=[],
-            multiple=False,
-            valueType=None
-        )
-        self.source.metadata_fields.append(new_field)
-        return new_field
-
-    def apply_field_changes(self, field_changes: List[MetadataFieldBuilder]):
-        raise NotImplementedError
-
-    def update_fields(self):
-        self.source.client.update_metadata_fields(
-            self,
-            [FieldMetadataUpdate(name=f.name, tags=f.tags, valueType=f.valueType) for f in self.fields]
-        )
 
     def clear_query(self):
         """
@@ -161,6 +124,27 @@ class Datasource:
             logger.warning(
                 f"Datasource {self.source.name} is currently in the progress of rescanning. "
                 f"Values might change if you requery later")
+
+    def metadata_field(self, field_name: str):
+        """
+        Returns a builder for a metadata field.
+        The builder can be used to change properties of a field or create a new field altogether
+
+        Example of creating a new annotation field:
+            ds.metadata_field("annotation").set_type(dtypes.LabelStudioAnnotation).apply()
+        NOTE: New fields have to have their type defined using .set_type() before doing anything else
+
+        Example of marking an existing field as an annotation field:
+            ds.metadata_field("existing-field").set_annotation().apply()
+        """
+        return MetadataFieldBuilder(self, field_name)
+
+    def apply_field_changes(self, field_builders: List[MetadataFieldBuilder]):
+        """
+        Applies one or multiple metadata field builders that can be constructed using the metadata_field() function
+        """
+        self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
+        self.source.get_from_dagshub()
 
     def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
