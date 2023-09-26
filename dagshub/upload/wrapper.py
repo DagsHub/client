@@ -43,11 +43,11 @@ FileUploadStruct = Tuple[os.PathLike, BinaryIO]
 def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
     """
     Create a new repository on DagsHub and upload an entire dataset to it
-    :param repo_name (str): Name of the repository to be created
-    :param local_path (str): local path where the dataset to upload is located
-    :param glob_exclude (str): regex to exclude certain files from the upload process
-    :param org_name (str): Organization name to be the repository owner
-    :param private (bool): Flag to indicate the repository is going to be private
+    :param repo_name: Name of the repository to be created
+    :param local_path: local path where the dataset to upload is located
+    :param glob_exclude: regex to exclude certain files from the upload process
+    :param org_name: Organization name to be the repository owner
+    :param private: Flag to indicate the repository is going to be private
     :return : Repo object of the repository created
     """
     repo = create_repo(repo_name, org_name=org_name, private=private)
@@ -61,9 +61,9 @@ def add_dataset_to_repo(repo,
                         data_dir=DEFAULT_DATA_DIR_NAME):
     """
     Given a repository created on dagshub - upload an entire dataset to it
-    :param reo (Reop): repository created beforehand
-    :param local_path (str): local path where the dataset to upload is located
-    :param data_dir (str): name of data directory that will be created inside repo
+    :param repo: repository created beforehand
+    :param local_path: local path where the dataset to upload is located
+    :param data_dir: name of data directory that will be created inside repo
     """
     dir = repo.directory(data_dir)
     dir.add_dir(local_path, commit_message=DEFAULT_DATASET_COMMIT_MESSAGE)
@@ -84,15 +84,15 @@ def create_repo(
     """
     Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
 
-    :param repo_name (str): Name of the repository to be created
-    :param org_name (str): Organization name to be the repository owner
-    :param description (str): Description for the repository
-    :param private (bool): Flag to indicate the repository is going to be private
-    :param auto_init (bool): Pass true to create an initial commit with README, .gitignore and LICENSE.
-    :param gitignores (str): Which gitignore template(s) to use (comma separated string)
-    :param license (str): Which license file to use
-    :param readme (str): Readme file path to upload
-    :param template (str): Which project template to use, options are: none, custom, notebook-template,
+    :param repo_name: Name of the repository to be created
+    :param org_name: Organization name to be the repository owner
+    :param description: Description for the repository
+    :param private: Flag to indicate the repository is going to be private
+    :param auto_init: Pass true to create an initial commit with README, .gitignore and LICENSE.
+    :param gitignores: Which gitignore template(s) to use (comma separated string)
+    :param license: Which license file to use
+    :param readme: Readme file path to upload
+    :param template: Which project template to use, options are: none, custom, notebook-template,
     cookiecutter-dagshub-dvc. To learn more, check out https://dagshub.com/docs/feature_guide/project_templates/
     :return: Repo object of the repository created
     """
@@ -187,12 +187,12 @@ class Repo:
         WARNING: this class is not thread safe.
         Uploading files in parallel can lead to unexpected outcomes
 
-        :param owner (str): Store the username of the user who owns this repository
-        :param name (str): Identify the repository
-        :param username (str): Set the username to none if it is not provided
-        :param password (str): Set the password to none if it is not provided
-        :param token (str): Set the token
-        :param branch (str): Set the branch to the default branch
+        :param owner: Store the username of the user who owns this repository
+        :param name: Identify the repository
+        :param username: Set the username to none if it is not provided
+        :param password : Set the password to none if it is not provided
+        :param token: Set the token
+        :param branch: Set the branch to the default branch
         :return: The object of the class
 
         """
@@ -448,7 +448,7 @@ class Repo:
         The directory function returns a DataSet object that represents the directory at the given path.
 
 
-        :param path (str): Specify the directory that will contain the data.
+        :param path: Specify the directory that will contain the data.
                            This directory is the "root" of the dataset.
         :return: A dataset object that represents the directory at the given path
 
@@ -501,8 +501,8 @@ class DataSet:
     def __init__(self, repo: Repo, directory: str):
         """
 
-        :param repo (Repo object): Pass a repo object
-        :param directory (str): Specify the directory of the repository
+        :param repo: Pass a repo object
+        :param directory: Specify the directory of the repository
         :return: A DataSet object
 
         """
@@ -516,8 +516,8 @@ class DataSet:
         The add function adds a file to the list of files that will be uploaded.
 
 
-        :param file (str): Specify the file to be uploaded
-        :param path (str): Specify the path to upload the file
+        :param file: Specify the file to be uploaded
+        :param path: Specify the path to upload the file
         :return: None
 
         """
@@ -537,10 +537,10 @@ class DataSet:
         The function also commits all of these changes at once, so as not to overload the API with requests.
 
 
-        :param local_path  (str): Specify the local path where the dataset to upload is located
-        :param glob_exclude (str): Exclude certain files from the upload process
-        :param commit_message (str): Commit message
-        :param upload_kwargs (dict): kwargs that are passed to the uploading function
+        :param local_path: Specify the local path where the dataset to upload is located
+        :param glob_exclude: Exclude certain files from the upload process
+        :param commit_message: Commit message
+        :param upload_kwargs: kwargs that are passed to the uploading function
         :return: None
 
         """
@@ -608,7 +608,7 @@ class DataSet:
         they will be ignored and only alphanumeric characters (a-zA-Z0-9)
         will be kept.
 
-        :param directory (str): Specify the directory that will be cleaned
+        :param directory: Specify the directory that will be cleaned
         :return: The normalized path of the directory
                  (The directory name with the path separator normalized to a forward slash)
 
@@ -623,8 +623,8 @@ class DataSet:
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
         the file.
 
-        :param file (Union[str, IOBase]): File to upload
-        :param path (str): Desired path of the file in the repository
+        :param file: File to upload
+        :param path: Desired path of the file in the repository
         :return: A tuple of the path and a file object
 
         """
@@ -677,7 +677,7 @@ class DataSet:
         The function returns nothing.
 
 
-        :param commit_message (str): Set the commit message
+        :param commit_message: Set the commit message
         :param *args: Pass a non-keyworded, variable-length argument list to the function
         :param **kwargs: Pass additional parameters to the function
         :return: None
