@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, TYPE_CHECKING
 
 try:
     from functools import cached_property
 except ImportError:
     from cached_property import cached_property
+
+if TYPE_CHECKING:
+    from dagshub.streaming import DagsHubFilesystem
 
 storage_schemas = ["s3", "gs", "azure"]
 
@@ -23,7 +26,7 @@ class DagshubPath:
         original_path (Path): Original path as it was accessed by the user
     """
     # TODO: this couples this class hard to the fs, need to decouple later
-    fs: Any  # Actual type is DagsHubFilesystem, but imports are wonky
+    fs: "DagsHubFilesystem"  # Actual type is DagsHubFilesystem, but imports are wonky
     absolute_path: Optional[Path]
     relative_path: Optional[Path]
     original_path: Optional[Path]
@@ -67,7 +70,9 @@ class DagshubPath:
         str_path = self.relative_path.as_posix()
         if "/site-packages/" in str_path or str_path.endswith("/site-packages"):
             return True
-        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
+        if str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc"):
+            return True
+        return any((self.relative_path.match(glob) for glob in self.fs.exclude_globs))
 
     def __truediv__(self, other):
         return DagshubPath(

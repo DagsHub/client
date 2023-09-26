@@ -90,6 +90,9 @@ class DagsHubFilesystem:
     :param token: DagsHub API token (as an alternative login variant to username/password)
     :param timeout: Timeout in seconds for HTTP requests.
         Influences all requests except for file download, which has no timeout
+    :param exclude_globs: One or more glob patterns to exclude from looking up on the server
+        This is useful in case your framework tries to look up cached files on disk that might not be there.
+        Example: YOLO and .npy files
     """
 
     already_mounted_filesystems: Dict[Path, 'DagsHubFilesystem'] = {}
@@ -102,7 +105,8 @@ class DagsHubFilesystem:
                  username: Optional[str] = None,
                  password: Optional[str] = None,
                  token: Optional[str] = None,
-                 timeout: Optional[int] = None):
+                 timeout: Optional[int] = None,
+                 exclude_globs: Optional[Union[List[str], str]] = None):
 
         # Find root directory of Git project
         if not project_root:
@@ -136,6 +140,13 @@ class DagsHubFilesystem:
         self.password = password or config.password
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
+
+        if exclude_globs is None:
+            exclude_globs = []
+        elif exclude_globs is str:
+            exclude_globs = [exclude_globs]
+
+        self.exclude_globs: List[str] = exclude_globs
 
         self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
 
@@ -792,7 +803,8 @@ def install_hooks(project_root: Optional[PathLike] = None,
                   username: Optional[str] = None,
                   password: Optional[str] = None,
                   token: Optional[str] = None,
-                  timeout: Optional[int] = None):
+                  timeout: Optional[int] = None,
+                  exclude_globs: Optional[Union[List[str], str]] = None):
     """
     Monkey patches builtin Python functions to make them DagsHub-repo aware.
     Patched functions are: `open()`, `os.listdir()`, `os.scandir()`, `os.stat()` + pathlib's functions that use them
@@ -810,9 +822,12 @@ def install_hooks(project_root: Optional[PathLike] = None,
     :param token: DagsHub API token (as an alternative login variant to username/password)
     :param timeout: Timeout in seconds for HTTP requests.
         Influences all requests except for file download, which has no timeout
+    :param exclude_globs: One or more glob patterns to exclude from looking up on the server
+        This is useful in case your framework tries to look up cached files on disk that might not be there.
+        Example: YOLO and .npy files
     """
     fs = DagsHubFilesystem(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
-                           password=password, token=token, timeout=timeout)
+                           password=password, token=token, timeout=timeout, exclude_globs=exclude_globs)
     fs.install_hooks()
 
 
