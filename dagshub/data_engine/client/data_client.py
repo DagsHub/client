@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Tuple
+from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
 
 import dacite
 import gql

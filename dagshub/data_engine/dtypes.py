@@ -6,6 +6,7 @@ from typing import List
 class ReservedTags(enum.Enum):
     ANNOTATION = "annotation"
 
+
 # These are the base primitives that the data engine database is capable of storing
 class MetadataFieldType(enum.Enum):
     BOOLEAN = "BOOLEAN"

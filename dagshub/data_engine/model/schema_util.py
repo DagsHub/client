@@ -13,4 +13,3 @@ metadataTypeLookup = {
 metadataTypeLookupReverse: Dict[str, Type] = {}
 for k, v in metadataTypeLookup.items():
     metadataTypeLookupReverse[v.value] = k
-

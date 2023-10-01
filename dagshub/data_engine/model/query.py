@@ -1,6 +1,6 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union, Dict, Type
+from typing import TYPE_CHECKING, Optional, Union, Dict
 
 from treelib import Tree, Node
 

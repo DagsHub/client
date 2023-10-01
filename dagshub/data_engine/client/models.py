@@ -85,4 +85,3 @@ class DatasetResult:
     name: str
     datasource: DatasourceResult
     datasetQuery: str
-
