@@ -22,14 +22,22 @@ class TensorFlowDataset(DagsHubDataset):
 
     def generator(self):
         for idx in range(len(self)):
-            yield self[idx]
+            yield tuple(self[idx])
 
 
 class TensorFlowDataLoader(tf.keras.utils.Sequence):
-    def __init__(self, dataset, batch_size=1, shuffle=True, seed=None):
+    def __init__(
+        self,
+        dataset,
+        batch_size=1,
+        shuffle=True,
+        seed=None,
+        post_hook=lambda x: x,
+    ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.post_hook = post_hook
 
         if seed:
             random.seed(seed)
@@ -59,7 +67,7 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
             for idx, tensor in enumerate(sample):
                 batch[idx].append(tensor)
 
-        return [tf.stack(column) for column in batch]
+        return tuple(self.post_hook([tf.stack(column) for column in batch]))
 
     def on_epoch_end(self) -> None:
         self.indices = np.arange(self.dataset.__len__())
@@ -74,7 +82,12 @@ class Tensorizers:
 
     @staticmethod
     def audio(filepath: str) -> tf.Tensor:
-        raise NotImplementedError("Coming Soon!")
+        return tf.audio.decode_wav(
+            tf.io.read_file(str(filepath)),
+            desired_channels=-1,
+            desired_samples=-1,
+            name=None,
+        )
 
     @staticmethod
     def video(filepath: str) -> tf.Tensor:
