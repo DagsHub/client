@@ -208,14 +208,14 @@ class QueryResult:
                 f"needs to be either int or str or slice")
 
     def get_blob_fields(self, *fields: str, load_into_memory=False,
-                        cache_on_disk=True, num_proc: int = config.download_threads) -> "QueryResult":
+                    cache_on_disk=True, num_proc: int = config.download_threads) -> "QueryResult":
         """
         Downloads data from blob fields
 
         Args:
-            fields: list of binary fields to download blobs for
+            fields: list of binary fields to download blobs for. If empty, download all blob fields.
             load_into_memory: Whether to load the blobs into the datapoints, or just store them on disk
-                If True : the datapoints' specified fields will contain the blob data
+                If True: the datapoints' specified fields will contain the blob data
                 If False: the datapoints' specified fields will contain Path objects to the file of the downloaded blob
             cache_on_disk: Whether to cache the blobs on disk or not (valid only if load_into_memory is set to True)
                 Cache location is `~/dagshub/datasets/<user>/<repo>/<datasource_id>/.metadata_blobs/`
@@ -223,6 +223,11 @@ class QueryResult:
         send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
         if not load_into_memory:
             assert cache_on_disk
+
+        # If no fields are specified, include all blob fields from self.datasource.fields
+        if not fields:
+            fields = [field.name for field in self.datasource.fields if field.is_blob()]
+
         for fld in fields:
             logger.info(f"Downloading metadata for field {fld} with {num_proc} processes")
             cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
@@ -243,6 +248,7 @@ class QueryResult:
                 dp.metadata[fld] = binary_val_or_path
 
         return self
+
 
     def download_binary_columns(self, *columns: str, load_into_memory=True,
                                 cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
