@@ -28,7 +28,7 @@ class GqlQueries:
             "rootUrl",
             "integrationStatus",
             "preprocessingStatus",
-            "metadataFields {name valueType multiple}"
+            "metadataFields {name valueType multiple tags}"
             "type",
         ]).generate()
         return q
@@ -97,7 +97,7 @@ class GqlQueries:
             "id",
             "name",
             "datasource {id name rootUrl integrationStatus preprocessingStatus "
-            "metadataFields {name valueType multiple} type}",
+            "metadataFields {name valueType multiple tags} type}",
             "datasetQuery",
         ]).generate()
         return q
