@@ -66,10 +66,40 @@ class GqlMutations:
         return q
 
     @staticmethod
+    @functools.lru_cache()
+    def update_metadata_field():
+        q = GqlQuery().operation(
+            "mutation",
+            name="updateMetadataFieldProps",
+            input={
+                "$datasource": "ID!",
+                "$props": "[MetadataFieldPropsInput!]!"
+            }
+        ).query(
+            "updateMetadataFieldProps",
+            input={
+                "datasource": "$datasource",
+                "props": "$props"
+            }
+        ).fields([
+            "name",
+            "valueType",
+            "multiple",
+            "tags",
+        ]).generate()
+        return q
+
+    @staticmethod
     def update_metadata_params(datasource_id: Union[int, str], datapoints: List[Dict[str, Any]]):
         return {
             "datasource": datasource_id,
             "datapoints": datapoints,
+        }
+
+    def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: List[Dict[str, Any]]):
+        return {
+            "datasource": datasource_id,
+            "props": metadata_field_props
         }
 
     @staticmethod
