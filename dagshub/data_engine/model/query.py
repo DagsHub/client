@@ -1,16 +1,24 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union, Dict
+from typing import TYPE_CHECKING, Optional, Union, Dict, Type
 
 from treelib import Tree, Node
 
+from dagshub.data_engine.client.models import MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError
-from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
+
+_metadataTypeLookup = {
+    int: MetadataFieldType.INTEGER,
+    bool: MetadataFieldType.BOOLEAN,
+    float: MetadataFieldType.FLOAT,
+    str: MetadataFieldType.STRING,
+    bytes: MetadataFieldType.BLOB,
+}
 
 
 def bytes_deserializer(val: str) -> bytes:
@@ -24,6 +32,10 @@ _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
     bytes: bytes_deserializer,
 }
+
+_metadataTypeLookupReverse: Dict[str, Type] = {}
+for k, v in _metadataTypeLookup.items():
+    _metadataTypeLookupReverse[v.value] = k
 
 
 class FieldFilterOperand(enum.Enum):
@@ -131,7 +143,7 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
-            value_type = metadataTypeLookup[type(value)].value
+            value_type = _metadataTypeLookup[type(value)].value
             if type(value) is bytes:
                 # TODO: this will need to probably be changed when we allow actual binary field comparisons
                 value = value.decode("utf-8")
@@ -139,11 +151,11 @@ class DatasourceQuery:
                 value = str(value)
             if value_type is None:
                 raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
-                                   f"Supported types: {list(metadataTypeLookup.keys())}")
+                                   f"Supported types: {list(_metadataTypeLookup.keys())}")
             return {
                 "filter": {
                     "key": key,
-                    "value": str(value),
+                    "value": value,
                     "valueType": value_type,
                     "comparator": query_op.value,
                 }
@@ -176,7 +188,7 @@ class DatasourceQuery:
         if op_type == "filter":
             comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
             key = val["key"]
-            value_type = metadataTypeLookupReverse[val["valueType"]]
+            value_type = _metadataTypeLookupReverse[val["valueType"]]
             converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
             value = converter(val["value"])
             node = Node(tag=comparator, data={"field": key, "value": value})

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from dagshub.data_engine.dtypes import MetadataFieldType
+from dagshub.data_engine.client.models import MetadataFieldType
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, MetadataContextManager
 
 
