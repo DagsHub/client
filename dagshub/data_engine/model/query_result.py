@@ -15,11 +15,15 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.annotation.voxel_conversion import add_voxel_annotations, add_ls_annotations
+from dagshub.data_engine.annotation.voxel_conversion import (
+    add_voxel_annotations,
+    add_ls_annotations,
+)
 from dagshub.data_engine.client.models import DatasourceType
 from dagshub.data_engine.model.datapoint import Datapoint, _get_blob
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
+from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -147,7 +151,10 @@ class QueryResult:
                         the shuffle order is determined for the first epoch; default: False
         """
 
-        send_analytics_event("Client_DataEngine_DataLoaderInitialized", repo=self.datasource.source.repoApi)
+        send_analytics_event(
+            "Client_DataEngine_DataLoaderInitialized",
+            repo=self.datasource.source.repoApi,
+        )
 
         def keypairs(keys):
             return {key: kwargs[key] for key in keys}
@@ -205,10 +212,16 @@ class QueryResult:
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
-                f"needs to be either int or str or slice")
+                f"needs to be either int or str or slice"
+            )
 
-    def get_blob_fields(self, *fields: str, load_into_memory=False,
-                    cache_on_disk=True, num_proc: int = config.download_threads) -> "QueryResult":
+    def get_blob_fields(
+        self,
+        *fields: str,
+        load_into_memory=False,
+        cache_on_disk=True,
+        num_proc: int = config.download_threads,
+    ) -> "QueryResult":
         """
         Downloads data from blob fields
 
@@ -220,25 +233,42 @@ class QueryResult:
             cache_on_disk: Whether to cache the blobs on disk or not (valid only if load_into_memory is set to True)
                 Cache location is `~/dagshub/datasets/<user>/<repo>/<datasource_id>/.metadata_blobs/`
         """
-        send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
+        send_analytics_event(
+            "Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi
+        )
         if not load_into_memory:
             assert cache_on_disk
 
         # If no fields are specified, include all blob fields from self.datasource.fields
         if not fields:
-            fields = [field.name for field in self.datasource.fields if field.is_blob()]
+            fields = [
+                field.name
+                for field in self.datasource.fields
+                if field.valueType == MetadataFieldType.BLOB
+            ]
 
         for fld in fields:
-            logger.info(f"Downloading metadata for field {fld} with {num_proc} processes")
-            cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
+            logger.info(
+                f"Downloading metadata for field {fld} with {num_proc} processes"
+            )
+            cache_location = (
+                self.datasource.default_dataset_location / ".metadata_blobs"
+            )
 
             if cache_on_disk:
                 cache_location.mkdir(parents=True, exist_ok=True)
 
-            blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(fld), self.entries))
+            blob_urls = list(
+                map(lambda dp: dp._extract_blob_url_and_path(fld), self.entries)
+            )
             auth = self.datasource.source.repoApi.auth
-            func_args = zip(map(lambda bu: bu[0], blob_urls), map(lambda bu: bu[1], blob_urls), repeat(auth),
-                            repeat(cache_on_disk), repeat(load_into_memory))
+            func_args = zip(
+                map(lambda bu: bu[0], blob_urls),
+                map(lambda bu: bu[1], blob_urls),
+                repeat(auth),
+                repeat(cache_on_disk),
+                repeat(load_into_memory),
+            )
             with multiprocessing.pool.ThreadPool(num_proc) as pool:
                 res = pool.starmap(_get_blob, func_args)
 
@@ -249,17 +279,30 @@ class QueryResult:
 
         return self
 
-
-    def download_binary_columns(self, *columns: str, load_into_memory=True,
-                                cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+    def download_binary_columns(
+        self,
+        *columns: str,
+        load_into_memory=True,
+        cache_on_disk=True,
+        num_proc: int = 32,
+    ) -> "QueryResult":
         """
         deprecated: Use get_blob_fields instead.
         """
-        return self.get_blob_fields(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk,
-                                    num_proc=num_proc)
+        return self.get_blob_fields(
+            *columns,
+            load_into_memory=load_into_memory,
+            cache_on_disk=cache_on_disk,
+            num_proc=num_proc,
+        )
 
-    def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
-                       redownload=False, path_field: Optional[str] = None) -> PathLike:
+    def download_files(
+        self,
+        target_dir: Optional[Union[str, PathLike]] = None,
+        keep_source_prefix=True,
+        redownload=False,
+        path_field: Optional[str] = None,
+    ) -> PathLike:
         """
         Downloads the query result to the target_dir directory
         Args:
@@ -277,13 +320,23 @@ class QueryResult:
             Path to the directory with the downloaded files
         """
 
-        target_path = self.datasource.default_dataset_location if target_dir is None else Path(target_dir).expanduser()
+        target_path = (
+            self.datasource.default_dataset_location
+            if target_dir is None
+            else Path(target_dir).expanduser()
+        )
         logger.warning(f"Downloading {len(self.entries)} files to {str(target_path)}")
 
         if self.datasource.source.source_type == DatasourceType.BUCKET:
-            send_analytics_event("Client_DataEngine_downloadDatapointsFromBucket", repo=self.datasource.source.repoApi)
+            send_analytics_event(
+                "Client_DataEngine_downloadDatapointsFromBucket",
+                repo=self.datasource.source.repoApi,
+            )
         else:
-            send_analytics_event("Client_DataEngine_downloadDatapoints", repo=self.datasource.source.repoApi)
+            send_analytics_event(
+                "Client_DataEngine_downloadDatapoints",
+                repo=self.datasource.source.repoApi,
+            )
 
         def dp_path(dp: Datapoint):
             if path_field is not None:
@@ -307,7 +360,9 @@ class QueryResult:
             else:
                 return dp.download_url
 
-        download_args = [(dp_url(dp), dp_path(dp)) for dp in self.entries if dp_path(dp) is not None]
+        download_args = [
+            (dp_url(dp), dp_path(dp)) for dp in self.entries if dp_path(dp) is not None
+        ]
 
         download_files(download_args, skip_if_exists=not redownload)
         return target_path
@@ -337,7 +392,9 @@ class QueryResult:
             ds: fo.Dataset = fo.Dataset(name)
         # ds.persistent = True
 
-        dataset_location = Path(kwargs.get("files_location", self.datasource.default_dataset_location))
+        dataset_location = Path(
+            kwargs.get("files_location", self.datasource.default_dataset_location)
+        )
         dataset_location.mkdir(parents=True, exist_ok=True)
         logger.info("Downloading files...")
 
@@ -355,7 +412,9 @@ class QueryResult:
             self._check_downloaded_dataset_size()
 
         redownload = kwargs.get("redownload", False)
-        self.download_files(self.datasource.default_dataset_location, redownload=redownload)
+        self.download_files(
+            self.datasource.default_dataset_location, redownload=redownload
+        )
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         task = progress.add_task("Generating voxel samples...", total=len(self.entries))
@@ -364,7 +423,9 @@ class QueryResult:
 
         with progress:
             for datapoint in self.entries:
-                filepath = self.datasource.default_dataset_location / datapoint.path_in_repo
+                filepath = (
+                    self.datasource.default_dataset_location / datapoint.path_in_repo
+                )
                 sample = fo.Sample(filepath=filepath)
                 sample["dagshub_download_url"] = datapoint.download_url
                 sample["datapoint_id"] = datapoint.datapoint_id
@@ -383,10 +444,12 @@ class QueryResult:
         return ds
 
     def _check_downloaded_dataset_size(self):
-        download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
+        download_size_prompt_threshold = 100 * (2**20)  # 100 Megabytes
         dp_size = self._calculate_datapoint_size()
         if dp_size is not None and dp_size > download_size_prompt_threshold:
-            prompt = f"You're about to download {sizeof_fmt(dp_size)} of images locally."
+            prompt = (
+                f"You're about to download {sizeof_fmt(dp_size)} of images locally."
+            )
             should_download = prompt_user(prompt)
             if not should_download:
                 msg = "Downloading voxel dataset cancelled"
@@ -405,22 +468,30 @@ class QueryResult:
             else:
                 all_have_sum_field = False
         if not has_sum_field:
-            logger.warning("None of the datapoints had a size field, can't calculate size of the downloading dataset")
+            logger.warning(
+                "None of the datapoints had a size field, can't calculate size of the downloading dataset"
+            )
             return None
         if not all_have_sum_field:
-            logger.warning("Not every datapoint has a size field, size calculations might be wrong")
+            logger.warning(
+                "Not every datapoint has a size field, size calculations might be wrong"
+            )
         return sum_size
 
     def visualize(self, **kwargs):
         set_voxel_envvars()
 
-        send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
+        send_analytics_event(
+            "Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi
+        )
 
         ds = self.to_voxel51_dataset(**kwargs)
 
         sess = fo.launch_app(ds)
         # Launch the server for plugin interaction
-        plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
+        plugin_server_module.run_plugin_server(
+            sess, self.datasource, self.datasource.source.revision
+        )
 
         return sess
 
@@ -432,7 +503,10 @@ class QueryResult:
         :param ignore_warning: Suppress any non-lethal warnings that require user input
         :return The URL of the created Label Studio workspace
         """
-        send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
+        send_analytics_event(
+            "Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi
+        )
 
-        return self.datasource.send_datapoints_to_annotation(self.entries,
-                                                             open_project=open_project, ignore_warning=ignore_warning)
+        return self.datasource.send_datapoints_to_annotation(
+            self.entries, open_project=open_project, ignore_warning=ignore_warning
+        )
