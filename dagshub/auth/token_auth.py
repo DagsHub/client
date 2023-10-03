@@ -200,13 +200,15 @@ class HTTPBearerAuth(Auth):
         yield request
 
     def __eq__(self, other):
-        return all([
-            self.token == getattr(other, 'token', None),
-        ])
+        return all(
+            [
+                self.token == getattr(other, "token", None),
+            ]
+        )
 
     def __ne__(self, other):
         return not self == other
 
     def __call__(self, r):
-        r.headers['Authorization'] = f'Bearer {self.token}'
+        r.headers["Authorization"] = f"Bearer {self.token}"
         return r

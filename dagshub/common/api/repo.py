@@ -1,7 +1,13 @@
 import logging
 
-from dagshub.common.api.responses import RepoAPIResponse, BranchAPIResponse, CommitAPIResponse, StorageAPIEntry, \
-    ContentAPIEntry, StorageContentAPIResult
+from dagshub.common.api.responses import (
+    RepoAPIResponse,
+    BranchAPIResponse,
+    CommitAPIResponse,
+    StorageAPIEntry,
+    ContentAPIEntry,
+    StorageContentAPIResult,
+)
 from dagshub.common.util import multi_urljoin
 
 try:
@@ -42,7 +48,6 @@ class PathNotFoundError(Exception):
 
 
 class RepoAPI:
-
     def __init__(self, repo: str, host: Optional[str] = None, auth: Optional[Any] = None):
         """
         Class for interacting with the API of a repository
@@ -131,9 +136,7 @@ class RepoAPI:
         """
         Get listing of everything in the specified path
         """
-        params = {
-            "include_size": include_size
-        }
+        params = {"include_size": include_size}
         res = self._http_request("GET", self.content_api_url(path, revision), params=params)
 
         if res.status_code == 404:
@@ -155,10 +158,7 @@ class RepoAPI:
         Path format: <scheme>/<bucket-name>/<path>
         Example: s3/my-bucket/prefix/path/to/file
         """
-        params = {
-            "include_size": include_size,
-            "paging": True
-        }
+        params = {"include_size": include_size, "paging": True}
 
         url = self.storage_content_api_url(path)
         has_next_page = True
@@ -175,8 +175,13 @@ class RepoAPI:
                 raise RuntimeError(error_msg)
 
             content = res.json()
-            if 'entries' not in content:
-                content = {'entries': [content, ], 'next_token': None}
+            if "entries" not in content:
+                content = {
+                    "entries": [
+                        content,
+                    ],
+                    "next_token": None,
+                }
             return dacite.from_dict(StorageContentAPIResult, content)
 
         entries = []
@@ -264,50 +269,32 @@ class RepoAPI:
         URL of the repo on DagsHub
         Format: https://dagshub.com/user/repo
         """
-        return multi_urljoin(
-            self.host,
-            self.owner,
-            self.repo_name
-        )
+        return multi_urljoin(self.host, self.owner, self.repo_name)
 
     def branch_url(self, branch) -> str:
         """
         URL of a branch on the repo
         Format: https://dasghub.com/api/v1/repos/user/repo/branches/branch
         """
-        return multi_urljoin(
-            self.repo_api_url,
-            "branches",
-            branch
-        )
+        return multi_urljoin(self.repo_api_url, "branches", branch)
 
     @cached_property
     def data_engine_url(self) -> str:
         """
         URL of data engine
         """
-        return multi_urljoin(
-            self.repo_api_url,
-            "data-engine"
-        )
+        return multi_urljoin(self.repo_api_url, "data-engine")
 
     @cached_property
     def annotations_url(self) -> str:
-        return multi_urljoin(
-            self.repo_api_url,
-            "annotations"
-        )
+        return multi_urljoin(self.repo_api_url, "annotations")
 
     def commit_url(self, sha) -> str:
         """
         URL of a commit in the repo
         Format: https://dagshub.com/api/v1/repos/user/repo/commits/sha
         """
-        return multi_urljoin(
-            self.repo_api_url,
-            "commits",
-            sha
-        )
+        return multi_urljoin(self.repo_api_url, "commits", sha)
 
     def content_api_url(self, path: str, revision: Optional[str] = None) -> str:
         """
@@ -316,12 +303,7 @@ class RepoAPI:
         """
         if revision is None:
             revision = self.default_branch
-        return multi_urljoin(
-            self.repo_api_url,
-            "content",
-            revision,
-            path
-        )
+        return multi_urljoin(self.repo_api_url, "content", revision, path)
 
     def raw_api_url(self, path: str, revision: Optional[str] = None) -> str:
         """
@@ -330,12 +312,7 @@ class RepoAPI:
         """
         if revision is None:
             revision = self.default_branch
-        return multi_urljoin(
-            self.repo_api_url,
-            "raw",
-            revision,
-            path
-        )
+        return multi_urljoin(self.repo_api_url, "raw", revision, path)
 
     def storage_content_api_url(self, path: str) -> str:
         """
@@ -343,11 +320,7 @@ class RepoAPI:
         path example: s3/bucket-name/path/in/bucket
         Format: https://dagshub.com/api/v1/repos/user/repo/storage/content/path
         """
-        return multi_urljoin(
-            self.repo_api_url,
-            "storage/content",
-            path
-        )
+        return multi_urljoin(self.repo_api_url, "storage/content", path)
 
     def storage_raw_api_url(self, path: str) -> str:
         """
@@ -355,11 +328,7 @@ class RepoAPI:
         path example: s3/bucket-name/path/in/bucket
         Format: https://dagshub.com/api/v1/repos/user/repo/storage/raw/path
         """
-        return multi_urljoin(
-            self.repo_api_url,
-            "storage/raw",
-            path
-        )
+        return multi_urljoin(self.repo_api_url, "storage/raw", path)
 
     def storage_api_url(self) -> str:
         """

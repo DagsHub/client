@@ -50,11 +50,7 @@ class ScanOption(str, enum.Enum):
 class MetadataFieldSchema:
     # This should match the GraphQL schema: MetadataFieldProps
     name: str
-    valueType: MetadataFieldType = field(
-        metadata=config(
-            encoder=lambda val: val.value
-        )
-    )
+    valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     multiple: bool
     tags: Optional[List[str]]
 

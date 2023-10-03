@@ -16,9 +16,7 @@ class TensorFlowDataset(DagsHubDataset):
     def __init__(self, *args, **kwargs):
         self.tensorlib = Tensorizers
         super().__init__(*args, **kwargs)
-        self.signature = tuple(
-            tf.TensorSpec.from_tensor(tensor) for tensor in next(self.generator())
-        )
+        self.signature = tuple(tf.TensorSpec.from_tensor(tensor) for tensor in next(self.generator()))
 
     def generator(self):
         for idx in range(len(self)):
@@ -56,13 +54,9 @@ class TensorFlowDataLoader(tf.keras.utils.Sequence):
     def __getitem__(self, index: int) -> tf.Tensor:
         samples = [
             self.dataset.__getitem__(index)
-            for index in self.indices[
-                index * self.batch_size : (index + 1) * self.batch_size
-            ]
+            for index in self.indices[index * self.batch_size : (index + 1) * self.batch_size]
         ]
-        batch = [
-            [] for _ in range(len(samples[0]))
-        ]  # [[]] * len(samples[0]) creates lists shallowly
+        batch = [[] for _ in range(len(samples[0]))]  # [[]] * len(samples[0]) creates lists shallowly
         for sample in samples:
             for idx, tensor in enumerate(sample):
                 batch[idx].append(tensor)

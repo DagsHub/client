@@ -70,9 +70,7 @@ class QueryResult:
             metadata_keys.update(e.metadata.keys())
 
         metadata_keys = list(sorted(metadata_keys))
-        return pd.DataFrame.from_records(
-            [dp.to_dict(metadata_keys) for dp in self.entries]
-        )
+        return pd.DataFrame.from_records([dp.to_dict(metadata_keys) for dp in self.entries])
 
     def __len__(self):
         return len(self.entries)
@@ -84,9 +82,7 @@ class QueryResult:
         return f"QueryResult of datasource {self.datasource.source.name} with {len(self.entries)} datapoint(s)"
 
     @staticmethod
-    def from_gql_query(
-        query_resp: Dict[str, Any], datasource: "Datasource"
-    ) -> "QueryResult":
+    def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
         if "edges" not in query_resp:
             return QueryResult([], datasource)
         if query_resp["edges"] is None:
@@ -119,9 +115,7 @@ class QueryResult:
             from dagshub.data_engine.client.loaders.tf import TensorFlowDataset
 
             ds_builder = TensorFlowDataset(self, **kwargs)
-            ds = tf.data.Dataset.from_generator(
-                ds_builder.generator, output_signature=ds_builder.signature
-            )
+            ds = tf.data.Dataset.from_generator(ds_builder.generator, output_signature=ds_builder.signature)
             ds.__len__ = lambda: ds_builder.__len__()
             ds.__getitem__ = ds_builder.__getitem__
             ds.builder = ds_builder
@@ -163,18 +157,14 @@ class QueryResult:
                 return TensorFlowDataLoader(flavor, **kwargs)
 
         kwargs["for_dataloader"] = True
-        dataset_kwargs = set(
-            list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
-        )
+        dataset_kwargs = set(list(inspect.signature(DagsHubDataset).parameters.keys())[1:])
         global_kwargs = set(kwargs.keys())
         flavor = flavor.lower() if type(flavor) == str else flavor
         if flavor == "torch":
             from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 
             return PyTorchDataLoader(
-                self.as_ml_dataset(
-                    flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))
-                ),
+                self.as_ml_dataset(flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))),
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         elif flavor == "tensorflow":
@@ -188,9 +178,7 @@ class QueryResult:
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         else:
-            raise ValueError(
-                "supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>"
-            )
+            raise ValueError("supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>")
 
     def __getitem__(self, item: Union[str, int, slice]):
         """
@@ -205,10 +193,12 @@ class QueryResult:
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
-                f"needs to be either int or str or slice")
+                f"needs to be either int or str or slice"
+            )
 
-    def get_blob_fields(self, *fields: str, load_into_memory=False,
-                        cache_on_disk=True, num_proc: int = config.download_threads) -> "QueryResult":
+    def get_blob_fields(
+        self, *fields: str, load_into_memory=False, cache_on_disk=True, num_proc: int = config.download_threads
+    ) -> "QueryResult":
         """
         Downloads data from blob fields
 
@@ -232,8 +222,13 @@ class QueryResult:
 
             blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(fld), self.entries))
             auth = self.datasource.source.repoApi.auth
-            func_args = zip(map(lambda bu: bu[0], blob_urls), map(lambda bu: bu[1], blob_urls), repeat(auth),
-                            repeat(cache_on_disk), repeat(load_into_memory))
+            func_args = zip(
+                map(lambda bu: bu[0], blob_urls),
+                map(lambda bu: bu[1], blob_urls),
+                repeat(auth),
+                repeat(cache_on_disk),
+                repeat(load_into_memory),
+            )
             with multiprocessing.pool.ThreadPool(num_proc) as pool:
                 res = pool.starmap(_get_blob, func_args)
 
@@ -244,16 +239,23 @@ class QueryResult:
 
         return self
 
-    def download_binary_columns(self, *columns: str, load_into_memory=True,
-                                cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+    def download_binary_columns(
+        self, *columns: str, load_into_memory=True, cache_on_disk=True, num_proc: int = 32
+    ) -> "QueryResult":
         """
         deprecated: Use get_blob_fields instead.
         """
-        return self.get_blob_fields(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk,
-                                    num_proc=num_proc)
+        return self.get_blob_fields(
+            *columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk, num_proc=num_proc
+        )
 
-    def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
-                       redownload=False, path_field: Optional[str] = None) -> PathLike:
+    def download_files(
+        self,
+        target_dir: Optional[Union[str, PathLike]] = None,
+        keep_source_prefix=True,
+        redownload=False,
+        path_field: Optional[str] = None,
+    ) -> PathLike:
         """
         Downloads the query result to the target_dir directory
         Args:
@@ -377,7 +379,7 @@ class QueryResult:
         return ds
 
     def _check_downloaded_dataset_size(self):
-        download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
+        download_size_prompt_threshold = 100 * (2**20)  # 100 Megabytes
         dp_size = self._calculate_datapoint_size()
         if dp_size is not None and dp_size > download_size_prompt_threshold:
             prompt = f"You're about to download {sizeof_fmt(dp_size)} of images locally."
@@ -428,5 +430,6 @@ class QueryResult:
         """
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
 
-        return self.datasource.send_datapoints_to_annotation(self.entries,
-                                                             open_project=open_project, ignore_warning=ignore_warning)
+        return self.datasource.send_datapoints_to_annotation(
+            self.entries, open_project=open_project, ignore_warning=ignore_warning
+        )

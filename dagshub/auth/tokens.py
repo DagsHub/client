@@ -9,8 +9,14 @@ import yaml
 from httpx import Auth
 
 from dagshub.auth import oauth
-from dagshub.auth.token_auth import HTTPBearerAuth, DagshubTokenABC, TokenDeserializationError, AppDagshubToken, \
-    EnvVarDagshubToken, DagshubAuthenticator
+from dagshub.auth.token_auth import (
+    HTTPBearerAuth,
+    DagshubTokenABC,
+    TokenDeserializationError,
+    AppDagshubToken,
+    EnvVarDagshubToken,
+    DagshubAuthenticator,
+)
 from dagshub.common import config
 from dagshub.common.helpers import http_request
 from dagshub.common.util import multi_urljoin
@@ -110,13 +116,13 @@ class TokenStorage:
 
     def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
         """
-         This function does following:
-         - Iterates over all tokens in the cache for the provided host
-         - Finds a first valid token and returns it
-         - If it finds an invalid token, it deletes it from the cache
+        This function does following:
+        - Iterates over all tokens in the cache for the provided host
+        - Finds a first valid token and returns it
+        - If it finds an invalid token, it deletes it from the cache
 
-         We're using a set of known good tokens to skip rechecking for token validity every time
-         """
+        We're using a set of known good tokens to skip rechecking for token validity every time
+        """
 
         host = host or config.host
         if host == config.host and config.token is not None:
@@ -156,11 +162,10 @@ class TokenStorage:
                 if fail_if_no_token:
                     raise RuntimeError(
                         f"No valid tokens found for host '{host}'.\n"
-                        "Log into DagsHub by executing `dagshub login` in your terminal")
-                else:
-                    logger.debug(
-                        f"No valid tokens found for host '{host}'. Authenticating with OAuth"
+                        "Log into DagsHub by executing `dagshub login` in your terminal"
                     )
+                else:
+                    logger.debug(f"No valid tokens found for host '{host}'. Authenticating with OAuth")
                     good_token = oauth.oauth_flow(host, **kwargs)
                     tokens.append(good_token)
                     good_token_set.add(good_token)
@@ -235,9 +240,7 @@ class TokenStorage:
                     return self._v1_token_list_parser(cache_yaml)
                 raise RuntimeError(f"Don't know how to parse token schema {version}")
         except Exception:
-            logger.error(
-                f"Error while loading DagsHub token cache: {traceback.format_exc()}"
-            )
+            logger.error(f"Error while loading DagsHub token cache: {traceback.format_exc()}")
             raise
 
     @staticmethod
@@ -275,9 +278,7 @@ class TokenStorage:
             with open(self.cache_location, "w") as f:
                 yaml.dump(dict_to_dump, f, yaml.Dumper)
         except Exception:
-            logger.error(
-                f"Error while storing DagsHub token cache: {traceback.format_exc()}"
-            )
+            logger.error(f"Error while storing DagsHub token cache: {traceback.format_exc()}")
             raise
 
     def __getstate__(self):
@@ -287,7 +288,7 @@ class TokenStorage:
         # However, I'm not sure of a good way to solve it
         access_lock_key = f"_{self.__class__.__name__}__token_access_lock"
         if access_lock_key in d:
-            del (d[access_lock_key])
+            del d[access_lock_key]
         return d
 
     def __setstate__(self, state):

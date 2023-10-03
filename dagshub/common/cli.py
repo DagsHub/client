@@ -35,9 +35,7 @@ def cli(ctx, host, quiet):
 @click.option("--repo_url", help="URL of the repo hosted on DagsHub")
 @click.option("--branch", help="Repository's branch")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
-@click.option(
-    "--debug", default=False, type=bool, help="Run fuse in foreground"
-)
+@click.option("--debug", default=False, type=bool, help="Run fuse in foreground")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def mount(ctx, verbose, quiet, **kwargs):
@@ -130,21 +128,11 @@ def to_log_level(verbosity):
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
-@click.option("--versioning", help="Versioning system to be used to upload the file(s)",
-              type=click.Choice(["git", "dvc", "auto"]))
+@click.option(
+    "--versioning", help="Versioning system to be used to upload the file(s)", type=click.Choice(["git", "dvc", "auto"])
+)
 @click.pass_context
-def upload(ctx,
-           filename,
-           target,
-           repo,
-           message,
-           branch,
-           verbose,
-           update,
-           quiet,
-           host,
-           versioning,
-           **kwargs):
+def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet, host, versioning, **kwargs):
     """
     Upload FILENAME to REPO at location TARGET.
 
@@ -165,11 +153,15 @@ def upload(ctx,
     owner, repo_name = repo
     repo = Repo(owner=owner, name=repo_name, branch=branch)
     try:
-        repo.upload(local_path=filename, remote_path=target, commit_message=message, force=update,
-                    versioning=versioning)
+        repo.upload(
+            local_path=filename, remote_path=target, commit_message=message, force=update, versioning=versioning
+        )
     except UpdateNotAllowedError:
-        log_message(":warning: You're trying to update existing files! :warning:\n"
-                    "If you want to do that, retry with --update to force the update", logger)
+        log_message(
+            ":warning: You're trying to update existing files! :warning:\n"
+            "If you want to do that, retry with --update to force the update",
+            logger,
+        )
 
 
 @cli.command()
@@ -195,12 +187,7 @@ def repo():
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
-def create(ctx,
-           repo_name,
-           upload_data,
-           clone,
-           verbose,
-           quiet):
+def create(ctx, repo_name, upload_data, clone, verbose, quiet):
     """
     create a repo and:\n
     optional- upload files to 'data' dir,
@@ -217,7 +204,6 @@ def create(ctx,
     logger.setLevel(to_log_level(verbose))
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-
         # override default host if provided by --host
         host = ctx.obj["host"]
 
@@ -234,17 +220,17 @@ def create(ctx,
             downloaded_file_name = os.path.basename(urlparse(upload_data).path)
 
             # save to disk
-            with open(downloaded_file_name, 'wb') as fh:
+            with open(downloaded_file_name, "wb") as fh:
                 fh.write(res.content)
 
             log_message(f"Downloaded and saved {downloaded_file_name}", logger)
 
             # extract to data dir or move there
             if zipfile.is_zipfile(downloaded_file_name):
-                with zipfile.ZipFile(downloaded_file_name, 'r') as zip_ref:
+                with zipfile.ZipFile(downloaded_file_name, "r") as zip_ref:
                     zip_ref.extractall(tmp_dir)
             elif tarfile.is_tarfile(downloaded_file_name):
-                with tarfile.TarFile(downloaded_file_name, 'r') as tar_ref:
+                with tarfile.TarFile(downloaded_file_name, "r") as tar_ref:
                     tar_ref.extractall(tmp_dir)
             else:
                 shutil.move(downloaded_file_name, f"{tmp_dir}/{downloaded_file_name}")
