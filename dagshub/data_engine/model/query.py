@@ -88,10 +88,12 @@ class DatasourceQuery:
             if type(other) is not DatasourceQuery:
                 raise RuntimeError(f"Expected other argument to be a dataset, got {type(other)} instead")
             if op not in ["and", "or"]:
-                raise RuntimeError(f"Cannot use operator '{op}' to chain two queries together.\r\n"
-                                   f"Queries:\r\n"
-                                   f"\t{self}\r\n"
-                                   f"\t{other}\r\n")
+                raise RuntimeError(
+                    f"Cannot use operator '{op}' to chain two queries together.\r\n"
+                    f"Queries:\r\n"
+                    f"\t{self}\r\n"
+                    f"\t{other}\r\n"
+                )
             # Don't compose with an empty query, carry the other instead
             if self.is_empty:
                 self._operand_tree = other._operand_tree
@@ -138,8 +140,10 @@ class DatasourceQuery:
             else:
                 value = str(value)
             if value_type is None:
-                raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
-                                   f"Supported types: {list(metadataTypeLookup.keys())}")
+                raise RuntimeError(
+                    f"Value type {value_type} is not supported for querying.\r\n"
+                    f"Supported types: {list(metadataTypeLookup.keys())}"
+                )
             return {
                 "filter": {
                     "key": key,

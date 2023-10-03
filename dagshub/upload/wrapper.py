@@ -29,7 +29,7 @@ DEFAULT_DATASET_COMMIT_MESSAGE = "Initial dataset commit"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
-DEFAULT_DATA_DIR_NAME = 'data'
+DEFAULT_DATA_DIR_NAME = "data"
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -56,9 +56,7 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     return repo
 
 
-def add_dataset_to_repo(repo,
-                        local_path,
-                        data_dir=DEFAULT_DATA_DIR_NAME):
+def add_dataset_to_repo(repo, local_path, data_dir=DEFAULT_DATA_DIR_NAME):
     """
     Given a repository created on dagshub - upload an entire dataset to it
     :param reo (Reop): repository created beforehand
@@ -79,7 +77,7 @@ def create_repo(
     license="",
     readme="",
     template="custom",
-    host=""
+    host="",
 ):
     """
     Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
@@ -144,8 +142,12 @@ def create_repo(
 
     repo = res.json()
     return Repo(
-        owner=repo["owner"]["login"], name=repo["name"], username=username, password=password,
-        token=token, branch="main"
+        owner=repo["owner"]["login"],
+        name=repo["name"],
+        username=username,
+        password=password,
+        token=token,
+        branch="main",
     )
 
 
@@ -177,10 +179,7 @@ def upload_files(
 
 
 class Repo:
-    def __init__(
-        self, owner, name, username=None, password=None, token=None, branch=None
-    ):
-
+    def __init__(self, owner, name, username=None, password=None, token=None, branch=None):
         """
         Repo class constructor. If branch is not provided, then default branch is used.
 
@@ -311,7 +310,9 @@ class Repo:
             self._uploading_to_new_branch = True
             log_message(
                 f"Uploading to a new branch {self.branch}, "
-                f"splitting it off from the default branch {self._api.default_branch}", logger)
+                f"splitting it off from the default branch {self._api.default_branch}",
+                logger,
+            )
             upload_url = self.get_request_url(directory=directory_path, branch=self._api.default_branch)
             new_branch = self.branch
 
@@ -391,7 +392,8 @@ class Repo:
         # Initial state - assume we can upload
         # Also can upload if last upload didn't have any changes
         if not self._uploading_to_new_branch and (
-            self._last_upload_revision is None or not self._last_upload_had_changes):
+            self._last_upload_revision is None or not self._last_upload_had_changes
+        ):
             return
 
         poll_interval = 1.0  # seconds
@@ -403,6 +405,7 @@ class Repo:
 
             def finish():
                 self.current_progress.remove_task(task)
+
         else:
             status = rich.status.Status("Waiting for the mirror to sync", console=rich_console)
             status.start()
@@ -424,8 +427,10 @@ class Repo:
                 return
 
         finish()
-        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
-                       f"Trying to push anyway, which might not work.")
+        logger.warning(
+            f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
+            f"Trying to push anyway, which might not work."
+        )
 
     @property
     def auth(self):
@@ -525,9 +530,7 @@ class DataSet:
         path, file = self.get_file(file, path)
         if file is not None:
             if path in self.files:
-                log_message(
-                    f'File already staged for upload on path "{path}". Overwriting', logger
-                )
+                log_message(f'File already staged for upload on path "{path}". Overwriting', logger)
             self.files[path] = (path, file)
 
     def add_dir(self, local_path, glob_exclude="", commit_message=None, **upload_kwargs):
@@ -547,9 +550,14 @@ class DataSet:
         upload_file_number = 100
         file_counter = 0
 
-        progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
-                                          rich.progress.MofNCompleteColumn(),
-                                          console=rich_console, transient=True, disable=config.quiet)
+        progress = rich.progress.Progress(
+            rich.progress.SpinnerColumn(),
+            *rich.progress.Progress.get_default_columns(),
+            rich.progress.MofNCompleteColumn(),
+            console=rich_console,
+            transient=True,
+            disable=config.quiet,
+        )
         total_task = progress.add_task("Uploading files...", total=None)
         self.repo.current_progress = progress
 
@@ -571,10 +579,7 @@ class DataSet:
                         for filename in files:
                             rel_file_path = posixpath.join(root, filename)
                             rel_remote_file_path = rel_file_path.replace(local_path, "")
-                            if (
-                                glob_exclude == ""
-                                or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
-                            ):
+                            if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
                                 self.add(file=rel_file_path, path=rel_remote_file_path)
                                 if len(self.files) >= upload_file_number:
                                     file_counter += len(self.files)
@@ -593,8 +598,11 @@ class DataSet:
                     self.commit(commit_message, **upload_kwargs)
                     progress.update(total_task, completed=file_counter)
 
-            log_message(f"Directory upload complete, uploaded {file_counter} files"
-                        f" to {self.repo.get_files_ui_url(self.directory)}", logger)
+            log_message(
+                f"Directory upload complete, uploaded {file_counter} files"
+                f" to {self.repo.get_files_ui_url(self.directory)}",
+                logger,
+            )
         finally:
             self.repo.current_progress = None
 
@@ -633,9 +641,7 @@ class DataSet:
             # if path is not provided, fall back to the file name
             if path is None:
                 try:
-                    path = posixpath.basename(
-                        posixpath.normpath(file if type(file) is str else file.name)
-                    )
+                    path = posixpath.basename(posixpath.normpath(file if type(file) is str else file.name))
                 except Exception:
                     raise RuntimeError(
                         "Could not interpret your file's name. Please specify it in the keyword parameter 'path'."
@@ -646,9 +652,7 @@ class DataSet:
                     f = open(file, "rb")
                     return path, f
                 except IsADirectoryError:
-                    raise IsADirectoryError(
-                        "'file' must describe a file, not a directory."
-                    )
+                    raise IsADirectoryError("'file' must describe a file, not a directory.")
 
             return path, file
 
@@ -684,7 +688,5 @@ class DataSet:
         """
 
         file_list = list(self.files.values())
-        self.repo.upload_files(
-            file_list, self.directory, commit_message=commit_message, *args, **kwargs
-        )
+        self.repo.upload_files(file_list, self.directory, commit_message=commit_message, *args, **kwargs)
         self._reset_dataset()
