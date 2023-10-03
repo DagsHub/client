@@ -12,7 +12,9 @@ from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus, DatasetResult, MetadataFieldType, ScanOption
+    PreprocessingStatus, DatasetResult, MetadataFieldSchema
+from dagshub.data_engine.dtypes import MetadataFieldType
+from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
@@ -31,7 +33,6 @@ class DataClient:
     FULL_LIST_PAGE_SIZE = 5000
 
     def __init__(self, repo: str):
-        # TODO: add project authentication here
         self.repo = repo
         self.host = config.host
         self.client = self._init_client()
@@ -39,7 +40,7 @@ class DataClient:
     def _init_client(self):
         url = f"{self.host}/api/v1/repos/{self.repo}/data-engine/graphql"
         auth = dagshub.auth.get_authenticator(host=self.host)
-        transport = RequestsHTTPTransport(url=url, auth=auth)
+        transport = RequestsHTTPTransport(url=url, auth=auth, headers=config.requests_headers)
         client = gql.Client(transport=transport)
         return client
 
@@ -152,6 +153,19 @@ class DataClient:
         params = GqlMutations.update_metadata_params(
             datasource_id=datasource.source.id,
             datapoints=[e.to_dict() for e in entries]
+        )
+
+        return self._exec(q, params)
+
+    def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
+        q = GqlMutations.update_metadata_field()
+
+        assert datasource.source.id is not None
+        # assert len(entries) > 0
+
+        params = GqlMutations.update_metadata_fields_params(
+            datasource_id=datasource.source.id,
+            metadata_field_props=[e.to_dict() for e in metadata_field_props]
         )
 
         return self._exec(q, params)

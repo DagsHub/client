@@ -5,7 +5,7 @@ from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECK
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
-from dagshub.data_engine.client.models import MetadataFieldType
+from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
