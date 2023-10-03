@@ -24,6 +24,7 @@ class DagshubDataType(metaclass=ABCMeta):
         backing_field_type: primitive type in the data engine database
         custom_tags: additional tags applied to this type
     """
+
     backing_field_type: MetadataFieldType = None
     custom_tags: List[str] = None
 

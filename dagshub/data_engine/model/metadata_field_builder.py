@@ -37,8 +37,10 @@ class MetadataFieldBuilder:
     @property
     def schema(self) -> MetadataFieldSchema:
         if self._schema is None:
-            raise RuntimeError(f"Field {self._field_name} is a new field. "
-                               "Make sure to set_type() the field before setting any other properties")
+            raise RuntimeError(
+                f"Field {self._field_name} is a new field. "
+                "Make sure to set_type() the field before setting any other properties"
+            )
         return self._schema
 
     def set_type(self, t: Union[Type, DagshubDataType]) -> "MetadataFieldBuilder":
@@ -51,18 +53,15 @@ class MetadataFieldBuilder:
         backing_type = self._get_backing_type(t)
 
         if self._schema is None:
-            self._schema = MetadataFieldSchema(
-                name=self._field_name,
-                valueType=backing_type,
-                multiple=False,
-                tags=[]
-            )
+            self._schema = MetadataFieldSchema(name=self._field_name, valueType=backing_type, multiple=False, tags=[])
             if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._schema.tags = t.custom_tags.copy()
         else:
             if backing_type != self._schema.valueType:
-                raise ValueError("Can't change a type of an already existing field "
-                                 f"(changing from {self._schema.valueType.value} to {backing_type.value})")
+                raise ValueError(
+                    "Can't change a type of an already existing field "
+                    f"(changing from {self._schema.valueType.value} to {backing_type.value})"
+                )
             if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._add_tags(t.custom_tags)
 

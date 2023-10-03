@@ -111,8 +111,9 @@ class Datapoint:
         else:
             raise ValueError(f"Can't extract blob metadata from value {current_value} of type {type(current_value)}")
 
-    def download_file(self, target: Optional[Union[PathLike, str]] = None, keep_source_prefix=True,
-                      redownload=False) -> PathLike:
+    def download_file(
+        self, target: Optional[Union[PathLike, str]] = None, keep_source_prefix=True, redownload=False
+    ) -> PathLike:
         """
         Downloads the datapoint to the target_dir directory
         Args:
@@ -132,7 +133,8 @@ class Datapoint:
         # by checking if there's an extension, or it's an already existing file
         n = target_path.name
         target_is_already_file = (target_path.exists() and target_path.is_file()) or (
-            "." in n and not n.startswith("."))
+            "." in n and not n.startswith(".")
+        )
 
         if not target_is_already_file:
             if keep_source_prefix:
@@ -157,8 +159,9 @@ class Datapoint:
         return self.blob_url(sha), self.blob_cache_location / sha
 
 
-def _get_blob(url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk, return_blob) -> Optional[
-    Union[Path, str, bytes]]:
+def _get_blob(
+    url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk, return_blob
+) -> Optional[Union[Path, str, bytes]]:
     """
     Args:
         url: url to download the blob from
