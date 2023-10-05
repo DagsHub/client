@@ -439,6 +439,7 @@ def test_blob_deserialization(ds):
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
 
+
 def test_sequential_querying(ds):
     add_blob_fields(ds, "col1")
     add_blob_fields(ds, "col2")

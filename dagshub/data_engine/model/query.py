@@ -64,6 +64,7 @@ for k, v in fieldFilterOperandMap.items():
 
 UNFILLED_NODE_TAG = "undefined"
 
+
 class DatasourceQuery:
     def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None):
         self._operand_tree: Tree = Tree()
