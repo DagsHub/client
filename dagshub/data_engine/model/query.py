@@ -50,14 +50,15 @@ fieldFilterOperandMapReverseMap: Dict[str, str] = {}
 for k, v in fieldFilterOperandMap.items():
     fieldFilterOperandMapReverseMap[v.value] = k
 
+UNFILLED_NODE_TAG = "undefined"
+
 
 class DatasourceQuery:
     def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None):
         self._operand_tree: Tree = Tree()
-        self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
         if type(column_or_query) is str:
-            # If it's ds["column"] then the root node is just the column name
-            self._column_filter = column_or_query
+            # If it's ds["column"] then the root node is just the column name, will be filled later
+            self._operand_tree.create_node(UNFILLED_NODE_TAG, data={"field": column_or_query})
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
 
@@ -68,13 +69,17 @@ class DatasourceQuery:
 
     @property
     def column_filter(self) -> Optional[str]:
-        return self._column_filter
+        filter_node = self._column_filter_node
+        if filter_node is None:
+            return None
+        return filter_node.data["field"]
 
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
-        if self._column_filter is not None:
-            # Just the column is in the query - compose into a tree
-            self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
-            self._column_filter = None
+        if self._column_filter_node is not None:
+            # If there was an unfilled query node with a column - put the operand in that node
+            node = self._column_filter_node
+            node.tag = op
+            node.data.update({"value": other})
         elif op == "isnull":
             # Can only do isnull on the column filter, if we got here, there's something wrong
             raise RuntimeError("is_null operation can only be done on a column (e.g. ds['col1'].is_null())")
@@ -98,13 +103,17 @@ class DatasourceQuery:
             if self.is_empty:
                 self._operand_tree = other._operand_tree
                 return
-            elif other.is_empty:
+            elif other.is_empty and other._column_filter_node is None:
                 return
             composite_tree = Tree()
             root_node = composite_tree.create_node(op)
             composite_tree.paste(root_node.identifier, self._operand_tree)
             composite_tree.paste(root_node.identifier, other._operand_tree)
             self._operand_tree = composite_tree
+
+    @property
+    def _column_filter_node(self) -> Node:
+        return next(self._operand_tree.filter_nodes(lambda n: n.tag == UNFILLED_NODE_TAG), None)
 
     @property
     def _operand_root(self) -> Node:
@@ -198,12 +207,9 @@ class DatasourceQuery:
 
     def __deepcopy__(self, memodict={}):
         q = DatasourceQuery()
-        if self._column_filter is not None:
-            q._column_filter = self._column_filter
-        else:
-            q._operand_tree = Tree(tree=self._operand_tree, deep=True)
+        q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 
     @property
     def is_empty(self):
-        return self._column_filter is not None or self._operand_tree.root is None
+        return self._operand_tree.root is None or self._column_filter_node is not None
