@@ -16,7 +16,7 @@ def test_query_single_column(ds):
     assert type(ds2) is Datasource
 
     q = ds2.get_query()
-    print(q._column_filter == column_name)
+    print(q.column_filter == column_name)
 
 
 def test_simple_filter(ds):
@@ -438,3 +438,20 @@ def test_blob_deserialization(ds):
     }
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+
+def test_sequential_querying(ds):
+    add_blob_fields(ds, "col1")
+    add_blob_fields(ds, "col2")
+    queried = ds["col1"].is_null()
+    queried2 = queried["col2"].is_null()
+
+    expected = {
+        "and": {
+            "children": [
+                {"isnull": {"data": {"field": "col1", "value": b""}}},
+                {"isnull": {"data": {"field": "col2", "value": b""}}},
+            ],
+            "data": None,
+        }
+    }
+    assert queried2.get_query().to_dict() == expected

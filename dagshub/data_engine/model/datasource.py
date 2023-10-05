@@ -477,19 +477,20 @@ class Datasource:
         if type(other) is str:
             if not self.has_field(other):
                 raise FieldNotFoundError(other)
-            new_ds._query = DatasourceQuery(other)
-            return new_ds
-        else:
-            # "index" is a datasource with a query - compose with "and"
-            # Example:
-            #   ds = Dataset()
-            #   filtered_ds = ds[ds["aaa"] > 5]
-            #   filtered_ds2 = filtered_ds[filtered_ds["bbb"] < 4]
+            other_query = DatasourceQuery(other)
             if self._query.is_empty:
-                new_ds._query = other._query
-                return new_ds
+                new_ds._query = other_query
             else:
-                return other.__and__(self)
+                new_ds._query.compose("and", other_query)
+            return new_ds
+        # "index" is a datasource with a query - return the datasource inside
+        # Example:
+        #   ds = Dataset()
+        #   filtered_ds = ds[ds["aaa"] > 5]
+        #   filtered_ds2 = filtered_ds[filtered_ds["bbb"] < 4]
+        # filtered_ds2 will be "aaa" > 5 AND "bbb" < 4
+        if isinstance(other, Datasource):
+            return other
 
     def __gt__(self, other: object):
         self._test_not_comparing_other_ds(other)
