@@ -257,7 +257,7 @@ class Repo:
         self,
         files: List[FileUploadStruct],
         directory_path: str = "",
-        commit_message: str = DEFAULT_COMMIT_MESSAGE,
+        commit_message: Optional[str] = DEFAULT_COMMIT_MESSAGE,
         versioning: str = "auto",
         new_branch: str = None,
         last_commit: str = None,
@@ -278,6 +278,9 @@ class Repo:
             force (bool): Force the upload of a file even if it is already present on the server.
                 Sets last_commit to be the tip of the branch
         """
+
+        if commit_message is None:
+            commit_message = DEFAULT_COMMIT_MESSAGE
 
         # Truncate the commit message because the max we allow is 100 symbols
         commit_message = commit_message[:100]
