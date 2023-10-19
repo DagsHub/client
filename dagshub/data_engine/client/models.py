@@ -61,7 +61,7 @@ class MetadataFieldSchema:
         return res
 
     def is_annotation(self):
-        return ReservedTags.ANNOTATION.value in self.tags if self.tags else False
+        return (ReservedTags.ANNOTATION.value in self.tags if self.tags else False) or self.name == "annotation"
 
 
 @dataclass

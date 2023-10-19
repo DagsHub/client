@@ -63,7 +63,7 @@ class GqlMutations:
                     "name",
                     "valueType",
                     "multiple",
-                    "tags",
+                    # "tags",
                 ]
             )
             .generate()
