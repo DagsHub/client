@@ -4,24 +4,31 @@ import logging
 import tempfile
 from pathlib import Path, PurePosixPath
 from socket import gethostname, gethostbyname
+from typing import TYPE_CHECKING
 
 import httpx
 import urllib.parse
-from IPython import get_ipython
 
+from dagshub.common.util import lazy_load
 from dagshub.common.helpers import log_message
 from dagshub.upload import Repo
+
+if TYPE_CHECKING:
+    import IPython as IPy
+else:
+    IPy = lazy_load("IPython")
+
 
 logger = logging.getLogger(__name__)
 
 
 def _inside_notebook():
-    return get_ipython() is not None
+    return IPy.get_ipython() is not None
 
 
 def _inside_colab():
     try:
-        if get_ipython() and "google.colab" in get_ipython().extension_manager.loaded:
+        if IPy.get_ipython() and "google.colab" in IPy.get_ipython().extension_manager.loaded:
             return True
     except Exception:
         pass
@@ -89,7 +96,7 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning="g
                 file.write(json.dumps(notebook_ipynb["ipynb"], indent=4))
         else:
             log_message("Saving only the execution history for the notebook in Jupyter environments", logger)
-            get_ipython().run_line_magic("notebook", out_path)
+            IPy.get_ipython().run_line_magic("notebook", out_path)
 
         repo = Repo(owner, repo, branch=branch)
         repo.upload(
