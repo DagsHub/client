@@ -1,6 +1,6 @@
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Type, Union, List
+from typing import TYPE_CHECKING, Type, Union, List, Set
 
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags
@@ -53,7 +53,9 @@ class MetadataFieldBuilder:
         backing_type = self._get_backing_type(t)
 
         if self._schema is None:
-            self._schema = MetadataFieldSchema(name=self._field_name, valueType=backing_type, multiple=False, tags=[])
+            self._schema = MetadataFieldSchema(
+                name=self._field_name, valueType=backing_type, multiple=False, tags=set()
+            )
             if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._schema.tags = t.custom_tags.copy()
         else:
@@ -76,14 +78,15 @@ class MetadataFieldBuilder:
 
     def _set_or_unset(self, tag, is_set):
         if is_set:
-            self._add_tags([tag])
+            self._add_tags({tag})
         else:
             self._remove_tag(tag)
 
-    def _add_tags(self, tags: List[str]):
+    def _add_tags(self, tags: Set[str]):
         if self.schema.tags is None:
-            self.schema.tags = []
-        self.schema.tags.extend(tags)
+            self.schema.tags = set()
+        for t in tags:
+            self.schema.tags.add(t)
 
     def _remove_tag(self, tag: str):
         if self.schema.tags is None:

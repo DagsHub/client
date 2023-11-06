@@ -1,7 +1,7 @@
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Union, Optional
+from typing import Any, List, Union, Optional, Set
 
 from dataclasses_json import dataclass_json, config
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
@@ -52,7 +52,7 @@ class MetadataFieldSchema:
     name: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     multiple: bool
-    tags: Optional[List[str]]
+    tags: Optional[Set[str]]
 
     def __repr__(self):
         res = f"{self.name} ({self.valueType.value})"
