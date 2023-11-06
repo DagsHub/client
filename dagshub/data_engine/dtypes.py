@@ -1,6 +1,6 @@
 import enum
 from abc import ABCMeta
-from typing import List, Set
+from typing import Set
 
 
 class ReservedTags(enum.Enum):

@@ -1,6 +1,6 @@
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Type, Union, List, Set
+from typing import TYPE_CHECKING, Type, Union, Set
 
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags
