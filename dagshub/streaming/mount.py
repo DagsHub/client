@@ -43,6 +43,15 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return super(DagsHubFUSE, self).__call__(op, self.fs.project_root / path[1:], *args)
 
     def access(self, path, mode):
+        """
+        Check file accessibility based on the given path and mode.
+
+        Args:
+            path (_type_): The path to check accessibility.
+            mode (_type_): The access mode to check.
+
+        Returns: True if the file is accessible; otherwise, False.
+        """
         logger.debug(f"access - path: {path}, mode:{mode}")
         try:
             self.fs.stat(path)
@@ -50,6 +59,18 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             return False
 
     def open(self, path, flags):
+        """
+        Open a file for reading or writing.
+
+        Args:
+            path (_type_): The path of the file to open.
+            flags (_type_): The flags for opening the file.
+
+        Raises:
+            FuseOSError: If an error occurs while opening the file, a FuseOSError is raised.
+
+        Returns: The file descriptor for the opened file.
+        """
         logger.debug(f"open - path: {path}, flags: {flags}")
         if path == Path(self.fs.project_root / SPECIAL_FILE):
             return SPECIAL_FILE_FH
@@ -61,6 +82,19 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         return os.open(self.fs._relative_path(path), flags, dir_fd=self.fs.project_root_fd)
 
     def getattr(self, path, fd=None):
+        """
+        Get the attributes of a file or directory.
+
+        Args:
+            path (_type_): The path to the file or directory.
+            fd (_type_, optional): An optional file descriptor. Defaults to None.
+
+        Raises:
+            FuseOSError: If the file or directory does not exist, a FuseOSError is raised.
+
+        Returns:
+            _type_: A dictionary containing file attributes such as size, mode, and more.
+        """
         logger.debug(f"getattr - path:{str(path)}, fd:{fd}")
         try:
             if fd:
@@ -89,6 +123,17 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             raise FuseOSError(errno.ENOENT)
 
     def read(self, path, size, offset, fh):
+        """
+        Read data from a file.
+
+        Args:
+            path (_type_): The path of the file to read.
+            size (_type_): The size of data to read.
+            offset (_type_): The offset in the file.
+            fh (_type_): The file descriptor.
+
+        Returns: The data read from the file.
+        """
         logger.debug(f"read - path: {path}, offset: {offset}, fh: {fh}")
         if fh == SPECIAL_FILE_FH:
             return self.fs._special_file()[offset:offset + size]
@@ -97,6 +142,15 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             return os.read(fh, size)
 
     def readdir(self, path, fh):
+        """
+        List the contents of a directory.
+
+        Args:
+            path (_type_): The path of the directory.
+            fh (_type_): The file descriptor.
+
+        Returns: A list of directory contents.
+        """
         logger.debug(f"readdir - path: {path}, fh: {fh}")
         return ['.', '..'] + self.fs.listdir(path)
 
@@ -113,6 +167,17 @@ def mount(debug=False,
           username: Optional[str] = None,
           password: Optional[str] = None,
           token: Optional[str] = None):
+    """_summary_
+
+    Args:
+        debug (bool, optional): _description_. Defaults to False.
+        project_root (Optional[PathLike], optional): _description_. Defaults to None.
+        repo_url (Optional[str], optional): _description_. Defaults to None.
+        branch (Optional[str], optional): _description_. Defaults to None.
+        username (Optional[str], optional): _description_. Defaults to None.
+        password (Optional[str], optional): _description_. Defaults to None.
+        token (Optional[str], optional): _description_. Defaults to None.
+    """
     logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,
                        password=password, token=token)

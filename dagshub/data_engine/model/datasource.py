@@ -492,17 +492,26 @@ class Datasource:
         raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in ds`")
 
     def contains(self, item: str):
+        """
+        Check if the filtering field contains the specified string item.
+        """
         if type(item) is not str:
             return WrongOperatorError(f"Cannot use contains with non-string value {item}")
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
     def is_null(self):
+        """
+        Check if the filtering field is null.
+        """
         field = self._get_filtering_field()
         value_type = _metadataTypeLookupReverse[field.valueType.value]
         return self.add_query_op("isnull", value_type())
 
     def is_not_null(self):
+        """
+        Check if the filtering field is not null.
+        """
         return self.is_null().add_query_op("not")
 
     def _get_filtering_field(self) -> MetadataFieldSchema:
@@ -532,8 +541,7 @@ class Datasource:
             raise WrongOrderError(type(other))
         raise NotImplementedError
 
-    def add_query_op(self, op: str,
-                     other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None) -> "Datasource":
+    def add_query_op(self, op: str, other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None) -> "Datasource":
         """
         Returns a new dataset with an added query param
         """
@@ -556,6 +564,13 @@ class MetadataContextManager:
         self._multivalue_fields = dataset._get_multivalue_fields()
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
+        """ 
+        Update metadata for the specified datapoints.
+
+        Args:
+            datapoints (Union[List[str], str]): A list of datapoints or a single datapoint URL to update metadata for.
+            metadata (Dict[str, Any]): A dictionary containing metadata key-value pairs to update.
+        """
         if isinstance(datapoints, str):
             datapoints = [datapoints]
         for dp in datapoints:

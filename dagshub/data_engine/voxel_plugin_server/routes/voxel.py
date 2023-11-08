@@ -82,6 +82,16 @@ def sanitize_voxel_filter(sess: "fo.Session", filters: List[VoxelFilterState]):
 
 
 def apply_filters_to_datasource(ds: "Datasource", filters: List[VoxelFilterState]) -> "Datasource":
+    """
+    Apply a list of voxel filters to a given datasource.
+
+    Args:
+        ds (Datasource): The datasource to which the filters should be applied.
+        filters (List[VoxelFilterState]): A list of voxel filters to be applied.
+
+    Returns:
+        Datasource: The modified datasource with the applied filters.
+    """
     voxel_query = DatasourceQuery()
     for f in filters:
         filter_query = f.to_datasource_query()

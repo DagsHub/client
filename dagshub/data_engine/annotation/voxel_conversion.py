@@ -11,6 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+    """
+    Adds annotation to the voxel sample.
+
+    Args:
+        sample (fo.Sample): FiftyOne sample to add the annotations to
+        datapoint (Datapoint): Data Engine datapoint to get metadata from
+    """
     from fiftyone import Label
     for field in annotation_fields:
         annotation_val = datapoint.get_blob(field)

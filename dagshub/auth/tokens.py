@@ -27,6 +27,14 @@ class TokenStorage:
         return self.__token_cache
 
     def add_token(self, token: Dict, host: str = None):
+        """
+        Add a token to the token storage for the specified host.
+
+        Args:
+            token (Dict): A dictionary containing the token information.
+            host (str, optional): The host URL for which the token is being added.
+                If not provided, the configuration's default host URL will be used.
+        """
         host = host or config.host
         if host not in self._token_cache:
             self._token_cache[host] = []
@@ -34,6 +42,19 @@ class TokenStorage:
         self._store_cache_file()
 
     def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
+        """
+        Retrieve a token from the token storage for the specified host.
+
+        Args:
+            host (str, optional): The host URL for which the token is being retrieved.
+                If not provided, the configuration's default host URL will be used.
+            
+            fail_if_no_token (bool, optional): If True, raise an error if no valid token is found.
+                If False, initiate OAuth authentication to obtain a token.
+
+        Returns:
+            str: The access token for the specified host.
+        """
         host = host or config.host
         tokens = self._token_cache.get(host, [])
         app_tokens = [t for t in tokens if t.get("token_type") == APP_TOKEN_TYPE]
@@ -118,6 +139,14 @@ def get_token(**kwargs):
 
 
 def add_app_token(token: str, host: Optional[str] = None, **kwargs):
+    """
+    Add an application-specific access token to the token storage.
+
+    Args:
+        token (str): The access token to be added.
+        host (Optional[str], optional): The host URL for which the token is valid.
+            If not provided, the token will be added without an associated host.
+    """
     token_dict = {
         "access_token": token,
         "token_type": APP_TOKEN_TYPE,
@@ -127,6 +156,16 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 
 
 def add_oauth_token(host: Optional[str] = None, **kwargs):
+    """ 
+    Add an OAuth 2.0 access token to the token storage for the specified host.
+
+    Args:
+        host (Optional[str], optional): The host URL for which the access token is being obtained.
+            If not provided, the configuration's default host URL will be used.
+
+    Note:
+        This function initiates the OAuth flow to obtain an access token for the specified host.
+    """
     host = host or config.host
     token = oauth.oauth_flow(host)
     _get_token_storage(**kwargs).add_token(token, host)

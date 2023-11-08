@@ -224,6 +224,18 @@ class DagsHubFilesystem:
         DagsHubFilesystem.already_mounted_filesystems[self.project_root] = self
 
     def get_remote_branch_head(self, branch):
+        """
+        Get the head commit ID of a remote branch.
+
+        Args:
+            branch (str): The name of the remote branch.
+
+        Raises:
+            RuntimeError: Raised if there is an issue when trying to get the head of the branch.
+
+        Returns:
+            str: The commit ID of the head of the remote branch.
+        """
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
         resp = self.http_get(url)
         if resp.status_code != 200:
@@ -256,6 +268,12 @@ class DagsHubFilesystem:
             return answer['username'], answer['password']
 
     def get_remotes_from_git_config(self) -> List[str]:
+        """
+        Get the list of DAGsHub remotes from the Git configuration.
+
+        Returns:
+            List[str]: A list of DAGsHub remote URLs.
+        """
         # Get URLs of dagshub remotes
         git_config = ConfigParser()
         git_config.read(Path(self.project_root) / '.git/config')
@@ -300,6 +318,20 @@ class DagsHubFilesystem:
 
     def open(self, file, mode='r', buffering=-1, encoding=None,
              errors=None, newline=None, closefd=True, opener=None):
+        """ 
+        Open a file for reading or writing, including support for special files and DagsHub integration.
+
+        Args:
+            file (_type_): The file to be opened.
+            mode (str, optional): The mode in which the file should be opened. Defaults to 'r'.
+            buffering (int, optional): The buffering value. Defaults to -1.
+            encoding (_type_, optional): The encoding to use when reading the file. Defaults to None.
+            errors (_type_, optional): The error handling strategy. Defaults to None.
+            newline (_type_, optional): The newline parameter. Defaults to None.
+            closefd (bool, optional): Whether to close the file descriptor. Defaults to True.
+            opener (_type_, optional): The file opener. Defaults to None.
+
+        """
         # FD passthrough
         if type(file) is int:
             return self.__open(file, mode, buffering, encoding, errors, newline, closefd)
@@ -393,6 +425,16 @@ class DagsHubFilesystem:
         return os.open(path.relative_path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *args, dir_fd=None, follow_symlinks=True):
+        """
+        Get the status of a file or directory, including support for special files and DagsHub integration.
+
+        Args:
+            path (_type_): The path of the file or directory to get the status for.
+            dir_fd (_type_, optional): File descriptor of the directory. Defaults to None.
+            follow_symlinks (bool, optional): Whether to follow symbolic links. Defaults to True.
+
+        Returns: A namedtuple containing the file status information.
+        """
         # FD passthrough
         if type(path) is int:
             return self.__stat(path, *args, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
@@ -447,6 +489,13 @@ class DagsHubFilesystem:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
     def chdir(self, path):
+        """
+        Change the current working directory to the specified path, including support for DagsHub integration.
+
+        Args:
+            path (_type_): The path to change the current working directory to.
+
+        """
         # FD check
         if type(path) is int:
             return self.__chdir(path)
@@ -469,6 +518,17 @@ class DagsHubFilesystem:
             self.__chdir(path)
 
     def listdir(self, path='.'):
+        """ 
+        List the contents of a directory, including support for DagsHub integration.
+
+        Args:
+            path (str, optional): The path of the directory to list. Defaults to '.'.
+
+        Raises:
+            error: If an error occurs during the operation, it will be raised.
+
+        Returns: A list of directory contents. If 'path' is a bytes object, the results will also be in bytes.
+        """
         # FD check
         if type(path) is int:
             return self.__listdir(path)

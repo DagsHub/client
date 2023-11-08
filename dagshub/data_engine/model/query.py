@@ -74,6 +74,13 @@ class DatasourceQuery:
         return self._column_filter
 
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
+        """
+        Compose the current query with another query or a value using the specified operator.
+
+        Args:
+            op (str): The operator to use for composing the query.
+            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]): The query or value to compose with.
+        """
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree
             self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
