@@ -52,14 +52,20 @@ for k, v in fieldFilterOperandMap.items():
 
 
 class DatasourceQuery:
-    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None):
+    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None, as_of: Optional[int] = None):
         self._operand_tree: Tree = Tree()
         self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
+        self._as_of: Optional[int] = as_of  # for storing filters when user does ds["column"]
+
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name
             self._column_filter = column_or_query
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
+
+        if as_of:
+            # If it's ds["column"] then the root node is just the column name
+            self._as_of = as_of
 
     def __repr__(self):
         if self.is_empty:
@@ -73,7 +79,7 @@ class DatasourceQuery:
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree
-            self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
+            self._operand_tree.create_node(op, data={"field": self._column_filter, "as_of": self._as_of,"value": other})
             self._column_filter = None
         elif op == "isnull":
             # Can only do isnull on the column filter, if we got here, there's something wrong
@@ -131,6 +137,8 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
+            as_of = node.data["as_of"]
+
             value_type = metadataTypeLookup[type(value)].value
             if type(value) is bytes:
                 # TODO: this will need to probably be changed when we allow actual binary field comparisons
@@ -146,6 +154,7 @@ class DatasourceQuery:
                     "value": str(value),
                     "valueType": value_type,
                     "comparator": query_op.value,
+                    "asOf": as_of
                 }
             }
 
@@ -194,6 +203,9 @@ class DatasourceQuery:
 
     def __deepcopy__(self, memodict={}):
         q = DatasourceQuery()
+
+        q._as_of = self._as_of
+
         if self._column_filter is not None:
             q._column_filter = self._column_filter
         else:

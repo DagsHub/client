@@ -56,6 +56,13 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     )
     allowMultiple: bool = False
 
+#@dataclass
+class Field:
+    def __init__(self, column, as_of=None):
+        self.as_of = as_of
+        self.column = column
+    as_of: int
+    column: str
 
 class Datasource:
 
@@ -301,6 +308,10 @@ class Datasource:
         self.source.client.scan_datasource(self, options=options)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
+        self.source.client.update_metadata(self, metadata_entries)
+        # Update the status from dagshub, so we get back the new metadata columns
+        self.source.get_from_dagshub()
+        return
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
@@ -490,7 +501,7 @@ class Datasource:
         queried_ds = ds[ds["value"] == 5]
     """
 
-    def __getitem__(self, other: Union[slice, str, "Datasource"]):
+    def __getitem__(self, other: Union[slice, str, "Datasource", "Field"]):
         # Slicing - get items from the slice
         if type(other) is slice:
             return self.sample(other.start, other.stop)
@@ -501,6 +512,11 @@ class Datasource:
             if not self.has_field(other):
                 raise FieldNotFoundError(other)
             new_ds._query = DatasourceQuery(other)
+            return new_ds
+        elif type(other) is Field:
+            if not self.has_field(other.column):
+                raise FieldNotFoundError(other.column)
+            new_ds._query = DatasourceQuery(other.column, other.as_of)
             return new_ds
         else:
             # "index" is a datasource with a query - compose with "and"
