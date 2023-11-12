@@ -1,5 +1,3 @@
-import logging
-
 from dagshub.common.api.repo import RepoAPI
 from dagshub.auth import get_token
 
