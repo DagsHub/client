@@ -133,8 +133,7 @@ class Datasource:
         self._select = []
 
         for s in selected:
-            new_select_field = {}
-            new_select_field["name"] = s.column
+            new_select_field = {"name": s.column}
             if s.as_of:
                 new_select_field["asOf"] = s.as_of
             if s.alias:
