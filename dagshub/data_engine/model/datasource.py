@@ -58,11 +58,13 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 
 #@dataclass
 class Field:
-    def __init__(self, column, as_of=None):
+    def __init__(self, column, as_of=None, alias=None):
         self.as_of = as_of
         self.column = column
+        self.alias = alias
     as_of: int
     column: str
+    alias: str
 
 class Datasource:
 
@@ -127,9 +129,19 @@ class Datasource:
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 
-    def select(self, s) :
-               # , selected: List[Field]):
-        self._select = s
+    def select(self, selected: List[Field]):
+        self._select = []
+
+        for s in selected:
+            new_select_field = {}
+            new_select_field["name"] = s.column
+            if s.as_of:
+                new_select_field["asOf"] = s.as_of
+            if s.alias:
+                new_select_field["alias"] = s.alias
+
+            self._select.append(new_select_field)
+
         return self
 
     def _check_preprocess(self):
