@@ -55,7 +55,7 @@ class DatasourceQuery:
     def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None, as_of: Optional[int] = None):
         self._operand_tree: Tree = Tree()
         self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
-        self._as_of: Optional[int] = as_of  # for storing filters when user does ds["column"]
+        self._as_of: Optional[int] = as_of
 
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name

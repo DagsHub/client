@@ -71,7 +71,7 @@ class Datasource:
         if query is None:
             query = DatasourceQuery()
         self._query = query
-
+        self._select = None
         self.serialize_gql_query_input()
 
     @property
@@ -97,9 +97,12 @@ class Datasource:
         return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
-        return {
+        x = {
             "query": self._query.serialize_graphql(),
         }
+        if self._select:
+            x["select"] = self._select
+        return x
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
@@ -123,6 +126,11 @@ class Datasource:
         """
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
+
+    def select(self, s) :
+               # , selected: List[Field]):
+        self._select = s
+        return self
 
     def _check_preprocess(self):
         self.source.get_from_dagshub()
