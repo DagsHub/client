@@ -213,8 +213,6 @@ class DatasourceQuery:
 
     def __deepcopy__(self, memodict={}):
         q = DatasourceQuery()
-       # yuvald TODO ? q._as_of = self._as_of
-
         q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 
