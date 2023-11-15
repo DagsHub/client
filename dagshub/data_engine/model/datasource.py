@@ -56,18 +56,16 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     )
     allowMultiple: bool = False
 
-# yuvald TODO @dataclass
+
+@dataclass
 class Field:
-    def __init__(self, column, as_of_timestamp=None, alias=None):
-        self.as_of = as_of_timestamp
-        self.column = column
-        self.alias = alias
-    as_of: int
     column: str
-    alias: str
+    # yuvald TODO what happens if the user is in a different TZ than our server
+    as_of_timestamp: Optional[int] = None
+    alias: Optional[str] = None
+
 
 class Datasource:
-
     def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None):
         self._source = datasource
         if query is None:
@@ -134,8 +132,8 @@ class Datasource:
 
         for s in selected:
             new_select_field = {"name": s.column}
-            if s.as_of:
-                new_select_field["asOf"] = s.as_of
+            if s.as_of_timestamp:
+                new_select_field["asOf"] = s.as_of_timestamp
             if s.alias:
                 new_select_field["alias"] = s.alias
 
@@ -534,9 +532,10 @@ class Datasource:
             new_ds._query = DatasourceQuery(other)
             return new_ds
         elif type(other) is Field:
+            # yuvald TODO should i warn if alias!=None?
             if not self.has_field(other.column):
                 raise FieldNotFoundError(other.column)
-            new_ds._query = DatasourceQuery(other.column, other.as_of)
+            new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)
             return new_ds
         else:
             # "index" is a datasource with a query - compose with "and"
