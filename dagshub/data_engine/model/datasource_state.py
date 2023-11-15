@@ -84,7 +84,6 @@ class DatasourceState:
         elif len(sources) > 1:
             raise RuntimeError(
                 f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong")
-        print(f"yuvald : got from dagshub ")
         self._update_from_ds_result(sources[0])
 
     def content_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> str:
@@ -205,7 +204,6 @@ class DatasourceState:
         self.source_type = ds.type
         self.preprocessing_status = ds.preprocessingStatus
         self.metadata_fields = [] if ds.metadataFields is None else ds.metadataFields
-        print("yuvald:",self.metadata_fields)
         if self.source_type == DatasourceType.REPOSITORY:
             self.revision = self.path_parts()["revision"]
 

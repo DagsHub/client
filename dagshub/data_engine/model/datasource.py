@@ -56,7 +56,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     )
     allowMultiple: bool = False
 
-#@dataclass
+# yuvald TODO @dataclass
 class Field:
     def __init__(self, column, as_of=None, alias=None):
         self.as_of = as_of
@@ -73,7 +73,7 @@ class Datasource:
         if query is None:
             query = DatasourceQuery()
         self._query = query
-        self._select = None
+        self._select = []
         self.serialize_gql_query_input()
 
     @property
@@ -99,12 +99,12 @@ class Datasource:
         return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
-        x = {
+        result = {
             "query": self._query.serialize_graphql(),
         }
         if self._select:
-            x["select"] = self._select
-        return x
+            result["select"] = self._select
+        return result
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
@@ -327,10 +327,11 @@ class Datasource:
         self.source.client.scan_datasource(self, options=options)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
-        self.source.client.update_metadata(self, metadata_entries)
-        # Update the status from dagshub, so we get back the new metadata columns
-        self.source.get_from_dagshub()
-        return
+        # yuvald TODO clean
+        # self.source.client.update_metadata(self, metadata_entries)
+        # # Update the status from dagshub, so we get back the new metadata columns
+        # self.source.get_from_dagshub()
+        # return
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 

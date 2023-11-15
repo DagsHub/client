@@ -64,7 +64,6 @@ class DatasourceQuery:
             self._operand_tree.create_node(column_or_query)
 
         if as_of:
-            # If it's ds["column"] then the root node is just the column name
             self._as_of = as_of
 
     def __repr__(self):
@@ -203,7 +202,6 @@ class DatasourceQuery:
 
     def __deepcopy__(self, memodict={}):
         q = DatasourceQuery()
-
         q._as_of = self._as_of
 
         if self._column_filter is not None:

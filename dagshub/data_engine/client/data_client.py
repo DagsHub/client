@@ -154,7 +154,6 @@ class DataClient:
             datasource_id=datasource.source.id,
             datapoints=[e.to_dict() for e in entries]
         )
-        print(f"yuvald update metadata {q} {params} {[e.to_dict() for e in entries]}")
         return self._exec(q, params)
 
     def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
