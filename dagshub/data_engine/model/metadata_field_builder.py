@@ -1,6 +1,6 @@
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Type, Union, List
+from typing import TYPE_CHECKING, Type, Union, Set
 
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags
@@ -37,8 +37,10 @@ class MetadataFieldBuilder:
     @property
     def schema(self) -> MetadataFieldSchema:
         if self._schema is None:
-            raise RuntimeError(f"Field {self._field_name} is a new field. "
-                               "Make sure to set_type() the field before setting any other properties")
+            raise RuntimeError(
+                f"Field {self._field_name} is a new field. "
+                "Make sure to set_type() the field before setting any other properties"
+            )
         return self._schema
 
     def set_type(self, t: Union[Type, DagshubDataType]) -> "MetadataFieldBuilder":
@@ -52,17 +54,16 @@ class MetadataFieldBuilder:
 
         if self._schema is None:
             self._schema = MetadataFieldSchema(
-                name=self._field_name,
-                valueType=backing_type,
-                multiple=False,
-                tags=[]
+                name=self._field_name, valueType=backing_type, multiple=False, tags=set()
             )
             if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._schema.tags = t.custom_tags.copy()
         else:
             if backing_type != self._schema.valueType:
-                raise ValueError("Can't change a type of an already existing field "
-                                 f"(changing from {self._schema.valueType.value} to {backing_type.value})")
+                raise ValueError(
+                    "Can't change a type of an already existing field "
+                    f"(changing from {self._schema.valueType.value} to {backing_type.value})"
+                )
             if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._add_tags(t.custom_tags)
 
@@ -77,14 +78,15 @@ class MetadataFieldBuilder:
 
     def _set_or_unset(self, tag, is_set):
         if is_set:
-            self._add_tags([tag])
+            self._add_tags({tag})
         else:
             self._remove_tag(tag)
 
-    def _add_tags(self, tags: List[str]):
+    def _add_tags(self, tags: Set[str]):
         if self.schema.tags is None:
-            self.schema.tags = []
-        self.schema.tags.extend(tags)
+            self.schema.tags = set()
+        for t in tags:
+            self.schema.tags.add(t)
 
     def _remove_tag(self, tag: str):
         if self.schema.tags is None:

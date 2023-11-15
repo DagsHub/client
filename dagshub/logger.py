@@ -19,14 +19,15 @@ class DAGsHubLogger:
     metrics_csv_writer: Any
     hparams: Dict[str, Any]
 
-    def __init__(self,
-                 metrics_path: str = 'metrics.csv',
-                 should_log_metrics: bool = True,
-                 hparams_path: str = 'params.yml',
-                 should_log_hparams: bool = True,
-                 should_make_dirs: bool = True,
-                 eager_logging: bool = True,
-                 ):
+    def __init__(
+        self,
+        metrics_path: str = "metrics.csv",
+        should_log_metrics: bool = True,
+        hparams_path: str = "params.yml",
+        should_log_hparams: bool = True,
+        should_make_dirs: bool = True,
+        eager_logging: bool = True,
+    ):
         """
         :param metrics_path: Where to save the single metrics CSV file.
         :param should_log_metrics: Whether to log metrics at all. Should probably always be True.
@@ -79,7 +80,7 @@ class DAGsHubLogger:
 
     def save_metrics(self):
         if self.should_log_metrics:
-            if not hasattr(self, 'metrics_file'):
+            if not hasattr(self, "metrics_file"):
                 self.init_metrics_file()
 
             for metrics, timestamp, step_num in self.unsaved_metrics:
@@ -90,7 +91,7 @@ class DAGsHubLogger:
     def save_hparams(self):
         if self.should_log_hparams:
             self.ensure_dir(self.hparams_path)
-            with open(self.hparams_path, 'w') as f:
+            with open(self.hparams_path, "w") as f:
                 yaml.safe_dump(self.hparams, f)
 
     @staticmethod
@@ -112,7 +113,7 @@ class DAGsHubLogger:
 
     def init_metrics_file(self):
         self.ensure_dir(self.metrics_path)
-        self.metrics_file = open(self.metrics_path, 'w', newline='')  # newline='' required for csv writer
+        self.metrics_file = open(self.metrics_path, "w", newline="")  # newline='' required for csv writer
         self.metrics_file.write("Name,Value,Timestamp,Step\n")
         self.metrics_csv_writer = csv.writer(self.metrics_file, quoting=csv.QUOTE_NONNUMERIC)
 
@@ -123,17 +124,19 @@ class DAGsHubLogger:
                 os.makedirs(dirname, exist_ok=True)
 
     def close(self):
-        if hasattr(self, 'metrics_file'):
+        if hasattr(self, "metrics_file"):
             self.metrics_file.close()
 
 
 @contextmanager
-def dagshub_logger(metrics_path: str = 'metrics.csv',
-                   should_log_metrics: bool = True,
-                   hparams_path: str = 'params.yml',
-                   should_log_hparams: bool = True,
-                   should_make_dirs: bool = True,
-                   eager_logging: bool = True, ) -> ContextManager[DAGsHubLogger]:
+def dagshub_logger(
+    metrics_path: str = "metrics.csv",
+    should_log_metrics: bool = True,
+    hparams_path: str = "params.yml",
+    should_log_hparams: bool = True,
+    should_make_dirs: bool = True,
+    eager_logging: bool = True,
+) -> ContextManager[DAGsHubLogger]:
     """
     Example usage:
 
@@ -156,9 +159,14 @@ def dagshub_logger(metrics_path: str = 'metrics.csv',
             in memory. Watch out not to run out of memory!
     """
 
-    logger = DAGsHubLogger(metrics_path=metrics_path, should_log_metrics=should_log_metrics,
-                           hparams_path=hparams_path, should_log_hparams=should_log_hparams,
-                           should_make_dirs=should_make_dirs, eager_logging=eager_logging)
+    logger = DAGsHubLogger(
+        metrics_path=metrics_path,
+        should_log_metrics=should_log_metrics,
+        hparams_path=hparams_path,
+        should_log_hparams=should_log_hparams,
+        should_make_dirs=should_make_dirs,
+        eager_logging=eager_logging,
+    )
     try:
         yield logger
     finally:

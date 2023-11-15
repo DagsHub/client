@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
+from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Set
 
 import dacite
 import gql
@@ -11,8 +11,14 @@ import dagshub.common.config
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.data_engine.client.models import DatasourceResult, DatasourceType, IntegrationStatus, \
-    PreprocessingStatus, DatasetResult, MetadataFieldSchema
+from dagshub.data_engine.client.models import (
+    DatasourceResult,
+    DatasourceType,
+    IntegrationStatus,
+    PreprocessingStatus,
+    DatasetResult,
+    MetadataFieldSchema,
+)
 from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
@@ -25,7 +31,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType])
+dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType, Set])
 
 
 class DataClient:
@@ -40,7 +46,7 @@ class DataClient:
     def _init_client(self):
         url = f"{self.host}/api/v1/repos/{self.repo}/data-engine/graphql"
         auth = dagshub.auth.get_authenticator(host=self.host)
-        transport = RequestsHTTPTransport(url=url, auth=auth)
+        transport = RequestsHTTPTransport(url=url, auth=auth, headers=config.requests_headers)
         client = gql.Client(transport=transport)
         return client
 
@@ -51,11 +57,7 @@ class DataClient:
         assert ds.path is not None
         assert ds.source_type is not None
 
-        params = GqlMutations.create_datasource_params(
-            name=ds.name,
-            url=ds.path,
-            ds_type=ds.source_type
-        )
+        params = GqlMutations.create_datasource_params(name=ds.name, url=ds.path, ds_type=ds.source_type)
         res = self._exec(q, params)
         return dacite.from_dict(DatasourceResult, res["createDatasource"], config=dacite_config)
 
@@ -128,9 +130,9 @@ class DataClient:
         resp = self.client.execute(q, variable_values=params)
         return resp
 
-    def _datasource_query(self, datasource: Datasource, include_metadata: bool, limit: Optional[int] = None,
-                          after: Optional[str] = None):
-
+    def _datasource_query(
+        self, datasource: Datasource, include_metadata: bool, limit: Optional[int] = None, after: Optional[str] = None
+    ):
         send_analytics_event("Client_DataEngine_QueryRun", repo=datasource.source.repoApi)
 
         q = GqlQueries.datasource_query(include_metadata)
@@ -139,7 +141,7 @@ class DataClient:
             datasource_id=datasource.source.id,
             query_input=datasource.serialize_gql_query_input(),
             first=limit,
-            after=after
+            after=after,
         )
 
         return self._exec(q, params)["datasourceQuery"]
@@ -151,8 +153,7 @@ class DataClient:
         assert len(entries) > 0
 
         params = GqlMutations.update_metadata_params(
-            datasource_id=datasource.source.id,
-            datapoints=[e.to_dict() for e in entries]
+            datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
         )
         return self._exec(q, params)
 
@@ -163,8 +164,7 @@ class DataClient:
         # assert len(entries) > 0
 
         params = GqlMutations.update_metadata_fields_params(
-            datasource_id=datasource.source.id,
-            metadata_field_props=[e.to_dict() for e in metadata_field_props]
+            datasource_id=datasource.source.id, metadata_field_props=[e.to_dict() for e in metadata_field_props]
         )
 
         return self._exec(q, params)
@@ -176,8 +176,7 @@ class DataClient:
         res = self._exec(q, params)["datasource"]
         if res is None:
             return []
-        return [dacite.from_dict(DatasourceResult, val, config=dacite_config)
-                for val in res]
+        return [dacite.from_dict(DatasourceResult, val, config=dacite_config) for val in res]
 
     def delete_datasource(self, datasource: Datasource):
         q = GqlMutations.delete_datasource()
@@ -200,9 +199,9 @@ class DataClient:
 
         assert name is not None
 
-        params = GqlMutations.save_dataset_params(datasource_id=datasource.source.id,
-                                                  name=name,
-                                                  query_input=datasource.serialize_gql_query_input())
+        params = GqlMutations.save_dataset_params(
+            datasource_id=datasource.source.id, name=name, query_input=datasource.serialize_gql_query_input()
+        )
         return self._exec(q, params)
 
     def get_datasets(self, id: Optional[Union[str, int]], name: Optional[str]) -> List[DatasetResult]:
@@ -213,5 +212,4 @@ class DataClient:
         if res is None:
             return []
 
-        return [dacite.from_dict(DatasetResult, val, config=dacite_config)
-                for val in res]
+        return [dacite.from_dict(DatasetResult, val, config=dacite_config) for val in res]

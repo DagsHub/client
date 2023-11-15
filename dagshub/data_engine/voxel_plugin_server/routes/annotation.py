@@ -23,10 +23,12 @@ async def to_annotate(request: Request):
     if selected is None:
         return JSONResponse({"error": "Selection empty"}, status_code=400)
     for sample in selected:
-        req_dicts.append({
-            "datapoint_id": sample["datapoint_id"],
-            "download_url": sample["dagshub_download_url"],
-        })
+        req_dicts.append(
+            {
+                "datapoint_id": sample["datapoint_id"],
+                "download_url": sample["dagshub_download_url"],
+            }
+        )
     print(f"Sending to annotation: {req_dicts}")
     # Don't open the project because we're going to open it from the Voxel's plugin code
     link = ds.send_datapoints_to_annotation(req_dicts, open_project=False)

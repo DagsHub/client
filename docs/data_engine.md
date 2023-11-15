@@ -123,6 +123,26 @@ ds.upload_metadata_from_dataframe(df, path_column="path")
 All other columns are considered metadata columns.
 If `path_column` isn't specified, then the first column is considered as the path column.
 
+### Metadata tagging
+You can add additional information to your metadata fields, telling what these fields mean semantically.
+
+For example, marking a field as an annotation field will make it show up in FiftyOne visualization and LabelStudio projects on DagsHub.
+
+To mark a field as an annotation field:
+
+```python
+ds.metadata_field("field_name").set_annotation().apply()
+```
+
+You can also predefine a field with a certain type before uploading into it. Do that if you want to be sure you won't upload a wrong datatype accidentally on ingestion.
+For example, this is useful when you're uploading a pandas dataframe and want to enforce that the field will be an integer field and not a float field:
+
+```python
+ds.metadata_field("field_name").set_type(int).apply()
+```
+
+Keep in mind that you cannot change the type of an already existing field.
+
 ## Getting data
 
 At any point during working/querying, you can get the points that exist in the datasource with the current query
@@ -380,6 +400,14 @@ voxel_session.wait(-1)
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
 
+## Sending data for annotation
+
+You can send a datasource or result of a query to annotation in Label Studio.
+
+Doing a `ds.annotate()` or `ds.head(...).annotate` will open up a wizard for creating a new Label Studio project on DagsHub.
+
+If you have a field that was marked as annotation already, you can export annotations into the project from them
+(See the Metadata Tagging section to learn how to tag fields as annotation fields)
 
 # Contributing
 

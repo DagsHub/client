@@ -1,6 +1,6 @@
 import enum
 from abc import ABCMeta
-from typing import List
+from typing import Set
 
 
 class ReservedTags(enum.Enum):
@@ -24,8 +24,9 @@ class DagshubDataType(metaclass=ABCMeta):
         backing_field_type: primitive type in the data engine database
         custom_tags: additional tags applied to this type
     """
+
     backing_field_type: MetadataFieldType = None
-    custom_tags: List[str] = None
+    custom_tags: Set[str] = None
 
 
 class Int(DagshubDataType):
@@ -50,9 +51,9 @@ class Bool(DagshubDataType):
 
 class LabelStudioAnnotation(DagshubDataType):
     backing_field_type = MetadataFieldType.BLOB
-    custom_tags = [ReservedTags.ANNOTATION.value]
+    custom_tags = {ReservedTags.ANNOTATION.value}
 
 
 class Voxel51Annotation(DagshubDataType):
     backing_field_type = MetadataFieldType.BLOB
-    custom_tags = [ReservedTags.ANNOTATION.value]
+    custom_tags = {ReservedTags.ANNOTATION.value}

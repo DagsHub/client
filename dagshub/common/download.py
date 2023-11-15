@@ -28,7 +28,8 @@ DownloadFunctionType = Callable[[str, Path], None]
 
 storage_download_url_regex = re.compile(
     r".*/api/v1/repos/(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)/storage/raw/(?P<proto>s3|gs)/"
-    r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)")
+    r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)"
+)
 
 
 def enable_gcs_bucket_downloader(client=None):
@@ -42,6 +43,7 @@ def enable_gcs_bucket_downloader(client=None):
     """
     if client is None:
         from google.cloud import storage
+
         client = storage.Client()
 
     def get_fn(bucket_name, bucket_path) -> bytes:
@@ -64,6 +66,7 @@ def enable_s3_bucket_downloader(client=None):
 
     if client is None:
         import boto3
+
         client = boto3.client("s3")
 
     def get_fn(bucket, path) -> bytes:
@@ -88,9 +91,11 @@ def enable_azure_container_downloader(account_url=None, client=None):
         raise TypeError("missing required argument 'account_url' or 'client'")
 
     import io
+
     if client is None:
         from azure.storage.blob import BlobServiceClient
         from azure.identity import DefaultAzureCredential
+
         client = BlobServiceClient(account_url, credential=DefaultAzureCredential())
 
     def get_fn(bucket, path) -> bytes:
@@ -120,7 +125,8 @@ def _dagshub_download(url: str, auth: Auth) -> bytes:
     # TODO: retry
     except AssertionError:
         raise RuntimeError(
-            f"Couldn't download file at URL {url}. Response code {resp.status_code} (Body: {resp.content})")
+            f"Couldn't download file at URL {url}. Response code {resp.status_code} (Body: {resp.content})"
+        )
     return resp.content
 
 
@@ -171,9 +177,12 @@ def _ensure_default_downloader_exists():
         _default_downloader = partial(_dagshub_download, auth=auth)
 
 
-def download_files(files: List[Tuple[str, Union[str, Path]]],
-                   download_fn: Optional[DownloadFunctionType] = None,
-                   threads=config.download_threads, skip_if_exists=True):
+def download_files(
+    files: List[Tuple[str, Union[str, Path]]],
+    download_fn: Optional[DownloadFunctionType] = None,
+    threads=config.download_threads,
+    skip_if_exists=True,
+):
     """
     Download files using multithreading
 

@@ -23,17 +23,13 @@ class _BaseDataLoaderIter:
         return self.post_hook(super().__next__())
 
 
-class _SingleProcessDataLoaderIter(
-    _BaseDataLoaderIter, torch.utils.data.dataloader._SingleProcessDataLoaderIter
-):
+class _SingleProcessDataLoaderIter(_BaseDataLoaderIter, torch.utils.data.dataloader._SingleProcessDataLoaderIter):
     def __init__(self, *args, post_hook, **kwargs):
         self.post_hook = post_hook
         super().__init__(*args, **kwargs)
 
 
-class _MultiProcessingDataLoaderIter(
-    _BaseDataLoaderIter, torch.utils.data.dataloader._MultiProcessingDataLoaderIter
-):
+class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter, torch.utils.data.dataloader._MultiProcessingDataLoaderIter):
     def __init__(self, *args, post_hook, **kwargs):
         self.post_hook = post_hook
         super().__init__(*args, **kwargs)
