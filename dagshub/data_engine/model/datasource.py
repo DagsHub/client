@@ -101,6 +101,7 @@ class Datasource:
         return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
+        # yuvald TODO just =
         result = {
             "query": self._query.serialize_graphql(),
         }

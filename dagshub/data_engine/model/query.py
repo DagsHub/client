@@ -145,7 +145,7 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
-            as_of = node.data["as_of"]
+            as_of = node.data.get("as_of")
 
             value_type = metadataTypeLookup[type(value)].value
             if type(value) is bytes:
