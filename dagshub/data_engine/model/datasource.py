@@ -58,8 +58,8 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 
 # yuvald TODO @dataclass
 class Field:
-    def __init__(self, column, as_of=None, alias=None):
-        self.as_of = as_of
+    def __init__(self, column, as_of_timestamp=None, alias=None):
+        self.as_of = as_of_timestamp
         self.column = column
         self.alias = alias
     as_of: int
