@@ -1,3 +1,5 @@
+from typing import Literal
+
 from dagshub.common.api.repo import RepoAPI
 from dagshub.auth import get_token
 from dagshub.common.helpers import log_message
@@ -34,8 +36,10 @@ _s3_flavor_lookup = {
     "s3fs": get_s3fs_client,
 }
 
+FlavorTypes = Literal["boto", "s3fs"]
 
-def get_repo_bucket_client(repo: str, flavor="boto"):
+
+def get_repo_bucket_client(repo: str, flavor: FlavorTypes = "boto"):
     """
     Creates an S3 client for the specified repository's DagsHub storage bucket
 
