@@ -1,5 +1,5 @@
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import rich.progress
 
@@ -259,14 +259,14 @@ class RepoAPI:
 
         return files
 
-    def download_folder(
+    def download(
         self, remote_path, local_path=".", revision=None, recursive=True, keep_source_prefix=True, redownload=False
     ):
         """
         Downloads the contents of the repository at "remote_path" to the "local_path"
 
         Args:
-            remote_path: path of the folder to download in the repository
+            remote_path: path of the folder or folder to download in the repository
             local_path: where to download the files. Defaults to CWD
             revision: repo revision, if not specified - uses default repo branch
             recursive: whether to download files recursively
@@ -280,10 +280,21 @@ class RepoAPI:
         files = self._get_files_in_path(remote_path, revision, recursive)
         file_tuples = []
         local_path = Path(local_path)
-        for f in files:
-            file_path = f.path if keep_source_prefix else f.path[len(remote_path) + 1 :]
-            file_path = local_path / file_path
+        # Edge case - download one single file - different output path semantics
+        if len(files) == 1 and files[0].path == remote_path:
+            f = files[0]
+            remote_path = PurePosixPath(f.path)
+            # If local_path was specified, assume that the local_path is the exact name of the file
+            if local_path != Path("."):
+                file_path = local_path
+            else:
+                file_path = remote_path if keep_source_prefix else remote_path.name
             file_tuples.append((f.download_url, file_path))
+        else:
+            for f in files:
+                file_path = f.path if keep_source_prefix else f.path[len(remote_path) + 1 :]
+                file_path = local_path / file_path
+                file_tuples.append((f.download_url, file_path))
         download_files(file_tuples, skip_if_exists=not redownload)
 
     @cached_property
