@@ -58,7 +58,10 @@ class DatasourceQuery:
         self._operand_tree: Tree = Tree()
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name, will be filled later
-            self._operand_tree.create_node(UNFILLED_NODE_TAG, data={"field": column_or_query, "as_of": as_of})
+            data = {"field": column_or_query}
+            if as_of:
+                data["as_of"] = as_of
+            self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
 

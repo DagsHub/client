@@ -64,7 +64,6 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 @dataclass
 class Field:
     column: str
-    # yuvald TODO what happens if the user is in a different TZ than our server
     as_of_timestamp: Optional[int] = None
     alias: Optional[str] = None
 
@@ -101,7 +100,6 @@ class Datasource:
         return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
-        # yuvald TODO just =
         result = {
             "query": self._query.serialize_graphql(),
         }
@@ -543,6 +541,8 @@ class Datasource:
             return new_ds
         elif type(other) is Field:
             # yuvald TODO should i warn if alias!=None?
+            # yuvald TODO unit tests
+            # yuvald TODO datasets
             if not self.has_field(other.column):
                 raise FieldNotFoundError(other.column)
             new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)
