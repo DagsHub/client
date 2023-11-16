@@ -337,6 +337,15 @@ class RepoAPI:
         """
         return multi_urljoin(self.repo_api_url, "storage")
 
+    def repo_bucket_api_url(self) -> str:
+        """
+        Endpoint URL for getting access to the S3-compatible repo bucket
+        Format: https://dagshub.com/api/v1/repo-buckets/s3/user
+
+        The bucket name is usually the name of the repo
+        """
+        return multi_urljoin(self.host, "api/v1/repo-buckets/s3", self.owner)
+
     @staticmethod
     def parse_repo(repo: str) -> Tuple[str, str]:
         repo = repo.strip("/")
