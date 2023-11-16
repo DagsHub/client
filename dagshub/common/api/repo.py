@@ -1,4 +1,7 @@
 import logging
+from pathlib import Path
+
+import rich.progress
 
 from dagshub.common.api.responses import (
     RepoAPIResponse,
@@ -8,6 +11,8 @@ from dagshub.common.api.responses import (
     ContentAPIEntry,
     StorageContentAPIResult,
 )
+from dagshub.common.download import download_files
+from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
 
 try:
@@ -225,6 +230,61 @@ class RepoAPI:
             logger.debug(res.content)
             raise RuntimeError(error_msg)
         return res.content
+
+    def _get_files_in_path(self, path, revision=None, recursive=False) -> list[ContentAPIEntry]:
+        """
+        Walks through the path of the repo, returning non-dir entries
+        """
+
+        dir_queue = [path]
+        files = []
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Traversing directories...", total=None)
+
+        def step(step_path):
+            res = self.list_path(step_path, revision)
+            for entry in res:
+                if entry.type == "file":
+                    files.append(entry)
+                elif entry.type == "dir" and recursive:
+                    dir_queue.append(entry.path)
+                # TODO: storage
+            progress.update(task, advance=1)
+
+        with progress:
+            while len(dir_queue):
+                query_path = dir_queue.pop(0)
+                step(query_path)
+
+        return files
+
+    def download_folder(
+        self, remote_path, local_path=".", revision=None, recursive=True, keep_source_prefix=True, redownload=False
+    ):
+        """
+        Downloads the contents of the repository at "remote_path" to the "local_path"
+
+        Args:
+            remote_path: path of the folder to download in the repository
+            local_path: where to download the files. Defaults to CWD
+            revision: repo revision, if not specified - uses default repo branch
+            recursive: whether to download files recursively
+            keep_source_prefix: whether to keep the path of the folder in the download path or not
+                example: Given remote_path "src/data" and file "test/file.txt"
+                if True: will download to "<local_path>/src/data/test/file.txt"
+                if False: will download to "<local_path>/test/file.txt"
+            redownload: whether to redownload an already existing file
+                The downloader doesn't do any hash comparisons and only checks if a file already exists in the FS or not
+        """
+        files = self._get_files_in_path(remote_path, revision, recursive)
+        file_tuples = []
+        local_path = Path(local_path)
+        for f in files:
+            file_path = f.path if keep_source_prefix else f.path[len(remote_path) + 1 :]
+            file_path = local_path / file_path
+            file_tuples.append((f.download_url, file_path))
+        download_files(file_tuples, skip_if_exists=not redownload)
 
     @cached_property
     def default_branch(self) -> str:
