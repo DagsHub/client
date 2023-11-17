@@ -79,7 +79,28 @@ class DatasourceQuery:
 
         Args:
             op (str): The operator to use for composing the query.
-            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]): The query or value to compose with.
+            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]): 
+                The query or value to compose with.
+
+        Raises:
+            RuntimeError: If the operation is not supported or if there is a mismatch in usage.
+
+        Notes:
+            - If the current query contains only a column filter, it will be composed into a tree with the specified operator and value.
+            - If the operation is 'isnull', it can only be applied to a column filter; otherwise, a RuntimeError is raised.
+            - If the operation is 'not', a 'not' node is added to the query tree.
+            - If the current query is a complex query with a tree structure, a subtree is created by combining the current query and the provided query using the specified operator ('and' or 'or').
+            - If either query is empty, the composition is adjusted accordingly.
+
+        Example:
+            ```
+            ds['col1'] > 5
+            ds['col2'].is_null()
+            ```
+            The above queries can be composed as:
+            ```
+            ds['col1'] > 5 and ds['col2'].is_null()
+            ```
         """
         if self._column_filter is not None:
             # Just the column is in the query - compose into a tree

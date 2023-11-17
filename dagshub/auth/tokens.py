@@ -33,7 +33,7 @@ class TokenStorage:
         Args:
             token (Dict): A dictionary containing the token information.
             host (str, optional): The host URL for which the token is being added.
-                If not provided, the configuration's default host URL will be used.
+                If not provided, the configuration's default host (https://dagshub.com) will be used.
         """
         host = host or config.host
         if host not in self._token_cache:

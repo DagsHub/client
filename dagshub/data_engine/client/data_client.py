@@ -77,7 +77,7 @@ class DataClient:
             size (Optional[int], optional): The number of entries to retrieve. Defaults to None.
 
         Returns:
-            QueryResult: The query result containing the retrieved data.
+            QueryResult: The query result containing the retrieved data.(By Default returns the first 100 samples)
 
         """
         if size is None:
@@ -167,13 +167,15 @@ class DataClient:
 
     def update_metadata(self, datasource: Datasource, entries: List[DatapointMetadataUpdateEntry]):
         """
-        Create a new datasource using the provided datasource state.
+        Update the Datasource with the metadata entry
 
         Args:
-            ds (DatasourceState): The datasource state containing information about the datasource.
+            datasource (Datasource): The datasource instance to be updated
+            entries (List[DatapointMetadataUpdateEntry]): The new metadata entries 
+
 
         Returns:
-            DatasourceResult: The result of creating the datasource.
+            Updates the Datasource.
 
         """
         q = GqlMutations.update_metadata()
@@ -211,6 +213,8 @@ class DataClient:
     def delete_datasource(self, datasource: Datasource):
         """
         Delete a specified datasource.
+         Args:
+            datasource (Datasource): The datasource instance to be deleted.
         """
         q = GqlMutations.delete_datasource()
 
@@ -222,6 +226,9 @@ class DataClient:
     def scan_datasource(self, datasource: Datasource):
         """
         Initiate a scan operation on the specified datasource.
+
+         Args:
+            datasource (Datasource): The datasource instance to be updated
         """
         q = GqlMutations.scan_datasource()
 
@@ -233,6 +240,10 @@ class DataClient:
     def save_dataset(self, datasource: Datasource, name: str):
         """
         Save a dataset using the specified datasource and name.
+        
+        Args:
+            datasource (Datasource): The datasource instance to be saved.
+            name (str) : Name of the new datasource instance
         """
         q = GqlMutations.save_dataset()
 

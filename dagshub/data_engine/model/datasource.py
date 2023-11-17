@@ -376,7 +376,7 @@ class Datasource:
 
     def wait_until_ready(self, max_wait_time=300, fail_on_timeout=True):
         """
-       Blocks until the datasource preprocessing is complete
+       Wait until the datasource preprocessing is complete
 
        Args:
            max_wait_time (int): Maximum time to wait in seconds
@@ -543,7 +543,15 @@ class Datasource:
 
     def add_query_op(self, op: str, other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None) -> "Datasource":
         """
-        Returns a new dataset with an added query param
+        Add a query operation to the current Datasource instance.
+
+        Args:
+            op (str): The operation to be performed in the query.
+            other (Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]], optional): 
+                The operand for the query operation. Defaults to None.
+
+        Returns:
+            Datasource: A new Datasource instance with the added query operation.
         """
         new_ds = self.__deepcopy__()
         if type(other) is Datasource:

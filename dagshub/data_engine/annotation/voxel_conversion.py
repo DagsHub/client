@@ -17,6 +17,7 @@ def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotati
     Args:
         sample (fo.Sample): FiftyOne sample to add the annotations to
         datapoint (Datapoint): Data Engine datapoint to get metadata from
+        annotation_fields(str): JSON blobs of voxel annotations that are added to sample.
     """
     from fiftyone import Label
     for field in annotation_fields:

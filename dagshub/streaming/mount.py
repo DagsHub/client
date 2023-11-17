@@ -44,13 +44,26 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
     def access(self, path, mode):
         """
-        Check file accessibility based on the given path and mode.
+        Check file accessibility based on the given path and access mode.
 
         Args:
-            path (_type_): The path to check accessibility.
-            mode (_type_): The access mode to check.
+            path (Union[str, int, bytes]): The path to check accessibility. It can be a path (str), file descriptor (int), or bytes-like object.
+            mode (int): 
+                The access mode to check.
 
-        Returns: True if the file is accessible; otherwise, False.
+        Returns:
+            bool: True if the file is accessible; otherwise, False.
+
+        Notes:
+            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard access() method.
+            - The 'mode' argument follows the same convention as the os.access() function, where values like os.R_OK, os.W_OK, and os.X_OK indicate read, write, and execute permissions, respectively.
+
+        Examples:
+            ```python
+            dh = DagsHubClient()
+            is_accessible = dh.access('file.txt', os.R_OK)
+            print(is_accessible)  # True if the file is readable, otherwise False
+            ```
         """
         logger.debug(f"access - path: {path}, mode:{mode}")
         try:
@@ -63,13 +76,25 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Open a file for reading or writing.
 
         Args:
-            path (_type_): The path of the file to open.
-            flags (_type_): The flags for opening the file.
+            path (Union[str, int, bytes]): The path of the file to open. It can be a path (str), file descriptor (int), or bytes-like object.
+            flags (int): The flags for opening the file.
 
         Raises:
             FuseOSError: If an error occurs while opening the file, a FuseOSError is raised.
 
-        Returns: The file descriptor for the opened file.
+        Returns:
+            int: The file descriptor for the opened file.
+
+        Notes:
+            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.open() method.
+            - Special files are handled, and their dedicated file descriptor is returned.
+
+        Examples:
+            ```python
+            dh = DagsHubClient()
+            file_descriptor = dh.open('file.txt', os.O_RDONLY)
+            print(file_descriptor)
+            ```
         """
         logger.debug(f"open - path: {path}, flags: {flags}")
         if path == Path(self.fs.project_root / SPECIAL_FILE):
@@ -86,14 +111,24 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Get the attributes of a file or directory.
 
         Args:
-            path (_type_): The path to the file or directory.
-            fd (_type_, optional): An optional file descriptor. Defaults to None.
+            path (Union[str, int, bytes]): The path to the file or directory. It can be a path (str), file descriptor (int), or bytes-like object.
+            fd (int, optional): An optional file descriptor. Defaults to None.
 
         Raises:
             FuseOSError: If the file or directory does not exist, a FuseOSError is raised.
 
         Returns:
-            _type_: A dictionary containing file attributes such as size, mode, and more.
+            Dict[str, Any]: A dictionary containing file attributes such as size, mode, and more.
+
+        Notes:
+            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.fstat() method.
+            - The returned dictionary includes attributes like access time, creation time, group ID, mode, modification time, size, and user ID.
+
+        Examples:
+            ```python
+            dh = DagsHubClient()
+            file_attributes = dh.getattr('file.txt')
+            ```
         """
         logger.debug(f"getattr - path:{str(path)}, fd:{fd}")
         try:
@@ -124,15 +159,27 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
     def read(self, path, size, offset, fh):
         """
-        Read data from a file.
+        Read data in the form of bytes from a file.
 
         Args:
-            path (_type_): The path of the file to read.
-            size (_type_): The size of data to read.
-            offset (_type_): The offset in the file.
-            fh (_type_): The file descriptor.
+            path (Union[str, int, bytes]): The path of the file to read. It can be a path (str), file descriptor (int), or bytes-like object.
+            size (int): The size of data to read.
+            offset (int): The offset in the file.
+            fh (int): The file descriptor.
 
-        Returns: The data read from the file.
+        Returns:
+            bytes: The data read from the file.
+
+        Notes:
+            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.read() method.
+            - Special files are handled, and their content is retrieved directly.
+
+        Examples:
+            ```python
+            dh = DagsHubClient()
+            data = dh.read('file.txt', 1024, 0, file_descriptor)
+            print(data)
+            ```
         """
         logger.debug(f"read - path: {path}, offset: {offset}, fh: {fh}")
         if fh == SPECIAL_FILE_FH:
@@ -146,15 +193,47 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         List the contents of a directory.
 
         Args:
-            path (_type_): The path of the directory.
-            fh (_type_): The file descriptor.
+            path (Union[str, int, bytes]): The path of the directory. It can be a path (str), file descriptor (int), or bytes-like object.
+            fh (int): The file descriptor.
 
-        Returns: A list of directory contents.
+        Returns:
+            List[str]: A list of directory contents.
+
+        Notes:
+            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.listdir() method.
+            - The returned list includes entries for the current directory ('.') and the parent directory ('..').
+
+        Examples:
+            ```python
+            dh = DagsHubClient()
+            contents = dh.readdir('directory', file_descriptor)
+            print(contents)
+            ```
         """
         logger.debug(f"readdir - path: {path}, fh: {fh}")
         return ['.', '..'] + self.fs.listdir(path)
 
     def release(self, path, fh):
+        """
+        Release the resources associated with an open file.
+
+        Args:
+            path (Union[str, int, bytes]): 
+                The path of the file. 
+                It can be a path (str), file descriptor (int), or bytes-like object.
+            fh (int): 
+                The file descriptor.
+
+        Notes:
+            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.close() method.
+            - Special file descriptors, such as SPECIAL_FILE_FH, are not closed.
+
+        Examples:
+            ```python
+            dh = DagsHubClient()
+            dh.release('file.txt', file_descriptor)
+            ```
+        """
         logger.debug(f"release - path: {path}, fh: {fh}")
         if fh != SPECIAL_FILE_FH:
             return os.close(fh)
@@ -167,16 +246,26 @@ def mount(debug=False,
           username: Optional[str] = None,
           password: Optional[str] = None,
           token: Optional[str] = None):
-    """_summary_
+    """
+    Mount a DagsHubFUSE filesystem.
 
     Args:
-        debug (bool, optional): _description_. Defaults to False.
-        project_root (Optional[PathLike], optional): _description_. Defaults to None.
-        repo_url (Optional[str], optional): _description_. Defaults to None.
-        branch (Optional[str], optional): _description_. Defaults to None.
-        username (Optional[str], optional): _description_. Defaults to None.
-        password (Optional[str], optional): _description_. Defaults to None.
-        token (Optional[str], optional): _description_. Defaults to None.
+        debug (bool, optional): If True, run the FUSE filesystem in the foreground with debug logging; otherwise, run it in the background. Defaults to False.
+        project_root (Optional[PathLike], optional): The local directory to mount as the DagsHubFUSE filesystem. Defaults to None.
+        repo_url (Optional[str], optional): The URL of the DagsHub repository to mount. Defaults to None.
+        branch (Optional[str], optional): The branch of the DagsHub repository to mount. Defaults to None.
+        username (Optional[str], optional): The username for authentication. Defaults to None.
+        password (Optional[str], optional): The password for authentication. Defaults to None.
+        token (Optional[str], optional): The token for authentication. Defaults to None.
+
+    Notes:
+        - If the 'debug' parameter is True, the filesystem is run in the foreground with debug logging.
+        - If 'debug' is False, the filesystem runs in the background.
+
+    Example:
+        ```python
+        mount(debug=True, project_root='/path/to/local/directory', repo_url='https://dagshub.com/user/repo.git', branch='main')
+        ```
     """
     logging.basicConfig(level=logging.DEBUG)
     fuse = DagsHubFUSE(project_root=project_root, repo_url=repo_url, branch=branch, username=username,

@@ -15,10 +15,10 @@ def get_default_branch(owner, reponame, auth, host=config.host):
     The get_default_branch function returns the default branch of a given repository.
 
     Args:
-        owner (_type_): Specify the owner of the repository
-        reponame (_type_): Specify the name of the repository
-        auth (_type_): Authentication object or a (username, password) tuple
-        host (_type_, optional): Specify the host to be used. Defaults to config.host.
+        owner (str): Specify the owner of the repository
+        reponame (str): Specify the name of the repository
+        auth (Any): Authentication object or a (username, password) tuple
+        host (str, optional): Specify the host to be used. Defaults to config.host.
 
     Returns:
         The default branch of the given repository
