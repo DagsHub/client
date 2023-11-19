@@ -184,8 +184,7 @@ class DataClient:
 
         Args:
             datasource (Datasource): The datasource instance to be updated
-            entries (List[DatapointMetadataUpdateEntry]): The new metadata entries 
-
+            entries (List[DatapointMetadataUpdateEntry]): The new metadata entries
 
         Returns:
             Updates the Datasource.
@@ -263,7 +262,7 @@ class DataClient:
     def save_dataset(self, datasource: Datasource, name: str):
         """
         Save a dataset using the specified datasource and name.
-        
+
         Args:
             datasource (Datasource): The datasource instance to be saved.
             name (str) : Name of the new datasource instance

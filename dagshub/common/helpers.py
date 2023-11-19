@@ -11,7 +11,7 @@ default_logger = logging.getLogger("dagshub")
 
 
 def get_default_branch(owner, reponame, auth, host=config.host):
-    """    
+    """
     The get_default_branch function returns the default branch of a given repository.
 
     Args:

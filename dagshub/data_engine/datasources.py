@@ -1,5 +1,4 @@
 import logging
-import urllib.parse
 from typing import Optional, Union, List
 
 from dagshub.common.analytics import send_analytics_event

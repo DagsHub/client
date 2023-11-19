@@ -2,8 +2,6 @@ import base64
 import gzip
 import json
 import logging
-import time
-
 import math
 import os.path
 import time
@@ -377,16 +375,6 @@ class Datasource:
         """
         return self.all().annotate()
 
-    def annotate(self) -> Optional[str]:
-        """
-        Sends all datapoints in the datasource for annotation in Label Studio.
-        It's recommended to not send a huge amount of datapoints to be annotated at once, to avoid overloading
-        The Label Studio workspace.
-
-        :return: Link to open Label Studio in the browser
-        """
-        return self.all().annotate()
-
     def send_to_annotation(self):
         """
         deprecated, see annotate()
@@ -647,7 +635,7 @@ class Datasource:
 
         Args:
             op (str): The operation to be performed in the query.
-            other (Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]], optional): 
+            other (Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]], optional):
                 The operand for the query operation. Defaults to None.
 
         Returns:
@@ -672,7 +660,7 @@ class MetadataContextManager:
         self._multivalue_fields = datasource._get_multivalue_fields()
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
-        """ 
+        """
         Update metadata for the specified datapoints.
 
         Args:

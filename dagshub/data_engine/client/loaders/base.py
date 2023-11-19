@@ -26,12 +26,13 @@ class DagsHubDataset:
         Initialize a dataset using the specified parameters.
 
         Args:
-    
         query_result (<dagshub.data_engine.client.models.QueryResult>): The query result containing dataset entries.
-        metadata_columns (List[str], optional): columns that are returned from the metadata as part of the dataloader. Defaults to [].
+        metadata_columns (List[str], optional):
+            columns that are returned from the metadata as part of the dataloader.Defaults to [].
         file_columns (List[str], optional): columns with a datapoint metadata that are files. Defaults to None.
         strategy (str, optional): Download strategy - preload|background|lazy. Defaults to "lazy".
-        tensorizers (Union[str, List[Union[str, FunctionType]]], optional): Tensorization strategy - auto|image|<function>. Defaults to "auto".
+        tensorizers (Union[str, List[Union[str, FunctionType]]], optional):
+            Tensorization strategy - auto|image|<function>. Defaults to "auto".
         savedir (str, optional): Location where the dataset is stored. Defaults to None.
         processes (int, optional): number of parallel processes that download the dataset. Defaults to 8.
         for_dataloader (bool, optional): Whether the dataset is used in a dataloader context. Defaults to False.

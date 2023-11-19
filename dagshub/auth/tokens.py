@@ -182,7 +182,7 @@ class TokenStorage:
 
         Args:
             token: token to check validity
-            host: which host to connect against
+            host: which host to connect against, default (https://dagshub.com)
         """
         host = host or config.host
         check_url = multi_urljoin(host, "api/v1/user")

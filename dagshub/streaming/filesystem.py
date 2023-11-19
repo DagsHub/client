@@ -319,11 +319,12 @@ class DagsHubFilesystem:
 
     def open(self, file, mode='r', buffering=-1, encoding=None,
              errors=None, newline=None, closefd=True, opener=None):
-        """ 
+        """
         Open a file for reading or writing, with support for special files and DagsHub integration.
 
         Args:
-            file (Union[str, int, bytes]): The file to be opened. It can be a path (str), file descriptor (int), or bytes-like object.
+            file (Union[str, int, bytes]): The file to be opened.
+                It can be a path (str), file descriptor (int), or bytes-like object.
             mode (str, optional): The mode in which the file should be opened. Defaults to 'r'.
             buffering (int, optional): The buffering value. Defaults to -1.
             encoding (str, optional): The encoding to use when reading the file. Defaults to None.
@@ -336,13 +337,17 @@ class DagsHubFilesystem:
             File object: A file object representing the opened file.
 
         Raises:
-            NotImplementedError: If a custom opener is provided, as DagsHub's patched open() does not support custom openers.
+            NotImplementedError: If a custom opener is provided,
+                as DagsHub's patched open() does not support custom openers.
             FileNotFoundError: If the file is not found in the repository and an attempt to download it fails.
-            RuntimeError: If multiple attempts to download the file fail or if there is an unexpected response code during download.
+            RuntimeError: If multiple attempts to download the file fail
+                or if there is an unexpected response code during download.
 
         Notes:
-            - If the provided 'file' argument is an integer (file descriptor), the function behaves as a passthrough to the standard open() method.
-            - If the 'file' argument is a bytes-like object, it is decoded into a string using the file system's default encoding.
+            - If the provided 'file' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard open() method.
+            - If the 'file' argument is a bytes-like object,
+                it is decoded into a string using the file system's default encoding.
             - Special files and DagsHub integration are handled based on the file path provided.
 
         Examples:
@@ -446,7 +451,8 @@ class DagsHubFilesystem:
         Get the status of a file or directory, including support for special files and DagsHub integration.
 
         Args:
-            path (Union[str, int, bytes]): The path of the file or directory to get the status for. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path of the file or directory to get the status for.
+                It can be a path (str), file descriptor (int), or bytes-like object.
             dir_fd (int, optional): File descriptor of the directory. Defaults to None.
             follow_symlinks (bool, optional): Whether to follow symbolic links. Defaults to True.
 
@@ -454,12 +460,15 @@ class DagsHubFilesystem:
             collections.namedtuple: A namedtuple containing the file status information.
 
         Raises:
-            NotImplementedError: If dir_fd is not None or follow_symlinks is False, as DagsHub's patched stat() does not support these options.
-            FileNotFoundError: If the file is not found in the repository, and an attempt to update the cache or create missing directories fails.
+            NotImplementedError: If dir_fd is not None or follow_symlinks is False,
+                as DagsHub's patched stat() does not support these options.
+            FileNotFoundError: If the file is not found in the repository,
+                and an attempt to update the cache or create missing directories fails.
             RuntimeError: If an unknown file type is encountered during the stat operation.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard stat() method.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard stat() method.
             - Special files and DagsHub integration are handled based on the file path provided.
 
         Examples:
@@ -527,13 +536,16 @@ class DagsHubFilesystem:
         Change the current working directory to the specified path, with support for DagsHub integration.
 
         Args:
-            path (Union[str, int, bytes]): The path to change the current working directory to. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path to change the current working directory to.
+                It can be a path (str), file descriptor (int), or bytes-like object.
 
         Raises:
-            FileNotFoundError: If the specified path is not found in the repository, and an attempt to create missing directories fails.
+            FileNotFoundError: If the specified path is not found in the repository,
+                and an attempt to create missing directories fails.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard chdir() method.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard chdir() method.
             - DagsHub integration is applied when the provided path is within the DagsHub repository.
 
         Examples:
@@ -564,7 +576,7 @@ class DagsHubFilesystem:
             self.__chdir(path)
 
     def listdir(self, path='.'):
-        """ 
+        """
         List the contents of a directory, including support for DagsHub integration.
 
         Args:

@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 def oauth_flow(
     host: str,
     client_id: Optional[str] = None
-) -> Dict:
-    
+) -> OAuthDagshubToken:
+
     """
     Initiate the OAuth 2.0 flow for obtaining an access token.
 
     Args:
         host (str): The URL of the OAuth provider.
-        client_id (Optional[str], optional): The client ID used for authentication. 
+        client_id (Optional[str], optional): The client ID used for authentication.
             If not provided, it will use the default client ID from the configuration.
 
     Returns:
