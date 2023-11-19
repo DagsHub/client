@@ -27,7 +27,7 @@ import dacite
 import dagshub.auth
 from dagshub.common import config
 
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, log_message
 
 logger = logging.getLogger("dagshub")
 
@@ -279,8 +279,13 @@ class RepoAPI:
         """
         files = self._get_files_in_path(remote_path, revision, recursive)
         file_tuples = []
+        if local_path is None:
+            local_path = "."
         local_path = Path(local_path)
-        # Edge case - download one single file - different output path semantics
+        # Strip the slashes from the beginning so the relative_to logic works
+        if str(remote_path.startswith("/")):
+            remote_path = str(remote_path).lstrip("/")
+        # Edge case - if the user requested a single file - different output path semantics
         if len(files) == 1 and files[0].path == remote_path:
             f = files[0]
             remote_path = PurePosixPath(f.path)
@@ -292,10 +297,16 @@ class RepoAPI:
             file_tuples.append((f.download_url, file_path))
         else:
             for f in files:
-                file_path = f.path if keep_source_prefix else f.path[len(remote_path) + 1 :]
+                file_path_in_remote = PurePosixPath(f.path)
+                remote_path_obj = PurePosixPath(remote_path)
+                if keep_source_prefix:
+                    file_path = file_path_in_remote
+                else:
+                    file_path = file_path_in_remote.relative_to(remote_path_obj)
                 file_path = local_path / file_path
                 file_tuples.append((f.download_url, file_path))
         download_files(file_tuples, skip_if_exists=not redownload)
+        log_message(f"Downloaded {len(files)} file(s) to {local_path.resolve()}")
 
     @cached_property
     def default_branch(self) -> str:
