@@ -390,8 +390,10 @@ class Datasource:
         Args:
             datapoints (Union[List[Datapoint], QueryResult, List[Dict]]):
                 Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
-            open_project (bool, optional):  Specifies whether the link to the returned LS project should be opened from Python.
-            ignore_warning (bool, optional): Suppress any non-lethal warnings that require user input. Defaults to False.
+            open_project (bool, optional):
+                Specifies whether the link to the returned LS project should be opened from Python.
+            ignore_warning (bool, optional):
+                Suppress any non-lethal warnings that require user input. Defaults to False.
 
         Returns:
             Link to open Label Studio in the browser

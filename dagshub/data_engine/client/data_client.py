@@ -266,6 +266,10 @@ class DataClient:
         Args:
             datasource (Datasource): The datasource instance to be saved.
             name (str) : Name of the new datasource instance
+
+        Example:
+            For a detailed description of how to create and save datasets, refer to this link:
+                "https://dagshub.com/docs/use_cases/data_engine/query_and_create_subsets/#querying-and-saving-subsets-of-your-data
         """
         q = GqlMutations.save_dataset()
 
