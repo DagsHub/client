@@ -202,7 +202,7 @@ class DatasourceQuery:
             converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
             value = converter(val["value"])
             as_of = val.get("asOf")
-            node = Node(tag=comparator, data={"field": key, "value": value, "as_of": as_of })
+            node = Node(tag=comparator, data={"field": key, "value": value, "as_of": as_of})
             tree.add_node(node, parent_node)
         elif op_type in ("and", "or"):
             main_node = Node(tag=op_type)

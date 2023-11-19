@@ -541,7 +541,6 @@ class Datasource:
             return new_ds
         elif type(other) is Field:
             # yuvald TODO should i warn if alias!=None?
-            # yuvald TODO unit tests
             if not self.has_field(other.column):
                 raise FieldNotFoundError(other.column)
             new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)

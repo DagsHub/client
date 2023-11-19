@@ -31,9 +31,9 @@ def test_versioning(ds):
     add_int_fields(ds, "x")
     add_int_fields(ds, "y")
 
-    ds2 = ((ds[ds[Field("x", as_of_timestamp=123)] > 1]) & \
-          (ds[ds[Field("x", as_of_timestamp=345)] > 2]) | \
-          (ds[ds[Field("y", as_of_timestamp=789)] > 3])).\
+    ds2 = ((ds[ds[Field("x", as_of_timestamp=123)] > 1]) &
+           (ds[ds[Field("x", as_of_timestamp=345)] > 2]) |
+           (ds[ds[Field("y", as_of_timestamp=789)] > 3])).\
         select([Field("y", as_of_timestamp=123), Field("x", as_of_timestamp=456, alias="y_t1")])
     q = ds2.get_query()
     expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
@@ -44,7 +44,6 @@ def test_versioning(ds):
 
     expected_select = [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]
     assert ds2._select == expected_select
-
 
 
 def test_composite_filter(ds):
