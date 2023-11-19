@@ -378,9 +378,7 @@ class Datasource:
     def send_to_annotation(self):
         """
         deprecated, see annotate()
-        deprecated, see annotate()
         """
-        return self.annotate()
         return self.annotate()
 
     def send_datapoints_to_annotation(
@@ -389,17 +387,16 @@ class Datasource:
         """
         Sends datapoints to annotations in Label Studio
 
-        :param datapoints: Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
-                     A QueryResult can also function as a list of Datapoint.
-        :param open_project: Specifies whether the link to the returned LS project should be opened from Python
-        :param ignore_warning: Suppress any non-lethal warnings that require user input
-        :return: Link to open Label Studio in the browser
-        :param datapoints: Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
-                     A QueryResult can also function as a list of Datapoint.
-        :param open_project: Specifies whether the link to the returned LS project should be opened from Python
-        :param ignore_warning: Suppress any non-lethal warnings that require user input
-        :return: Link to open Label Studio in the browser
+        Args:
+            datapoints (Union[List[Datapoint], QueryResult, List[Dict]]):
+                Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
+            open_project (bool, optional):  Specifies whether the link to the returned LS project should be opened from Python.
+            ignore_warning (bool, optional): Suppress any non-lethal warnings that require user input. Defaults to False.
+
+        Returns:
+            Link to open Label Studio in the browser
         """
+
         if len(datapoints) == 0:
             logger.warning("No datapoints provided to be sent to annotation")
             return None
@@ -666,6 +663,25 @@ class MetadataContextManager:
         Args:
             datapoints (Union[List[str], str]): A list of datapoints or a single datapoint URL to update metadata for.
             metadata (Dict[str, Any]): A dictionary containing metadata key-value pairs to update.
+
+        Example:
+        ```
+        ds = datasources.get_datasource("simon/baby-yoda-segmentation-dataset", name="bucket-ds")
+
+        # Example usage to update metadata for a list of datapoints
+        with ds.metadata_context() as ctx:
+            metadata = {
+                "episode": 5,
+                "has_baby_yoda": True,
+            }
+
+            # Attach metadata to a single specific file in the datasource.
+            # The first argument is the filepath to attach metadata to, **relative to the root of the datasource**.
+            ctx.update_metadata("images/005.jpg", metadata)
+
+            # Attach metadata to several files at once:
+            ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
+        ```
         """
         if isinstance(datapoints, str):
             datapoints = [datapoints]
