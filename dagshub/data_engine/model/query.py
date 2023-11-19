@@ -92,8 +92,6 @@ class DatasourceQuery:
             - If the operation is 'isnull', it can only be applied to a column filter;
                 otherwise, a RuntimeError is raised.
             - If the operation is 'not', a 'not' node is added to the query tree.
-            - If the current query is a complex query with a tree structure,
-                a subtree is created by combining the current query and the provided query using the specified operator ('and' or 'or').
             - If either query is empty, the composition is adjusted accordingly.
 
         Example:

@@ -57,7 +57,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Check file accessibility based on the given path and access mode.
 
         Args:
-            path (Union[str, int, bytes]): The path to check accessibility. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path to check accessibility.
+                It can be a path (str), file descriptor (int), or bytes-like object.
             mode (int):
                 The access mode to check.
 
@@ -68,7 +69,7 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             - If the provided 'path' argument is an integer (file descriptor),
                 the function behaves as a passthrough to the standard access() method.
             - The 'mode' argument follows the same convention as the os.access() function,
-                where values like os.R_OK, os.W_OK, and os.X_OK indicate read, write, and execute permissions, respectively.
+                where values like os.R_OK, os.W_OK, and os.X_OK indicate read, write, and execute permissions.
 
         Examples:
             ```python
@@ -290,7 +291,7 @@ def mount(
 
     Example:
         ```python
-        mount(debug=True, project_root='/path/to/local/directory', repo_url='https://dagshub.com/user/repo.git', branch='main')
+        mount(debug=True, project_root='/path/to/local/dir', repo_url='https://dagshub.com/user/repo.git', branch='main')
         ```
     """
     logging.basicConfig(level=logging.DEBUG)
