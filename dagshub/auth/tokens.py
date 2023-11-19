@@ -71,14 +71,6 @@ class TokenStorage:
             self._store_cache_file()
 
     def add_token(self, token: Union[str, DagshubTokenABC], host: str = None, skip_validation=False):
-        """
-        Add a token to the token storage for the specified host.
-
-        Args:
-            token (Dict): A dictionary containing the token information.
-            host (str, optional): The host URL for which the token is being added.
-                If not provided, the configuration's default host (https://dagshub.com) will be used.
-        """
         host = host or config.host
 
         if type(token) is str:
@@ -97,7 +89,41 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
-    def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
+    def invalidate_token(self, token: DagshubTokenABC, host: str = None):
+        host = host or config.host
+
+        try:
+            if host in self._token_cache:
+                tokens = self._token_cache[host]
+                tokens.remove(token)
+
+                if host in self._known_good_tokens:
+                    good_token_set = self._known_good_tokens[host]
+                    if token in good_token_set:
+                        good_token_set.remove(token)
+
+                self._store_cache_file()
+        except ValueError:
+            logger.warning(f"Token {token} does not exist in the storage")
+
+    def get_authenticator(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubAuthenticator:
+        """
+        Returns the authenticator object, that can renegotiate tokens in case of failure
+        """
+        host = host or config.host
+        token = self.get_token_object(host, fail_if_no_token, **kwargs)
+        return DagshubAuthenticator(token, token_storage=self, host=host)
+
+    def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
+        """
+        This function does following:
+        - Iterates over all tokens in the cache for the provided host
+        - Finds a first valid token and returns it
+        - If it finds an invalid token, it deletes it from the cache
+
+        We're using a set of known good tokens to skip rechecking for token validity every time
+        """
+
         host = host or config.host
         if host == config.host and config.token is not None:
             return EnvVarDagshubToken(config.token, host)
@@ -182,7 +208,7 @@ class TokenStorage:
 
         Args:
             token: token to check validity
-            host: which host to connect against, default (https://dagshub.com)
+            host: which host to connect against
         """
         host = host or config.host
         check_url = multi_urljoin(host, "api/v1/user")
@@ -318,15 +344,20 @@ def get_token(**kwargs):
 
 
 def add_app_token(token: str, host: Optional[str] = None, **kwargs):
-    token_dict = {
-        "access_token": token,
-        "token_type": APP_TOKEN_TYPE,
-        "expiry": "never",
-    }
-    _get_token_storage(**kwargs).add_token(token_dict, host)
+    """
+    Adds an application token to the token cache.
+    This is a long-lived token that you can add/revoke in your profile settings on DagsHub
+    """
+    token_obj = AppDagshubToken(token)
+    _get_token_storage(**kwargs).add_token(token_obj, host)
 
 
 def add_oauth_token(host: Optional[str] = None, **kwargs):
+    """
+    Launches the OAuth flow that generates a short-lived token.
+    This will open a new browser window, so this is not a CI/headless friendly function.
+    Consider using `add_app_token` or setting the `DAGSHUB_USER_TOKEN` env var in those cases.
+    """
     host = host or config.host
     token = oauth.oauth_flow(host)
     _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)

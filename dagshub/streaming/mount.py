@@ -58,15 +58,17 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
         Args:
             path (Union[str, int, bytes]): The path to check accessibility. It can be a path (str), file descriptor (int), or bytes-like object.
-            mode (int): 
+            mode (int):
                 The access mode to check.
 
         Returns:
             bool: True if the file is accessible; otherwise, False.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard access() method.
-            - The 'mode' argument follows the same convention as the os.access() function, where values like os.R_OK, os.W_OK, and os.X_OK indicate read, write, and execute permissions, respectively.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard access() method.
+            - The 'mode' argument follows the same convention as the os.access() function,
+                where values like os.R_OK, os.W_OK, and os.X_OK indicate read, write, and execute permissions, respectively.
 
         Examples:
             ```python
@@ -86,7 +88,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Open a file for reading or writing.
 
         Args:
-            path (Union[str, int, bytes]): The path of the file to open. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path of the file to open.
+                It can be a path (str), file descriptor (int), or bytes-like object.
             flags (int): The flags for opening the file.
 
         Raises:
@@ -96,7 +99,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             int: The file descriptor for the opened file.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.open() method.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard os.open() method.
             - Special files are handled, and their dedicated file descriptor is returned.
 
         Examples:
@@ -121,7 +125,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Get the attributes of a file or directory.
 
         Args:
-            path (Union[str, int, bytes]): The path to the file or directory. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path to the file or directory.
+                It can be a path (str), file descriptor (int), or bytes-like object.
             fd (int, optional): An optional file descriptor. Defaults to None.
 
         Raises:
@@ -131,8 +136,10 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             Dict[str, Any]: A dictionary containing file attributes such as size, mode, and more.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.fstat() method.
-            - The returned dictionary includes attributes like access time, creation time, group ID, mode, modification time, size, and user ID.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard os.fstat() method.
+            - The returned dictionary includes attributes like access time,
+                creation time, group ID, mode, modification time, size, and user ID.
 
         Examples:
             ```python
@@ -172,7 +179,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Read data in the form of bytes from a file.
 
         Args:
-            path (Union[str, int, bytes]): The path of the file to read. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path of the file to read. It can be a path (str),
+                file descriptor (int), or bytes-like object.
             size (int): The size of data to read.
             offset (int): The offset in the file.
             fh (int): The file descriptor.
@@ -181,7 +189,8 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             bytes: The data read from the file.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.read() method.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard os.read() method.
             - Special files are handled, and their content is retrieved directly.
 
         Examples:
@@ -203,14 +212,16 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         List the contents of a directory.
 
         Args:
-            path (Union[str, int, bytes]): The path of the directory. It can be a path (str), file descriptor (int), or bytes-like object.
+            path (Union[str, int, bytes]): The path of the directory.
+                It can be a path (str), file descriptor (int), or bytes-like object.
             fh (int): The file descriptor.
 
         Returns:
             List[str]: A list of directory contents.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.listdir() method.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard os.listdir() method.
             - The returned list includes entries for the current directory ('.') and the parent directory ('..').
 
         Examples:
@@ -228,14 +239,15 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Release the resources associated with an open file.
 
         Args:
-            path (Union[str, int, bytes]): 
-                The path of the file. 
+            path (Union[str, int, bytes]):
+                The path of the file.
                 It can be a path (str), file descriptor (int), or bytes-like object.
-            fh (int): 
+            fh (int):
                 The file descriptor.
 
         Notes:
-            - If the provided 'path' argument is an integer (file descriptor), the function behaves as a passthrough to the standard os.close() method.
+            - If the provided 'path' argument is an integer (file descriptor),
+                the function behaves as a passthrough to the standard os.close() method.
             - Special file descriptors, such as SPECIAL_FILE_FH, are not closed.
 
         Examples:
@@ -262,8 +274,10 @@ def mount(
     Mount a DagsHubFUSE filesystem.
 
     Args:
-        debug (bool, optional): If True, run the FUSE filesystem in the foreground with debug logging; otherwise, run it in the background. Defaults to False.
-        project_root (Optional[PathLike], optional): The local directory to mount as the DagsHubFUSE filesystem. Defaults to None.
+        debug (bool, optional): If True, run the FUSE filesystem in the foreground with debug logging;
+            otherwise, run it in the background. Defaults to False.
+        project_root (Optional[PathLike], optional): The local directory to mount as the DagsHubFUSE filesystem.
+            Defaults to None.
         repo_url (Optional[str], optional): The URL of the DagsHub repository to mount. Defaults to None.
         branch (Optional[str], optional): The branch of the DagsHub repository to mount. Defaults to None.
         username (Optional[str], optional): The username for authentication. Defaults to None.
