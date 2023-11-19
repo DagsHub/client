@@ -1,7 +1,7 @@
 import pytest
 
 from dagshub.data_engine.model.datasource import (
-    Datasource,
+    Datasource, Field,
 )
 from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError, FieldNotFoundError
 from dagshub.data_engine.model.query import DatasourceQuery, bytes_deserializer
@@ -25,6 +25,26 @@ def test_simple_filter(ds):
     q = ds2.get_query()
     expected = {"gt": {"data": {"field": "column1", "value": 5}}}
     assert q.to_dict() == expected
+
+
+def test_versioning(ds):
+    add_int_fields(ds, "x")
+    add_int_fields(ds, "y")
+
+    ds2 = ((ds[ds[Field("x", as_of_timestamp=123)] > 1]) & \
+          (ds[ds[Field("x", as_of_timestamp=345)] > 2]) | \
+          (ds[ds[Field("y", as_of_timestamp=789)] > 3])).\
+        select([Field("y", as_of_timestamp=123), Field("x", as_of_timestamp=456, alias="y_t1")])
+    q = ds2.get_query()
+    expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
+                                                          {'gt': {'data': {'field': 'x', 'as_of': 345, 'value': 2}}}],
+                                             'data': None}},
+                                    {'gt': {'data': {'field': 'y', 'as_of': 789, 'value': 3}}}], 'data': None}}
+    assert q.to_dict() == expected
+
+    expected_select = [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]
+    assert ds2._select == expected_select
+
 
 
 def test_composite_filter(ds):
