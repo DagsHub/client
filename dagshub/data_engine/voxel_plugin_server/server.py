@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
 
+from dagshub.common import is_inside_colab
 from dagshub.data_engine.voxel_plugin_server.app import app
 from dagshub.data_engine.voxel_plugin_server.models import PluginServerState
 
@@ -41,8 +42,11 @@ class PluginServer:
 
     def set_dataset_config(self, session: "fo.Session"):
         session.config.plugins["dagshub"] = {
-            "server": self.server_address
+            "server": self.server_address,
+            "in_colab": is_inside_colab(),
+            "datasource_name": self._state.datasource.source.name,
         }
+        session.refresh()
 
     async def start_serve(self):
         self.set_state(self._state)
@@ -66,17 +70,3 @@ def run_plugin_server(voxel_session: "fo.Session", datasource: "Datasource", bra
         _running_server.set_state(state)
 
     return _running_server
-
-# if __name__ == "__main__":
-#     repo = RepoAPI(repo="kirill/baby-yoda-segmentation-dataset", host="http://localhost:3000")
-#     set_voxel_envvars()
-#     logging.basicConfig(level=logging.INFO)
-#
-#     import fiftyone as fo
-#
-#     fo.set_logging_level(level=logging.INFO)
-#
-#     sess = fo.launch_app(fo.load_dataset("default-dataset"))
-#     server_state = PluginServerState(voxel_session=sess, repo=repo, branch=None)
-#     run_plugin_server(sess, repo, None)
-#     sess.wait()

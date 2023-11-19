@@ -34,13 +34,14 @@ class DAGsHubLogger(Callback):
     ```
     """
 
-    def __init__(self,
-                 metrics_path: str = 'metrics.csv',
-                 should_log_metrics: bool = True,
-                 hparams_path: str = 'params.yml',
-                 should_log_hparams: bool = True,
-                 should_make_dirs: bool = True,
-                 ):
+    def __init__(
+        self,
+        metrics_path: str = "metrics.csv",
+        should_log_metrics: bool = True,
+        hparams_path: str = "params.yml",
+        should_log_hparams: bool = True,
+        should_make_dirs: bool = True,
+    ):
         """
         :param metrics_path (str): Where to save the single metrics CSV file.
         :param should_log_metrics (bool): Whether to log metrics at all. Should probably always be True.
@@ -52,18 +53,23 @@ class DAGsHubLogger(Callback):
             and hparams_path will be created. Has no effect if the directory structure already exists.
         """
         super(DAGsHubLogger, self).__init__()
-        self.logger = LoggerImpl(metrics_path=metrics_path, should_log_metrics=should_log_metrics,
-                                 hparams_path=hparams_path, should_log_hparams=should_log_hparams,
-                                 should_make_dirs=should_make_dirs, eager_logging=True)
+        self.logger = LoggerImpl(
+            metrics_path=metrics_path,
+            should_log_metrics=should_log_metrics,
+            hparams_path=hparams_path,
+            should_log_hparams=should_log_hparams,
+            should_make_dirs=should_make_dirs,
+            eager_logging=True,
+        )
 
     def on_train_begin(self, logs={}):
         params = {}
         with ignore_exceptions():
             params.update(self.params)
         with ignore_exceptions():
-            params['optimizer'] = self.model.optimizer.get_config()
+            params["optimizer"] = self.model.optimizer.get_config()
         with ignore_exceptions():
-            params['loss'] = self.model.loss.get_config()
+            params["loss"] = self.model.loss.get_config()
         self.logger.log_hyperparams(params)
         self.logger.log_hyperparams(success=False)
         self._epoch = -1
@@ -78,7 +84,7 @@ class DAGsHubLogger(Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         # At the end of an epoch, logs has more metrics
-        metrics = {'epoch': self._epoch, **logs}
+        metrics = {"epoch": self._epoch, **logs}
         self.logger.log_metrics(metrics, step_num=self._step)
 
     def on_train_end(self, logs={}):

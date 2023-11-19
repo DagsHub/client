@@ -23,11 +23,18 @@ def get_default_branch(owner, reponame, auth, host=config.host):
     Returns:
         The default branch of the given repository
     """
-    res = http_request("GET", urllib.parse.urljoin(host, config.REPO_INFO_URL.format(
-        owner=owner,
-        reponame=reponame,
-    )), auth=auth)
-    return res.json().get('default_branch')
+    res = http_request(
+        "GET",
+        urllib.parse.urljoin(
+            host,
+            config.REPO_INFO_URL.format(
+                owner=owner,
+                reponame=reponame,
+            ),
+        ),
+        auth=auth,
+    )
+    return res.json().get("default_branch")
 
 
 def http_request(method, url, **kwargs):
@@ -57,11 +64,13 @@ def http_request(method, url, **kwargs):
 
 
 def get_project_root(root):
-    while not (root / '.git').is_dir():
+    while not (root / ".git").is_dir():
         if ismount(root):
-            raise ValueError(f"No git project found! (stopped at mountpoint {root}). \
-                               Please run this command in a git repository.")
-        root = root / '..'
+            raise ValueError(
+                f"No git project found! (stopped at mountpoint {root}). \
+                               Please run this command in a git repository."
+            )
+        root = root / ".."
     return Path(root)
 
 

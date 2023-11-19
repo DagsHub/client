@@ -5,9 +5,10 @@ Direct Data Access (DDA), a component to let you stream and upload your data.
 
 This Readme is divided into segments based on functionality:
 1. [Installation & Setup](#installation-and-setup)
-2. [Data Streaming](#data-streaming)
-3. [Data Upload](#data-upload)
-4. [Experiment Tracking](#experiment-tracking-logger)
+2. [Data Engine](data_engine.md)
+3. [Data Streaming](#data-streaming)
+4. [Data Upload](#data-upload)
+5. [Experiment Tracking](#experiment-tracking-logger)
    1. [Autologging](#autologging-integrations-with-ml-frameworks)
 
 Some functionality is supported only in Python.
@@ -168,9 +169,9 @@ DVC.**
 Basic usage example is as follows:
 
 ```python
-from dagshub import upload
+from dagshub import upload_files
 
-upload("<repo_owner>/<repo_name>", local_path="<path_to_file_or_dir_to_upload>")
+upload_files("<repo_owner>/<repo_name>", local_path="<path_to_file_or_dir_to_upload>")
 # Optional: remote_path, commit_message, username, password, token, branch, commit_message, versioning
 # For a full list of potential options, see dagshub.upload.wrapper.Repo.upload_files
 ```

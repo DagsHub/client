@@ -1,4 +1,4 @@
-# Data Engine (codename Data Shepherd) preliminary docs
+# Dagshub Data Engine documentation
 
 ## The overall idea
 
@@ -11,10 +11,6 @@
 * Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
 
 
-## Warning: The interface for everything is still in development and is subject to big changes.
-
-Let Kirill know if the README is not up to date and he will update
-
 ## Creating/Getting a datasource
 
 ### Creating
@@ -25,15 +21,12 @@ from dagshub.data_engine import datasources
 
 # Create a datasource from a connected storage bucket.
 # You need to first connect the bucket to the repo using repo settings -> integrations.
-ds = datasources.create_from_bucket("simon/baby-yoda-segmentation-dataset", "bucket-ds", "s3://data-bucket/prefix")
+ds = datasources.get_or_create("simon/baby-yoda-segmentation-dataset", "bucket-ds", "s3://data-bucket/prefix")
 
 # OR
-# Create a datasource from a path in the repo
-ds = datasources.create_from_repo("simon/baby-yoda-segmentation-dataset", "path-ds", "path/to/dir")
+# Create a datasource from a path in the repo (last argument is the revision)
+ds = datasources.get_or_create("simon/baby-yoda-segmentation-dataset", "path-ds", "path/to/dir", "main")
 ```
-
-If the datasource with name `bucket-ds` already exists, we will throw an error, so on further uses you need to get a
-datasource.
 
 Shortly after creating the datasource, the DagsHub system will start scanning it for files and automatically adding some
 metadata fields that we can infer automatically, such as file size.
@@ -103,10 +96,6 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
 - Boolean
 - String
 - Blobs (need to be of type `bytes`)
-- Planned, not implemented yet:
-  - JSON
-  - Label Studio format annotations
-  - Images
 - ** Please let us know about other metadata types you'd like to use and why **
 
 We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being
@@ -134,19 +123,39 @@ ds.upload_metadata_from_dataframe(df, path_column="path")
 All other columns are considered metadata columns.
 If `path_column` isn't specified, then the first column is considered as the path column.
 
+### Metadata tagging
+You can add additional information to your metadata fields, telling what these fields mean semantically.
+
+For example, marking a field as an annotation field will make it show up in FiftyOne visualization and LabelStudio projects on DagsHub.
+
+To mark a field as an annotation field:
+
+```python
+ds.metadata_field("field_name").set_annotation().apply()
+```
+
+You can also predefine a field with a certain type before uploading into it. Do that if you want to be sure you won't upload a wrong datatype accidentally on ingestion.
+For example, this is useful when you're uploading a pandas dataframe and want to enforce that the field will be an integer field and not a float field:
+
+```python
+ds.metadata_field("field_name").set_type(int).apply()
+```
+
+Keep in mind that you cannot change the type of an already existing field.
+
 ## Getting data
 
 At any point during working/querying, you can get the points that exist in the datasource with the current query
 
 ```python
 # Get first 100 entries
-head = ds.head()
+head = ds.head(100)
 # Get all entries
 all = ds.all()
 ```
 
 The returned objects carry the returned datapoints + metadata.
-If you're more used to working pandas dataframes, you can get a dataframe back by using the dataframe property:
+If you're more used to working with pandas dataframes, you can get a dataframe back by using the dataframe property:
 
 ```python
 df = ds.head().dataframe
@@ -173,7 +182,7 @@ If instead you want to download blob fields for the entire dataset at once,
 you can do that using the `get_blob_fields(*fields)` function of the QueryResult:
 
 ```python
-df = ds.all().get_blob_fields("binary_1", "binary_2").dataframe
+df = ds.all().get_blob_fields("binary_1", "binary_2", load_into_memory=True).dataframe
 # Now "binary_1" and "binary_2" fields have the paths to the downloaded blob files
 ```
 
@@ -196,12 +205,15 @@ you can enable the bucket downloader, and the download functions will download t
 instead of our servers
 
 ```python
-from dagshub.common.download import enable_s3_bucket_downloader, enable_gcs_bucket_downloader
+from dagshub.common.download import enable_s3_bucket_downloader, enable_gcs_bucket_downloader, enable_azure_container_downloader
 
 # S3
 enable_s3_bucket_downloader()
 # GCS
 enable_gcs_bucket_downloader()
+# Azure Blob Storage
+account_url = "https://<storage-account-name>.blob.core.windows.net"
+enable_azure_container_downloader(account_url=account_url)
 
 # You can also use a custom client, if the default auth is not set up
 import boto3
@@ -290,6 +302,13 @@ ds = datasets.get_dataset("user/repo", "my-cool-dataset")
 ```
 
 You'll get back the dataset and can continue working from where you left off
+
+
+## Deleting a datasource
+
+```python
+ds.delete_source()
+```
 
 # Datasets and Dataloaders
 
@@ -381,17 +400,20 @@ voxel_session.wait(-1)
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
 
-## Deleting a datasource
+## Sending data for annotation
 
-```python
-ds.delete_source()
-```
+You can send a datasource or result of a query to annotation in Label Studio.
 
-## Contributing
+Doing a `ds.annotate()` or `ds.head(...).annotate` will open up a wizard for creating a new Label Studio project on DagsHub.
+
+If you have a field that was marked as annotation already, you can export annotations into the project from them
+(See the Metadata Tagging section to learn how to tag fields as annotation fields)
+
+# Contributing
 
 Feel free to add whatever issues you get into the issue tracker on the repository
 
-## Known issues
+# Known issues
 
 - No deleting of metadata yet
 - Works only on data in the repository you specified. For now you can't create a datasource in one repo and use data
@@ -401,7 +423,7 @@ Feel free to add whatever issues you get into the issue tracker on the repositor
   probably
   (with unexpected results)
 
-## Troubleshooting
+# Troubleshooting
 
 It's VERY useful for us if you can turn on debug logging and report with that.
 That way we can see the executing queries and their results

@@ -1,32 +1,76 @@
 import datetime
 import logging
 import os
+import threading
 import traceback
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Set, Union
 
 import yaml
+from httpx import Auth
 
 from dagshub.auth import oauth
+from dagshub.auth.token_auth import (
+    HTTPBearerAuth,
+    DagshubTokenABC,
+    TokenDeserializationError,
+    AppDagshubToken,
+    EnvVarDagshubToken,
+    DagshubAuthenticator,
+)
 from dagshub.common import config
+from dagshub.common.helpers import http_request
+from dagshub.common.util import multi_urljoin
 
 logger = logging.getLogger(__name__)
 
 APP_TOKEN_TYPE = "app-token"
 
 
+class InvalidTokenError(Exception):
+    def __str__(self):
+        print("The token is not a valid DagsHub token")
+
+
 class TokenStorage:
     def __init__(self, cache_location: str = None, **kwargs):
         cache_location = cache_location or config.cache_location
         self.cache_location = cache_location
-        self.__token_cache: Optional[Dict[str, List[Dict]]] = None
+        self.schema_version = config.TOKENS_CACHE_SCHEMA_VERSION
+        self.__token_cache: Optional[Dict[str, List[DagshubTokenABC]]] = None
+
+        # We check tokens only once for validity, so we don't do a lot of redundant requests
+        #   maybe there is a point to re-evaluate them once in a while
+        self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = {}
+
+        self.__token_access_lock = threading.RLock()
 
     @property
     def _token_cache(self):
         if self.__token_cache is None:
             self.__token_cache = self._load_cache_file()
+            self.remove_expired_tokens()
         return self.__token_cache
 
-    def add_token(self, token: Dict, host: str = None):
+    @property
+    def _token_access_lock(self):
+        if not hasattr(self, "__token_access_lock"):
+            self.__token_access_lock = threading.RLock()
+        return self.__token_access_lock
+
+    def remove_expired_tokens(self):
+        had_changes = False
+        for host, tokens in self._token_cache.items():
+            if host == "version":
+                continue
+            expired_tokens = filter(lambda token: token.is_expired, tokens)
+            for t in expired_tokens:
+                had_changes = True
+                tokens.remove(t)
+        if had_changes:
+            logger.info("Removed expired tokens from the token cache")
+            self._store_cache_file()
+
+    def add_token(self, token: Union[str, DagshubTokenABC], host: str = None, skip_validation=False):
         """
         Add a token to the token storage for the specified host.
 
@@ -36,47 +80,88 @@ class TokenStorage:
                 If not provided, the configuration's default host (https://dagshub.com) will be used.
         """
         host = host or config.host
+
+        if type(token) is str:
+            token = AppDagshubToken(token)
+
+        if self._token_already_exists(token.token_text, host):
+            logger.warning("The added token already exists in the token cache, skipping")
+            return
+
+        if not skip_validation:
+            if not TokenStorage.is_valid_token(token.token_text, host):
+                raise InvalidTokenError
+
         if host not in self._token_cache:
             self._token_cache[host] = []
         self._token_cache[host].append(token)
         self._store_cache_file()
 
     def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs):
-        """
-        Retrieve a token from the token storage for the specified host.
-
-        Args:
-            host (str, optional): The host URL for which the token is being retrieved.
-                If not provided, the configuration's default host URL will be used.
-            
-            fail_if_no_token (bool, optional): If True, raise an error if no valid token is found.
-                If False, initiate OAuth authentication to obtain a token.
-
-        Returns:
-            str: The access token for the specified host.
-        """
         host = host or config.host
-        tokens = self._token_cache.get(host, [])
-        app_tokens = [t for t in tokens if t.get("token_type") == APP_TOKEN_TYPE]
-        if len(app_tokens) > 0:
-            token = app_tokens[0]
-        else:
-            non_expired_tokens = [t for t in tokens if not self._is_expired(t)]
-            if len(non_expired_tokens) > 0:
-                token = non_expired_tokens[0]
-            elif fail_if_no_token:
-                raise RuntimeError(
-                    f"No valid tokens found for host '{host}'.\n"
-                    "Log into DagsHub by executing `dagshub login` in your terminal")
-            else:
-                logger.debug(
-                    f"No valid tokens found for host '{host}'. Authenticating with OAuth"
-                )
-                token = oauth.oauth_flow(host, **kwargs)
-                tokens.append(token)
-                self._token_cache[host] = tokens
-                self._store_cache_file()
-        return token["access_token"]
+        if host == config.host and config.token is not None:
+            return EnvVarDagshubToken(config.token, host)
+
+        with self._token_access_lock:
+            tokens = self._token_cache.get(host, [])
+
+            if host not in self._known_good_tokens:
+                self._known_good_tokens[host] = set()
+            good_token_set = self._known_good_tokens[host]
+            good_token = None
+            token_queue = list(sorted(tokens, key=lambda t: t.priority))
+
+            for token in token_queue:
+                if token.is_expired:
+                    self.invalidate_token(token, host)
+                    good_token_set = self._known_good_tokens[host]
+
+                if token in good_token_set:
+                    good_token = token
+                    break
+                # Check token validity
+                elif self.is_valid_token(token, host):
+                    good_token = token
+                    good_token_set.add(token)
+                # Remove invalid token from the cache
+                else:
+                    self.invalidate_token(token, host)
+                    good_token_set = self._known_good_tokens[host]
+                if good_token is not None:
+                    break
+
+            # Couldn't manage to find a good token after the search
+            # Either go through the oauth flow, or throw a runtime error
+            if good_token is None:
+                if fail_if_no_token:
+                    raise RuntimeError(
+                        f"No valid tokens found for host '{host}'.\n"
+                        "Log into DagsHub by executing `dagshub login` in your terminal"
+                    )
+                else:
+                    logger.debug(f"No valid tokens found for host '{host}'. Authenticating with OAuth")
+                    good_token = oauth.oauth_flow(host, **kwargs)
+                    tokens.append(good_token)
+                    good_token_set.add(good_token)
+                    # Save the cache
+                    self._token_cache[host] = tokens
+                    self._store_cache_file()
+
+            return good_token
+
+    def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
+        """
+        Return the raw token string
+        This is a lower level method that cannot do renegotiations, we only return the token itself here.
+        Used mainly for setting environment variables, for example for MLflow
+        """
+        return self.get_token_object(host, fail_if_no_token).token_text
+
+    def _token_already_exists(self, token_text: str, host: str):
+        for token in self._token_cache.get(host, []):
+            if token.token_text == token_text:
+                return True
+        return False
 
     @staticmethod
     def _is_expired(token: Dict[str, str]) -> bool:
@@ -90,38 +175,98 @@ class TokenStorage:
         is_expired = expiry_dt < datetime.datetime.utcnow()
         return is_expired
 
-    def _load_cache_file(self) -> Dict[str, List[Dict]]:
-        logger.debug(f"Loading OAuth token cache from {self.cache_location}")
+    @staticmethod
+    def is_valid_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> bool:
+        """
+        Check for token validity
+
+        Args:
+            token: token to check validity
+            host: which host to connect against
+        """
+        host = host or config.host
+        check_url = multi_urljoin(host, "api/v1/user")
+        if type(token) is str:
+            auth = HTTPBearerAuth(token)
+        else:
+            auth = token
+        resp = http_request("GET", check_url, auth=auth)
+
+        try:
+            # 500's might be ok since they're server errors, so check only for 400's
+            assert not (400 <= resp.status_code <= 499)
+            if resp.status_code == 200:
+                assert "login" in resp.json()
+            return True
+        except AssertionError:
+            return False
+
+    def _load_cache_file(self) -> Dict[str, List[DagshubTokenABC]]:
+        logger.debug(f"Loading token cache from {self.cache_location}")
         if not os.path.exists(self.cache_location):
-            logger.debug("OAuth token cache file doesn't exist")
-            return self._get_empty_cache_dict()
+            logger.debug("Token cache file doesn't exist")
+            return {}
         try:
             with open(self.cache_location) as f:
-                tokens_cache = yaml.load(f, yaml.Loader)
-                return tokens_cache
+                cache_yaml = yaml.load(f, yaml.Loader)
+                version = cache_yaml.get("version", "1")
+                if version == "1":
+                    return self._v1_token_list_parser(cache_yaml)
+                raise RuntimeError(f"Don't know how to parse token schema {version}")
         except Exception:
-            logger.error(
-                f"Error while loading DagsHub OAuth token cache: {traceback.format_exc()}"
-            )
+            logger.error(f"Error while loading DagsHub token cache: {traceback.format_exc()}")
             raise
 
     @staticmethod
-    def _get_empty_cache_dict():
-        return {"version": config.TOKENS_CACHE_SCHEMA_VERSION}
+    def _v1_token_list_parser(cache_yaml: Dict[str, Union[str, List[Dict]]]) -> Dict[str, List[DagshubTokenABC]]:
+        res = {}
+
+        token_class_map = {}
+        for token_class in DagshubTokenABC.__subclasses__():
+            token_class_map[token_class.token_type] = token_class
+
+        for host, tokens in cache_yaml.items():
+            if host == "version":
+                continue
+            if len(tokens) == 0:
+                continue
+            host_tokens = []
+            for token_dict in tokens:
+                try:
+                    token = token_class_map[token_dict["token_type"]].deserialize(token_dict)
+                    host_tokens.append(token)
+                except TokenDeserializationError as e:
+                    logger.warning(f"Failed to deserialize token {token_dict}: {e}")
+            res[host] = host_tokens
+        return res
 
     def _store_cache_file(self):
-        logger.debug(f"Dumping OAuth token cache to {self.cache_location}")
+        logger.debug(f"Dumping token cache to {self.cache_location}")
         try:
             dirpath = os.path.dirname(self.cache_location)
             if not os.path.exists(dirpath):
                 os.makedirs(dirpath)
+            dict_to_dump = {"version": self.schema_version}
+            for host, tokens in self.__token_cache.items():
+                dict_to_dump[host] = [t.serialize() for t in tokens]
             with open(self.cache_location, "w") as f:
-                yaml.dump(self.__token_cache, f, yaml.Dumper)
+                yaml.dump(dict_to_dump, f, yaml.Dumper)
         except Exception:
-            logger.error(
-                f"Error while storing DagsHub OAuth token cache: {traceback.format_exc()}"
-            )
+            logger.error(f"Error while storing DagsHub token cache: {traceback.format_exc()}")
             raise
+
+    def __getstate__(self):
+        d = self.__dict__
+        # Don't pickle the lock. This will make it so multiple authenticators might request for tokens at the same time
+        # This can lead to e.g. multiple OAuth requests firing at the same time, which is not desirable
+        # However, I'm not sure of a good way to solve it
+        access_lock_key = f"_{self.__class__.__name__}__token_access_lock"
+        if access_lock_key in d:
+            del d[access_lock_key]
+        return d
+
+    def __setstate__(self, state):
+        self.__dict__ = state
 
 
 _token_storage: Optional[TokenStorage] = None
@@ -134,19 +279,45 @@ def _get_token_storage(**kwargs):
     return _token_storage
 
 
+def get_authenticator(**kwargs) -> DagshubAuthenticator:
+    """
+    Get an authenticator object.
+    This object can be used as auth argument for the httpx requests
+
+    The authenticator has renegotiation logic in case where a token gets invalidated
+    """
+    return _get_token_storage(**kwargs).get_authenticator(**kwargs)
+
+
+def get_token_object(**kwargs):
+    """
+    Gets a DagsHub token, by default if no token is found authenticates with OAuth
+
+    Kwargs:
+        host (str): URL of a dagshub instance (defaults to dagshub.com)
+        cache_location (str): Location of the cache file with the token (defaults to <cache_dir>/dagshub/tokens)
+        fail_if_no_token (bool): What to do if token is not found.
+            If set to False (default), goes through OAuth flow
+            If set to True, throws a RuntimeError
+    """
+    return _get_token_storage(**kwargs).get_token_object(**kwargs)
+
+
 def get_token(**kwargs):
+    """
+    Gets a DagsHub token text, by default if no token is found authenticates with OAuth
+
+    Kwargs:
+        host (str): URL of a dagshub instance (defaults to dagshub.com)
+        cache_location (str): Location of the cache file with the token (defaults to <cache_dir>/dagshub/tokens)
+        fail_if_no_token (bool): What to do if token is not found.
+            If set to False (default), goes through OAuth flow
+            If set to True, throws a RuntimeError
+    """
     return _get_token_storage(**kwargs).get_token(**kwargs)
 
 
 def add_app_token(token: str, host: Optional[str] = None, **kwargs):
-    """
-    Add an application-specific access token to the token storage.
-
-    Args:
-        token (str): The access token to be added.
-        host (Optional[str], optional): The host URL for which the token is valid.
-            If not provided, the token will be added without an associated host.
-    """
     token_dict = {
         "access_token": token,
         "token_type": APP_TOKEN_TYPE,
@@ -156,16 +327,6 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 
 
 def add_oauth_token(host: Optional[str] = None, **kwargs):
-    """ 
-    Add an OAuth 2.0 access token to the token storage for the specified host.
-
-    Args:
-        host (Optional[str], optional): The host URL for which the access token is being obtained.
-            If not provided, the configuration's default host URL will be used.
-
-    Note:
-        This function initiates the OAuth flow to obtain an access token for the specified host.
-    """
     host = host or config.host
     token = oauth.oauth_flow(host)
-    _get_token_storage(**kwargs).add_token(token, host)
+    _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)

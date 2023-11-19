@@ -1,6 +1,5 @@
 import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,6 +19,7 @@ def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotati
         annotation_fields(str): JSON blobs of voxel annotations that are added to sample.
     """
     from fiftyone import Label
+
     for field in annotation_fields:
         annotation_val = datapoint.get_blob(field)
         label = Label.from_json(annotation_val.decode())
@@ -36,14 +36,23 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
         annotation_fields: fields from which to get annotations
     """
     from fiftyone.utils.labelstudio import import_label_studio_annotation
-    from fiftyone import Detections, Detection, Classification, Classifications, Keypoint, Keypoints, Polylines, \
-        Polyline
+    from fiftyone import (
+        Detections,
+        Detection,
+        Classification,
+        Classifications,
+        Keypoint,
+        Keypoints,
+        Polylines,
+        Polyline,
+    )
+
     for field in annotation_fields:
         annotations = datapoint.metadata.get(field)
         if type(annotations) is not bytes:
             return
         ann_dict = json.loads(annotations.decode())
-        for ann in ann_dict["annotations"]:
+        for ann in ann_dict.get("annotations", {}):
             if "result" not in ann:
                 continue
             annotations = []
@@ -51,9 +60,11 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
                 try:
                     converted = import_label_studio_annotation(res)
                     annotations.append(converted)
-                except:
+                except Exception:
                     logger.warning(f"Couldn't convert LS annotation {ann} to voxel annotation")
 
+            if len(annotations) == 0:
+                continue
             # Group the annotations of a similar type together
             # For now assuming there's no mixing and matching
             ann_type = type(annotations[0])

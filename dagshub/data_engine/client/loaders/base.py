@@ -46,12 +46,11 @@ class DagsHubDataset:
         )  # prevent circular calls
         self.datasource = query_result.datasource
         self.repo = self.datasource.source.repoApi
-        self.savedir = savedir or self.datasource.default_dataset_location
+        self.savedir = Path(savedir) if savedir else self.datasource.default_dataset_location
         self.strategy = strategy
+        self.source = self.datasource.source.path.split("://")[0]
 
-        self.datasource_root = Path(
-            self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)]
-        )
+        self.datasource_root = Path(self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)])
         self.processes = processes
         self.order = None
         self.file_columns = file_columns or self._get_file_columns()
@@ -70,9 +69,7 @@ class DagsHubDataset:
                 return
             Process(target=self.pull).start()
         elif strategy != "lazy":
-            logger.warning(
-                "Invalid download strategy (none from preload|background|lazy); defaulting to lazy."
-            )
+            logger.warning("Invalid download strategy (none from preload|background|lazy); defaulting to lazy.")
 
     def __len__(self) -> int:
         return len(self.entries)
@@ -86,7 +83,16 @@ class DagsHubDataset:
             [self.entries[0].metadata[col] for col in self.metadata_columns],
         ):
             try:
-                self.repo.list_path((self.datasource_root / str(value)).as_posix())
+                if self.datasource.source.source_type == self.datasource.source.source_type.REPOSITORY:
+                    self.repo.list_path((self.datasource_root / str(value)).as_posix())
+                else:
+                    self.repo.list_storage_path(
+                        (
+                            Path("/".join(list(self.datasource.source.path_parts().values())[:2]))
+                            / self.datasource_root
+                            / str(value)
+                        ).as_posix()
+                    )
                 res.append(column)
             except PathNotFoundError:
                 pass
@@ -116,13 +122,8 @@ class DagsHubDataset:
 
         return out
 
-    def __getitem__(
-        self, idx: int
-    ):  # -> List[Union[torch.Tensor, tf.Tensor]]:  # type specification in this line makes torch/tf requirements for one another
-        return [
-            tensorizer(data)
-            for tensorizer, data in zip(self.tensorizers, self.get(idx))
-        ]
+    def __getitem__(self, idx: int) -> List[Union["torch.Tensor", "tf.Tensor"]]:  # noqa: F821
+        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, self.get(idx))]
 
     def pull(self) -> None:
         if self.order is not None:
@@ -144,19 +145,24 @@ class DagsHubDataset:
         for path in paths:
             (self.savedir / Path(path).parent).mkdir(parents=True, exist_ok=True)
             if not (self.savedir / path).is_file():
-                data = self.repo.get_file(f"{self.datasource_root}/{path}")
+                if self.source == "repo":
+                    data = self.repo.get_file(f"{self.datasource_root}/{path}")
+                else:
+                    data = self.repo.get_storage_file(
+                        f"{'/'.join(list(self.datasource.source.path_parts().values())[:2])}"
+                        f"/{self.datasource_root}/{path}"
+                    )
+
                 filepath = self.savedir / path
                 with open(filepath, "wb") as file:
                     file.write(data)
 
-    def _get_tensorizers(
-        self, datatypes: Union[str, List[Union[str, FunctionType]]]
-    ) -> FunctionType:
+    def _get_tensorizers(self, datatypes: Union[str, List[Union[str, FunctionType]]]) -> FunctionType:
         if datatypes in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning("`tensorizers` set to 'auto'; guessing the datatypes")
             tensorizers = []
 
-            ## naive pass
+            # naive pass
             for idx, entry in enumerate(self.get(0)):
                 if not idx or self.metadata_columns[idx - 1] in self.file_columns:
                     extension = entry.split("/")[-1].split(".")[-1]
@@ -168,28 +174,27 @@ class DagsHubDataset:
                         tensorizers.append(self.tensorlib.image)
                     else:
                         raise ValueError(
-                            "Unable to automatically detect the datatypes. Please manually set a list of tensorizers, \
-                                        either with string arguments image|video|audio, or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
+                            "Unable to automatically detect the datatypes. "
+                            "Please manually set a list of tensorizers, either with string arguments image|video|audio,"
+                            " or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
                         )
                 elif type(entry) in [int, float]:
                     tensorizers.append(self.tensorlib.numeric)
                 else:
                     raise ValueError(
-                        "Unable to automatically tensorize non-numeric metadata. Please menually setup a list of tensorizers, either with string arguments image|video|audio, or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
+                        "Unable to automatically tensorize non-numeric metadata. "
+                        "Please manually setup a list of tensorizers, either with string arguments image|video|audio, "
+                        "or custom tensorizer functions with prototype `<str> -> <torch.Tensor>`."
                     )
             return tensorizers
         elif datatypes in ["image", "audio", "video"]:
             return [
                 getattr(self.tensorlib, datatypes),
             ] * (len(self.metadata_columns) + 1)
-        elif (
-            type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1
-        ):
-            return [
-                getattr(self.tensorlib, datatype) if type(datatype) == str else datatype
-                for datatype in datatypes
-            ]
+        elif type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1:
+            return [getattr(self.tensorlib, datatype) if type(datatype) == str else datatype for datatype in datatypes]
         else:
             raise ValueError(
-                "Unable to set tensorizers. Please ensure the number of selected columns equals the number of tensorizers."
+                "Unable to set tensorizers. "
+                "Please ensure the number of selected columns equals the number of tensorizers."
             )

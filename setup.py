@@ -31,22 +31,28 @@ install_requires = [
     "click>=8.0.4",
     "httpx~=0.23.0",
     "GitPython>=3.1.29",
-    "rich[jupyter]~=13.1.0",
+    "rich~=13.1.0",
     # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
     "dacite~=1.6.0",
     "tenacity~=8.2.2",
-    "gql-query-builder~=0.1.7",
     "gql[requests]",
     "dataclasses-json",
     "pandas",
     "treelib~=1.6.4",
     "pathvalidate~=3.0.0",
+    "python-dateutil",
 ]
+
+extras_require = {
+    "jupyter": ["rich[jupyter]~=13.1.0"],
+    "fuse": ["fusepy>=3"],
+}
 
 # Polyfills for Python 3.7
 if sys.version_info.major == 3 and sys.version_info.minor == 7:
     install_requires += [
-        "cached-property==1.5.2"
+        "cached-property==1.5.2",
+        "typing_extensions",
     ]
 
 packages = setuptools.find_packages(exclude=["tests", "tests.*"])

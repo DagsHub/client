@@ -7,7 +7,7 @@ try:
 except ImportError:
     from cached_property import cached_property
 
-storage_schemas = ["s3", "gs"]
+storage_schemas = ["s3", "gs", "azure"]
 
 
 @dataclass
@@ -22,6 +22,7 @@ class DagshubPath:
                                         If None, path is outside the FS
         original_path (Path): Original path as it was accessed by the user
     """
+
     # TODO: this couples this class hard to the fs, need to decouple later
     fs: Any  # Actual type is DagsHubFilesystem, but imports are wonky
     absolute_path: Optional[Path]
@@ -34,7 +35,7 @@ class DagshubPath:
             str_path = self.relative_path.as_posix()
             for storage_schema in storage_schemas:
                 if str_path.startswith(f"{storage_schema}:/"):
-                    str_path = str_path[len(storage_schema) + 2:]
+                    str_path = str_path[len(storage_schema) + 2 :]
                     self.relative_path = Path(".dagshub/storage") / storage_schema / str_path
                     self.absolute_path = self.fs.project_root / self.relative_path
 
@@ -67,12 +68,12 @@ class DagshubPath:
         str_path = self.relative_path.as_posix()
         if "/site-packages/" in str_path or str_path.endswith("/site-packages"):
             return True
-        return str_path.startswith(('.git/', '.dvc/')) or str_path in (".git", ".dvc")
+        return str_path.startswith((".git/", ".dvc/")) or str_path in (".git", ".dvc")
 
     def __truediv__(self, other):
         return DagshubPath(
             absolute_path=self.absolute_path / other,
             relative_path=self.relative_path / other,
             original_path=self.original_path / other,
-            fs=self.fs
+            fs=self.fs,
         )

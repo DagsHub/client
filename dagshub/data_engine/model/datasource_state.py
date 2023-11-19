@@ -6,8 +6,7 @@ from typing import Optional, Union, Mapping, Any, Dict, List
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, \
-    MetadataFieldSchema
+from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, MetadataFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
@@ -19,12 +18,12 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 path_regexes = {
-    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs)://(?P<bucket>[\w\-]+)(?P<prefix>/.*)?"),
+    DatasourceType.BUCKET: re.compile(r"(?P<schema>s3|gs|azure)://(?P<bucket>[\w\-._]+)(?P<prefix>/.*)?"),
     DatasourceType.REPOSITORY: re.compile(r"repo://(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)(?P<prefix>/.*)?"),
 }
 
 expected_formats = {
-    DatasourceType.BUCKET: "s3|gs://bucket-name/prefix",
+    DatasourceType.BUCKET: "s3|gs|azure://bucket-name/prefix",
     DatasourceType.REPOSITORY: "repo://owner/reponame/prefix",
 }
 
@@ -53,6 +52,8 @@ class DatasourceState:
         self.repoApi = RepoAPI(self.repo)
         if hasattr(self, "source_type") and self.source_type == DatasourceType.REPOSITORY:
             self.revision = self.path_parts()["revision"]
+        if not hasattr(self, "metadata_fields"):
+            self.metadata_fields = []
 
     @property
     def revision(self) -> str:
@@ -81,7 +82,8 @@ class DatasourceState:
             raise DatasourceNotFoundError(self)
         elif len(sources) > 1:
             raise RuntimeError(
-                f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong")
+                f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong"
+            )
         self._update_from_ds_result(sources[0])
 
     def content_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> str:
@@ -168,8 +170,10 @@ class DatasourceState:
         regex = path_regexes[self.source_type]
         match = regex.fullmatch(self.path)
         if match is None:
-            raise InvalidPathFormatError(f"{self.path} is not valid path format for type {self.source_type}.\n"
-                                         f"Expected format: {expected_formats[self.source_type]}")
+            raise InvalidPathFormatError(
+                f"{self.path} is not valid path format for type {self.source_type}.\n"
+                f"Expected format: {expected_formats[self.source_type]}"
+            )
         res = match.groupdict()
         # For repository type - handle revision that is in format of repo://user/repo/branch:prefix
         # Couldn't do that with regexes, so handling it here

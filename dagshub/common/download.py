@@ -1,16 +1,24 @@
 import logging
 import os.path
+import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
-from typing import Tuple, Callable, Optional, List, Union, Dict, Literal
+from typing import Tuple, Callable, Optional, List, Union, Dict
+
+from httpx import Auth
+
+from dagshub.common import config
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 import re
 import rich.progress
 
-from dagshub.auth import get_token
-from dagshub.auth.token_auth import HTTPBearerAuth
-from dagshub.common import config
+from dagshub.auth import get_authenticator
 from dagshub.common.helpers import http_request
 from dagshub.common.rich_util import get_rich_progress
 
@@ -20,7 +28,8 @@ DownloadFunctionType = Callable[[str, Path], None]
 
 storage_download_url_regex = re.compile(
     r".*/api/v1/repos/(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)/storage/raw/(?P<proto>s3|gs)/"
-    r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)")
+    r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)"
+)
 
 
 def enable_gcs_bucket_downloader(client=None):
@@ -34,6 +43,7 @@ def enable_gcs_bucket_downloader(client=None):
     """
     if client is None:
         from google.cloud import storage
+
         client = storage.Client()
 
     def get_fn(bucket_name, bucket_path) -> bytes:
@@ -56,6 +66,7 @@ def enable_s3_bucket_downloader(client=None):
 
     if client is None:
         import boto3
+
         client = boto3.client("s3")
 
     def get_fn(bucket, path) -> bytes:
@@ -63,6 +74,37 @@ def enable_s3_bucket_downloader(client=None):
         return resp["Body"].read()
 
     add_bucket_downloader("s3", get_fn)
+
+
+def enable_azure_container_downloader(account_url=None, client=None):
+    """
+    Enables downloading storage items using the azure client, instead of going through DagsHub's server.
+    For custom clients use `enable_custom_bucket_downloader` function.
+
+    Args:
+        account_url: an azure storage account url, of the form "https://<storage-account-name>.blob.core.windows.net"
+        client: preconfigured azure.storage.blob.BlobServiceClient
+            If client isn't specified, the default parameterless constructor is used.
+            If specified, account_url is disregarded, and the client is used.
+    """
+    if account_url is None and client is None:
+        raise TypeError("missing required argument 'account_url' or 'client'")
+
+    import io
+
+    if client is None:
+        from azure.storage.blob import BlobServiceClient
+        from azure.identity import DefaultAzureCredential
+
+        client = BlobServiceClient(account_url, credential=DefaultAzureCredential())
+
+    def get_fn(bucket, path) -> bytes:
+        blob_client = client.get_blob_client(container=bucket, blob=path)
+        stream = io.BytesIO()
+        blob_client.download_blob().readinto(stream)
+        return stream
+
+    add_bucket_downloader("azure", get_fn)
 
 
 def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
@@ -76,14 +118,15 @@ def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
     return groups["proto"], groups["bucket"], groups["path"]
 
 
-def _dagshub_download(url: str, auth: HTTPBearerAuth) -> bytes:
+def _dagshub_download(url: str, auth: Auth) -> bytes:
     resp = http_request("GET", url, auth=auth, timeout=600)
     try:
         assert resp.status_code == 200
     # TODO: retry
     except AssertionError:
         raise RuntimeError(
-            f"Couldn't download file at URL {url}. Response code {resp.status_code} (Body: {resp.content})")
+            f"Couldn't download file at URL {url}. Response code {resp.status_code} (Body: {resp.content})"
+        )
     return resp.content
 
 
@@ -93,7 +136,7 @@ _bucket_downloader_map: Dict[str, BucketDownloaderFuncType] = {}
 _default_downloader: Optional[Callable[[str], bytes]] = None
 
 
-def add_bucket_downloader(proto: Literal["gs", "s3"], func: BucketDownloaderFuncType):
+def add_bucket_downloader(proto: Literal["gs", "s3", "azure"], func: BucketDownloaderFuncType):
     if proto in _bucket_downloader_map:
         logger.warning(f"Protocol {proto} already has a custom downloader function specified, overwriting it")
     _bucket_downloader_map[proto] = func
@@ -130,13 +173,16 @@ def _ensure_default_downloader_exists():
     """
     global _default_downloader
     if _default_downloader is None:
-        token = config.token or get_token(host=config.host)
-        _default_downloader = partial(_dagshub_download, auth=HTTPBearerAuth(token=token))
+        auth = get_authenticator()
+        _default_downloader = partial(_dagshub_download, auth=auth)
 
 
-def download_files(files: List[Tuple[str, Union[str, Path]]],
-                   download_fn: Optional[DownloadFunctionType] = None,
-                   threads=32, skip_if_exists=True):
+def download_files(
+    files: List[Tuple[str, Union[str, Path]]],
+    download_fn: Optional[DownloadFunctionType] = None,
+    threads=config.download_threads,
+    skip_if_exists=True,
+):
     """
     Download files using multithreading
 
@@ -146,7 +192,7 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
             download url and Path where to save the file
             If function is not specified, then a default function that downloads a file with DagsHub credentials is used
             CAUTION: function needs to be pickleable since we're using ThreadPool to execute
-        threads: number of threads to run this function on, default 32
+        threads: number of threads to run this function on, defaults to the config value of download_threads (32)
         skip_if_exists: skip the download if the file exists (only for the default downloader)
     """
     _ensure_default_downloader_exists()
@@ -166,12 +212,29 @@ def download_files(files: List[Tuple[str, Union[str, Path]]],
 
         with progress:
             with ThreadPoolExecutor(max_workers=threads) as tp:
+
+                def cancel_download(*args):
+                    logger.warning("Interrupt received - shutting down downloader")
+                    tp.shutdown(wait=False, cancel_futures=True)
+
+                orig_interrupt = None
+                try:
+                    orig_interrupt = signal.signal(signal.SIGINT, cancel_download)
+                # ValueError means the function is not running from the main thread.
+                # TODO: figure out a workaround
+                except ValueError:
+                    pass
+
                 futures = [tp.submit(download_fn, url, location) for (url, location) in files]
                 for f in as_completed(futures):
                     exc = f.exception()
                     if exc is not None:
                         logger.warning(f"Got exception {type(exc)} while downloading file: {exc}")
                     progress.update(task, advance=1)
+
+                if orig_interrupt is not None:
+                    signal.signal(signal.SIGINT, orig_interrupt)
+
     elif len(files) == 1:
         # Single file - don't bother with the multithreading, just download the file
         url, location = files[0]

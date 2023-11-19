@@ -1,9 +1,10 @@
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Union, Optional
+from typing import Any, List, Union, Optional, Set
 
 from dataclasses_json import dataclass_json, config
+from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +41,27 @@ class DatasourceType(enum.Enum):
     CUSTOM = "CUSTOM"
 
 
-class MetadataFieldType(enum.Enum):
-    BOOLEAN = "BOOLEAN"
-    INTEGER = "INTEGER"
-    FLOAT = "FLOAT"
-    STRING = "STRING"
-    BLOB = "BLOB"
+class ScanOption(str, enum.Enum):
+    FORCE_REGENERATE_AUTO_SCAN_VALUES = "FORCE_REGENERATE_AUTO_SCAN_VALUES"
 
 
 @dataclass_json
 @dataclass
 class MetadataFieldSchema:
+    # This should match the GraphQL schema: MetadataFieldProps
     name: str
-    valueType: MetadataFieldType = field(
-        metadata=config(
-            encoder=lambda val: val.value
-        )
-    )
+    valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     multiple: bool
+    tags: Optional[Set[str]]
+
+    def __repr__(self):
+        res = f"{self.name} ({self.valueType.value})"
+        if self.tags is not None and len(self.tags) > 0:
+            res += f" with tags: {self.tags}"
+        return res
+
+    def is_annotation(self):
+        return ReservedTags.ANNOTATION.value in self.tags if self.tags else False
 
 
 @dataclass
