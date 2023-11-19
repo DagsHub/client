@@ -231,7 +231,7 @@ class RepoAPI:
             raise RuntimeError(error_msg)
         return res.content
 
-    def _get_files_in_path(self, path, revision=None, recursive=False) -> list[ContentAPIEntry]:
+    def _get_files_in_path(self, path, revision=None, recursive=False) -> List[ContentAPIEntry]:
         """
         Walks through the path of the repo, returning non-dir entries
         """
