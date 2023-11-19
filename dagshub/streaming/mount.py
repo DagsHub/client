@@ -291,7 +291,7 @@ def mount(
 
     Example:
         ```python
-        mount(debug=True, project_root='/path/to/local/dir', repo_url='https://dagshub.com/user/repo.git', branch='main')
+        mount(debug=True, project_root='/path/local/dir', repo_url='https://dagshub.com/user/repo.git', branch='main')
         ```
     """
     logging.basicConfig(level=logging.DEBUG)
