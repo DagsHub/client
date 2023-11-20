@@ -158,6 +158,9 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
     def read(self, path, size, offset, fh):
         """
+         NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.read)
+
         Read data in the form of bytes from a file.
 
         Args:
@@ -167,20 +170,6 @@ class DagsHubFUSE(LoggingMixIn, Operations):
             offset (int): The offset in the file.
             fh (int): The file descriptor.
 
-        Returns:
-            bytes: The data read from the file.
-
-        Notes:
-            - If the provided 'path' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard os.read() method.
-            - Special files are handled, and their content is retrieved directly.
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            data = dh.read('file.txt', 1024, 0, file_descriptor)
-            print(data)
-            ```
         """
         logger.debug(f"read - path: {path}, offset: {offset}, fh: {fh}")
         if fh == SPECIAL_FILE_FH:
@@ -201,17 +190,6 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Returns:
             List[str]: A list of directory contents.
 
-        Notes:
-            - If the provided 'path' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard os.listdir() method.
-            - The returned list includes entries for the current directory ('.') and the parent directory ('..').
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            contents = dh.readdir('directory', file_descriptor)
-            print(contents)
-            ```
         """
         logger.debug(f"readdir - path: {path}, fh: {fh}")
         return [".", ".."] + self.fs.listdir(path)
