@@ -542,7 +542,7 @@ class Datasource:
         elif type(other) is Field:
             if not self.has_field(other.column):
                 raise FieldNotFoundError(other.column)
-            new_ds._query = DatasourceQuery(other.column, int(other.as_of_timestamp))
+            new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)
             return new_ds
         # "index" is a datasource with a query - return the datasource inside
         # Example:
