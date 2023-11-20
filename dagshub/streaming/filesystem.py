@@ -320,6 +320,9 @@ class DagsHubFilesystem:
     def open(self, file, mode='r', buffering=-1, encoding=None,
              errors=None, newline=None, closefd=True, opener=None):
         """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/functions.html#open)
+
         Open a file for reading or writing, with support for special files and DagsHub integration.
 
         Args:
@@ -335,27 +338,6 @@ class DagsHubFilesystem:
 
         Returns:
             File object: A file object representing the opened file.
-
-        Raises:
-            NotImplementedError: If a custom opener is provided,
-                as DagsHub's patched open() does not support custom openers.
-            FileNotFoundError: If the file is not found in the repository and an attempt to download it fails.
-            RuntimeError: If multiple attempts to download the file fail
-                or if there is an unexpected response code during download.
-
-        Notes:
-            - If the provided 'file' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard open() method.
-            - If the 'file' argument is a bytes-like object,
-                it is decoded into a string using the file system's default encoding.
-            - Special files and DagsHub integration are handled based on the file path provided.
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            with dh.open('file.txt', 'r') as f:
-                content = f.read()
-            ```
 
         """
         # FD passthrough
@@ -448,6 +430,9 @@ class DagsHubFilesystem:
 
     def stat(self, path, *args, dir_fd=None, follow_symlinks=True):
         """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.stat)
+
         Get the status of a file or directory, including support for special files and DagsHub integration.
 
         Args:
@@ -459,24 +444,6 @@ class DagsHubFilesystem:
         Returns:
             collections.namedtuple: A namedtuple containing the file status information.
 
-        Raises:
-            NotImplementedError: If dir_fd is not None or follow_symlinks is False,
-                as DagsHub's patched stat() does not support these options.
-            FileNotFoundError: If the file is not found in the repository,
-                and an attempt to update the cache or create missing directories fails.
-            RuntimeError: If an unknown file type is encountered during the stat operation.
-
-        Notes:
-            - If the provided 'path' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard stat() method.
-            - Special files and DagsHub integration are handled based on the file path provided.
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            file_status = dh.stat('file.txt')
-            print(file_status)
-            ```
         """
         # FD passthrough
         if type(path) is int:
@@ -533,26 +500,14 @@ class DagsHubFilesystem:
 
     def chdir(self, path):
         """
+         NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.chdir)
+
         Change the current working directory to the specified path, with support for DagsHub integration.
 
         Args:
             path (Union[str, int, bytes]): The path to change the current working directory to.
                 It can be a path (str), file descriptor (int), or bytes-like object.
-
-        Raises:
-            FileNotFoundError: If the specified path is not found in the repository,
-                and an attempt to create missing directories fails.
-
-        Notes:
-            - If the provided 'path' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard chdir() method.
-            - DagsHub integration is applied when the provided path is within the DagsHub repository.
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            dh.chdir('data')  # Change to the 'data' directory within the DagsHub repository.
-            ```
         """
         # FD check
         if type(path) is int:
@@ -577,6 +532,9 @@ class DagsHubFilesystem:
 
     def listdir(self, path='.'):
         """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.listdir)
+
         List the contents of a directory, including support for DagsHub integration.
 
         Args:
@@ -798,6 +756,25 @@ class DagsHubFilesystem:
         return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
     def install_hooks(self):
+        """
+        Install hooks to override default file and directory operations with DagsHub functionality.
+
+        This method patches the standard Python I/O operations such as open, stat, listdir, scandir, and chdir
+        with their DagsHub equivalents. It also handles specific cases for IPython notebooks.
+
+        If hooks have already been installed, this method does nothing.
+
+        Raises:
+            ImportError: If the IPython module is not available.
+
+        Example:
+            ```python
+            # Example usage to install hooks for DagsHub operations
+            dags_hub_fs = DagsHubFilesystem()
+            dags_hub_fs.install_hooks()
+            ```
+
+        """
         if not hasattr(self.__class__, f"_{self.__class__.__name__}__unpatched"):
             # TODO: DRY this dictionary. i.e. __open() links cls.__open
             #  and io.open even though this dictionary links them

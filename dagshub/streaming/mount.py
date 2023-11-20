@@ -86,6 +86,9 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
     def open(self, path, flags):
         """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/functions.html#open)
+
         Open a file for reading or writing.
 
         Args:
@@ -99,17 +102,6 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Returns:
             int: The file descriptor for the opened file.
 
-        Notes:
-            - If the provided 'path' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard os.open() method.
-            - Special files are handled, and their dedicated file descriptor is returned.
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            file_descriptor = dh.open('file.txt', os.O_RDONLY)
-            print(file_descriptor)
-            ```
         """
         logger.debug(f"open - path: {path}, flags: {flags}")
         if path == Path(self.fs.project_root / SPECIAL_FILE):
@@ -123,6 +115,9 @@ class DagsHubFUSE(LoggingMixIn, Operations):
 
     def getattr(self, path, fd=None):
         """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/functions.html#getattr)
+
         Get the attributes of a file or directory.
 
         Args:
@@ -133,20 +128,6 @@ class DagsHubFUSE(LoggingMixIn, Operations):
         Raises:
             FuseOSError: If the file or directory does not exist, a FuseOSError is raised.
 
-        Returns:
-            Dict[str, Any]: A dictionary containing file attributes such as size, mode, and more.
-
-        Notes:
-            - If the provided 'path' argument is an integer (file descriptor),
-                the function behaves as a passthrough to the standard os.fstat() method.
-            - The returned dictionary includes attributes like access time,
-                creation time, group ID, mode, modification time, size, and user ID.
-
-        Examples:
-            ```python
-            dh = DagsHubClient()
-            file_attributes = dh.getattr('file.txt')
-            ```
         """
         logger.debug(f"getattr - path:{str(path)}, fd:{fd}")
         try:
