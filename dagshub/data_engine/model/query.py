@@ -161,15 +161,17 @@ class DatasourceQuery:
                     f"Value type {value_type} is not supported for querying.\r\n"
                     f"Supported types: {list(metadataTypeLookup.keys())}"
                 )
-            return {
+            res = {
                 "filter": {
                     "key": key,
                     "value": str(value),
                     "valueType": value_type,
-                    "comparator": query_op.value,
-                    "asOf": as_of
+                    "comparator": query_op.value
                 }
             }
+            if as_of:
+                res["filter"]["asOf"] = as_of
+            return res
 
     @staticmethod
     def deserialize(serialized_query: Dict) -> "DatasourceQuery":

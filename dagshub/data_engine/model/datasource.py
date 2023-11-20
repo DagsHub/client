@@ -64,7 +64,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 @dataclass
 class Field:
     column: str
-    as_of_timestamp: Optional[int] = None
+    as_of_timestamp: Optional[float] = None
     alias: Optional[str] = None
 
 
@@ -136,7 +136,7 @@ class Datasource:
         for s in selected:
             new_select_field = {"name": s.column}
             if s.as_of_timestamp:
-                new_select_field["asOf"] = s.as_of_timestamp
+                new_select_field["asOf"] = int(s.as_of_timestamp)
             if s.alias:
                 new_select_field["alias"] = s.alias
 
@@ -540,10 +540,9 @@ class Datasource:
                 new_ds._query.compose("and", other_query)
             return new_ds
         elif type(other) is Field:
-            # yuvald TODO should i warn if alias!=None?
             if not self.has_field(other.column):
                 raise FieldNotFoundError(other.column)
-            new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)
+            new_ds._query = DatasourceQuery(other.column, int(other.as_of_timestamp))
             return new_ds
         # "index" is a datasource with a query - return the datasource inside
         # Example:

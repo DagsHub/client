@@ -31,7 +31,7 @@ def test_versioning(ds):
     add_int_fields(ds, "x")
     add_int_fields(ds, "y")
 
-    ds2 = ((ds[ds[Field("x", as_of_timestamp=123)] > 1]) &
+    ds2 = ((ds[ds[Field("x", as_of_timestamp=123.99)] > 1]) &
            (ds[ds[Field("x", as_of_timestamp=345)] > 2]) |
            (ds[ds[Field("y", as_of_timestamp=789)] > 3])).\
         select([Field("y", as_of_timestamp=123), Field("x", as_of_timestamp=456, alias="y_t1")])
