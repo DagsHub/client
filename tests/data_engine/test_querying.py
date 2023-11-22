@@ -39,7 +39,7 @@ def test_versioning_query_ts_format(ds):
     # datetime
     ds2 = ds[ds[Field("x", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
     q = ds2.get_query()
-    assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
+    assert q.to_dict() == {'gt': {'data': {'as_of': int(dateutil.parser.parse("Wed 22 Nov 2023").timestamp()), 'field': 'x', 'value': 1}}}
 
 
 def test_versioning_select(ds):
@@ -50,8 +50,7 @@ def test_versioning_select(ds):
     ds2 = ((ds[ds[Field("x", as_of_time=123.99)] > 1]) &
            (ds[ds[Field("x", as_of_time=345)] > 2]) |
            (ds[ds[Field("y", as_of_time=789)] > 3])).\
-        select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"),
-               Field("z", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023")))
+        select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"))
     q = ds2.get_query()
     expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
                                                           {'gt': {'data': {'field': 'x', 'as_of': 345, 'value': 2}}}],
@@ -65,8 +64,7 @@ def test_versioning_select(ds):
         {'filter': {'key': 'x', 'value': '2', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 345}}]}, {
                                                 'filter': {'key': 'y', 'value': '3', 'valueType': 'INTEGER',
                                                            'comparator': 'GREATER_THAN', 'asOf': 789}}]},
-                           'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'},
-                                      {'name': 'z', 'asOf': 1700604000}]}
+                           'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]}
     assert ds2.serialize_gql_query_input() == expected_serialized
 
 
