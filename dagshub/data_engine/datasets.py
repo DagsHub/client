@@ -7,7 +7,6 @@ from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DatasetNotFoundError
-from dagshub.data_engine.model.query import DatasourceQuery
 
 
 def get_datasets(repo: str) -> List[Datasource]:

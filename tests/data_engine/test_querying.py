@@ -28,7 +28,21 @@ def test_simple_filter(ds):
     assert q.to_dict() == expected
 
 
-def test_versioning(ds):
+def test_versioning_query_ts_format(ds):
+    add_int_fields(ds, "x")
+
+    # timestamp
+    ds2 = ds[ds[Field("x", as_of_time=1700604000)] > 1]
+    q = ds2.get_query()
+    assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
+
+    # datetime
+    ds2 = ds[ds[Field("x", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
+    q = ds2.get_query()
+    assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
+
+
+def test_versioning_select(ds):
     add_int_fields(ds, "x")
     add_int_fields(ds, "y")
     add_int_fields(ds, "z")
@@ -36,7 +50,8 @@ def test_versioning(ds):
     ds2 = ((ds[ds[Field("x", as_of_time=123.99)] > 1]) &
            (ds[ds[Field("x", as_of_time=345)] > 2]) |
            (ds[ds[Field("y", as_of_time=789)] > 3])).\
-        select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"), Field("z", as_of_time=dateutil.parser.parse("Wed 22 Nov")))
+        select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"),
+               Field("z", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023")))
     q = ds2.get_query()
     expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
                                                           {'gt': {'data': {'field': 'x', 'as_of': 345, 'value': 2}}}],
@@ -57,8 +72,9 @@ def test_versioning(ds):
 
 def test_versioning_dataset_deserialize(ds):
     # test de-serialization works and includes select
-    query = {'select': [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}], 'query': {
-        'filter': {'key': 'x', 'value': 'dogs', 'valueType': 'STRING', 'comparator': 'EQUAL', 'asOf': 1700651563}}}
+    query = {'select': [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}],
+             'query': {'filter': {'key': 'x', 'value': 'dogs', 'valueType': 'STRING', 'comparator': 'EQUAL',
+                                  'asOf': 1700651563}}}
 
     Datasource.deserialize_gql_result(ds, query)
     assert ds._select == [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}]

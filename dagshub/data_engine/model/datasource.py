@@ -80,7 +80,7 @@ class Field:
 
     def to_dict(self) -> Dict[str, Any]:
         res_dict = {"name": self.column}
-        if self.as_of_time:
+        if self.as_of_time is not None:
             res_dict["asOf"] = self.as_of_timestamp
         if self.alias:
             res_dict["alias"] = self.alias
@@ -131,7 +131,6 @@ class Datasource:
             self._query = DatasourceQuery.deserialize(query_dict["query"])
         self._select = query_dict.get("select")
 
-
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
             logger.warning("Starting slices is not implemented for now")
@@ -155,7 +154,7 @@ class Datasource:
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 
-    def select(self,  *selected: Field):
+    def select(self, *selected: Field):
         """
         Choose which columns will appear on the query result, what their names will be (alias) and from what time.
         example:
