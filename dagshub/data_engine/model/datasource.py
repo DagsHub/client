@@ -1,4 +1,5 @@
 import base64
+import datetime
 import gzip
 import json
 import logging
@@ -64,13 +65,23 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 @dataclass
 class Field:
     column: str
-    as_of_timestamp: Optional[float] = None
+    as_of_time: Optional[Union[float, datetime.datetime]] = None
     alias: Optional[str] = None
+
+    @property
+    def as_of_timestamp(self) -> Optional[int]:
+        if self.as_of_time:
+            if isinstance(self.as_of_time, datetime.datetime):
+                return int(self.as_of_time.timestamp())
+            else:
+                return int(self.as_of_time)
+        else:
+            return None
 
     def to_dict(self) -> Dict[str, Any]:
         res_dict = {"name": self.column}
-        if self.as_of_timestamp:
-            res_dict["asOf"] = int(self.as_of_timestamp)
+        if self.as_of_time:
+            res_dict["asOf"] = self.as_of_timestamp
         if self.alias:
             res_dict["alias"] = self.alias
         return res_dict
@@ -115,6 +126,12 @@ class Datasource:
             result["select"] = self._select
         return result
 
+    def deserialize_gql_result(self, query_dict):
+        if "query" in query_dict:
+            self._query = DatasourceQuery.deserialize(query_dict["query"])
+        self._select = query_dict.get("select")
+
+
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
             logger.warning("Starting slices is not implemented for now")
@@ -143,7 +160,7 @@ class Datasource:
         Choose which columns will appear on the query result, what their names will be (alias) and from what time.
         example:
         t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
-        q1 = (ds["episode"] > 5).select(Field("episode", as_of_timestamp=t, alias="episode_asof_t"), Field("size"))
+        q1 = (ds["episode"] > 5).select(Field("episode", as_of_time=t, alias="episode_asof_t"), Field("size"))
         """
         self._select = [s.to_dict() for s in selected]
 

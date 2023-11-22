@@ -1,3 +1,4 @@
+import dateutil.parser
 import pytest
 
 from dagshub.data_engine.model.datasource import (
@@ -30,11 +31,12 @@ def test_simple_filter(ds):
 def test_versioning(ds):
     add_int_fields(ds, "x")
     add_int_fields(ds, "y")
+    add_int_fields(ds, "z")
 
-    ds2 = ((ds[ds[Field("x", as_of_timestamp=123.99)] > 1]) &
-           (ds[ds[Field("x", as_of_timestamp=345)] > 2]) |
-           (ds[ds[Field("y", as_of_timestamp=789)] > 3])).\
-        select([Field("y", as_of_timestamp=123), Field("x", as_of_timestamp=456, alias="y_t1")])
+    ds2 = ((ds[ds[Field("x", as_of_time=123.99)] > 1]) &
+           (ds[ds[Field("x", as_of_time=345)] > 2]) |
+           (ds[ds[Field("y", as_of_time=789)] > 3])).\
+        select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"), Field("z", as_of_time=dateutil.parser.parse("Wed 22 Nov")))
     q = ds2.get_query()
     expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
                                                           {'gt': {'data': {'field': 'x', 'as_of': 345, 'value': 2}}}],
@@ -42,8 +44,24 @@ def test_versioning(ds):
                                     {'gt': {'data': {'field': 'y', 'as_of': 789, 'value': 3}}}], 'data': None}}
     assert q.to_dict() == expected
 
-    expected_select = [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]
-    assert ds2._select == expected_select
+    # test serialization works and includes select
+    expected_serialized = {'query': {'or': [{'and': [
+        {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 123}},
+        {'filter': {'key': 'x', 'value': '2', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 345}}]}, {
+                                                'filter': {'key': 'y', 'value': '3', 'valueType': 'INTEGER',
+                                                           'comparator': 'GREATER_THAN', 'asOf': 789}}]},
+                           'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'},
+                                      {'name': 'z', 'asOf': 1700604000}]}
+    assert ds2.serialize_gql_query_input() == expected_serialized
+
+
+def test_versioning_dataset_deserialize(ds):
+    # test de-serialization works and includes select
+    query = {'select': [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}], 'query': {
+        'filter': {'key': 'x', 'value': 'dogs', 'valueType': 'STRING', 'comparator': 'EQUAL', 'asOf': 1700651563}}}
+
+    Datasource.deserialize_gql_result(ds, query)
+    assert ds._select == [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}]
 
 
 def test_composite_filter(ds):
