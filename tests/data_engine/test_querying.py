@@ -48,6 +48,7 @@ def test_versioning_select(ds):
     add_int_fields(ds, "y")
     add_int_fields(ds, "z")
 
+    # test select
     ds2 = ((ds[ds[Field("x", as_of_time=123.99)] > 1]) &
            (ds[ds[Field("x", as_of_time=345)] > 2]) |
            (ds[ds[Field("y", as_of_time=789)] > 3])).\
@@ -67,6 +68,10 @@ def test_versioning_select(ds):
                                                            'comparator': 'GREATER_THAN', 'asOf': 789}}]},
                            'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]}
     assert ds2.serialize_gql_query_input() == expected_serialized
+
+    # test select non-exising
+    with pytest.raises(FieldNotFoundError):
+        _ = ds[ds[Field("x", as_of_time=123.99)] > 1].select(Field("x_not_there"))
 
 
 def test_versioning_dataset_deserialize(ds):

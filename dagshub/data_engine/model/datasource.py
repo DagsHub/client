@@ -78,7 +78,10 @@ class Field:
         else:
             return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, ds: "Datasource") -> Dict[str, Any]:
+        if not ds.has_field(self.column):
+            raise FieldNotFoundError(self.column)
+
         res_dict = {"name": self.column}
         if self.as_of_time is not None:
             res_dict["asOf"] = self.as_of_timestamp
@@ -161,7 +164,7 @@ class Datasource:
         t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
         q1 = (ds["episode"] > 5).select(Field("episode", as_of_time=t, alias="episode_asof_t"), Field("size"))
         """
-        self._select = [s.to_dict() for s in selected]
+        self._select = [s.to_dict(self) for s in selected]
 
         return self
 
