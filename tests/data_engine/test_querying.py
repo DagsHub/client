@@ -39,7 +39,8 @@ def test_versioning_query_ts_format(ds):
     # datetime
     ds2 = ds[ds[Field("x", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
     q = ds2.get_query()
-    assert q.to_dict() == {'gt': {'data': {'as_of': int(dateutil.parser.parse("Wed 22 Nov 2023").timestamp()), 'field': 'x', 'value': 1}}}
+    assert q.to_dict() == {'gt': {'data': {'as_of': int(dateutil.parser.parse("Wed 22 Nov 2023").timestamp()),
+                                           'field': 'x', 'value': 1}}}
 
 
 def test_versioning_select(ds):
