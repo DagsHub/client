@@ -67,6 +67,14 @@ class Field:
     as_of_timestamp: Optional[float] = None
     alias: Optional[str] = None
 
+    def to_dict(self) -> Dict[str, Any]:
+        res_dict = {"name": self.column}
+        if self.as_of_timestamp:
+            res_dict["asOf"] = int(self.as_of_timestamp)
+        if self.alias:
+            res_dict["alias"] = self.alias
+        return res_dict
+
 
 class Datasource:
     def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None):
@@ -130,17 +138,14 @@ class Datasource:
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 
-    def select(self, selected: List[Field]):
-        self._select = []
-
-        for s in selected:
-            new_select_field = {"name": s.column}
-            if s.as_of_timestamp:
-                new_select_field["asOf"] = int(s.as_of_timestamp)
-            if s.alias:
-                new_select_field["alias"] = s.alias
-
-            self._select.append(new_select_field)
+    def select(self,  *selected: Field):
+        """
+        Choose which columns will appear on the query result, what their names will be (alias) and from what time.
+        example:
+        t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
+        q1 = (ds["episode"] > 5).select(Field("episode", as_of_timestamp=t, alias="episode_asof_t"), Field("size"))
+        """
+        self._select = [s.to_dict() for s in selected]
 
         return self
 

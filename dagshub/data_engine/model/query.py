@@ -166,7 +166,7 @@ class DatasourceQuery:
                     "key": key,
                     "value": str(value),
                     "valueType": value_type,
-                    "comparator": query_op.value
+                    "comparator": query_op.value,
                 }
             }
             if as_of:
