@@ -70,7 +70,7 @@ class Field:
 
     @property
     def as_of_timestamp(self) -> Optional[int]:
-        if self.as_of_time:
+        if self.as_of_time is not None:
             if isinstance(self.as_of_time, datetime.datetime):
                 return int(self.as_of_time.timestamp())
             else:
@@ -129,7 +129,7 @@ class Datasource:
             result["select"] = self._select
         return result
 
-    def deserialize_gql_result(self, query_dict):
+    def _deserialize_gql_result(self, query_dict):
         if "query" in query_dict:
             self._query = DatasourceQuery.deserialize(query_dict["query"])
         self._select = query_dict.get("select")
@@ -157,14 +157,15 @@ class Datasource:
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 
-    def select(self, *selected: Field):
+    def select(self, *selected: Union[str, Field]):
         """
         Choose which columns will appear on the query result, what their names will be (alias) and from what time.
         example:
         t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
         q1 = (ds["episode"] > 5).select(Field("episode", as_of_time=t, alias="episode_asof_t"), Field("size"))
         """
-        self._select = [s.to_dict(self) for s in selected]
+
+        self._select = [s.to_dict(self) if isinstance(s, Field) else {"name": s} for s in selected]
 
         return self
 

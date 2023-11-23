@@ -28,19 +28,21 @@ def test_simple_filter(ds):
     assert q.to_dict() == expected
 
 
-def test_versioning_query_ts_format(ds):
+def test_versioning_query_datetime(ds):
     add_int_fields(ds, "x")
-
-    # timestamp
-    ds2 = ds[ds[Field("x", as_of_time=1700604000)] > 1]
-    q = ds2.get_query()
-    assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
-
     # datetime
     ds2 = ds[ds[Field("x", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
     q = ds2.get_query()
     assert q.to_dict() == {'gt': {'data': {'as_of': int(dateutil.parser.parse("Wed 22 Nov 2023").timestamp()),
                                            'field': 'x', 'value': 1}}}
+
+
+def test_versioning_query_timestamp(ds):
+    add_int_fields(ds, "x")
+    # timestamp
+    ds2 = ds[ds[Field("x", as_of_time=1700604000)] > 1]
+    q = ds2.get_query()
+    assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
 
 
 def test_versioning_select(ds):
@@ -69,9 +71,23 @@ def test_versioning_select(ds):
                            'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]}
     assert ds2.serialize_gql_query_input() == expected_serialized
 
-    # test select non-exising
-    with pytest.raises(FieldNotFoundError):
-        _ = ds[ds[Field("x", as_of_time=123.99)] > 1].select(Field("x_not_there"))
+
+def test_versioning_select_as_strings(ds):
+    add_int_fields(ds, "x")
+    add_int_fields(ds, "y")
+    add_int_fields(ds, "z")
+
+    ds2 = (ds[ds["x"] > 1]).select("y", "z")
+    print(ds2.serialize_gql_query_input())
+    assert ds2.serialize_gql_query_input() == {'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}}, 'select': [{'name': 'y'},  {'name': 'z'}]}
+
+    ds2 = (ds[ds["x"] > 1]).select("y", Field("x"), "z")
+    print(ds2.serialize_gql_query_input())
+    assert ds2.serialize_gql_query_input() == {'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}}, 'select': [{'name': 'y'}, {'name': 'x'}, {'name': 'z'}]}
+
+    ds2 = (ds[ds["x"] > 1]).select("y", Field("x", as_of_time=1234), "z")
+    print(ds2.serialize_gql_query_input())
+    assert ds2.serialize_gql_query_input() == {'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}}, 'select': [{'name': 'y'}, {'name': 'x','asOf': 1234 }, {'name': 'z'}]}
 
 
 def test_versioning_dataset_deserialize(ds):
@@ -80,7 +96,7 @@ def test_versioning_dataset_deserialize(ds):
              'query': {'filter': {'key': 'x', 'value': 'dogs', 'valueType': 'STRING', 'comparator': 'EQUAL',
                                   'asOf': 1700651563}}}
 
-    Datasource.deserialize_gql_result(ds, query)
+    ds._deserialize_gql_result(query)
     assert ds._select == [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}]
 
 

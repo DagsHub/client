@@ -41,6 +41,6 @@ def _from_gql_result(repo: str, dataset_result: "DatasetResult") -> "Datasource"
 
     query_dict = json.loads(dataset_result.datasetQuery)
 
-    Datasource.deserialize_gql_result(ds, query_dict)
+    ds._deserialize_gql_result(query_dict)
 
     return ds
