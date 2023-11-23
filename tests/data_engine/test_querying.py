@@ -53,7 +53,7 @@ def test_versioning_select(ds):
     # test select
     ds2 = ((ds[ds[Field("x", as_of_time=123.99)] > 1]) &
            (ds[ds[Field("x", as_of_time=345)] > 2]) |
-           (ds[ds[Field("y", as_of_time=789)] > 3])).\
+           (ds[ds[Field("y", as_of_time=789)] > 3])). \
         select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"))
     q = ds2.get_query()
     expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
@@ -66,9 +66,9 @@ def test_versioning_select(ds):
     expected_serialized = {'query': {'or': [{'and': [
         {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 123}},
         {'filter': {'key': 'x', 'value': '2', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 345}}]}, {
-                                                'filter': {'key': 'y', 'value': '3', 'valueType': 'INTEGER',
-                                                           'comparator': 'GREATER_THAN', 'asOf': 789}}]},
-                           'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]}
+        'filter': {'key': 'y', 'value': '3', 'valueType': 'INTEGER',
+                   'comparator': 'GREATER_THAN', 'asOf': 789}}]},
+        'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]}
     assert ds2.serialize_gql_query_input() == expected_serialized
 
 
@@ -79,15 +79,21 @@ def test_versioning_select_as_strings(ds):
 
     ds2 = (ds[ds["x"] > 1]).select("y", "z")
     print(ds2.serialize_gql_query_input())
-    assert ds2.serialize_gql_query_input() == {'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}}, 'select': [{'name': 'y'},  {'name': 'z'}]}
+    assert ds2.serialize_gql_query_input() == {
+        'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
+        'select': [{'name': 'y'}, {'name': 'z'}]}
 
     ds2 = (ds[ds["x"] > 1]).select("y", Field("x"), "z")
     print(ds2.serialize_gql_query_input())
-    assert ds2.serialize_gql_query_input() == {'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}}, 'select': [{'name': 'y'}, {'name': 'x'}, {'name': 'z'}]}
+    assert ds2.serialize_gql_query_input() == {
+        'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
+        'select': [{'name': 'y'}, {'name': 'x'}, {'name': 'z'}]}
 
     ds2 = (ds[ds["x"] > 1]).select("y", Field("x", as_of_time=1234), "z")
     print(ds2.serialize_gql_query_input())
-    assert ds2.serialize_gql_query_input() == {'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}}, 'select': [{'name': 'y'}, {'name': 'x','asOf': 1234 }, {'name': 'z'}]}
+    assert ds2.serialize_gql_query_input() == {
+        'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
+        'select': [{'name': 'y'}, {'name': 'x', 'asOf': 1234}, {'name': 'z'}]}
 
 
 def test_versioning_dataset_deserialize(ds):
