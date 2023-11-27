@@ -97,7 +97,18 @@ class Datasource:
             query = DatasourceQuery()
         self._query = query
         self._select = []
+        self._global_as_of = None
         self.serialize_gql_query_input()
+
+    @property
+    def global_as_of_timestamp(self) -> Optional[int]:
+        if self._global_as_of is not None:
+            if isinstance(self._global_as_of, datetime.datetime):
+                return int(self._global_as_of.timestamp())
+            else:
+                return int(self._global_as_of)
+        else:
+            return None
 
     @property
     def source(self) -> "DatasourceState":
@@ -127,6 +138,9 @@ class Datasource:
         }
         if self._select:
             result["select"] = self._select
+
+        if self.global_as_of_timestamp:
+            result["asOf"] = self.global_as_of_timestamp
         return result
 
     def _deserialize_gql_result(self, query_dict):
@@ -167,6 +181,13 @@ class Datasource:
 
         self._select = [s.to_dict(self) if isinstance(s, Field) else {"name": s} for s in selected]
 
+        return self
+
+    def asof(self, time: Union[float, datetime.datetime]):
+        """
+
+        """
+        self._global_as_of = time
         return self
 
     def _check_preprocess(self):
