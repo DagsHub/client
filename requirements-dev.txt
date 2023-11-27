@@ -1,5 +1,5 @@
 setuptools==69.0.2
-pytest==7.4.0
+pytest==7.4.3
 respx==0.20.2
 pytest-git==1.7.0
 pytest-env==0.8.2
