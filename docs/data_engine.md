@@ -281,6 +281,52 @@ filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 ```
 
+### Versioning
+#### query filtering:
+An extended syntax lets you query according to different versions of enrichments. For example:
+```python
+# size metadata is constantly changed and we want to address the one from 24h ago
+t = datetime.now(timezone.utc) - timedelta(hours=24)
+
+q1 = ds[Field("size", as_of_time=t] > 5
+```
+in the above example all datapoints whose "size" column updated no later than 't' that match the condition '>5' are returned.
+
+
+#### query select:
+Using select() you can choose which columns will appear on the query result, what their names will be (alias) and from what time. For example:
+
+```python
+t = datetime.now(timezone.utc) - timedelta(hours=24)
+
+q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
+```
+
+#### global as_of time:
+Using as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
+
+```python
+t = datetime.now(timezone.utc) - timedelta(hours=24)
+
+q1 = (ds["size"] > 5).as_of(t)
+```
+in the above example all datapoints whose creation time is no later than 't' and that match the condition at 't' - are returned.
+
+
+#### Notes and limitations:
+
+- time parameter:
+    1. the time parameter can be POSIX timestamp or datetime object
+    2. notice timezones- use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as dateutil.parser.parse("Tue 28 Nov 11:29 +2:00") specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
+- select list:
+    1. both "x" and Field("x") can be used
+    2. alias, as_of_time - are optional
+    3. the list should make sense, i.e .select(Field("x", as_of_time=t1), Field("x", as_of_time=t2)) does not make sense since there is no alias to differentiate, the result will not reflect the intention. also .select("x","x")
+    4. when no select list specified all datapoint enrichements are returned, else only those specified.
+- global as_of behavior: it applies to all entities unless otherwise specified, i.e if we use Field("x", as_of_time=t1)) than this t will take precedence over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichmnts in t2.
+
+
+
 ## Saving queries
 
 You can save the query you have on the datasource.
