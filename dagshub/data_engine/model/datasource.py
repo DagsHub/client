@@ -91,13 +91,13 @@ class Field:
 
 
 class Datasource:
-    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None):
+    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None, select=[], as_of=None):
         self._source = datasource
         if query is None:
             query = DatasourceQuery()
         self._query = query
-        self._select = []
-        self._global_as_of = None
+        self._select = select
+        self._global_as_of = as_of
         self.serialize_gql_query_input()
 
     @property
@@ -122,7 +122,7 @@ class Datasource:
         self._query = DatasourceQuery()
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
-        res = Datasource(self._source, self._query.__deepcopy__())
+        res = Datasource(self._source, self._query.__deepcopy__(), self._select, self._global_as_of)
         return res
 
     def get_query(self):
@@ -178,17 +178,19 @@ class Datasource:
         t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
         q1 = (ds["episode"] > 5).select(Field("episode", as_of_time=t, alias="episode_asof_t"), Field("size"))
         """
+        new_ds = self.__deepcopy__()
 
-        self._select = [s.to_dict(self) if isinstance(s, Field) else {"name": s} for s in selected]
-
-        return self
+        new_ds._select = [s.to_dict(self) if isinstance(s, Field) else {"name": s} for s in selected]
+        return new_ds
 
     def asof(self, time: Union[float, datetime.datetime]):
         """
 
         """
-        self._global_as_of = time
-        return self
+        new_ds = self.__deepcopy__()
+
+        new_ds._global_as_of = time
+        return new_ds
 
     def _check_preprocess(self):
         self.source.get_from_dagshub()
