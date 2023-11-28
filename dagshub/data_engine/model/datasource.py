@@ -91,12 +91,12 @@ class Field:
 
 
 class Datasource:
-    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None, select=[], as_of=None):
+    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None, select=None, as_of=None):
         self._source = datasource
         if query is None:
             query = DatasourceQuery()
         self._query = query
-        self._select = select
+        self._select = select or []
         self._global_as_of = as_of
         self.serialize_gql_query_input()
 
@@ -177,6 +177,8 @@ class Datasource:
         example:
         t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
         q1 = (ds["episode"] > 5).select(Field("episode", as_of_time=t, alias="episode_asof_t"), Field("size"))
+
+
         """
         new_ds = self.__deepcopy__()
 
