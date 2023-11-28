@@ -317,14 +317,14 @@ in the above example all datapoints whose creation time is no later than 't' and
 
 ##### Time parameter:
 - the time parameter can be POSIX timestamp or datetime object
-- pay attention to timezones - use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as ```python dateutil.parser.parse("Tue 28 Nov 11:29 +2:00")``` specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
+- pay attention to timezones - use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as  `dateutil.parser.parse("Tue 28 Nov 11:29 +2:00")` specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
 ##### Select list:
-- both "x" and Field("x") can be used
+- both "x" and `Field("x")` can be used
 - alias, as_of_time - are optional
-- the list should make sense, i.e ```python.select(Field("x", as_of_time=t1), Field("x", as_of_time=t2))``` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also ```python .select("x","x")```
+- the list should make sense, i.e  `select(Field("x", as_of_time=t1), Field("x", as_of_time=t2))` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also `select("x","x")`
 - when no select list specified all datapoint enrichements are returned, else only those specified.
 ##### Global as_of behavior:
-- it applies to all entities unless otherwise specified, i.e if we use ```python Field("x", as_of_time=t1))``` than this t will take precedence over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichmnts in t2.
+- it applies to all entities unless otherwise specified, i.e if we use Field("x", as_of_time=t1)) than this t will take precedence over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichmnts in t2.
 
 
 
