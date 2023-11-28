@@ -282,7 +282,7 @@ filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 ```
 
 ### Versioning
-#### query filtering:
+#### Query filtering:
 An extended syntax lets you query according to different versions of enrichments. For example:
 ```python
 # size metadata is constantly changed and we want to address the one from 24h ago
@@ -293,7 +293,7 @@ q1 = ds[Field("size", as_of_time=t] > 5
 in the above example all datapoints whose "size" column updated no later than 't' that match the condition '>5' are returned.
 
 
-#### query select:
+#### Query select:
 Using select() you can choose which columns will appear on the query result, what their names will be (alias) and from what time. For example:
 
 ```python
@@ -302,7 +302,7 @@ t = datetime.now(timezone.utc) - timedelta(hours=24)
 q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
 ```
 
-#### global as_of time:
+#### Global as_of time:
 Using as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
 
 ```python
@@ -313,17 +313,17 @@ q1 = (ds["size"] > 5).as_of(t)
 in the above example all datapoints whose creation time is no later than 't' and that match the condition at 't' - are returned.
 
 
-#### "Notes and limitations:"
+#### Notes and limitations:
 
-##### time parameter:
+##### Time parameter:
 - the time parameter can be POSIX timestamp or datetime object
-- notice timezones- use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as ```python dateutil.parser.parse("Tue 28 Nov 11:29 +2:00")``` specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
-##### select list:
+- pay attention to timezones - use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as ```python dateutil.parser.parse("Tue 28 Nov 11:29 +2:00")``` specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
+##### Select list:
 - both "x" and Field("x") can be used
 - alias, as_of_time - are optional
 - the list should make sense, i.e ```python.select(Field("x", as_of_time=t1), Field("x", as_of_time=t2))``` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also ```python .select("x","x")```
 - when no select list specified all datapoint enrichements are returned, else only those specified.
-##### global as_of behavior:
+##### Global as_of behavior:
 - it applies to all entities unless otherwise specified, i.e if we use ```python Field("x", as_of_time=t1))``` than this t will take precedence over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichmnts in t2.
 
 
