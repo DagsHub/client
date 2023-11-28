@@ -173,21 +173,25 @@ class Datasource:
 
     def select(self, *selected: Union[str, Field]):
         """
-        Choose which columns will appear on the query result, what their names will be (alias) and from what time.
-        example:
-        t = int((datetime.datetime.now()-datetime.timedelta(hours=24)).timestamp())
-        q1 = (ds["episode"] > 5).select(Field("episode", as_of_time=t, alias="episode_asof_t"), Field("size"))
-
-
+        using select() you can choose which columns will appear on the query result,
+         what their names will be (alias) and from what time. For example:
+        t = datetime.now(timezone.utc) - timedelta(hours=24)
+        q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
         """
         new_ds = self.__deepcopy__()
 
         new_ds._select = [s.to_dict(self) if isinstance(s, Field) else {"name": s} for s in selected]
         return new_ds
 
-    def asof(self, time: Union[float, datetime.datetime]):
+    def as_of(self, time: Union[float, datetime.datetime]):
         """
+        as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
 
+        t = datetime.now(timezone.utc) - timedelta(hours=24)
+        q1 = (ds["size"] > 5).as_of(t)
+
+        in the above example all datapoints whose creation time is no later than 't',
+        and that match the condition at 't' - are returned.
         """
         new_ds = self.__deepcopy__()
 
