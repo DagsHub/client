@@ -301,6 +301,12 @@ t = datetime.now(timezone.utc) - timedelta(hours=24)
 
 q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
 ```
+in the above example the result set of datapoints will have 2 columns of metadata: "size_asof_24h_ago" and "episode".
+all other metadata columns are ommited.if the desired result is to get all metadata columns and in addition the selected list,
+then use `include_all`, example:
+```python
+q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), include_all=True)
+```
 
 #### Global as_of time:
 Using as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
@@ -322,7 +328,6 @@ in the above example all datapoints whose creation time is no later than 't' and
 - both "x" and `Field("x")` can be used
 - alias, as_of_time - are optional
 - we currently do not check the list for contradictions/overwrites/duplications, i.e  `select(Field("x", as_of_time=t1), Field("x", as_of_time=t2))` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also `select("x","x")`
-- when no select list specified all datapoint enrichments are returned, else only those specified.
 ##### Global as_of behavior:
 - it applies to all entities unless otherwise specified, i.e if we use Field("x", as_of_time=t1)) then t1 will precede over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichments in t2.
 
