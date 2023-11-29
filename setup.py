@@ -68,6 +68,7 @@ setuptools.setup(
     url="https://github.com/DagsHub/client",
     packages=packages,
     install_requires=install_requires,
+    extras_require=extras_require,
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
