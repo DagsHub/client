@@ -7,9 +7,9 @@ Welcome to DagsHub client's documentation!
 ===================================
 
 .. toctree::
-   :caption: Contents:
+    :caption: Contents:
 
-   reference/index
+    reference/index
 
 Indices and tables
 ==================

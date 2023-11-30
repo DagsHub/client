@@ -32,10 +32,16 @@ class Datapoint:
 
     @property
     def download_url(self):
+        """
+        str: URL that can be used to download the datapoint's file from DagsHub
+        """
         return self.datasource.source.raw_path(self)
 
     @property
     def path_in_repo(self):
+        """
+        PurePosixPath: Path of the datapoint in repo
+        """
         return self.datasource.source.file_path(self)
 
     @staticmethod

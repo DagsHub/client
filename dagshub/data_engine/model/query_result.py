@@ -44,7 +44,6 @@ class VisualizeError(Exception):
 @dataclass
 class QueryResult:
     _entries: List[Datapoint]
-    """ List of downloaded entries."""
     datasource: "Datasource"
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
 
@@ -53,6 +52,9 @@ class QueryResult:
 
     @property
     def entries(self):
+        """
+        list(Datapoint): Datapoints contained in this QueryResult
+        """
         return self._entries
 
     @entries.setter
@@ -67,6 +69,11 @@ class QueryResult:
 
     @property
     def dataframe(self):
+        """
+        Represent the contents of this QueryResult as a pandas DataFrame
+
+        This creates a copy dataframe
+        """
         import pandas as pd
 
         metadata_keys = set()
@@ -80,6 +87,7 @@ class QueryResult:
         return len(self.entries)
 
     def __iter__(self):
+        """You can iterate over a QueryResult to get containing datapoints"""
         return self.entries.__iter__()
 
     def __repr__(self):

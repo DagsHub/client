@@ -28,3 +28,6 @@ exclude_patterns = []
 
 html_theme = "furo"
 html_static_path = ["_static"]
+
+napoleon_include_init_with_doc = True
+autodoc_member_order = 'bysource'

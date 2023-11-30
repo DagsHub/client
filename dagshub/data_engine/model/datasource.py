@@ -377,7 +377,7 @@ class Datasource:
 
     def send_to_annotation(self):
         """
-        deprecated, see annotate()
+        deprecated, see :func:`annotate()`
         """
         return self.annotate()
 
@@ -639,6 +639,8 @@ class Datasource:
 
         Returns:
             Datasource: A new Datasource instance with the added query operation.
+
+        :meta private:
         """
         new_ds = self.__deepcopy__()
         if type(other) is Datasource:
