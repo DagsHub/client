@@ -1,12 +1,10 @@
 API Reference
 ==============
 
-.. automodule:: dagshub
-
 .. toctree::
     :titlesonly:
 
-    data_engine
+    data_engine/index
     file_streaming
     file_uploading
     repo_bucket

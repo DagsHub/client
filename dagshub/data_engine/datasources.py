@@ -111,11 +111,11 @@ def _create_datasource_state(repo: str, name: str, source_type: DatasourceType, 
 
 
 __all__ = [
-    create_datasource,
-    create,
-    create_from_bucket,
-    create_from_repo,
-    get_datasource,
-    get,
-    get_or_create,
+    create_datasource.__name__,
+    create.__name__,
+    create_from_bucket.__name__,
+    create_from_repo.__name__,
+    get_datasource.__name__,
+    get.__name__,
+    get_or_create.__name__,
 ]
