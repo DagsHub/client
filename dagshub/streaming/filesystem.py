@@ -231,6 +231,18 @@ class DagsHubFilesystem:
         DagsHubFilesystem.already_mounted_filesystems[self.project_root] = self
 
     def get_remote_branch_head(self, branch):
+        """
+        Get the head commit ID of a remote branch.
+
+        Args:
+            branch (str): The name of the remote branch.
+
+        Raises:
+            RuntimeError: Raised if there is an issue when trying to get the head of the branch.
+
+        Returns:
+            str: The commit ID of the head of the remote branch.
+        """
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
         resp = self.http_get(url)
         if resp.status_code != 200:
@@ -259,6 +271,12 @@ class DagsHubFilesystem:
             return answer["username"], answer["password"]
 
     def get_remotes_from_git_config(self) -> List[str]:
+        """
+        Get the list of DagsHub remotes from the Git configuration.
+
+        Returns:
+            List[str]: A list of DAGsHub remote URLs.
+        """
         # Get URLs of dagshub remotes
         git_config = ConfigParser()
         git_config.read(Path(self.project_root) / ".git/config")
@@ -299,7 +317,29 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b"v0\n"
 
-    def open(self, file, mode="r", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
+    def open(self, file, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None, closefd=True, opener=None):
+        """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/functions.html#open)
+
+        Open a file for reading or writing, with support for special files and DagsHub integration.
+
+        Args:
+            file (Union[str, int, bytes]): The file to be opened.
+                It can be a path (str), file descriptor (int), or bytes-like object.
+            mode (str, optional): The mode in which the file should be opened. Defaults to 'r'.
+            buffering (int, optional): The buffering value. Defaults to -1.
+            encoding (str, optional): The encoding to use when reading the file. Defaults to None.
+            errors (str, optional): The error handling strategy. Defaults to None.
+            newline (str, optional): The newline parameter. Defaults to None.
+            closefd (bool, optional): Whether to close the file descriptor. Defaults to True.
+            opener (callable, optional): The file opener. Defaults to None.
+
+        Returns:
+            File object: A file object representing the opened file.
+
+        """
         # FD passthrough
         if type(file) is int:
             return self.__open(file, mode, buffering, encoding, errors, newline, closefd)
@@ -389,6 +429,22 @@ class DagsHubFilesystem:
         return os.open(path.absolute_path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *args, dir_fd=None, follow_symlinks=True):
+        """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.stat)
+
+        Get the status of a file or directory, including support for special files and DagsHub integration.
+
+        Args:
+            path (Union[str, int, bytes]): The path of the file or directory to get the status for.
+                It can be a path (str), file descriptor (int), or bytes-like object.
+            dir_fd (int, optional): File descriptor of the directory. Defaults to None.
+            follow_symlinks (bool, optional): Whether to follow symbolic links. Defaults to True.
+
+        Returns:
+            collections.namedtuple: A namedtuple containing the file status information.
+
+        """
         # FD passthrough
         if type(path) is int:
             return self.__stat(path, *args, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
@@ -443,6 +499,16 @@ class DagsHubFilesystem:
             return self.__stat(path, follow_symlinks=follow_symlinks)
 
     def chdir(self, path):
+        """
+         NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.chdir)
+
+        Change the current working directory to the specified path, with support for DagsHub integration.
+
+        Args:
+            path (Union[str, int, bytes]): The path to change the current working directory to.
+                It can be a path (str), file descriptor (int), or bytes-like object.
+        """
         # FD check
         if type(path) is int:
             return self.__chdir(path)
@@ -464,7 +530,21 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path="."):
+    def listdir(self, path='.'):
+        """
+        NOTE: This is a wrapper function for python's built-in file operations
+            (https://docs.python.org/3/library/os.html#os.listdir)
+
+        List the contents of a directory, including support for DagsHub integration.
+
+        Args:
+            path (str, optional): The path of the directory to list. Defaults to '.'.
+
+        Raises:
+            error: If an error occurs during the operation, it will be raised.
+
+        Returns: A list of directory contents. If 'path' is a bytes object, the results will also be in bytes.
+        """
         # FD check
         if type(path) is int:
             return self.__listdir(path)
@@ -676,6 +756,25 @@ class DagsHubFilesystem:
         return http_request("GET", path, auth=self.auth, timeout=timeout, **kwargs)
 
     def install_hooks(self):
+        """
+        Install hooks to override default file and directory operations with DagsHub functionality.
+
+        This method patches the standard Python I/O operations such as open, stat, listdir, scandir, and chdir
+        with their DagsHub equivalents. It also handles specific cases for IPython notebooks.
+
+        If hooks have already been installed, this method does nothing.
+
+        Raises:
+            ImportError: If the IPython module is not available.
+
+        Example:
+            ```python
+            # Example usage to install hooks for DagsHub operations
+            dags_hub_fs = DagsHubFilesystem()
+            dags_hub_fs.install_hooks()
+            ```
+
+        """
         if not hasattr(self.__class__, f"_{self.__class__.__name__}__unpatched"):
             # TODO: DRY this dictionary. i.e. __open() links cls.__open
             #  and io.open even though this dictionary links them

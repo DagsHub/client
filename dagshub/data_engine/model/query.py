@@ -75,6 +75,35 @@ class DatasourceQuery:
         return filter_node.data["field"]
 
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
+        """
+        Compose the current query with another query or a value using the specified operator.
+
+        Args:
+            op (str): The operator to use for composing the query.
+            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]):
+                The query or value to compose with.
+
+        Raises:
+            RuntimeError: If the operation is not supported or if there is a mismatch in usage.
+
+        Notes:
+            - If the current query contains only a column filter,
+                it will be composed into a tree with the specified operator and value.
+            - If the operation is 'isnull', it can only be applied to a column filter;
+                otherwise, a RuntimeError is raised.
+            - If the operation is 'not', a 'not' node is added to the query tree.
+            - If either query is empty, the composition is adjusted accordingly.
+
+        Example:
+            ```
+            ds['col1'] > 5
+            ds['col2'].is_null()
+            ```
+            The above queries can be composed as:
+            ```
+            ds['col1'] > 5 and ds['col2'].is_null()
+            ```
+        """
         if self._column_filter_node is not None:
             # If there was an unfilled query node with a column - put the operand in that node
             node = self._column_filter_node

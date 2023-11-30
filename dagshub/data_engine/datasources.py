@@ -42,6 +42,19 @@ def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = Non
     First attempts to get the repo datasource with the given name, and only if that fails,
     invokes create_datasource with the given parameters.
     See the docs on create_datasource for more info.
+    Args:
+        repo (str): The name or identifier of the repository containing the datasource.
+        name (str): The name of the datasource to retrieve or create.
+        path (str): The path to the datasource within the repository.
+        revision (Optional[str], optional): The specific revision or version of the datasource to retrieve.
+            Defaults to None.
+
+    Returns:
+        Datasource: The retrieved or newly created Datasource instance.
+
+    Raises:
+        DatasourceNotFoundError: If the datasource is not found during the retrieval attempt.
+
     """
     try:
         return get_datasource(repo, name)

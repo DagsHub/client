@@ -387,12 +387,18 @@ class Datasource:
         """
         Sends datapoints to annotations in Label Studio
 
-        :param datapoints: Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
-                     A QueryResult can also function as a list of Datapoint.
-        :param open_project: Specifies whether the link to the returned LS project should be opened from Python
-        :param ignore_warning: Suppress any non-lethal warnings that require user input
-        :return: Link to open Label Studio in the browser
+        Args:
+            datapoints (Union[List[Datapoint], QueryResult, List[Dict]]):
+                Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
+            open_project (bool, optional):
+                Specifies whether the link to the returned LS project should be opened from Python.
+            ignore_warning (bool, optional):
+                Suppress any non-lethal warnings that require user input. Defaults to False.
+
+        Returns:
+            Link to open Label Studio in the browser
         """
+
         if len(datapoints) == 0:
             logger.warning("No datapoints provided to be sent to annotation")
             return None
@@ -571,17 +577,26 @@ class Datasource:
         raise WrongOperatorError("Use `ds.contains(a)` for querying instead of `a in ds`")
 
     def contains(self, item: str):
+        """
+        Check if the filtering field contains the specified string item.
+        """
         if type(item) is not str:
             return WrongOperatorError(f"Cannot use contains with non-string value {item}")
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
     def is_null(self):
+        """
+        Check if the filtering field is null.
+        """
         field = self._get_filtering_field()
         value_type = metadataTypeLookupReverse[field.valueType.value]
         return self.add_query_op("isnull", value_type())
 
     def is_not_null(self):
+        """
+        Check if the filtering field is not null.
+        """
         return self.is_null().add_query_op("not")
 
     def _get_filtering_field(self) -> MetadataFieldSchema:
@@ -615,7 +630,15 @@ class Datasource:
         self, op: str, other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None
     ) -> "Datasource":
         """
-        Returns a new dataset with an added query param
+        Add a query operation to the current Datasource instance.
+
+        Args:
+            op (str): The operation to be performed in the query.
+            other (Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]], optional):
+                The operand for the query operation. Defaults to None.
+
+        Returns:
+            Datasource: A new Datasource instance with the added query operation.
         """
         new_ds = self.__deepcopy__()
         if type(other) is Datasource:
@@ -636,6 +659,32 @@ class MetadataContextManager:
         self._multivalue_fields = datasource._get_multivalue_fields()
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
+        """
+        Update metadata for the specified datapoints.
+
+        Args:
+            datapoints (Union[List[str], str]): A list of datapoints or a single datapoint URL to update metadata for.
+            metadata (Dict[str, Any]): A dictionary containing metadata key-value pairs to update.
+
+        Example:
+        ```
+        ds = datasources.get_datasource("simon/baby-yoda-segmentation-dataset", name="bucket-ds")
+
+        # Example usage to update metadata for a list of datapoints
+        with ds.metadata_context() as ctx:
+            metadata = {
+                "episode": 5,
+                "has_baby_yoda": True,
+            }
+
+            # Attach metadata to a single specific file in the datasource.
+            # The first argument is the filepath to attach metadata to, **relative to the root of the datasource**.
+            ctx.update_metadata("images/005.jpg", metadata)
+
+            # Attach metadata to several files at once:
+            ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
+        ```
+        """
         if isinstance(datapoints, str):
             datapoints = [datapoints]
 
