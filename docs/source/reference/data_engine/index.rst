@@ -1,4 +1,4 @@
-Data Engine (Metadata Versioning)
+Data Engine (``dagshub.data_engine``)
 ============
 
 .. automodule:: dagshub.data_engine.datasources

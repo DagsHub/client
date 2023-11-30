@@ -155,7 +155,9 @@ class RepoAPI:
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
         """
         Get listing of everything in the specified storage path
+
         Path format: <scheme>/<bucket-name>/<path>
+
         Example: s3/my-bucket/prefix/path/to/file
         """
         params = {"include_size": include_size, "paging": True}

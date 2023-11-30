@@ -1,4 +1,4 @@
-File Uploading
+File Uploading (``dagshub.upload``)
 ==========
 
 .. automodule:: dagshub.upload

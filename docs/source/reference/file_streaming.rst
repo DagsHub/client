@@ -1,4 +1,4 @@
-File Streaming
+File Streaming (``dagshub.streaming``)
 ============
 
 .. automodule:: dagshub.streaming
