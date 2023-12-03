@@ -80,14 +80,14 @@ class DagsHubFilesystem:
     A DagsHub-repo aware filesystem class
 
     :param project_root: Path to the git repository with the repo.
-        If None, we look up the filesystem from the current dir until we find a git repo
+        If None, traverse up the filesystem from the current dir until we find a git repo
     :param repo_url: URL to the DagsHub repository.
         If None, URL is received from the git configuration
     :param branch: Explicitly sets a branch/commit revision to work with
         If None, branch is received from the git configuration
-    :param username: DagsHub username
-    :param password: DagsHub password
-    :param token: DagsHub API token (as an alternative login variant to username/password)
+    :param token: DagsHub API token
+    :param username: DagsHub username (as an alternative to using the token)
+    :param password: DagsHub password (as an alternative to using the token)
     :param timeout: Timeout in seconds for HTTP requests.
         Influences all requests except for file download, which has no timeout
     """
@@ -216,6 +216,8 @@ class DagsHubFilesystem:
         """
         Checks that there's no other filesystem being mounted at the current project root
         If there is one, throw an error
+
+        :meta private:
         """
 
         def is_subpath(a: Path, b: Path) -> bool:
@@ -242,6 +244,8 @@ class DagsHubFilesystem:
 
         Returns:
             str: The commit ID of the head of the remote branch.
+
+        :meta private:
         """
         url = self.get_api_url(f"/api/v1/repos{self.parsed_repo_url.path}/branches/{branch}")
         resp = self.http_get(url)
@@ -276,6 +280,8 @@ class DagsHubFilesystem:
 
         Returns:
             List[str]: A list of DAGsHub remote URLs.
+
+        :meta private:
         """
         # Get URLs of dagshub remotes
         git_config = ConfigParser()
@@ -339,6 +345,7 @@ class DagsHubFilesystem:
         Returns:
             File object: A file object representing the opened file.
 
+        :meta private:
         """
         # FD passthrough
         if type(file) is int:
@@ -408,6 +415,8 @@ class DagsHubFilesystem:
         WARNING: DO NOT patch actual os.open with it, because the builtin uses os.open.
                  This is only for the purposes of patching pathlib.open in Python 3.9 and below.
                  Since Python 3.10 pathlib uses io.open, and in Python 3.11 they removed the accessor completely
+
+        :meta private:
         """
         if dir_fd is not None:  # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
@@ -444,6 +453,7 @@ class DagsHubFilesystem:
         Returns:
             collections.namedtuple: A namedtuple containing the file status information.
 
+        :meta private:
         """
         # FD passthrough
         if type(path) is int:
@@ -508,6 +518,8 @@ class DagsHubFilesystem:
         Args:
             path (Union[str, int, bytes]): The path to change the current working directory to.
                 It can be a path (str), file descriptor (int), or bytes-like object.
+
+        :meta private:
         """
         # FD check
         if type(path) is int:
@@ -544,6 +556,8 @@ class DagsHubFilesystem:
             error: If an error occurs during the operation, it will be raised.
 
         Returns: A list of directory contents. If 'path' is a bytes object, the results will also be in bytes.
+
+        :meta private:
         """
         # FD check
         if type(path) is int:
@@ -757,23 +771,23 @@ class DagsHubFilesystem:
 
     def install_hooks(self):
         """
-        Install hooks to override default file and directory operations with DagsHub functionality.
+        Install hooks to override default file and directory operations with DagsHub-aware functionality.
 
-        This method patches the standard Python I/O operations such as open, stat, listdir, scandir, and chdir
-        with their DagsHub equivalents. It also handles specific cases for IPython notebooks.
+        This method patches the standard Python I/O operations such as ``open``,
+        ``stat``, ``listdir``, ``scandir``, and ``chdir`` with DagsHub-aware equivalents.
+        Works inside a notebook and with Pathlib.
 
-        If hooks have already been installed, this method does nothing.
+        If ``install_hooks()`` have already been called before, this method does nothing.
 
-        Raises:
-            ImportError: If the IPython module is not available.
+        Example::
 
-        Example:
-            ```python
-            # Example usage to install hooks for DagsHub operations
-            dags_hub_fs = DagsHubFilesystem()
-            dags_hub_fs.install_hooks()
-            ```
+            dagshub_fs = DagsHubFilesystem()
+            dagshub_fs.install_hooks()
 
+            with open("src/file_in_repo.txt") as f:
+                print(f.read())
+
+        Call :func:`~DagsHubFilesystem.uninstall_hooks` to undo the monkey patching.
         """
         if not hasattr(self.__class__, f"_{self.__class__.__name__}__unpatched"):
             # TODO: DRY this dictionary. i.e. __open() links cls.__open
@@ -821,6 +835,9 @@ class DagsHubFilesystem:
 
     @classmethod
     def uninstall_hooks(cls):
+        """
+        Reverses the changes made by :func:`install_hooks`, bringing back the builtin file I/O functions.
+        """
         if hasattr(cls, f"_{cls.__name__}__unpatched"):
             io.open = builtins.open = cls.__unpatched["open"]
             os.stat = cls.__unpatched["stat"]
@@ -894,21 +911,15 @@ def install_hooks(
 ):
     """
     Monkey patches builtin Python functions to make them DagsHub-repo aware.
-    Patched functions are: `open()`, `os.listdir()`, `os.scandir()`, `os.stat()` + pathlib's functions that use them
+    Patched functions are: ``open()``, ``os.listdir()``, ``os.scandir()``, ``os.stat()`` and \
+    pathlib's functions that use them
 
-    This is equivalent to creating a `DagsHubFilesystem` object and calling its `install_hooks()` method
+    Calling this function is equivalent to creating a :class:`DagsHubFilesystem` object
+    and calling its `install_hooks()` method
 
-    :param project_root: Path to the git repository with the repo.
-        If None, we look up the filesystem from the current dir until we find a git repo
-    :param repo_url: URL to the DagsHub repository.
-        If None, URL is received from the git configuration
-    :param branch: Explicitly sets a branch/commit revision to work with
-        If None, branch is received from the git configuration
-    :param username: DagsHub username
-    :param password: DagsHub password
-    :param token: DagsHub API token (as an alternative login variant to username/password)
-    :param timeout: Timeout in seconds for HTTP requests.
-        Influences all requests except for file download, which has no timeout
+    For argument documentation, read :class:`.DagsHubFilesystem`
+
+    Call :func:`uninstall_hooks` to undo the monkey patching.
     """
     fs = DagsHubFilesystem(
         project_root=project_root,
@@ -923,6 +934,9 @@ def install_hooks(
 
 
 def uninstall_hooks():
+    """
+    Reverses the changes made by :func:`install_hooks`
+    """
     DagsHubFilesystem.uninstall_hooks()
 
 
