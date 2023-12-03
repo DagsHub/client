@@ -161,7 +161,8 @@ class Datasource:
 
     def apply_field_changes(self, field_builders: List[MetadataFieldBuilder]):
         """
-        Applies one or multiple metadata field builders that can be constructed using the :func:`metadata_field()` function
+        Applies one or multiple metadata field builders
+        that can be constructed using the :func:`metadata_field()` function.
         """
         self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
         self.source.get_from_dagshub()
@@ -370,26 +371,21 @@ class Datasource:
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
-        Creates a voxel51 dataset that can be used with
-        `fo.launch_app()
-        <https://docs.voxel51.com/api/fiftyone.core.session.html?highlight=launch_app#fiftyone.core.session.launch_app>`_
-        to visualize it.
-
-        Keyword Args:
-            name (str): name of the dataset (by default uses the same name as the datasource)
-            force_download (bool): download the dataset even if the size of the files is bigger than 100MB
-            files_location (str|PathLike): path to the location where to download the local files
-                default: ~/dagshub_datasets/user/repo/ds_name/
-            redownload (bool): Redownload files, replacing the ones that might exist on the filesystem
-            voxel_annotations (List[str]) : List of columns from which to load voxel annotations serialized with
-                                        `to_json()`. This will override the labelstudio annotations
-
-        :rtype: `fo.Dataset <https://docs.voxel51.com/api/fiftyone.core.dataset.html#fiftyone.core.dataset.Dataset>`_
+        Refer to :func:`QueryResult.to_voxel51_dataset() \
+        <dagshub.data_engine.model.query_result.QueryResult.to_voxel51_dataset>`\
+        for documentation.
         """
         return self.all().to_voxel51_dataset(**kwargs)
 
     @property
     def default_dataset_location(self) -> Path:
+        """
+        Default location where datapoint files are stored.
+
+        On UNIX-likes the path is ``~/dagshub/datasets/<repo_name>/<datasource_id>``
+
+        On Windows the path is ``C:\\Users\\<user>\\dagshub\\datasets\\<repo_name>\\<datasource_id>``
+        """
         return Path(
             sanitize_filepath(os.path.join(Path.home(), "dagshub", "datasets", self.source.repo, str(self.source.id)))
         )
