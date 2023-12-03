@@ -28,7 +28,8 @@ class MetadataFieldType(enum.Enum):
 class DagshubDataType(metaclass=ABCMeta):
     """
     Inheritors of this ABC define custom types
-    They are backed by a primitive type, but they also may have additional tags, describing specialized behavior
+
+    They are backed by a primitive type, but they also may have additional tags, which we use to enhance the experience.
 
     Attributes:
         backing_field_type: primitive type in the data engine database

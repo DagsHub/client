@@ -20,9 +20,21 @@ _generated_fields: Dict[str, Callable[["Datapoint"], Any]] = {
 @dataclass
 class Datapoint:
     datapoint_id: int
+    """
+    ID of the datapoint in the database
+    """
     path: str
+    """
+    Path of the datapoint, relative to the root of the datasource
+    """
     metadata: Dict[str, Any]
+    """
+    Dictionary with the metadata
+    """
     datasource: "Datasource"
+    """
+    Datasource this datapoint is from
+    """
 
     def __getitem__(self, item):
         gen_field = _generated_fields.get(item)
@@ -40,7 +52,9 @@ class Datapoint:
     @property
     def path_in_repo(self):
         """
-        PurePosixPath: Path of the datapoint in repo
+        Path of the datapoint in repo
+
+        :rtype: `PurePosixPath <https://docs.python.org/3/library/pathlib.html#pathlib.PurePosixPath>`_
         """
         return self.datasource.source.file_path(self)
 
@@ -71,15 +85,15 @@ class Datapoint:
 
     def get_blob(self, column: str, cache_on_disk=True, store_value=False) -> bytes:
         """
-        Returns the blob stored in the binary column
+        Returns the blob stored in a binary column
 
         Args:
             column: where to get the blob from
             cache_on_disk: whether to store the downloaded blob on disk.
-                If you store the blob on disk, it means that it won't need to be re-downloaded in the future.
+                If you store the blob on disk, then it won't need to be re-downloaded in the future.
                 The contents of datapoint[column] will change to be the path of the blob on the disk.
             store_value: whether to store the blob in memory on the field attached to this datapoint,
-                which will make its bytes directly retrievable using datapoint[column]
+                which will make its value accessible later using datapoint[column]
         """
         current_value = self.metadata[column]
 
@@ -122,13 +136,19 @@ class Datapoint:
     ) -> PathLike:
         """
         Downloads the datapoint to the target_dir directory
+
         Args:
-            target: Where to download the file (either a directory, or the full path).
-                If not specified, then downloads to ~/dagshub/datasets/<user>/<repo>/<ds_id>
-            keep_source_prefix: If True, includes the prefix of the datasource in the download path
-                Useful for cases where the download path is the root of the repository
-            redownload: Whether to redownload a file if it exists on the filesystem already
-                NOTE: We don't do any hashsum checks, so if it's possible that the file has been updated, turn it on
+            target: Where to download the file (either a directory, or the full path).\
+                If not specified, then downloads to\
+                :func:`datasource's default location \
+                <dagshub.data_engine.model.datasource.Datasource.default_dataset_location>`.
+            keep_source_prefix: If True, includes the prefix of the datasource in the download path.
+            redownload: Whether to redownload a file if it exists on the filesystem already.
+
+        .. note::
+            We don't do any hashsum checks, so if it's possible that the file has been updated,
+            set ``redownload`` to True
+
         Returns:
             Path to the downloaded file
         """

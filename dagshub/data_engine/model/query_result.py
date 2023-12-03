@@ -487,7 +487,8 @@ class QueryResult:
         """
         Visualize this QueryResult with Voxel51.
 
-        This function calls :func:`to_voxel51_dataset` and launches a fiftyone session showing the dataset.
+        This function calls :func:`to_voxel51_dataset`, passing to it the keyword arguments,
+        and launches a fiftyone session showing the dataset.
 
         Additionally, this function adds a DagsHub plugin into Voxel51 that you can use for additional interactions
         with the datasource from within the voxel environment.
