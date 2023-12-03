@@ -434,6 +434,9 @@ class QueryResult:
         return sum_size
 
     def visualize(self, **kwargs):
+        """
+        Visualize this QueryResult with Voxel51
+        """
         set_voxel_envvars()
 
         send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)

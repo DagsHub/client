@@ -31,3 +31,4 @@ html_static_path = ["_static"]
 
 napoleon_include_init_with_doc = True
 autodoc_member_order = 'bysource'
+autodoc_default_flags = ["inherited-members"]
