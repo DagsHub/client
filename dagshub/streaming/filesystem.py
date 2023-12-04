@@ -915,7 +915,7 @@ def install_hooks(
     pathlib's functions that use them
 
     Calling this function is equivalent to creating a :class:`DagsHubFilesystem` object
-    and calling its `install_hooks()` method
+    and calling its :func:`install_hooks() <dagshub.streaming.DagsHubFilesystem.install_hooks>` method
 
     For argument documentation, read :class:`.DagsHubFilesystem`
 

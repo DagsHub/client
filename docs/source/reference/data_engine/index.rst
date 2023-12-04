@@ -1,4 +1,4 @@
-Data Engine (``dagshub.data_engine``)
+Data Engine (Dataset Management)
 ========================================
 
 +++++++++++++

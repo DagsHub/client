@@ -314,7 +314,7 @@ class QueryResult:
         path_field: Optional[str] = None,
     ) -> PathLike:
         """
-        Downloads the query result to the target_dir directory
+        Downloads the datapoints to the ``target_dir`` directory
 
         Args:
             target_dir: Where to download the files. Defaults to \
