@@ -270,8 +270,7 @@ class Repo:
                 If unspecified, sets the value to the relative component of ``local_path`` to CWD.
                 If ``local_path`` is not relative to CWD, ``remote_path`` is the last component of the ``local_path``
 
-        Keyword Args:
-            # TODO: fill out
+        The kwargs are the parameters of :func:`upload_files`
         """
         local_path = Path(local_path).resolve()
         if local_path.is_dir():
@@ -489,15 +488,13 @@ class Repo:
             return EnvVarDagshubToken(self.token)
         return dagshub.auth.get_authenticator()
 
-    def directory(self, path):
+    def directory(self, path: str) -> "DataSet":
         """
-        The directory function returns a DataSet object that represents the directory at the given path.
+        Create a :class:`~dagshub.upload.wrapper.DataSet` object that allows you to stage multiple files before\
+        pushing them all to DagsHub in a single commit with :func:`~dagshub.upload.wrapper.DataSet.commit`.
 
-
-        :param path (str): Specify the directory that will contain the data.
-                           This directory is the "root" of the dataset.
-        :return: A dataset object that represents the directory at the given path
-
+        Args:
+            path: The path of the directory in the repository relative to which the files will be uploaded.
         """
         return DataSet(self, path)
 
@@ -513,6 +510,7 @@ class Repo:
             Default is None, which uses the branch set on object creation
         :return: The url for uploading a file
 
+        :meta private:
         """
         return self.get_repo_url(CONTENT_UPLOAD_URL, directory, branch)
 
@@ -526,6 +524,7 @@ class Repo:
             then you could pass one of these strings into this function as an argument.
         :return: The url that you can navigate to in your browser to see the files
 
+        :meta private:
         """
         return self.get_repo_url(FILES_UI_URL, directory)
 
@@ -546,31 +545,21 @@ class Repo:
 class DataSet:
     """
     Not to be confused with DataEngine's datasets.
-    This class represents a folder with files that are going to be uploaded to a repo
+    This class represents a folder with files that are going to be uploaded to a repo.
     """
 
     def __init__(self, repo: Repo, directory: str):
-        """
-
-        :param repo (Repo object): Pass a repo object
-        :param directory (str): Specify the directory of the repository
-        :return: A DataSet object
-
-        """
-
         self.files: Dict[os.PathLike, Tuple[os.PathLike, BinaryIO]] = {}
         self.repo = repo
         self.directory = self._clean_directory_name(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
         """
-        The add function adds a file to the list of files that will be uploaded.
+        Add a file to upload. The file will not be uploaded unless you call :func:`commit`
 
-
-        :param file (str): Specify the file to be uploaded
-        :param path (str): Specify the path to upload the file
-        :return: None
-
+        Args:
+            file: Path to the file on the filesystem OR the contents of the file.
+            path: Where to store the file in the repo.
         """
 
         path, file = self.get_file(file, path)
@@ -581,17 +570,16 @@ class DataSet:
 
     def add_dir(self, local_path, glob_exclude="", commit_message=None, **upload_kwargs):
         """
-        The add_dir function adds an entire dvc directory to a DagsHub repository.
-        It does this by iterating through all the files in the given directory and uploading them one-by-one.
-        The function also commits all of these changes at once, so as not to overload the API with requests.
+        Add *and upload* an entire directory to the DagsHub repository.
 
+        By default, this uploads a dvc folder.
 
-        :param local_path  (str): Specify the local path where the dataset to upload is located
-        :param glob_exclude (str): Exclude certain files from the upload process
-        :param commit_message (str): Commit message
-        :param upload_kwargs (dict): kwargs that are passed to the uploading function
-        :return: None
+        Args:
+            local_path: Local path of the directory to upload.
+            glob_exclude: Glob pattern to exclude some files from being uploaded.
+            commit_message: Message of the commit with the upload.
 
+        The keyword arguments are passed to :func:`Repo.upload_files() <dagshub.upload.wrapper.Repo.upload_files>`.
         """
         upload_file_number = 100
         file_counter = 0
@@ -681,6 +669,7 @@ class DataSet:
         :param path (str): Desired path of the file in the repository
         :return: A tuple of the path and a file object
 
+        :meta private:
         """
 
         try:
@@ -721,16 +710,13 @@ class DataSet:
 
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
         """
-        The commit function is used to commit the files in the dataset.
-        It takes a commit message as an argument,
-            if no argument is passed then it return default commit message "Upload files using DagsHub client".
-        The function returns nothing.
+        Commit files added with :func:`add` to the repo
 
+        Args:
+            commit_message: Message of the commit with the upload.
 
-        :param commit_message (str): Set the commit message
-        :param *args: Pass a non-keyworded, variable-length argument list to the function
-        :param **kwargs: Pass additional parameters to the function
-        :return: None
+        Other positional and keyword arguments are passed to
+        :func:`Repo.upload_files() <dagshub.upload.wrapper.Repo.upload_files>`
         """
 
         file_list = list(self.files.values())
