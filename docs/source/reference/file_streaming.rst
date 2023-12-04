@@ -1,4 +1,4 @@
-File Streaming (``dagshub.streaming``)
+File Downloading (``dagshub.streaming``)
 ============
 
 .. automodule:: dagshub.streaming

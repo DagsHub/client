@@ -1,11 +1,3 @@
-Miscellaneous
-===============
-
-++++++++++++++++++
-Initialization
-++++++++++++++++++
-.. autofunction:: dagshub.common.init.init
-
 ++++++++++++++++++++++++
 Working with notebooks
 ++++++++++++++++++++++++
