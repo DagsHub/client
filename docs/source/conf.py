@@ -29,6 +29,12 @@ exclude_patterns = []
 
 html_theme = "furo"
 html_static_path = ["_static"]
+# html_logo = "dagshub.svg"
+html_theme_options = {
+    "light_logo": "light_logo.svg",
+    "dark_logo": "dark_logo.svg",
+    "sidebar_hide_name": True,
+}
 
 napoleon_include_init_with_doc = True
 autodoc_member_order = 'bysource'
