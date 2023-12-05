@@ -15,7 +15,7 @@ To install the client in your environment:
     pip install dagshub
 
 If you're working in a Google Colab/jupyter environment,
-execute ``pip install dagshub[jupyter]`` to install additional dependencies to enhance your experience.
+run ``pip install dagshub[jupyter]`` to install additional dependencies to enhance your experience.
 
 .. toctree::
     :maxdepth: 1
