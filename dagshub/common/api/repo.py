@@ -88,6 +88,9 @@ class RepoAPI:
     def get_branch_info(self, branch: str) -> BranchAPIResponse:
         """
         Get information about specified branch
+
+        Args:
+            branch: Name of the branch to get the info
         """
         res = self._http_request("GET", self.branch_url(branch))
 
@@ -104,6 +107,9 @@ class RepoAPI:
     def get_commit_info(self, sha: str) -> CommitAPIResponse:
         """
         Get information about a specific commit
+
+        Args:
+            sha: SHA of the commit.
         """
         res = self._http_request("GET", self.commit_url(sha))
 
@@ -135,7 +141,12 @@ class RepoAPI:
 
     def list_path(self, path: str, revision: Optional[str] = None, include_size: bool = False) -> List[ContentAPIEntry]:
         """
-        Get listing of everything in the specified path
+        List contents of a repository directory
+
+        Args:
+            path: Path of the directory
+            revision: Branch or commit SHA. Default is tip of the default branch.
+            include_size: Whether to include sizes for files. Calculating sizes might take more time.
         """
         params = {"include_size": include_size}
         res = self._http_request("GET", self.content_api_url(path, revision), params=params)
@@ -155,11 +166,12 @@ class RepoAPI:
 
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
         """
-        Get listing of everything in the specified storage path
+        List contents of a folder in a connected storage bucket
 
-        Path format: <scheme>/<bucket-name>/<path>
+        Args:
+            path: Path of the storage directory in the format of ``<scheme>/<bucket-name>/<path>``
 
-        Example: s3/my-bucket/prefix/path/to/file
+        Path example: ``s3/my-bucket/prefix/path/to/file``
         """
         params = {"include_size": include_size, "paging": True}
 
@@ -201,7 +213,14 @@ class RepoAPI:
 
     def get_file(self, path: str, revision: Optional[str] = None) -> bytes:
         """
-        Download file from repo
+        Download file from repo.
+
+        Args:
+            path: Path of the file in the repo.
+            revision: Git branch or revision from which to download the file.
+
+        Returns:
+            bytes: The content of the file.
         """
         res = self._http_request("GET", self.raw_api_url(path, revision))
         if res.status_code == 404:
@@ -215,9 +234,15 @@ class RepoAPI:
 
     def get_storage_file(self, path: str) -> bytes:
         """
-        Download file from storage
-        Path format: <scheme>/<bucket-name>/<path>
-        Example: s3/my-bucket/prefix/path/to/file
+        Download file from a connected storage bucket.
+
+        Args:
+            path: Path in the bucket in the format of ``<scheme>/<bucket-name>/<path>``.
+
+        Path example: ``s3/my-bucket/prefix/path/to/file``
+
+        Returns:
+            bytes: The content of the file.
         """
         res = self._http_request("GET", self.storage_raw_api_url(path))
         if res.status_code == 404:
@@ -231,6 +256,9 @@ class RepoAPI:
 
     @cached_property
     def default_branch(self) -> str:
+        """
+        Name of the repository's default branch
+        """
         return self.get_repo_info().default_branch
 
     @cached_property
@@ -243,14 +271,29 @@ class RepoAPI:
 
     @property
     def full_name(self) -> str:
+        """
+        Full name of the repo in ``<owner>/<reponame>`` format
+        """
         return f"{self.owner}/{self.repo_name}"
 
     def last_commit(self, branch: Optional[str] = None) -> CommitAPIResponse:
+        """
+        Returns info about the last commit of a branch.
+
+        Args:
+            branch: Branch to get the last commit of. Defaults to :func:`default_branch`.
+        """
         if branch is None:
             branch = self.default_branch
         return self.get_branch_info(branch).commit
 
     def last_commit_sha(self, branch: Optional[str] = None) -> str:
+        """
+        Returns the SHA hash of the last commit of a branch.
+
+        Args:
+            branch: Branch to get the last commit of. Defaults to :func:`default_branch`.
+        """
         return self.last_commit(branch).id
 
     @cached_property
@@ -272,9 +315,8 @@ class RepoAPI:
     def repo_url(self) -> str:
         """
         URL of the repo on DagsHub
-        Format: https://dagshub.com/user/repo
 
-        :meta private:
+        Format: ``https://dagshub.com/<user>/<repo>``
         """
         return multi_urljoin(self.host, self.owner, self.repo_name)
 
