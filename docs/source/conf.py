@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "DagsHub client"
+project = "DagsHub Client"
 copyright = "2023, DagsHub"
 author = "DagsHub"
 
@@ -29,13 +29,26 @@ exclude_patterns = []
 
 html_theme = "furo"
 html_static_path = ["_static"]
-# html_logo = "dagshub.svg"
+html_title = "DagsHub Client Docs"
+
 html_theme_options = {
-    "light_logo": "light_logo.svg",
-    "dark_logo": "dark_logo.svg",
-    "sidebar_hide_name": True,
+    "light_css_variables": {
+        "color-problematic": "#4453B3",  # API names
+        "color-background-secondary": "#f5f5f5",  # Sidebar BG
+        "color-brand-content": "#00bda4",  # Links and active items
+        "color-brand-primary": "#00bda4",  # ditto
+        "color-sidebar-link-text--top-level": "rgba(0, 0, 0, 0.87)",  # Sidebar links
+    },
+    "dark_css_variables": {
+        "color-problematic": "#C4B5FD",  # API names
+        "color-background-primary": "hsl(189, 55%, 9%)",  # Main BG
+        "color-background-secondary": "hsla(189, 55%, 5%, 1)",  # Sidebar BG
+        "color-brand-content": "#00bda4",  # Links and active items
+        "color-brand-primary": "#00bda4",  # ditto
+        "color-sidebar-link-text--top-level": "rgba(226, 228, 233, 0.82)",  # Sidebar links
+    },
 }
 
 napoleon_include_init_with_doc = True
-autodoc_member_order = 'bysource'
+autodoc_member_order = "bysource"
 autodoc_default_flags = ["inherited-members"]
