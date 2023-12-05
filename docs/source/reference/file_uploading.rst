@@ -1,4 +1,4 @@
-File Uploading (``dagshub.upload``)
+File Uploading
 ==========
 .. autofunction:: dagshub.upload_files
 

@@ -1,4 +1,4 @@
-Repository Bucket (``dagshub.repo_bucket``)
+Repository Bucket
 =========
 
 .. automodule:: dagshub.repo_bucket
