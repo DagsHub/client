@@ -171,7 +171,7 @@ class Datasource:
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 
-    def select(self, *selected: Union[str, Field], include_all=False):
+    def select(self, *selected: Union[str, Field]):
         """
         using select() you can choose which columns will appear on the query result,
          what their names will be (alias) and from what time. For example:
@@ -180,7 +180,15 @@ class Datasource:
         """
         new_ds = self.__deepcopy__()
 
-        new_ds._select = [s.to_dict(self) if isinstance(s, Field) else {"name": s} for s in selected]
+        include_all = False
+        for s in selected:
+            if isinstance(s, Field):
+                new_ds._select.append(s.to_dict(self))
+            else:
+                if s != '*':
+                    new_ds._select.append({"name": s})
+                else:
+                    include_all = True
 
         if include_all:
             aliases = [s["alias"] for s in new_ds._select if "alias" in s]

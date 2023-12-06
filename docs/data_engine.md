@@ -303,9 +303,9 @@ q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ag
 ```
 in the above example the result set of datapoints will have 2 columns of metadata: "size_asof_24h_ago" and "episode".
 all other metadata columns are ommited.if the desired result is to get all metadata columns and in addition the selected list,
-then use `include_all`, example:
+add "*" to the list, example:
 ```python
-q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), include_all=True)
+q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), "*")
 ```
 
 #### Global as_of time:
