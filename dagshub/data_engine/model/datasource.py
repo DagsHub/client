@@ -1,4 +1,5 @@
 import base64
+import datetime
 import gzip
 import json
 import logging
@@ -61,14 +62,53 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     allowMultiple: bool = False
 
 
+@dataclass
+class Field:
+    column: str
+    as_of_time: Optional[Union[float, datetime.datetime]] = None
+    alias: Optional[str] = None
+
+    @property
+    def as_of_timestamp(self) -> Optional[int]:
+        if self.as_of_time is not None:
+            if isinstance(self.as_of_time, datetime.datetime):
+                return int(self.as_of_time.timestamp())
+            else:
+                return int(self.as_of_time)
+        else:
+            return None
+
+    def to_dict(self, ds: "Datasource") -> Dict[str, Any]:
+        if not ds.has_field(self.column):
+            raise FieldNotFoundError(self.column)
+
+        res_dict = {"name": self.column}
+        if self.as_of_time is not None:
+            res_dict["asOf"] = self.as_of_timestamp
+        if self.alias:
+            res_dict["alias"] = self.alias
+        return res_dict
+
+
 class Datasource:
-    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None):
+    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None, select=None, as_of=None):
         self._source = datasource
         if query is None:
             query = DatasourceQuery()
         self._query = query
-
+        self._select = select or []
+        self._global_as_of = as_of
         self.serialize_gql_query_input()
+
+    @property
+    def global_as_of_timestamp(self) -> Optional[int]:
+        if self._global_as_of is not None:
+            if isinstance(self._global_as_of, datetime.datetime):
+                return int(self._global_as_of.timestamp())
+            else:
+                return int(self._global_as_of)
+        else:
+            return None
 
     @property
     def source(self) -> "DatasourceState":
@@ -82,7 +122,7 @@ class Datasource:
         self._query = DatasourceQuery()
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
-        res = Datasource(self._source, self._query.__deepcopy__())
+        res = Datasource(self._source, self._query.__deepcopy__(), self._select, self._global_as_of)
         return res
 
     def get_query(self):
@@ -93,9 +133,20 @@ class Datasource:
         return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
-        return {
+        result = {
             "query": self._query.serialize_graphql(),
         }
+        if self._select:
+            result["select"] = self._select
+
+        if self.global_as_of_timestamp:
+            result["asOf"] = self.global_as_of_timestamp
+        return result
+
+    def _deserialize_gql_result(self, query_dict):
+        if "query" in query_dict:
+            self._query = DatasourceQuery.deserialize(query_dict["query"])
+        self._select = query_dict.get("select")
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
@@ -119,6 +170,48 @@ class Datasource:
         """
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
+
+    def select(self, *selected: Union[str, Field]):
+        """
+        using select() you can choose which columns will appear on the query result,
+         what their names will be (alias) and from what time. For example:
+        t = datetime.now(timezone.utc) - timedelta(hours=24)
+        q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
+        """
+        new_ds = self.__deepcopy__()
+
+        include_all = False
+        for s in selected:
+            if isinstance(s, Field):
+                new_ds._select.append(s.to_dict(self))
+            else:
+                if s != '*':
+                    new_ds._select.append({"name": s})
+                else:
+                    include_all = True
+
+        if include_all:
+            aliases = [s["alias"] for s in new_ds._select if "alias" in s]
+            for f in self.fields:
+                if f.name in aliases:
+                    raise ValueError(f"alias {f.name} can't be used, a column with that name exists")
+                new_ds._select.append({"name": f.name})
+        return new_ds
+
+    def as_of(self, time: Union[float, datetime.datetime]):
+        """
+        as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
+
+        t = datetime.now(timezone.utc) - timedelta(hours=24)
+        q1 = (ds["size"] > 5).as_of(t)
+
+        in the above example all datapoints whose creation time is no later than 't',
+        and that match the condition at 't' - are returned.
+        """
+        new_ds = self.__deepcopy__()
+
+        new_ds._global_as_of = time
+        return new_ds
 
     def _check_preprocess(self):
         self.source.get_from_dagshub()
@@ -505,7 +598,7 @@ class Datasource:
         queried_ds = ds[ds["value"] == 5]
     """
 
-    def __getitem__(self, other: Union[slice, str, "Datasource"]):
+    def __getitem__(self, other: Union[slice, str, "Datasource", "Field"]):
         # Slicing - get items from the slice
         if type(other) is slice:
             return self.sample(other.start, other.stop)
@@ -520,6 +613,11 @@ class Datasource:
                 new_ds._query = other_query
             else:
                 new_ds._query.compose("and", other_query)
+            return new_ds
+        elif type(other) is Field:
+            if not self.has_field(other.column):
+                raise FieldNotFoundError(other.column)
+            new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)
             return new_ds
         # "index" is a datasource with a query - return the datasource inside
         # Example:

@@ -7,7 +7,6 @@ from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DatasetNotFoundError
-from dagshub.data_engine.model.query import DatasourceQuery
 
 
 def get_datasets(repo: str) -> List[Datasource]:
@@ -41,7 +40,7 @@ def _from_gql_result(repo: str, dataset_result: "DatasetResult") -> "Datasource"
     ds = Datasource(DatasourceState.from_gql_result(repo, dataset_result.datasource))
 
     query_dict = json.loads(dataset_result.datasetQuery)
-    if "query" in query_dict:
-        ds._query = DatasourceQuery.deserialize(query_dict["query"])
+
+    ds._deserialize_gql_result(query_dict)
 
     return ds

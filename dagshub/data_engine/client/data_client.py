@@ -198,7 +198,6 @@ class DataClient:
         params = GqlMutations.update_metadata_params(
             datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
         )
-
         return self._exec(q, params)
 
     def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
