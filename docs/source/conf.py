@@ -50,6 +50,10 @@ html_theme_options = {
     },
 }
 
+html_js_files = [
+    "js/gtm.js",
+]
+
 napoleon_include_init_with_doc = True
 autodoc_member_order = "bysource"
 autodoc_default_flags = ["inherited-members"]
