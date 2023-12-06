@@ -19,8 +19,8 @@ run ``pip install dagshub[jupyter]`` to install additional dependencies to enhan
 
 .. toctree::
     :maxdepth: 1
-    :caption: Contents:
 
+    Back to DagsHub Docs <https://dagshub.com/docs>
     reference/setup
     reference/data_engine/index
     reference/file_downloading

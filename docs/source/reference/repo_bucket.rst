@@ -1,5 +1,4 @@
 Repository Bucket
 =========
 
-.. automodule:: dagshub.repo_bucket
-    :members:
+.. autofunction:: dagshub.get_repo_bucket_client

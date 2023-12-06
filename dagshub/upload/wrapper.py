@@ -197,7 +197,7 @@ def upload_files(
         remote_path: Specify the path to upload the file to.\
         Defaults to the relative component of ``local_path`` to CWD.
 
-    For kwarg docs look at :func:`Repo.upload() <dagshub.upload.wrapper.Repo.upload>`.
+    For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
     """
     owner, repo = validate_owner_repo(repo)
     repo = Repo(owner, repo)
@@ -579,7 +579,7 @@ class DataSet:
             glob_exclude: Glob pattern to exclude some files from being uploaded.
             commit_message: Message of the commit with the upload.
 
-        The keyword arguments are passed to :func:`Repo.upload_files() <dagshub.upload.wrapper.Repo.upload_files>`.
+        The keyword arguments are passed to :func:`Repo.upload_files() <dagshub.upload.Repo.upload_files>`.
         """
         upload_file_number = 100
         file_counter = 0
@@ -716,7 +716,7 @@ class DataSet:
             commit_message: Message of the commit with the upload.
 
         Other positional and keyword arguments are passed to
-        :func:`Repo.upload_files() <dagshub.upload.wrapper.Repo.upload_files>`
+        :func:`Repo.upload_files() <dagshub.upload.Repo.upload_files>`
         """
 
         file_list = list(self.files.values())

@@ -1,4 +1,4 @@
 Setup Functions
 =========
 
-.. autofunction:: dagshub.common.init.init
+.. autofunction:: dagshub.init
