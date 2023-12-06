@@ -5,5 +5,3 @@ if (document.location.hostname.toLowerCase() === "dagshub.com") {
         'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
     })(window,document,'script','dataLayer','GTM-PGHTMDN');
 }
-
-console.log("HELLO");
