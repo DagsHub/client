@@ -18,6 +18,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autosummary",
     "sphinx_copybutton",
+    "sphinx_sitemap",
 ]
 
 templates_path = ["_templates"]
@@ -30,7 +31,7 @@ exclude_patterns = []
 html_theme = "furo"
 html_static_path = ["_static"]
 html_title = "DagsHub Client Docs"
-html_baseurl = "/docs/client/"
+html_baseurl = "https://dagshub.com/docs/client/"
 
 html_theme_options = {
     "light_css_variables": {
@@ -57,3 +58,5 @@ html_js_files = [
 napoleon_include_init_with_doc = True
 autodoc_member_order = "bysource"
 autodoc_default_flags = ["inherited-members"]
+
+sitemap_url_scheme = "{link}"
