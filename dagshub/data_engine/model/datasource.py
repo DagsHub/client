@@ -64,7 +64,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 
 @dataclass
 class Field:
-    column: str
+    field_name: str
     as_of: Optional[Union[float, datetime.datetime]] = None
     alias: Optional[str] = None
 
@@ -79,10 +79,10 @@ class Field:
             return None
 
     def to_dict(self, ds: "Datasource") -> Dict[str, Any]:
-        if not ds.has_field(self.column):
-            raise FieldNotFoundError(self.column)
+        if not ds.has_field(self.field_name):
+            raise FieldNotFoundError(self.field_name)
 
-        res_dict = {"name": self.column}
+        res_dict = {"name": self.field_name}
         if self.as_of is not None:
             res_dict["asOf"] = self.as_of_timestamp
         if self.alias:
@@ -670,9 +670,9 @@ class Datasource:
                 new_ds._query.compose("and", other_query)
             return new_ds
         elif type(other) is Field:
-            if not self.has_field(other.column):
-                raise FieldNotFoundError(other.column)
-            new_ds._query = DatasourceQuery(other.column, other.as_of_timestamp)
+            if not self.has_field(other.field_name):
+                raise FieldNotFoundError(other.field_name)
+            new_ds._query = DatasourceQuery(other.field_name, other.as_of_timestamp)
             return new_ds
         # "index" is a datasource with a query - return the datasource inside
         # Example:
