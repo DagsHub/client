@@ -1,7 +1,8 @@
+import dateutil.parser
 import pytest
 
 from dagshub.data_engine.model.datasource import (
-    Datasource,
+    Datasource, Field,
 )
 from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError, FieldNotFoundError
 from dagshub.data_engine.model.query import DatasourceQuery, bytes_deserializer
@@ -25,6 +26,84 @@ def test_simple_filter(ds):
     q = ds2.get_query()
     expected = {"gt": {"data": {"field": "column1", "value": 5}}}
     assert q.to_dict() == expected
+
+
+def test_versioning_query_datetime(ds):
+    add_int_fields(ds, "x")
+    # datetime
+    ds2 = ds[ds[Field("x", as_of=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
+    q = ds2.get_query()
+    assert q.to_dict() == {'gt': {'data': {'as_of': int(dateutil.parser.parse("Wed 22 Nov 2023").timestamp()),
+                                           'field': 'x', 'value': 1}}}
+
+
+def test_versioning_query_timestamp(ds):
+    add_int_fields(ds, "x")
+    # timestamp
+    ds2 = ds[ds[Field("x", as_of=1700604000)] > 1]
+    q = ds2.get_query()
+    assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
+
+
+def test_versioning_select(ds):
+    add_int_fields(ds, "x")
+    add_int_fields(ds, "y")
+    add_int_fields(ds, "z")
+
+    # test select
+    ds2 = ((ds[ds[Field("x", as_of=123.99)] > 1]) &
+           (ds[ds[Field("x", as_of=345)] > 2]) |
+           (ds[ds[Field("y", as_of=789)] > 3])). \
+        select(Field("y", as_of=123), Field("x", as_of=456, alias="y_t1"))
+    q = ds2.get_query()
+    expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
+                                                          {'gt': {'data': {'field': 'x', 'as_of': 345, 'value': 2}}}],
+                                             'data': None}},
+                                    {'gt': {'data': {'field': 'y', 'as_of': 789, 'value': 3}}}], 'data': None}}
+    assert q.to_dict() == expected
+
+    # test serialization works and includes select
+    expected_serialized = {'query': {'or': [{'and': [
+        {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 123}},
+        {'filter': {'key': 'x', 'value': '2', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN', 'asOf': 345}}]}, {
+        'filter': {'key': 'y', 'value': '3', 'valueType': 'INTEGER',
+                   'comparator': 'GREATER_THAN', 'asOf': 789}}]},
+        'select': [{'name': 'y', 'asOf': 123}, {'name': 'x', 'asOf': 456, 'alias': 'y_t1'}]}
+    assert ds2.serialize_gql_query_input() == expected_serialized
+
+
+def test_versioning_select_as_strings(ds):
+    add_int_fields(ds, "x")
+    add_int_fields(ds, "y")
+    add_int_fields(ds, "z")
+
+    ds2 = (ds[ds["x"] > 1]).select("y", "z")
+    print(ds2.serialize_gql_query_input())
+    assert ds2.serialize_gql_query_input() == {
+        'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
+        'select': [{'name': 'y'}, {'name': 'z'}]}
+
+    ds2 = (ds[ds["x"] > 1]).select("y", Field("x"), "z")
+    print(ds2.serialize_gql_query_input())
+    assert ds2.serialize_gql_query_input() == {
+        'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
+        'select': [{'name': 'y'}, {'name': 'x'}, {'name': 'z'}]}
+
+    ds2 = (ds[ds["x"] > 1]).select("y", Field("x", as_of=1234), "z")
+    print(ds2.serialize_gql_query_input())
+    assert ds2.serialize_gql_query_input() == {
+        'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
+        'select': [{'name': 'y'}, {'name': 'x', 'asOf': 1234}, {'name': 'z'}]}
+
+
+def test_versioning_dataset_deserialize(ds):
+    # test de-serialization works and includes select
+    query = {'select': [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}],
+             'query': {'filter': {'key': 'x', 'value': 'dogs', 'valueType': 'STRING', 'comparator': 'EQUAL',
+                                  'asOf': 1700651563}}}
+
+    ds._deserialize_gql_result(query)
+    assert ds._select == [{'name': 'x', 'asOf': 1700651566}, {'name': 'y', 'alias': 'y_t1', 'asOf': 1700651563}]
 
 
 def test_composite_filter(ds):
