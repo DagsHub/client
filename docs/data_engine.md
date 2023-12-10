@@ -288,7 +288,7 @@ An extended syntax lets you query according to different versions of enrichments
 # size metadata is constantly changed and we want to address the one from 24h ago
 t = datetime.now(timezone.utc) - timedelta(hours=24)
 
-q1 = ds[Field("size", as_of_time=t] > 5
+q1 = ds[Field("size", as_of=t] > 5
 ```
 in the above example all datapoints whose "size" column updated no later than 't' that match the condition '>5' are returned.
 
@@ -299,13 +299,13 @@ Using select() you can choose which columns will appear on the query result, wha
 ```python
 t = datetime.now(timezone.utc) - timedelta(hours=24)
 
-q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
+q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), Field("episode"))
 ```
 in the above example the result set of datapoints will have 2 columns of metadata: "size_asof_24h_ago" and "episode".
 all other metadata columns are ommited.if the desired result is to get all metadata columns and in addition the selected list,
 add "*" to the list, example:
 ```python
-q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), "*")
+q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), "*")
 ```
 
 #### Global as_of time:
@@ -326,10 +326,10 @@ in the above example all datapoints whose creation time is no later than 't' and
 - pay attention to timezones - use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as  `dateutil.parser.parse("Tue 28 Nov 11:29 +2:00")` specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
 ##### Select list:
 - both "x" and `Field("x")` can be used
-- alias, as_of_time - are optional
-- we currently do not check the list for contradictions/overwrites/duplications, i.e  `select(Field("x", as_of_time=t1), Field("x", as_of_time=t2))` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also `select("x","x")`
+- alias, as_of - are optional
+- we currently do not check the list for contradictions/overwrites/duplications, i.e  `select(Field("x", as_of=t1), Field("x", as_of=t2))` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also `select("x","x")`
 ##### Global as_of behavior:
-- it applies to all entities unless otherwise specified, i.e if we use Field("x", as_of_time=t1)) then t1 will precede over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichments in t2.
+- it applies to all entities unless otherwise specified, i.e if we use Field("x", as_of=t1)) then t1 will precede over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichments in t2.
 
 
 

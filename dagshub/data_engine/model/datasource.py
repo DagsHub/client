@@ -65,16 +65,16 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 @dataclass
 class Field:
     column: str
-    as_of_time: Optional[Union[float, datetime.datetime]] = None
+    as_of: Optional[Union[float, datetime.datetime]] = None
     alias: Optional[str] = None
 
     @property
     def as_of_timestamp(self) -> Optional[int]:
-        if self.as_of_time is not None:
-            if isinstance(self.as_of_time, datetime.datetime):
-                return int(self.as_of_time.timestamp())
+        if self.as_of is not None:
+            if isinstance(self.as_of, datetime.datetime):
+                return int(self.as_of.timestamp())
             else:
-                return int(self.as_of_time)
+                return int(self.as_of)
         else:
             return None
 
@@ -83,7 +83,7 @@ class Field:
             raise FieldNotFoundError(self.column)
 
         res_dict = {"name": self.column}
-        if self.as_of_time is not None:
+        if self.as_of is not None:
             res_dict["asOf"] = self.as_of_timestamp
         if self.alias:
             res_dict["alias"] = self.alias
@@ -176,7 +176,7 @@ class Datasource:
         using select() you can choose which columns will appear on the query result,
          what their names will be (alias) and from what time. For example:
         t = datetime.now(timezone.utc) - timedelta(hours=24)
-        q1 = (ds["size"] > 5).select(Field("size", as_of_time=t, alias="size_asof_24h_ago"), Field("episode"))
+        q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), Field("episode"))
         """
         new_ds = self.__deepcopy__()
 

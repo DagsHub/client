@@ -31,7 +31,7 @@ def test_simple_filter(ds):
 def test_versioning_query_datetime(ds):
     add_int_fields(ds, "x")
     # datetime
-    ds2 = ds[ds[Field("x", as_of_time=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
+    ds2 = ds[ds[Field("x", as_of=dateutil.parser.parse("Wed 22 Nov 2023"))] > 1]
     q = ds2.get_query()
     assert q.to_dict() == {'gt': {'data': {'as_of': int(dateutil.parser.parse("Wed 22 Nov 2023").timestamp()),
                                            'field': 'x', 'value': 1}}}
@@ -40,7 +40,7 @@ def test_versioning_query_datetime(ds):
 def test_versioning_query_timestamp(ds):
     add_int_fields(ds, "x")
     # timestamp
-    ds2 = ds[ds[Field("x", as_of_time=1700604000)] > 1]
+    ds2 = ds[ds[Field("x", as_of=1700604000)] > 1]
     q = ds2.get_query()
     assert q.to_dict() == {'gt': {'data': {'as_of': 1700604000, 'field': 'x', 'value': 1}}}
 
@@ -51,10 +51,10 @@ def test_versioning_select(ds):
     add_int_fields(ds, "z")
 
     # test select
-    ds2 = ((ds[ds[Field("x", as_of_time=123.99)] > 1]) &
-           (ds[ds[Field("x", as_of_time=345)] > 2]) |
-           (ds[ds[Field("y", as_of_time=789)] > 3])). \
-        select(Field("y", as_of_time=123), Field("x", as_of_time=456, alias="y_t1"))
+    ds2 = ((ds[ds[Field("x", as_of=123.99)] > 1]) &
+           (ds[ds[Field("x", as_of=345)] > 2]) |
+           (ds[ds[Field("y", as_of=789)] > 3])). \
+        select(Field("y", as_of=123), Field("x", as_of=456, alias="y_t1"))
     q = ds2.get_query()
     expected = {'or': {'children': [{'and': {'children': [{'gt': {'data': {'field': 'x', 'as_of': 123, 'value': 1}}},
                                                           {'gt': {'data': {'field': 'x', 'as_of': 345, 'value': 2}}}],
@@ -89,7 +89,7 @@ def test_versioning_select_as_strings(ds):
         'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
         'select': [{'name': 'y'}, {'name': 'x'}, {'name': 'z'}]}
 
-    ds2 = (ds[ds["x"] > 1]).select("y", Field("x", as_of_time=1234), "z")
+    ds2 = (ds[ds["x"] > 1]).select("y", Field("x", as_of=1234), "z")
     print(ds2.serialize_gql_query_input())
     assert ds2.serialize_gql_query_input() == {
         'query': {'filter': {'key': 'x', 'value': '1', 'valueType': 'INTEGER', 'comparator': 'GREATER_THAN'}},
