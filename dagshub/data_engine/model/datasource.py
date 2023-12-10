@@ -64,9 +64,37 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 
 @dataclass
 class Field:
+    """
+    Class used to define custom fields for use in \
+    :func:`Datasource.select() <dagshub.data_engine.model.datasource.Datasource.select>` or in filtering.
+
+    Example of filtering on old data from a field::
+
+        t = datetime.now() - timedelta(days=2)
+        q = ds[Field("size", as_of=t)] > 500
+        q.all()
+    """
     field_name: str
+    """The database field where the values are stored. In other words, where to get the values from."""
     as_of: Optional[Union[float, datetime.datetime]] = None
+    """
+    If defined, the data in this field would be shown as of this moment in time.
+
+    Accepts either a datetime object, or a UTC timestamp.
+    """
     alias: Optional[str] = None
+    """
+    How the returned custom data field should be named.
+
+    Useful when you're comparing the same field at multiple points in time::
+
+        yesterday = datetime.now() - timedelta(days=1)
+
+        ds.select(
+            Field("value", alias="value_today"),
+            Field("value", as_of=yesterday, alias="value_yesterday")
+        ).all()
+    """
 
     @property
     def as_of_timestamp(self) -> Optional[int]:
@@ -177,10 +205,39 @@ class Datasource:
 
     def select(self, *selected: Union[str, Field]):
         """
-        using select() you can choose which columns will appear on the query result,
-         what their names will be (alias) and from what time. For example:
-        t = datetime.now(timezone.utc) - timedelta(hours=24)
-        q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), Field("episode"))
+        Select which fields should appear in the query result.
+
+        If you want to query older versions of metadata,
+        use :class:`Field` objects with ``as_of`` set to your desired time.
+
+        By default, only the defined fields are returned.
+        If you want to return all existing fields plus whatever additional fields you define,
+        add ``"*"`` into the arguments.
+
+        Args:
+            selected: Fields you want to select. Can be either of:
+
+                - Name of the field to select: ``"field"``.
+                - ``"*"`` to select all the fields in the datasource.
+                - :class:`Field` object.
+
+        Example::
+
+            t = datetime.now() - timedelta(hours=24)
+            q1 = ds.select("*", Field("size", as_of=t, alias="size_asof_24h_ago"))
+            q1.all()
+
+        .. note::
+            Currently we don't generate automatic aliases,
+            which can lead to accidental overwriting of fields in the output.
+            We recommend writing out aliases for any additional field you select::
+
+                # Do this
+                q1 = ds.select("size", Field("size", as_of=t, alias="size_asof_24h_ago"))
+                # Instead of this
+                q1 = ds.select("size", Field("size", as_of=t))
+
+            If the field is used once in the whole query, this is not a problem.
         """
         new_ds = self.__deepcopy__()
 
@@ -204,13 +261,22 @@ class Datasource:
 
     def as_of(self, time: Union[float, datetime.datetime]):
         """
-        as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
+        Get a snapshot of the datasource's state as of ``time``.
 
-        t = datetime.now(timezone.utc) - timedelta(hours=24)
-        q1 = (ds["size"] > 5).as_of(t)
+        Args:
+            time: At which point in time do you want to get data from.\
+                Either a UTC timestamp or a ``datetime`` object.
 
-        in the above example all datapoints whose creation time is no later than 't',
-        and that match the condition at 't' - are returned.
+        In the following example, you will get back datapoints that were created no later than yesterday AND \
+        had their size at this point bigger than 5 bytes::
+
+            t = datetime.now() - timedelta(hours=24)
+            q1 = (ds["size"] > 5).as_of(t)
+            q1.all()
+
+        .. note::
+            If used with :func:`select`, the ``as_of`` set on the fields takes precedence
+            over the global query ``as_of`` set here.
         """
         new_ds = self.__deepcopy__()
 
@@ -240,7 +306,7 @@ class Datasource:
             ds.metadata_field("annotation").set_type(dtypes.LabelStudioAnnotation).apply()
 
         .. note::
-            New fields have to have their type defined using .set_type() before doing anything else
+            New fields have to have their type defined using ``.set_type()`` before doing anything else
 
         Example of marking an existing field as an annotation field::
 
