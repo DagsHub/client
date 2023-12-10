@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to DagsHub client's documentation!
-===================================
+============================================
 
 This is the API reference for the `DagsHub Python Client <https://github.com/DagsHub/client>`_.
 
