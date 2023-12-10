@@ -64,9 +64,37 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 
 @dataclass
 class Field:
+    """
+    Class used to define custom fields for use in \
+    :func:`Datasource.select() <dagshub.data_engine.model.datasource.Datasource.select>` or in filtering.
+
+    Example of filtering on old data from a field::
+
+        t = datetime.now() - timedelta(days=2)
+        q = ds[Field("size", as_of=t)] > 500
+        q.all()
+    """
     field_name: str
+    """The database field where the values are stored. In other words, where to get the values from."""
     as_of: Optional[Union[float, datetime.datetime]] = None
+    """
+    If defined, the data in this field would be shown as of this moment in time.
+
+    Accepts either a datetime object, or a UTC timestamp.
+    """
     alias: Optional[str] = None
+    """
+    How the returned custom data field should be named.
+
+    Useful when you're comparing the same field at multiple points in time::
+
+        yesterday = datetime.now() - timedelta(days=1)
+
+        ds.select(
+            Field("value", alias="value_today"),
+            Field("value", as_of=yesterday, alias="value_yesterday")
+        ).all()
+    """
 
     @property
     def as_of_timestamp(self) -> Optional[int]:
@@ -116,8 +144,11 @@ class Datasource:
 
     def clear_query(self):
         """
-        This function clears the query assigned to this datasource.
-        Once you clear the query, next time you try to get datapoints, you'll get all the datapoints in the datasource
+        Clear the attached query. Next time this datasource gets queried, you'll get all of the datapoints.
+
+        .. note::
+            This function always clears the query.
+            That means that if you use it on a dataset, the whole query will get cleared, and not just your changes.
         """
         self._query = DatasourceQuery()
 
@@ -130,6 +161,7 @@ class Datasource:
 
     @property
     def annotation_fields(self) -> List[str]:
+        """Return all fields that have the annotation meta tag set"""
         return [f.name for f in self.fields if f.is_annotation()]
 
     def serialize_gql_query_input(self):
@@ -155,7 +187,7 @@ class Datasource:
 
     def head(self, size=100) -> "QueryResult":
         """
-        Executes the query and returns a QueryResult object containing first <size> datapoints
+        Executes the query and returns a :class:`.QueryResult` object containing first ``size`` datapoints
 
         Args:
             size: how many datapoints to get. Default is 100
@@ -166,17 +198,46 @@ class Datasource:
 
     def all(self) -> "QueryResult":
         """
-        Executes the query and returns a QueryResult object containing all datapoints
+        Executes the query and returns a :class:`.QueryResult` object containing all datapoints
         """
         self._check_preprocess()
         return self._source.client.get_datapoints(self)
 
     def select(self, *selected: Union[str, Field]):
         """
-        using select() you can choose which columns will appear on the query result,
-         what their names will be (alias) and from what time. For example:
-        t = datetime.now(timezone.utc) - timedelta(hours=24)
-        q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), Field("episode"))
+        Select which fields should appear in the query result.
+
+        If you want to query older versions of metadata,
+        use :class:`Field` objects with ``as_of`` set to your desired time.
+
+        By default, only the defined fields are returned.
+        If you want to return all existing fields plus whatever additional fields you define,
+        add ``"*"`` into the arguments.
+
+        Args:
+            selected: Fields you want to select. Can be either of:
+
+                - Name of the field to select: ``"field"``.
+                - ``"*"`` to select all the fields in the datasource.
+                - :class:`Field` object.
+
+        Example::
+
+            t = datetime.now() - timedelta(hours=24)
+            q1 = ds.select("*", Field("size", as_of=t, alias="size_asof_24h_ago"))
+            q1.all()
+
+        .. note::
+            Currently we don't generate automatic aliases,
+            which can lead to accidental overwriting of fields in the output.
+            We recommend writing out aliases for any additional field you select::
+
+                # Do this
+                q1 = ds.select("size", Field("size", as_of=t, alias="size_asof_24h_ago"))
+                # Instead of this
+                q1 = ds.select("size", Field("size", as_of=t))
+
+            If the field is used once in the whole query, this is not a problem.
         """
         new_ds = self.__deepcopy__()
 
@@ -200,13 +261,22 @@ class Datasource:
 
     def as_of(self, time: Union[float, datetime.datetime]):
         """
-        as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
+        Get a snapshot of the datasource's state as of ``time``.
 
-        t = datetime.now(timezone.utc) - timedelta(hours=24)
-        q1 = (ds["size"] > 5).as_of(t)
+        Args:
+            time: At which point in time do you want to get data from.\
+                Either a UTC timestamp or a ``datetime`` object.
 
-        in the above example all datapoints whose creation time is no later than 't',
-        and that match the condition at 't' - are returned.
+        In the following example, you will get back datapoints that were created no later than yesterday AND \
+        had their size at this point bigger than 5 bytes::
+
+            t = datetime.now() - timedelta(hours=24)
+            q1 = (ds["size"] > 5).as_of(t)
+            q1.all()
+
+        .. note::
+            If used with :func:`select`, the ``as_of`` set on the fields takes precedence
+            over the global query ``as_of`` set here.
         """
         new_ds = self.__deepcopy__()
 
@@ -227,31 +297,43 @@ class Datasource:
     def metadata_field(self, field_name: str) -> MetadataFieldBuilder:
         """
         Returns a builder for a metadata field.
-        The builder can be used to change properties of a field or create a new field altogether
+        The builder can be used to change properties of a field or create a new field altogether.
+        Note that fields get automatically created when you upload new metadata to the Data Engine,
+        so it's not necessary to create fields with this function.
 
-        Example of creating a new annotation field:
+        Example of creating a new annotation field::
+
             ds.metadata_field("annotation").set_type(dtypes.LabelStudioAnnotation).apply()
-        NOTE: New fields have to have their type defined using .set_type() before doing anything else
 
-        Example of marking an existing field as an annotation field:
+        .. note::
+            New fields have to have their type defined using ``.set_type()`` before doing anything else
+
+        Example of marking an existing field as an annotation field::
+
             ds.metadata_field("existing-field").set_annotation().apply()
+
+        Args:
+            field_name: Name of the field that you want to create/change
+
         """
         return MetadataFieldBuilder(self, field_name)
 
     def apply_field_changes(self, field_builders: List[MetadataFieldBuilder]):
         """
-        Applies one or multiple metadata field builders that can be constructed using the metadata_field() function
+        Applies one or multiple metadata field builders
+        that can be constructed using the :func:`metadata_field()` function.
         """
         self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
         self.source.get_from_dagshub()
 
     def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
-        Returns a metadata context, that you can upload metadata through via update_metadata
-        Once the context is exited, all metadata is uploaded in one batch
+        Returns a metadata context, that you can upload metadata through using its
+        :func:`~MetadataContextManager.update_metadata()` function.
+        Once the context is exited, all metadata is uploaded in one batch::
 
-        with df.metadata_context() as ctx:
-            ctx.update_metadata(["file1", "file2"], {"key1": True, "key2": "value"})
+            with df.metadata_context() as ctx:
+                ctx.update_metadata("file1", {"key1": True, "key2": "value"})
 
         """
 
@@ -268,11 +350,15 @@ class Datasource:
 
     def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
         """
-        Uploads metadata from a pandas dataframe
-        path_column can either be a name of the column with the data or its index.
-        This will be the column from which the datapoints are extracted.
-        All the other columns are treated as metadata to upload
-        If path_column is not specified, the first column is used as the datapoints
+        Upload metadata from a pandas dataframe.
+
+        All columns are uploaded as metadata, and the path of every datapoint is taken from `path_column`.
+
+        Args:
+            df (`pandas.DataFrame <https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html>`_):
+                DataFrame with metadata
+            path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
+                If not specified, the first column is used.
         """
         self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
@@ -367,8 +453,14 @@ class Datasource:
 
     def delete_source(self, force: bool = False):
         """
-        Delete the record of this datasource
-        This will remove ALL the datapoints + metadata associated with the datasource
+        Delete the record of this datasource along with all datapoints.
+
+        .. warning::
+            This is a destructive operation! If you delete the datasource,
+            all the datapoints and metadata will be removed.
+
+        Args:
+            force: Skip the confirmation prompt
         """
         prompt = (
             f'You are about to delete datasource "{self.source.name}" for repo "{self.source.repo}"\n'
@@ -386,17 +478,20 @@ class Datasource:
         """
         This function fires a call to the backend to rescan the datapoints.
         Call this function whenever you uploaded new files and want them to appear when querying the datasource,
-        Or if you changed existing file contents and want their metadata to be updated automatically.
+        or if you changed existing file contents and want their metadata to be updated.
+
+        DagsHub periodically rescans all datasources, this function is a way to make a scan happen as soon as possible.
 
         Notes about automatically scanned metadata:
-        1. Only new datapoints (files) will be added.
-           If files were removed from the source, their metadata will still remain,
-           and they will still be returned from queries on the datasource.
-           An API to actively remove metadata will be available soon.
-        2. Some metadata fields will be automatically scanned and updated by DagsHub based on this scan -
-           the list of automatic metadata fields is growing frequently!
+            1. Only new datapoints (files) will be added.
+               If files were removed from the source, their metadata will still remain,
+               and they will still be returned from queries on the datasource.
+               An API to actively remove metadata will be available soon.
+            2. Some metadata fields will be automatically scanned and updated by DagsHub based on this scan -
+               the list of automatic metadata fields is growing frequently!
 
-        :param options: List of scanning options. If not sure, leave empty.
+        Args:
+            options: List of scanning options. If not sure, leave empty.
         """
         logger.debug("Rescanning datasource")
         self.source.client.scan_datasource(self, options=options)
@@ -422,8 +517,11 @@ class Datasource:
     def save_dataset(self, name: str):
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
-        That way you can persist and share your queries on the backend
-        You can get the dataset back by calling `datasources.get_dataset(repo, name)`
+        That way you can persist and share your queries.
+        You can get the dataset back by calling :func:`.datasets.get_dataset()`
+
+        Args:
+            name: Name of the dataset
         """
         send_analytics_event("Client_DataEngine_QuerySaved", repo=self.source.repoApi)
 
@@ -432,26 +530,32 @@ class Datasource:
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
-        Creates a voxel51 dataset that can be used with `fo.launch_app()` to visualize it
-
-        Kwargs:
-            name (str): name of the dataset (by default uses the same name as the datasource)
-            force_download (bool): download the dataset even if the size of the files is bigger than 100MB
-            files_location (str|PathLike): path to the location where to download the local files
-                default: ~/dagshub_datasets/user/repo/ds_name/
-            redownload (bool): Redownload files, replacing the ones that might exist on the filesystem
-            voxel_annotations (List[str]) : List of columns from which to load voxel annotations serialized with
-                                        `to_json()`. This will override the labelstudio annotations
+        Refer to :func:`QueryResult.to_voxel51_dataset() \
+        <dagshub.data_engine.model.query_result.QueryResult.to_voxel51_dataset>`\
+        for documentation.
         """
         return self.all().to_voxel51_dataset(**kwargs)
 
     @property
     def default_dataset_location(self) -> Path:
+        """
+        Default location where datapoint files are stored.
+
+        On UNIX-likes the path is ``~/dagshub/datasets/<repo_name>/<datasource_id>``
+
+        On Windows the path is ``C:\\Users\\<user>\\dagshub\\datasets\\<repo_name>\\<datasource_id>``
+        """
         return Path(
             sanitize_filepath(os.path.join(Path.home(), "dagshub", "datasets", self.source.repo, str(self.source.id)))
         )
 
     def visualize(self, **kwargs) -> "fo.Session":
+        """
+        Visualize the whole datasource using
+        :func:`QueryResult.visualize() <dagshub.data_engine.model.query_result.QueryResult.visualize>`.
+
+        Read the function docs for kwarg documentation.
+        """
         return self.all().visualize(**kwargs)
 
     @property
@@ -461,8 +565,15 @@ class Datasource:
     def annotate(self) -> Optional[str]:
         """
         Sends all datapoints in the datasource for annotation in Label Studio.
-        It's recommended to not send a huge amount of datapoints to be annotated at once, to avoid overloading
-        The Label Studio workspace.
+
+        .. note::
+            This will send ALL datapoints in the datasource for annotation.
+            It's recommended to not send a huge amount of datapoints to be annotated at once, to avoid overloading
+            the Label Studio workspace.
+            Use :func:`QueryResult.annotate() <dagshub.data_engine.model.query_result.QueryResult.annotate>`
+            to annotate a result of a query with less datapoints.
+            Alternatively, use a lower level :func:`send_datapoints_to_annotation` function
+
 
         :return: Link to open Label Studio in the browser
         """
@@ -470,7 +581,9 @@ class Datasource:
 
     def send_to_annotation(self):
         """
-        deprecated, see annotate()
+        deprecated, see :func:`annotate()`
+
+        :meta private:
         """
         return self.annotate()
 
@@ -478,15 +591,18 @@ class Datasource:
         self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]], open_project=True, ignore_warning=False
     ) -> Optional[str]:
         """
-        Sends datapoints to annotations in Label Studio
+        Sends datapoints for annotation in Label Studio.
 
         Args:
-            datapoints (Union[List[Datapoint], QueryResult, List[Dict]]):
-                Either a list of Datapoints or dicts that have "id" and "downloadurl" fields.
-            open_project (bool, optional):
-                Specifies whether the link to the returned LS project should be opened from Python.
-            ignore_warning (bool, optional):
-                Suppress any non-lethal warnings that require user input. Defaults to False.
+            datapoints: Either of:
+
+                - A :class:`.QueryResult`
+                - List of :class:`.Datapoint` objects
+                - List of dictionaries. Each dictionary should have fields ``id`` and ``download_url``.
+                    ``id`` is the ID of the datapoint in the datasource.
+
+            open_project: Automatically open the created Label Studio project in the browser.
+            ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
 
         Returns:
             Link to open Label Studio in the browser
@@ -542,11 +658,13 @@ class Datasource:
 
     def wait_until_ready(self, max_wait_time=300, fail_on_timeout=True):
         """
-        Blocks until the datasource preprocessing is complete
+        Blocks until the datasource preprocessing is complete.
+
+        Useful when you have just created a datasource and the initial scanning hasn't finished yet.
 
         Args:
-            max_wait_time (int): Maximum time to wait in seconds
-            fail_on_timeout: Whether to raise a RuntimeError or continue if the scan does not complete on time
+            max_wait_time: Maximum time to wait in seconds
+            fail_on_timeout: Whether to raise a RuntimeError or log a warning if the scan does not complete on time
         """
 
         # Start LS workspace to save time later in the flow
@@ -578,7 +696,10 @@ class Datasource:
 
                 time.sleep(1)
 
-    def has_field(self, field_name: str):
+    def has_field(self, field_name: str) -> bool:
+        """
+        Checks if a metadata field ``field_name`` exists in the datasource.
+        """
         reserved_searchable_fields = ["path"]
         fields = (f.name for f in self.fields)
         return field_name in reserved_searchable_fields or field_name in fields
@@ -677,6 +798,8 @@ class Datasource:
     def contains(self, item: str):
         """
         Check if the filtering field contains the specified string item.
+
+        :meta private:
         """
         if type(item) is not str:
             return WrongOperatorError(f"Cannot use contains with non-string value {item}")
@@ -686,6 +809,8 @@ class Datasource:
     def is_null(self):
         """
         Check if the filtering field is null.
+
+        :meta private:
         """
         field = self._get_filtering_field()
         value_type = metadataTypeLookupReverse[field.valueType.value]
@@ -694,6 +819,8 @@ class Datasource:
     def is_not_null(self):
         """
         Check if the filtering field is not null.
+
+        :meta private:
         """
         return self.is_null().add_query_op("not")
 
@@ -737,6 +864,8 @@ class Datasource:
 
         Returns:
             Datasource: A new Datasource instance with the added query operation.
+
+        :meta private:
         """
         new_ds = self.__deepcopy__()
         if type(other) is Datasource:
@@ -751,6 +880,11 @@ class Datasource:
 
 
 class MetadataContextManager:
+    """
+    Context manager for updating the metadata on a datasource.
+    Batches the metadata changes, so they are being sent all at once.
+    """
+
     def __init__(self, datasource: Datasource):
         self._datasource = datasource
         self._metadata_entries: List[DatapointMetadataUpdateEntry] = []
@@ -760,28 +894,29 @@ class MetadataContextManager:
         """
         Update metadata for the specified datapoints.
 
+        .. note::
+            If ``datapoints`` is a list, the same metadata is assigned to all the datapoints in the list.
+            Call ``update_metadata()`` separately for each datapoint if you need to assign different metadata.
+
         Args:
-            datapoints (Union[List[str], str]): A list of datapoints or a single datapoint URL to update metadata for.
+            datapoints (Union[List[str], str]): A list of datapoints or a single datapoint path to update metadata for.
             metadata (Dict[str, Any]): A dictionary containing metadata key-value pairs to update.
 
-        Example:
-        ```
-        ds = datasources.get_datasource("simon/baby-yoda-segmentation-dataset", name="bucket-ds")
+        Example::
 
-        # Example usage to update metadata for a list of datapoints
-        with ds.metadata_context() as ctx:
-            metadata = {
-                "episode": 5,
-                "has_baby_yoda": True,
-            }
+            with ds.metadata_context() as ctx:
+                metadata = {
+                    "episode": 5,
+                    "has_baby_yoda": True,
+                }
 
-            # Attach metadata to a single specific file in the datasource.
-            # The first argument is the filepath to attach metadata to, **relative to the root of the datasource**.
-            ctx.update_metadata("images/005.jpg", metadata)
+                # Attach metadata to a single specific file in the datasource.
+                # The first argument is the filepath to attach metadata to, **relative to the root of the datasource**.
+                ctx.update_metadata("images/005.jpg", metadata)
 
-            # Attach metadata to several files at once:
-            ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
-        ```
+                # Attach metadata to several files at once:
+                ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
+
         """
         if isinstance(datapoints, str):
             datapoints = [datapoints]
@@ -852,6 +987,8 @@ class MetadataContextManager:
         """
         Handles bytes values for uploading metadata
         The process is gzip -> base64
+
+        :meta private:
         """
         compressed = gzip.compress(val)
         return base64.b64encode(compressed).decode("utf-8")

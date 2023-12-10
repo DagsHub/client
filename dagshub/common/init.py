@@ -3,6 +3,7 @@ import os
 import urllib
 from os.path import exists
 from pathlib import Path
+from typing import Optional
 
 import git
 
@@ -13,25 +14,34 @@ from dagshub.common.helpers import get_project_root, http_request, log_message
 from dagshub.upload import create_repo
 
 
-def init(repo_name=None, repo_owner=None, url=None, root=None, host=config.host, mlflow=True, dvc=False):
+def init(
+    repo_name: Optional[str] = None,
+    repo_owner: Optional[str] = None,
+    url: Optional[str] = None,
+    root: Optional[str] = None,
+    host: str = config.host,
+    mlflow: bool = True,
+    dvc: bool = False,
+):
     """
-    Initialize a DagsHub repository.
+    Initialize a DagsHub repository or DagsHub-related functionality.
 
     Initialization includes:
-        1) Creates a repository on DagsHub if it doesn't exist yet
-        2) If `dvc` flag is set, adds the DagsHub repository as a dvc remote
-        3) If `mlflow` flag is set, initializes MLflow environment variables to enable logging experiments into the
-            DagsHub hosted MLflow
+        1) Creates a repository on DagsHub if it doesn't exist yet.
+        2) If ``dvc`` flag is set, adds the DagsHub repository as a dvc remote.
+        3) If ``mlflow`` flag is set, initializes MLflow environment variables to enable logging experiments into the\
+            DagsHub hosted MLflow. That means that if you call ``dagshub.init()`` in your script,\
+            then any MLflow function called later in the script will log to the DagsHub hosted MLflow.
 
     Arguments:
-        root: path to the locally hosted git repository.
-            If it's not set, tries to find a repository going up the folders
-        repo_owner: along with `repo_name` defines the repository on DagsHub
-        repo_name: along with `repo_owner` defines the repository on DagsHub
-        url: url to the repository on DagsHub. Can be used as an alternative to repo_owner/repo_name arguments
-        host: address of a hosted DagsHub instance
-        mlflow: configure MLflow to log experiments to DagsHub
-        dvc: configure a dvc remote in the repository
+        repo_name: Along with ``repo_owner`` defines the repository on DagsHub.
+        repo_owner: Along with ``repo_name`` defines the repository on DagsHub.
+        url: Url to the repository on DagsHub. Can be used as an alternative to ``repo_owner/repo_name`` arguments.
+        root: Path to the locally hosted git repository.
+            If it's not set, tries to find a repository traversing up the filesystem.
+        host: Address of the DagsHub instance with the repository.
+        mlflow: Configure MLflow to log experiments to DagsHub.
+        dvc: Configure a dvc remote in the repository.
     """
     # Setup required variables
     if dvc:

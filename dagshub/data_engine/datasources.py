@@ -13,17 +13,28 @@ logger = logging.getLogger(__name__)
 
 def create_datasource(repo: str, name: str, path: str, revision: Optional[str] = None) -> Datasource:
     """
-    Create a datasource from a path in the repo, or a storage bucket URL.
+    Create a datasource from a path in the repo or a storage bucket URL.
+    You can have multiple datasources pointing at the same path.
 
-    :param repo: The full repo name in <owner>/<reponame> format
-    :param name: The name of the datasource to be created
-    :param path: Either a path to a directory inside the Git/DVC repo on DagsHub, e.g. "path/to/dir"
-                 or else a URL pointing
-                 to a storage bucket which is connected to the DagsHub repo - e.g. "s3://bucketname/path/in/bucket"
-    :param revision: Only valid when using a Git/DVC path inside the DagsHub repo, not when using a bucket URL.
-                     Allows you to define the branch name where the referenced directory exists.
-                     The default repo branch is used if this is left blank.
-    :return The created datasource
+    Args:
+        repo: Repo in ``<owner>/<reponame>`` format
+        name: Name of the datasource to be created. Name should be unique across the repository's datasources
+        path: Either of:
+
+            - a path to a directory inside the Git/DVC repo on DagsHub:
+                ``path/to/dir``
+            - URL pointing to a storage bucket which is connected to the DagsHub repo:
+                ``s3://bucketname/path/in/bucket``
+        revision: Branch or revision the datasource should be used with.
+                    Only valid when using a Git/DVC path inside the DagsHub repo.
+                    The default repo branch is used if this is left blank.
+
+    Returns:
+        Datasource: Created datasource
+
+    Raises:
+        DatasourceAlreadyExistsError: Datasource with this name already exists in repo.
+
     """
 
     if path_regexes[DatasourceType.BUCKET].fullmatch(path):
@@ -34,7 +45,9 @@ def create_datasource(repo: str, name: str, path: str, revision: Optional[str] =
         return create_from_repo(repo, name, path=path, revision=revision)
 
 
-create = create_datasource
+def create(*args, **kwargs) -> Datasource:
+    """Alias for :func:`create_datasource`"""
+    return create_datasource(*args, **kwargs)
 
 
 def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = None) -> Datasource:
@@ -42,19 +55,20 @@ def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = Non
     First attempts to get the repo datasource with the given name, and only if that fails,
     invokes create_datasource with the given parameters.
     See the docs on create_datasource for more info.
+
+
+
     Args:
-        repo (str): The name or identifier of the repository containing the datasource.
+        repo (str): Repo in the format of `user/repo`
         name (str): The name of the datasource to retrieve or create.
         path (str): The path to the datasource within the repository.
         revision (Optional[str], optional): The specific revision or version of the datasource to retrieve.
-            Defaults to None.
 
     Returns:
         Datasource: The retrieved or newly created Datasource instance.
 
     Raises:
-        DatasourceNotFoundError: If the datasource is not found during the retrieval attempt.
-
+        DatasourceAlreadyExistsError: Datasource with this name already exists in repo.
     """
     try:
         return get_datasource(repo, name)
@@ -63,12 +77,18 @@ def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = Non
 
 
 def create_from_bucket(repo: str, name: str, bucket_url: str) -> Datasource:
+    """
+    :meta private:
+    """
     # TODO: validation
     source = _create_datasource_state(repo, name, DatasourceType.BUCKET, bucket_url)
     return Datasource(source)
 
 
 def create_from_repo(repo: str, name: str, path: str, revision: Optional[str] = None) -> Datasource:
+    """
+    :meta private:
+    """
     if revision is None:
         repo_api = RepoAPI(repo)
         revision = repo_api.default_branch
@@ -81,8 +101,23 @@ def create_from_repo(repo: str, name: str, path: str, revision: Optional[str] = 
 
 def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None, **kwargs) -> Datasource:
     """
-    Additional kwargs:
-    revision - for repo datasources defines which branch/revision to download from (default branch if not specified)
+    Gets datasource with matching name or id for the repo
+
+    Args:
+        repo: Repo in ``<owner>/<reponame>`` format
+        name: Name of the datasource
+        id: ID of the datasource
+
+    Kwargs:
+        revision - for repo datasources defines which branch/revision to download from.
+        If not specified, uses the default branch of the repo
+
+    Returns:
+        Datasource: datasource that has supplied name and/or id
+
+    Raises:
+        DatasourceNotFoundError: The datasource with this id or name does not exist.
+
     """
     ds_state = DatasourceState(repo=repo, name=name, id=id)
     ds_state.get_from_dagshub()
@@ -92,14 +127,24 @@ def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int
 
 
 def get_datasources(repo: str) -> List[Datasource]:
+    """
+    Get all datasources that exist on the repo
+
+    Args:
+        repo: Repo in ``<owner>/<reponame>`` format
+
+    Returns:
+        list(Datasource): All datasources that exist for the repository
+    """
     send_analytics_event("Client_DataEngine_getDatasources")
     client = DataClient(repo)
     sources = client.get_datasources(None, None)
     return [Datasource(DatasourceState.from_gql_result(repo, source)) for source in sources]
 
 
-# Alias
-get = get_datasource
+def get(*args, **kwargs) -> Datasource:
+    """Alias for :func:`get_datasource`"""
+    return get_datasource(*args, **kwargs)
 
 
 def _create_datasource_state(repo: str, name: str, source_type: DatasourceType, path: str) -> DatasourceState:
@@ -111,11 +156,12 @@ def _create_datasource_state(repo: str, name: str, source_type: DatasourceType, 
 
 
 __all__ = [
-    create_datasource,
-    create,
-    create_from_bucket,
-    create_from_repo,
-    get_datasource,
-    get,
-    get_or_create,
+    create_datasource.__name__,
+    create.__name__,
+    create_from_bucket.__name__,
+    create_from_repo.__name__,
+    get_datasource.__name__,
+    get_datasources.__name__,
+    get.__name__,
+    get_or_create.__name__,
 ]

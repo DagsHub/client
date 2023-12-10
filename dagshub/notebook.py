@@ -49,15 +49,21 @@ def _default_notebook_name():
 
 def save_notebook(repo, path="", branch=None, commit_message=None, versioning="git") -> None:
     """
-    IPython wrapper for saving notebooks.
+    Save the notebook to DagsHub.
 
-    :param path (str): Where to save the notebook within the repository (including the filename).
-        If filename is not specified, we'll save it as "notebook-{datetime.now}.ipynb" under specified folder
-    :prama repo (str): repository in the format of "user/repo"
-    :param branch (str): The branch under which the notebook should be saved.
-        Will commit to the default repo branch if not specified
-    :param commit_message (str): The commit message for the update
-    :param versioning (str): ['git'|'dvc'] The VCS used to version the notebook
+    Args:
+        repo: Repository in the format of ``user/repo``.
+        path: Path of the notebook in repo, including the filename.
+             If left empty, saves the notebook to the root of the repo with format ``notebook-{date.now}.ipynb``.
+             If path is a directory and not a file (no extension), saves it to ``path/notebook-{date.now}.ipynb``.
+        branch: The branch under which to save the notebook. Uses the repo default if not specified.
+        commit_message: Message of the commit with the notebook upload. Default is ``"Uploaded notebook {name}"``
+        versioning: Either ``"git"`` or ``"dvc"``.
+
+
+    .. note::
+        Right now correctly saves only notebooks in a Colab environment.
+        Regular Jupyter environment will have the execution history saved instead of the notebook.
     """
 
     if not _inside_notebook():

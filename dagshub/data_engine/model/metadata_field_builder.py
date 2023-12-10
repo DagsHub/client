@@ -15,7 +15,10 @@ logger = logging.getLogger(__name__)
 class MetadataFieldBuilder:
     """
     Builder class for changing properties of a metadata field in a datasource.
-    It is also possible to create a new empty field with predefined schema with this builder
+    It is also possible to create a new empty field with predefined schema with this builder.
+    All functions return back the builder object to facilitate a builder pattern, for example::
+
+        builder.set_type(bytes).set_annotation().apply()
     """
 
     def __init__(self, datasource: "Datasource", field_name: str):
@@ -46,9 +49,10 @@ class MetadataFieldBuilder:
     def set_type(self, t: Union[Type, DagshubDataType]) -> "MetadataFieldBuilder":
         """
         Set the type of the field.
-        The type can be either a Python primitive supported by the Data Engine (str, bool, int, float, bytes)
-        Or it can be a DagshubDataType inheritor (found in dagshub.data_engine.dtypes)
-            The DataType inheritors can define additional tags on top of just the basic backing type
+        The type can be either a Python primitive supported by the Data Engine
+        (``str``, ``bool``, ``int``, ``float``, ``bytes``)
+        or it can be a :class:`~dagshub.data_engine.dtypes.DagshubDataType` inheritor.
+        The DataType inheritors can define additional tags on top of just the basic backing type
         """
         backing_type = self._get_backing_type(t)
 
@@ -110,6 +114,10 @@ class MetadataFieldBuilder:
 
     def apply(self):
         """
-        Apply the outgoing changes to the metadata field
+        Apply the outgoing changes to this builder's metadata field.
+
+        If you need to apply multiple changes at once, use
+        :func:`Datasource.apply_field_changes <dagshub.data_engine.model.datasource.Datasource.apply_field_changes>`
+        instead.
         """
         self.datasource.apply_field_changes([self])

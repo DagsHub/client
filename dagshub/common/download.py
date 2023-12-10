@@ -34,12 +34,16 @@ storage_download_url_regex = re.compile(
 
 def enable_gcs_bucket_downloader(client=None):
     """
-    Enables downloading storage items using the client, instead of going through DagsHub's server.
-    For custom clients use `enable_custom_bucket_downloader` function
+    Enables downloading storage items using the Google Cloud Storage client,\
+    instead of going through DagsHub's server.
+
+    For custom clients use :func:`add_bucket_downloader` function.
 
     Args:
-        client: a google.cloud.storage.Client from the `google-cloud-storage` package.
-            If client isn't specified, the default parameterless constructor is used
+        client: a `google.cloud.storage.Client \
+        <https://cloud.google.com/storage/docs/reference/libraries#client-libraries-install-python>`_\
+        from the ``google-cloud-storage`` package.\
+        If client isn't specified, the default parameterless constructor is used
     """
     if client is None:
         from google.cloud import storage
@@ -56,12 +60,15 @@ def enable_gcs_bucket_downloader(client=None):
 
 def enable_s3_bucket_downloader(client=None):
     """
-    Enables downloading storage items using the client, instead of going through DagsHub's server.
-    For custom clients use `enable_custom_bucket_downloader` function
+    Enables downloading storage items using the AWS Boto3 client,\
+    instead of going through DagsHub's server.
+
+    For custom clients use :func:`add_bucket_downloader` function.
 
     Args:
-        client: a boto3 S3 client.
-            If client isn't specified, the default parameterless constructor is used
+        client: a `boto3.client \
+        <https://boto3.amazonaws.com/v1/documentation/api/latest/reference/core/boto3.html#boto3.client>`_.\
+        If client isn't specified, the default parameterless constructor is used.
     """
 
     if client is None:
@@ -78,14 +85,18 @@ def enable_s3_bucket_downloader(client=None):
 
 def enable_azure_container_downloader(account_url=None, client=None):
     """
-    Enables downloading storage items using the azure client, instead of going through DagsHub's server.
-    For custom clients use `enable_custom_bucket_downloader` function.
+    Enables downloading storage items using the Azure Blob Storage client,\
+    instead of going through DagsHub's server.
+
+    For custom clients use :func:`add_bucket_downloader` function.
 
     Args:
-        account_url: an azure storage account url, of the form "https://<storage-account-name>.blob.core.windows.net"
-        client: preconfigured azure.storage.blob.BlobServiceClient
-            If client isn't specified, the default parameterless constructor is used.
-            If specified, account_url is disregarded, and the client is used.
+        account_url: an azure storage account url, of the form ``https://<storage-account-name>.blob.core.windows.net``
+        client: preconfigured `azure.storage.blob.BlobServiceClient \
+        <https://learn.microsoft.com/en-us/python/api/overview/azure/\
+        storage-blob-readme?view=azure-python#create-the-client>`_.\
+        If client isn't specified, the default parameterless constructor is used.\
+        If specified, ``account_url`` is disregarded, and the client is used.
     """
     if account_url is None and client is None:
         raise TypeError("missing required argument 'account_url' or 'client'")
@@ -137,6 +148,18 @@ _default_downloader: Optional[Callable[[str], bytes]] = None
 
 
 def add_bucket_downloader(proto: Literal["gs", "s3", "azure"], func: BucketDownloaderFuncType):
+    """
+    Add your own custom connected bucket downloader.
+
+    Args:
+        proto: Protocol for which you're adding the downloader.\
+            This function will handle **all** download requests to this protocol.
+        func: Function that receives the name of the bucket and the path to the object and returns the object content\
+            in ``bytes``.
+
+    .. warning::
+        The ``func`` function will be used in a ThreadPool, so it needs to be picklable.
+    """
     if proto in _bucket_downloader_map:
         logger.warning(f"Protocol {proto} already has a custom downloader function specified, overwriting it")
     _bucket_downloader_map[proto] = func

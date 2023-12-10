@@ -11,15 +11,31 @@ from dagshub.data_engine.model.errors import DatasetNotFoundError
 
 def get_datasets(repo: str) -> List[Datasource]:
     """
-    Gets datasets assigned to the repo.
-    Dataset is a combination of a datasource with a query + include/exclude lists
+    Get all datasources that exist on the repo
+
+    Args:
+        repo: Repo in ``<owner>/<reponame>`` format
+
+    Returns:
+        list(Datasource): All datasets of the repo
     """
     return _get_datasets(repo)
 
 
 def get_dataset(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None) -> Datasource:
     """
-    Get specific dataset (by name or id)
+    Get specific dataset by name or id
+
+    Args:
+        repo: Repo in ``<owner>/<reponame>`` format
+        name: Name of the dataset
+        id: ID of the dataset
+
+    Returns:
+        Datasource: Found dataset
+
+    Raises:
+        DatasetNotFoundError: No dataset found with this name or id
     """
     assert name is not None or id is not None
 
