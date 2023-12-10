@@ -4,6 +4,8 @@ Datasource
 .. autoclass:: dagshub.data_engine.model.datasource.Datasource
     :members:
 
+.. autoclass:: dagshub.data_engine.model.datasource.Field
+    :members:
 
 .. autoclass:: dagshub.data_engine.model.datasource.MetadataContextManager
     :members:
