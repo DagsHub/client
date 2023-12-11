@@ -1,0 +1,54 @@
+name: Publish Docs
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: "./docs"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Install client and dependencies
+        working-directory: "./"
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install .
+      - name: Install docs dependencies
+        run: |
+          pip install -r requirements-docs.txt
+      - name: Build documentation
+        run: make html
+
+#      - name: Upload docs as artifact
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: docs
+#          path: docs/build
+
+      - name: Authenticate with Google
+        uses: "google-github-actions/auth@v2"
+        with:
+          project_id: ${{ secrets.GCS_PROJECT }}
+          credentials_json: ${{ secrets.GCS_SERVICE_ACCOUNT_ACCESS_KEY }}
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: Upload to Google Cloud Storage
+        env:
+          UPLOAD_PATH: ${{ format('gs://{0}/docs/client', secrets.DOCS_BUCKET) }}
+        run: gsutil -m rsync -d -r build/html $UPLOAD_PATH
+
