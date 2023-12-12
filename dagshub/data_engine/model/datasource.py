@@ -179,6 +179,7 @@ class Datasource:
         if "query" in query_dict:
             self._query = DatasourceQuery.deserialize(query_dict["query"])
         self._select = query_dict.get("select")
+        self._global_as_of = query_dict.get("asOf")
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
