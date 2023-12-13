@@ -52,3 +52,8 @@ jobs:
           UPLOAD_PATH: ${{ format('gs://{0}/docs/client', secrets.DOCS_BUCKET) }}
         run: gsutil -m rsync -d -r build/html $UPLOAD_PATH
 
+      - name: Invalidate CDN Cache
+        env:
+          LOAD_BALANCER: ${{ secrets.LOAD_BALANCER_NAME }}
+        run: gcloud compute url-maps invalidate-cdn-cache $LOAD_BALANCER --path "/docs/client/*"
+
