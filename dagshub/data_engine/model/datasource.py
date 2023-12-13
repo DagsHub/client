@@ -589,7 +589,7 @@ class Datasource:
         return self.annotate()
 
     def send_datapoints_to_annotation(
-        self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]], open_project=True, ignore_warning=False
+        self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]], open_project=True, ignore_warning=False, ls_meta_excludes=None, ls_meta_includes=None
     ) -> Optional[str]:
         """
         Sends datapoints for annotation in Label Studio.
@@ -622,7 +622,7 @@ class Datasource:
             if not force:
                 return ""
 
-        req_data = {"datasource_id": self.source.id, "datapoints": []}
+        req_data = {"datasource_id": self.source.id, "datapoints": [], "ls_meta_excludes": ls_meta_excludes, "ls_meta_includes": ls_meta_includes}
 
         for dp in datapoints:
             req_dict = {}
