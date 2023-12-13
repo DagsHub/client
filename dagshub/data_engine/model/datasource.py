@@ -506,7 +506,7 @@ class Datasource:
 
         with progress:
             for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start : start + upload_batch_size]
+                entries = metadata_entries[start: start + upload_batch_size]
                 logger.debug(f"Uploading {len(entries)} metadata entries...")
                 self.source.client.update_metadata(self, entries)
                 progress.update(total_task, advance=upload_batch_size)
@@ -589,7 +589,8 @@ class Datasource:
         return self.annotate()
 
     def send_datapoints_to_annotation(
-        self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]], open_project=True, ignore_warning=False, ls_meta_excludes=None, ls_meta_includes=None
+        self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]], open_project=True, ignore_warning=False,
+        ls_meta_excludes=None, ls_meta_includes=None
     ) -> Optional[str]:
         """
         Sends datapoints for annotation in Label Studio.
@@ -622,7 +623,8 @@ class Datasource:
             if not force:
                 return ""
 
-        req_data = {"datasource_id": self.source.id, "datapoints": [], "ls_meta_excludes": ls_meta_excludes, "ls_meta_includes": ls_meta_includes}
+        req_data = {"datasource_id": self.source.id, "datapoints": [], "ls_meta_excludes": ls_meta_excludes,
+                    "ls_meta_includes": ls_meta_includes}
 
         for dp in datapoints:
             req_dict = {}
