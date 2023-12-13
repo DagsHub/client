@@ -511,15 +511,19 @@ class QueryResult:
 
         return sess
 
-    def annotate(self, open_project=True, ignore_warning=True, ls_meta_excludes=None, ls_meta_includes=None) -> \
-    Optional[str]:
+    def annotate(self, open_project=True,
+                 ignore_warning=True,
+                 ls_meta_excludes=None,
+                 ls_meta_includes=None) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
             ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
-
+            ls_meta_includes: list of meta-data columns names that will show up in Label Studio UI.
+            if not specified all are sent.
+            ls_meta_excludes: list of meta-data columns names that will not show up in Label Studio UI
         Returns:
             The URL of the created Label Studio workspace
         """
