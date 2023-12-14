@@ -563,7 +563,7 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
-    def annotate(self) -> Optional[str]:
+    def annotate(self, ls_meta_excludes=None, ls_meta_includes=None) -> Optional[str]:
         """
         Sends all datapoints in the datasource for annotation in Label Studio.
 
@@ -578,7 +578,7 @@ class Datasource:
 
         :return: Link to open Label Studio in the browser
         """
-        return self.all().annotate()
+        return self.all().annotate(ls_meta_excludes=ls_meta_excludes, ls_meta_includes=ls_meta_includes)
 
     def send_to_annotation(self):
         """

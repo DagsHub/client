@@ -521,9 +521,9 @@ class QueryResult:
         Args:
             open_project: Automatically open the Label Studio project in the browser
             ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
-            ls_meta_includes: list of meta-data columns names that will show up in Label Studio UI.
-            if not specified all are sent.
-            ls_meta_excludes: list of meta-data columns names that will not show up in Label Studio UI
+            ls_meta_includes: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all are sent.
+            ls_meta_excludes: list of meta-data columns that will not show up in Label Studio UI
         Returns:
             The URL of the created Label Studio workspace
         """
