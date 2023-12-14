@@ -127,7 +127,6 @@ class Datasource:
         self._select = select or []
         self._global_as_of = as_of
         self.serialize_gql_query_input()
-        # yuvald TODO deepcopy?
         self._ds_scope_update_ctx = None
 
     def _get_source_scope_metadata_entries(self):
@@ -943,8 +942,6 @@ class MetadataContextManager:
         """
         if isinstance(datapoints, str):
             datapoints = [datapoints]
-            # yuvald TODO remove
-            time.sleep(0.2)
 
         field_value_types = {f.name: f.valueType for f in self._datasource.fields}
 
