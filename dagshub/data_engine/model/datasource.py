@@ -563,7 +563,7 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
-    def annotate(self, ls_meta_excludes=None, ls_meta_includes=None) -> Optional[str]:
+    def annotate(self, fields_to_exclude=None, fields_to_embed=None) -> Optional[str]:
         """
         Sends all datapoints in the datasource for annotation in Label Studio.
 
@@ -578,7 +578,7 @@ class Datasource:
 
         :return: Link to open Label Studio in the browser
         """
-        return self.all().annotate(ls_meta_excludes=ls_meta_excludes, ls_meta_includes=ls_meta_includes)
+        return self.all().annotate(fields_to_exclude=fields_to_exclude, fields_to_embed=fields_to_embed)
 
     def send_to_annotation(self):
         """
@@ -590,7 +590,7 @@ class Datasource:
 
     def send_datapoints_to_annotation(
         self, datapoints: Union[List[Datapoint], "QueryResult", List[Dict]], open_project=True, ignore_warning=False,
-        ls_meta_excludes=None, ls_meta_includes=None
+        fields_to_exclude=None, fields_to_embed=None
     ) -> Optional[str]:
         """
         Sends datapoints for annotation in Label Studio.
@@ -605,10 +605,15 @@ class Datasource:
 
             open_project: Automatically open the created Label Studio project in the browser.
             ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
-
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
         Returns:
             Link to open Label Studio in the browser
         """
+        for f in (fields_to_embed or []) + (fields_to_exclude or []):
+            if not self.has_field(f):
+                raise FieldNotFoundError(f)
 
         if len(datapoints) == 0:
             logger.warning("No datapoints provided to be sent to annotation")
@@ -623,8 +628,8 @@ class Datasource:
             if not force:
                 return ""
 
-        req_data = {"datasource_id": self.source.id, "datapoints": [], "ls_meta_excludes": ls_meta_excludes,
-                    "ls_meta_includes": ls_meta_includes}
+        req_data = {"datasource_id": self.source.id, "datapoints": [], "ls_meta_excludes": fields_to_exclude,
+                    "ls_meta_includes": fields_to_embed}
 
         for dp in datapoints:
             req_dict = {}

@@ -513,23 +513,23 @@ class QueryResult:
 
     def annotate(self, open_project=True,
                  ignore_warning=True,
-                 ls_meta_excludes=None,
-                 ls_meta_includes=None) -> Optional[str]:
+                 fields_to_exclude=None,
+                 fields_to_embed=None) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
             ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
-            ls_meta_includes: list of meta-data columns that will show up in Label Studio UI.
-             if not specified all are sent.
-            ls_meta_excludes: list of meta-data columns that will not show up in Label Studio UI
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
         Returns:
             The URL of the created Label Studio workspace
         """
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
 
         return self.datasource.send_datapoints_to_annotation(
-            self.entries, open_project=open_project, ignore_warning=ignore_warning, ls_meta_excludes=ls_meta_excludes,
-            ls_meta_includes=ls_meta_includes
+            self.entries, open_project=open_project, ignore_warning=ignore_warning, fields_to_exclude=fields_to_exclude,
+            fields_to_embed=fields_to_embed
         )
