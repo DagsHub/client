@@ -42,6 +42,14 @@ class Datapoint:
             return gen_field(self)
         return self.metadata[item]
 
+    def __setitem__(self, key, value):
+        self.datasource.get_ctx().update_metadata(self.path, {key: value})
+
+    def save(self, ctx=None):
+        # if in conext, dont _upload_metadata, it will be done at context end
+        if not ctx:
+            self.datasource.save_ctx()
+
     @property
     def download_url(self):
         """

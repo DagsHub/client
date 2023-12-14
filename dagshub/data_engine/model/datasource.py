@@ -127,6 +127,14 @@ class Datasource:
         self._select = select or []
         self._global_as_of = as_of
         self.serialize_gql_query_input()
+        # yuvald TODO deepcopy?
+        self._ds_scope_update_ctx = None
+
+    def _get_source_scope_metadata_entries(self):
+        if self._ds_scope_update_ctx is not None:
+            return self._ds_scope_update_ctx.get_metadata_entries()
+        else:
+            return []
 
     @property
     def global_as_of_timestamp(self) -> Optional[int]:
@@ -327,6 +335,20 @@ class Datasource:
         self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
         self.source.get_from_dagshub()
 
+    def get_ctx(self) -> "MetadataContextManager":
+        if not self._ds_scope_update_ctx:
+            self.source.get_from_dagshub()
+            self._ds_scope_update_ctx = MetadataContextManager(self)
+
+        return self._ds_scope_update_ctx
+
+    def save_ctx(self):
+        if self._ds_scope_update_ctx:
+            try:
+                self._upload_metadata(self._get_source_scope_metadata_entries())
+            finally:
+                self._ds_scope_update_ctx = None
+
     def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
         Returns a metadata context, that you can upload metadata through using its
@@ -345,7 +367,7 @@ class Datasource:
             send_analytics_event("Client_DataEngine_addEnrichments", repo=self.source.repoApi)
             ctx = MetadataContextManager(self)
             yield ctx
-            self._upload_metadata(ctx.get_metadata_entries())
+            self._upload_metadata(ctx.get_metadata_entries() + self._get_source_scope_metadata_entries())
 
         return func()
 
@@ -921,6 +943,8 @@ class MetadataContextManager:
         """
         if isinstance(datapoints, str):
             datapoints = [datapoints]
+            # yuvald TODO remove
+            time.sleep(0.2)
 
         field_value_types = {f.name: f.valueType for f in self._datasource.fields}
 
