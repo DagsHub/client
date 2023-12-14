@@ -513,8 +513,9 @@ class QueryResult:
 
     def annotate(self, open_project=True,
                  ignore_warning=True,
-                 fields_to_exclude=None,
-                 fields_to_embed=None) -> Optional[str]:
+                 fields_to_embed=None,
+                 fields_to_exclude=None
+                 ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 

@@ -563,7 +563,7 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
-    def annotate(self, fields_to_exclude=None, fields_to_embed=None) -> Optional[str]:
+    def annotate(self, fields_to_embed=None, fields_to_exclude=None) -> Optional[str]:
         """
         Sends all datapoints in the datasource for annotation in Label Studio.
 
@@ -574,7 +574,9 @@ class Datasource:
             Use :func:`QueryResult.annotate() <dagshub.data_engine.model.query_result.QueryResult.annotate>`
             to annotate a result of a query with less datapoints.
             Alternatively, use a lower level :func:`send_datapoints_to_annotation` function
-
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
 
         :return: Link to open Label Studio in the browser
         """
