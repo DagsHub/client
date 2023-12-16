@@ -1,8 +1,5 @@
 [![DagsHub Client](https://github.com/DagsHub/client/raw/master/dagshub_github.png)](https://dagshub.com)
 
-<div align="center">
-    <h3>🚀 Launching <a href="https://github.com/DagsHub/client/blob/master/docs/data_engine.md">Data Engine</a> for powerful pandas-like management of file datasets! 🚀</h3>
-</div>
 <br/>
 
 [![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=master)](https://github.com/DAGsHub/client/actions/workflows/python-package.yml)
