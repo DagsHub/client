@@ -101,4 +101,4 @@ class DatasourceFileStruct:
 
     @property
     def has_query(self):
-        return (self.datasetQuery is not None) and (self.datasetQuery["query"] is not None)
+        return (self.datasetQuery is not None) and (self.datasetQuery.get("query") is not None)

@@ -46,12 +46,12 @@ def get_dataset(repo: str, name: Optional[str] = None, id: Optional[Union[int, s
     return sources[-1]
 
 
-def get_dataset_from_file(path: str):
+def get_dataset_from_file(path: str) -> Datasource:
     """
     Load a dataset from a local file
 
     Args:
-        path: Path to the `.dagshub` file with the relevant dataset
+        path: Path to the ``.dagshub`` file with the relevant dataset
 
     Returns:
         ds: dataset that was logged to the file
