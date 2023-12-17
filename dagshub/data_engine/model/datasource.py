@@ -129,12 +129,13 @@ class Datasource:
         self.serialize_gql_query_input()
         # a per datasource context used for dict update syntax
         self._implicit_update_ctx = None
-        # this counter marks if source is currently used in
+        # this ref marks if source is currently used in
         # meta-data update 'with' block
-        self.explicit_update_ctx_counter = 0
+        self._explicit_update_ctx = None
 
-    def has_context(self):
-        return self.explicit_update_ctx_counter > 0
+    @property
+    def has_explicit_context(self):
+        return self._explicit_update_ctx is not None
 
     def _get_source_implicit_metadata_entries(self):
         if self._implicit_update_ctx is not None:
@@ -341,9 +342,9 @@ class Datasource:
         self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
         self.source.get_from_dagshub()
 
-    def get_ctx(self) -> "MetadataContextManager":
+    @property
+    def implicit_update_context(self) -> "MetadataContextManager":
         if not self._implicit_update_ctx:
-            self.source.get_from_dagshub()
             self._implicit_update_ctx = MetadataContextManager(self)
 
         return self._implicit_update_ctx
@@ -373,10 +374,13 @@ class Datasource:
             send_analytics_event("Client_DataEngine_addEnrichments", repo=self.source.repoApi)
             ctx = MetadataContextManager(self)
 
-            ctx.start_explicit_ds_ctx()
+            self._explicit_update_ctx = ctx
             yield ctx
-            self._upload_metadata(ctx.get_metadata_entries() + self._get_source_implicit_metadata_entries())
-            ctx.end_explicit_ds_ctx()
+            try:
+                self._upload_metadata(ctx.get_metadata_entries() + self._get_source_implicit_metadata_entries())
+            finally:
+                self._implicit_update_ctx = None
+                self._explicit_update_ctx = None
 
         return func()
 
