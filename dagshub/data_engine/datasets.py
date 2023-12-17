@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 from dagshub.common.analytics import send_analytics_event
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasetResult
+from dagshub.data_engine.datasources import get_datasource_from_file
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DatasetNotFoundError
@@ -43,6 +44,19 @@ def get_dataset(repo: str, name: Optional[str] = None, id: Optional[Union[int, s
     if len(sources) == 0:
         raise DatasetNotFoundError(repo, id, name)
     return sources[-1]
+
+
+def get_dataset_from_file(path: str) -> Datasource:
+    """
+    Load a dataset from a local file
+
+    Args:
+        path: Path to the ``.dagshub`` file with the relevant dataset
+
+    Returns:
+        ds: dataset that was logged to the file
+    """
+    return get_datasource_from_file(path)
 
 
 def _get_datasets(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None) -> List[Datasource]:

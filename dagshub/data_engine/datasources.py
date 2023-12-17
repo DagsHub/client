@@ -1,9 +1,12 @@
+import json
+import dacite
 import logging
 from typing import Optional, Union, List
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
+from dagshub.data_engine.client.models import DatasourceFileStruct
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
 from dagshub.data_engine.model.errors import DatasourceNotFoundError
@@ -124,6 +127,28 @@ def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int
     if "revision" in kwargs:
         ds_state.revision = kwargs["revision"]
     return Datasource(ds_state)
+
+
+def get_datasource_from_file(path: str) -> Datasource:
+    """
+    Load a datasource from a local file
+
+    Args:
+        path: Path to the ``.dagshub`` file with the relevant datasource
+
+    Returns:
+        ds: Datasource that was logged to the file
+    """
+    with open(path, 'r') as file:
+        res = dacite.from_dict(DatasourceFileStruct, json.load(file))
+    ds_state = DatasourceState(repo=res.repo, name=res.name, id=res.id)
+    ds_state.get_from_dagshub()
+    ds = Datasource(ds_state)
+
+    if res.has_query:
+        ds._deserialize_gql_result(res.datasetQuery)
+
+    return ds
 
 
 def get_datasources(repo: str) -> List[Datasource]:
