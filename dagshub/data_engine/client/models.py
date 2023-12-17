@@ -89,3 +89,16 @@ class DatasetResult:
     name: str
     datasource: DatasourceResult
     datasetQuery: str
+
+
+@dataclass_json
+@dataclass
+class DatasourceFileStruct:
+    id: Union[str, int]
+    repo: str
+    name: str
+    datasetQuery: Optional[dict]
+
+    @property
+    def has_query(self):
+        return (self.datasetQuery is not None) and (self.datasetQuery["query"] is not None)

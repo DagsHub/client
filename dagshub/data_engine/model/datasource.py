@@ -39,6 +39,7 @@ from dagshub.data_engine.model.errors import (
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
 from dagshub.data_engine.model.query import DatasourceQuery
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
+from dagshub.data_engine.client.models import DatasourceFileStruct
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.query_result import QueryResult
@@ -528,6 +529,26 @@ class Datasource:
 
         self.source.client.save_dataset(self, name)
         log_message(f"Dataset {name} saved")
+
+    def save_to_file(self, path: str = ".", name: str = ""):
+        """
+        Save datasource or dataset information to a file which can be committed to Git. Useful for connecting code
+        versions to the datasource used for training.
+
+        Args:
+            path: Path to save the datasource or dataset file in, defaults to current directory
+            name: Optional: name of the file. if not provided, datasource or dataset name will be used instead.
+        """
+        res = DatasourceFileStruct(
+            id=self._source.id,
+            repo=self._source.repo,
+            name=self._source.name,
+            datasetQuery=self.serialize_gql_query_input()
+        )
+        file_path = os.path.join(path, (name or res.name) + ".dagshub")
+        with open(file_path, "w") as file:
+            file.write(json.dumps(res.to_dict(), indent=4))
+        log_message(f"Datasource saved to '{file_path}'")
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
