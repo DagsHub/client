@@ -127,11 +127,15 @@ class Datasource:
         self._select = select or []
         self._global_as_of = as_of
         self.serialize_gql_query_input()
-        self._ds_scope_update_ctx = None
+        self._implicit_update_ctx = None
+        self.explicit_update_ctx_counter = 0
+
+    def has_context(self):
+        return self.explicit_update_ctx_counter > 0
 
     def _get_source_scope_metadata_entries(self):
-        if self._ds_scope_update_ctx is not None:
-            return self._ds_scope_update_ctx.get_metadata_entries()
+        if self._implicit_update_ctx is not None:
+            return self._implicit_update_ctx.get_metadata_entries()
         else:
             return []
 
@@ -335,18 +339,18 @@ class Datasource:
         self.source.get_from_dagshub()
 
     def get_ctx(self) -> "MetadataContextManager":
-        if not self._ds_scope_update_ctx:
+        if not self._implicit_update_ctx:
             self.source.get_from_dagshub()
-            self._ds_scope_update_ctx = MetadataContextManager(self)
+            self._implicit_update_ctx = MetadataContextManager(self)
 
-        return self._ds_scope_update_ctx
+        return self._implicit_update_ctx
 
     def save_ctx(self):
-        if self._ds_scope_update_ctx:
+        if self._implicit_update_ctx:
             try:
                 self._upload_metadata(self._get_source_scope_metadata_entries())
             finally:
-                self._ds_scope_update_ctx = None
+                self._implicit_update_ctx = None
 
     def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
@@ -365,8 +369,11 @@ class Datasource:
             self.source.get_from_dagshub()
             send_analytics_event("Client_DataEngine_addEnrichments", repo=self.source.repoApi)
             ctx = MetadataContextManager(self)
+
+            ctx.start_explicit_ds_ctx()
             yield ctx
             self._upload_metadata(ctx.get_metadata_entries() + self._get_source_scope_metadata_entries())
+            ctx.end_explicit_ds_ctx()
 
         return func()
 
@@ -911,6 +918,12 @@ class MetadataContextManager:
         self._datasource = datasource
         self._metadata_entries: List[DatapointMetadataUpdateEntry] = []
         self._multivalue_fields = datasource._get_multivalue_fields()
+
+    def start_explicit_ds_ctx(self):
+        self._datasource.explicit_update_ctx_counter += 1
+
+    def end_explicit_ds_ctx(self):
+        self._datasource.explicit_update_ctx_counter -= 1
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
         """

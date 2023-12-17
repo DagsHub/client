@@ -45,9 +45,9 @@ class Datapoint:
     def __setitem__(self, key, value):
         self.datasource.get_ctx().update_metadata(self.path, {key: value})
 
-    def save(self, ctx=None):
-        # if in conext, dont _upload_metadata, it will be done at context end
-        if not ctx:
+    def save(self):
+        # if in context block, don't _upload_metadata, it will be done at context end
+        if not self.datasource.has_context():
             self.datasource.save_ctx()
 
     @property
