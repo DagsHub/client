@@ -127,13 +127,16 @@ class Datasource:
         self._select = select or []
         self._global_as_of = as_of
         self.serialize_gql_query_input()
+        # a per datasource context used for dict update syntax
         self._implicit_update_ctx = None
+        # this counter marks if source is currently used in
+        # meta-data update 'with' block
         self.explicit_update_ctx_counter = 0
 
     def has_context(self):
         return self.explicit_update_ctx_counter > 0
 
-    def _get_source_scope_metadata_entries(self):
+    def _get_source_implicit_metadata_entries(self):
         if self._implicit_update_ctx is not None:
             return self._implicit_update_ctx.get_metadata_entries()
         else:
@@ -348,7 +351,7 @@ class Datasource:
     def save_ctx(self):
         if self._implicit_update_ctx:
             try:
-                self._upload_metadata(self._get_source_scope_metadata_entries())
+                self._upload_metadata(self._get_source_implicit_metadata_entries())
             finally:
                 self._implicit_update_ctx = None
 
@@ -372,7 +375,7 @@ class Datasource:
 
             ctx.start_explicit_ds_ctx()
             yield ctx
-            self._upload_metadata(ctx.get_metadata_entries() + self._get_source_scope_metadata_entries())
+            self._upload_metadata(ctx.get_metadata_entries() + self._get_source_implicit_metadata_entries())
             ctx.end_explicit_ds_ctx()
 
         return func()
