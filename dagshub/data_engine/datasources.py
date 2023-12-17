@@ -129,12 +129,12 @@ def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int
     return Datasource(ds_state)
 
 
-def get_datasource_from_file(path: str):
+def get_datasource_from_file(path: str) -> Datasource:
     """
     Load a datasource from a local file
 
     Args:
-        path: Path to the `.dagshub` file with the relevant datasource
+        path: Path to the ``.dagshub`` file with the relevant datasource
 
     Returns:
         ds: Datasource that was logged to the file
