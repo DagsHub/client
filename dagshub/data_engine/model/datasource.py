@@ -530,7 +530,7 @@ class Datasource:
         self.source.client.save_dataset(self, name)
         log_message(f"Dataset {name} saved")
 
-    def save_to_file(self, path: str = ".", name: str = ""):
+    def save_to_file(self, path: str = ".", name: str = "") -> str:
         """
         Save datasource or dataset information to a file which can be committed to Git. Useful for connecting code
         versions to the datasource used for training.
@@ -538,6 +538,9 @@ class Datasource:
         Args:
             path: Path to save the datasource or dataset file in, defaults to current directory
             name: Optional: name of the file. if not provided, datasource or dataset name will be used instead.
+
+        Returns:
+            The path to the saved file
         """
         res = DatasourceFileStruct(
             id=self._source.id,
@@ -549,6 +552,8 @@ class Datasource:
         with open(file_path, "w") as file:
             file.write(json.dumps(res.to_dict(), indent=4))
         log_message(f"Datasource saved to '{file_path}'")
+
+        return file_path
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
