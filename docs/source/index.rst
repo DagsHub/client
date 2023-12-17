@@ -22,6 +22,7 @@ run ``pip install dagshub[jupyter]`` to install additional dependencies to enhan
 
     Back to DagsHub Docs <https://dagshub.com/docs>
     reference/setup
+    reference/auth
     reference/data_engine/index
     reference/file_downloading
     reference/file_uploading
