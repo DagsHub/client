@@ -46,6 +46,13 @@ class Datapoint:
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
     def save(self):
+        """
+        call save to commit changes to metadata done with
+        one ore more dictionary assignment syntax usages, example:
+         'specific_data_point[metadata-name] = value
+         specific_data_point.save()'
+        """
+
         # if in context block, don't _upload_metadata, it will be done at context end
         if not self.datasource.has_explicit_context:
             self.datasource.save_ctx()

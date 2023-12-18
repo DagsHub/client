@@ -350,6 +350,10 @@ class Datasource:
         return self._implicit_update_ctx
 
     def save_ctx(self):
+        """
+        commit meta data changes one in dictionary assignment context
+        :meta private
+        """
         if self._implicit_update_ctx:
             try:
                 self._upload_metadata(self._get_source_implicit_metadata_entries())
@@ -925,12 +929,6 @@ class MetadataContextManager:
         self._datasource = datasource
         self._metadata_entries: List[DatapointMetadataUpdateEntry] = []
         self._multivalue_fields = datasource._get_multivalue_fields()
-
-    def start_explicit_ds_ctx(self):
-        self._datasource.explicit_update_ctx_counter += 1
-
-    def end_explicit_ds_ctx(self):
-        self._datasource.explicit_update_ctx_counter -= 1
 
     def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
         """
