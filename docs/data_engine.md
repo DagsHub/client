@@ -459,6 +459,17 @@ You can send a datasource or result of a query to annotation in Label Studio.
 
 Doing a `ds.annotate()` or `ds.head(...).annotate` will open up a wizard for creating a new Label Studio project on DagsHub.
 
+When sending to annotation, by default all metadata fields of the datapoints are also sent to Label Studio and will be displayed in its UI in designated columns. this behavior can be changed, example:
+```python
+# only field1 and field2 will be added:
+ds.annotate(fields_to_embed=["field1", "field2"])
+
+# all fields except field1 and field2 will be added:
+ds.annotate(fields_to_exclude=["field1", "field2"])
+```
+
+
+
 If you have a field that was marked as annotation already, you can export annotations into the project from them
 (See the Metadata Tagging section to learn how to tag fields as annotation fields)
 
