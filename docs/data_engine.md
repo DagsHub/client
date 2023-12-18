@@ -461,10 +461,10 @@ Doing a `ds.annotate()` or `ds.head(...).annotate` will open up a wizard for cre
 
 When sending to annotation, by default all metadata fields of the datapoints are also sent to Label Studio and will be displayed in its UI in designated columns. this behavior can be changed, example:
 ```python
-# only field1 and field2 will be added:
+# only field1 and field2 will be sent:
 ds.annotate(fields_to_embed=["field1", "field2"])
 
-# all fields except field1 and field2 will be added:
+# all fields except field1 and field2 will be sent:
 ds.annotate(fields_to_exclude=["field1", "field2"])
 ```
 
