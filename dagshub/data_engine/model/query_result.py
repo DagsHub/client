@@ -455,7 +455,7 @@ class QueryResult:
         return ds
 
     def _check_downloaded_dataset_size(self):
-        download_size_prompt_threshold = 100 * (2**20)  # 100 Megabytes
+        download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
         dp_size = self._calculate_datapoint_size()
         if dp_size is not None and dp_size > download_size_prompt_threshold:
             prompt = f"You're about to download {sizeof_fmt(dp_size)} of images locally."
@@ -511,19 +511,26 @@ class QueryResult:
 
         return sess
 
-    def annotate(self, open_project=True, ignore_warning=True) -> Optional[str]:
+    def annotate(self, open_project=True,
+                 ignore_warning=True,
+                 fields_to_embed=None,
+                 fields_to_exclude=None
+                 ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
             ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
-
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
         Returns:
             The URL of the created Label Studio workspace
         """
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
 
         return self.datasource.send_datapoints_to_annotation(
-            self.entries, open_project=open_project, ignore_warning=ignore_warning
+            self.entries, open_project=open_project, ignore_warning=ignore_warning, fields_to_exclude=fields_to_exclude,
+            fields_to_embed=fields_to_embed
         )
