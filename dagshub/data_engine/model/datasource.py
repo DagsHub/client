@@ -128,6 +128,21 @@ class Datasource:
         self._select = select or []
         self._global_as_of = as_of
         self.serialize_gql_query_input()
+        # a per datasource context used for dict update syntax
+        self._implicit_update_ctx = None
+        # this ref marks if source is currently used in
+        # meta-data update 'with' block
+        self._explicit_update_ctx = None
+
+    @property
+    def has_explicit_context(self):
+        return self._explicit_update_ctx is not None
+
+    def _get_source_implicit_metadata_entries(self):
+        if self._implicit_update_ctx is not None:
+            return self._implicit_update_ctx.get_metadata_entries()
+        else:
+            return []
 
     @property
     def global_as_of_timestamp(self) -> Optional[int]:
@@ -316,6 +331,24 @@ class Datasource:
         self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
         self.source.get_from_dagshub()
 
+    @property
+    def implicit_update_context(self) -> "MetadataContextManager":
+        if not self._implicit_update_ctx:
+            self._implicit_update_ctx = MetadataContextManager(self)
+
+        return self._implicit_update_ctx
+
+    def upload_metadata_of_implicit_context(self):
+        """
+        commit meta data changes done in dictionary assignment context
+        :meta private:
+        """
+        if self._implicit_update_ctx:
+            try:
+                self._upload_metadata(self._get_source_implicit_metadata_entries())
+            finally:
+                self._implicit_update_ctx = None
+
     def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
         Returns a metadata context, that you can upload metadata through using its
@@ -333,8 +366,14 @@ class Datasource:
             self.source.get_from_dagshub()
             send_analytics_event("Client_DataEngine_addEnrichments", repo=self.source.repoApi)
             ctx = MetadataContextManager(self)
+
+            self._explicit_update_ctx = ctx
             yield ctx
-            self._upload_metadata(ctx.get_metadata_entries())
+            try:
+                self._upload_metadata(ctx.get_metadata_entries() + self._get_source_implicit_metadata_entries())
+            finally:
+                self._implicit_update_ctx = None
+                self._explicit_update_ctx = None
 
         return func()
 

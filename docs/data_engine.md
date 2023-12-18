@@ -8,7 +8,7 @@
   either gets added automatically by DagsHub or that you can attach and modify whenever you want.
 * DagsHub gives a pandas-like Python client to query this giant metadata table and return only matching files from your
   datasource.
-* Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
+* Further quality of life features will include things like dataset curation, UI, data fetching optimizations, and more as we develop the product.
 
 
 ## Creating/Getting a datasource
@@ -64,6 +64,7 @@ ds = datasources.get_datasource("simon/baby-yoda-segmentation-dataset", name="bu
 
 Before you can start querying and playing with data, you need to first add metadata.
 
+### with context
 To add metadata to a file path (we call them datapoints), we provide a `metadata_context` on the datasource object:
 
 ```python
@@ -79,8 +80,25 @@ with ds.metadata_context() as ctx:
   # Attach metadata to several files at once:
   ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
 ```
-
 Once the code exits the `metadata_context()`, all of the metadata is uploaded to the server.
+
+### with dictionary-like assignment
+```python
+datapoints = ds.all()
+datapoints["images/005.jpg"]["episode"] = 5
+datapoints["images/005.jpg"].save()
+```
+save() should be called for each datapoint eventually for changes to be commited.
+when looping over many datapoints the preferred method (to avoid many network writes) is to work in a context block.
+but dictionary syntax can still be used:
+```python
+with ds.metadata_context() as ctx:
+    for dp in datapoints:
+        dp["episode"] = 4
+        dp.save()
+```
+in the above example dp.save() can be omitted as a commit is done once the context is exited.
+
 
 **Note:**  The datapoint should be the path of the file relative to the root of the data source. So if you have a repo
 data source with path at `repo://simon/baby-yoda-segmentor/data` (starting from the data folder),
