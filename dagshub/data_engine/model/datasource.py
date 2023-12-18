@@ -228,18 +228,6 @@ class Datasource:
             t = datetime.now() - timedelta(hours=24)
             q1 = ds.select("*", Field("size", as_of=t, alias="size_asof_24h_ago"))
             q1.all()
-
-        .. note::
-            Currently we don't generate automatic aliases,
-            which can lead to accidental overwriting of fields in the output.
-            We recommend writing out aliases for any additional field you select::
-
-                # Do this
-                q1 = ds.select("size", Field("size", as_of=t, alias="size_asof_24h_ago"))
-                # Instead of this
-                q1 = ds.select("size", Field("size", as_of=t))
-
-            If the field is used once in the whole query, this is not a problem.
         """
         new_ds = self.__deepcopy__()
 
