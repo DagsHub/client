@@ -351,7 +351,7 @@ class Datasource:
 
     def save_ctx(self):
         """
-        commit meta data changes one in dictionary assignment context
+        commit meta data changes done in dictionary assignment context
         :meta private
         """
         if self._implicit_update_ctx:
