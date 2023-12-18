@@ -349,10 +349,10 @@ class Datasource:
 
         return self._implicit_update_ctx
 
-    def save_ctx(self):
+    def upload_metadata_of_implicit_context(self):
         """
         commit meta data changes done in dictionary assignment context
-        :meta private
+        :meta private:
         """
         if self._implicit_update_ctx:
             try:

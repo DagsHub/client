@@ -55,7 +55,7 @@ class Datapoint:
 
         # if in context block, don't _upload_metadata, it will be done at context end
         if not self.datasource.has_explicit_context:
-            self.datasource.save_ctx()
+            self.datasource.upload_metadata_of_implicit_context()
 
     @property
     def download_url(self):
