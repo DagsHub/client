@@ -131,6 +131,7 @@ def get_datasource(repo: str, name: Optional[str] = None, id: Optional[Union[int
 
 def get_datasource_from_file(path: str) -> Datasource:
     """
+    [EXPERIMENTAL]
     Load a datasource from a local file
 
     Args:

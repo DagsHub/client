@@ -559,6 +559,7 @@ class Datasource:
 
     def save_to_file(self, path: str = ".", name: str = "") -> str:
         """
+        [EXPERIMENTAL]
         Saves a text file representing the datasource or dataset information to a file which can be committed to Git.
         Useful for connecting code versions to the datasource used for training.
 
