@@ -624,6 +624,11 @@ class Datasource:
         """
         Sends all datapoints in the datasource for annotation in Label Studio.
 
+        Args:
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
+
         .. note::
             This will send ALL datapoints in the datasource for annotation.
             It's recommended to not send a huge amount of datapoints to be annotated at once, to avoid overloading
@@ -631,9 +636,6 @@ class Datasource:
             Use :func:`QueryResult.annotate() <dagshub.data_engine.model.query_result.QueryResult.annotate>`
             to annotate a result of a query with less datapoints.
             Alternatively, use a lower level :func:`send_datapoints_to_annotation` function
-            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
-             if not specified all will be displayed.
-            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
 
         :return: Link to open Label Studio in the browser
         """
