@@ -48,6 +48,7 @@ def get_dataset(repo: str, name: Optional[str] = None, id: Optional[Union[int, s
 
 def get_dataset_from_file(path: str) -> Datasource:
     """
+    [EXPERIMENTAL]
     Load a dataset from a local file
 
     Args:
