@@ -148,10 +148,8 @@ def get_datasource_from_file(path: str) -> Datasource:
         ds: Datasource that was logged to the file
     """
     with open(path, "r") as file:
-        res: DatasourceSerializedState = dacite.from_dict(
-            DatasourceSerializedState, json.load(file), config=dacite_config
-        )
-    return res.load()
+        state = json.load(file)
+    return Datasource.load_from_serialized_state(state)
 
 
 def get_datasources(repo: str) -> List[Datasource]:
@@ -179,10 +177,7 @@ def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> 
     artifact_uri = run.info.artifact_uri
     artifact_path = f"{artifact_uri}/{artifact_name}"
 
-    ds_state_dict = mlflow_artifacts.load_dict(artifact_path)
-    ds_state: DatasourceSerializedState = dacite.from_dict(
-        DatasourceSerializedState, ds_state_dict, config=dacite_config
-    )
+    ds_state = mlflow_artifacts.load_dict(artifact_path)
     return Datasource.load_from_serialized_state(ds_state)
 
 

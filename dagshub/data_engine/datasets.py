@@ -5,6 +5,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine.datasources import get_datasource_from_file
+from dagshub.data_engine.model.dataset_state import DatasetState
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DatasetNotFoundError
@@ -70,8 +71,6 @@ def _get_datasets(repo: str, name: Optional[str] = None, id: Optional[Union[int,
 def _from_gql_result(repo: str, dataset_result: "DatasetResult") -> "Datasource":
     ds = Datasource(DatasourceState.from_gql_result(repo, dataset_result.datasource))
 
-    query_dict = json.loads(dataset_result.datasetQuery)
-
-    ds._deserialize_gql_result(query_dict)
-
+    dataset_state = DatasetState.from_gql_dataset_result(dataset_result)
+    ds.load_from_dataset_state(dataset_state)
     return ds

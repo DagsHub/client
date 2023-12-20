@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
 
+import dacite
 import rich.progress
 from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
@@ -22,6 +23,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
+from dagshub.data_engine.client.data_client import dacite_config
 from dagshub.data_engine.client.models import (
     PreprocessingStatus,
     MetadataFieldSchema,
@@ -31,11 +33,13 @@ from dagshub.data_engine.client.models import (
 )
 from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datapoint import Datapoint
+from dagshub.data_engine.model.dataset_state import DatasetState
 from dagshub.data_engine.model.errors import (
     WrongOperatorError,
     WrongOrderError,
     DatasetFieldComparisonError,
     FieldNotFoundError,
+    DatasetNotFoundError,
 )
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
 from dagshub.data_engine.model.query import DatasourceQuery
@@ -129,8 +133,9 @@ class Datasource:
         self,
         datasource: "DatasourceState",
         query: Optional[DatasourceQuery] = None,
-        select=None,
-        as_of=None,
+        select: Optional[List[Dict]] = None,
+        as_of: Optional[Union[datetime.datetime, float]] = None,
+        from_dataset: Optional[DatasetState] = None,
     ):
         self._source = datasource
         if query is None:
@@ -144,6 +149,7 @@ class Datasource:
         # this ref marks if source is currently used in
         # meta-data update 'with' block
         self._explicit_update_ctx: Optional[MetadataContextManager] = None
+        self.assigned_dataset = from_dataset
 
     @property
     def has_explicit_context(self):
@@ -169,18 +175,22 @@ class Datasource:
     def source(self) -> "DatasourceState":
         return self._source
 
-    def clear_query(self):
+    def clear_query(self, reset_to_dataset=True):
         """
-        Clear the attached query. Next time this datasource gets queried, you'll get all of the datapoints.
+        Clear the attached query.
 
-        .. note::
-            This function always clears the query.
-            That means that if you use it on a dataset, the whole query will get cleared, and not just your changes.
+        Args:
+            reset_to_dataset: If ``True`` and this Datasource was saved as a dataset, reset to the query in the dataset,
+                instead of clearing the query completely.
         """
-        self._query = DatasourceQuery()
+        if reset_to_dataset and self.assigned_dataset is not None and self.assigned_dataset.query is not None:
+            self._query = self.assigned_dataset.query.__deepcopy__()
+        else:
+            self._query = DatasourceQuery()
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__(), self._select, self._global_as_of)
+        res.assigned_dataset = self.assigned_dataset
 
         # Carry over the update context, that way we'll keep track of the metadata being uploaded
         res._implicit_update_ctx = self._implicit_update_ctx
@@ -195,7 +205,12 @@ class Datasource:
         """Return all fields that have the annotation meta tag set"""
         return [f.name for f in self.fields if f.is_annotation()]
 
-    def serialize_gql_query_input(self):
+    def serialize_gql_query_input(self) -> Dict:
+        """
+        Serialize the query of this Datasource for use in GraphQL querying (e.g. getting datapoints)
+
+        :meta private:
+        """
         result = {
             "query": self._query.serialize_graphql(),
         }
@@ -206,11 +221,55 @@ class Datasource:
             result["asOf"] = self.global_as_of_timestamp
         return result
 
-    def _deserialize_gql_result(self, query_dict):
+    def _deserialize_from_gql_result(self, query_dict):
+        """
+        Imports query information from ``query_dict``
+        """
         if "query" in query_dict:
             self._query = DatasourceQuery.deserialize(query_dict["query"])
         self._select = query_dict.get("select")
         self._global_as_of = query_dict.get("asOf")
+
+    def load_from_dataset(
+        self, dataset_id: Optional[Union[str, int]] = None, dataset_name: Optional[str] = None, change_query=True
+    ):
+        """
+        Imports query information from a dataset with the specified id or name. Either of id or name could be specified
+
+        Args:
+            dataset_id: ID of the dataset
+            dataset_name: Name of the dataset
+            change_query: Whether to change the query of this object to the query in the dataset
+
+        :meta private:
+        """
+        datasets = self.source.client.get_datasets(id=dataset_id, name=dataset_name)
+        if not datasets:
+            raise DatasetNotFoundError(self.source.repo, dataset_id, dataset_name)
+        dataset_state = DatasetState.from_gql_dataset_result(datasets[0])
+        self.load_from_dataset_state(dataset_state, change_query)
+
+    def load_from_dataset_state(self, dataset_state: DatasetState, change_query=True):
+        """
+        Imports query information from a :class:`~dagshub.data_engine.model.dataset_state.DatasetState`
+
+        Args:
+            dataset_state: State to load
+            change_query: If false, only assigns the dataset.
+                If true, also changes the query to be the query of the dataset
+
+        :meta private:
+        """
+        if self.source.id != dataset_state.datasource_id:
+            raise RuntimeError(
+                "Dataset belongs to a different datasource "
+                f"(This datasource: {self.source.id}, Dataset's datasource: {dataset_state.datasource_id})"
+            )
+        self.assigned_dataset = dataset_state
+        if change_query:
+            self._query = dataset_state.query
+            self._select = dataset_state.select
+            self._global_as_of = dataset_state.as_of
 
     def sample(self, start: Optional[int] = None, end: Optional[int] = None):
         if start is not None:
@@ -558,7 +617,7 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def save_dataset(self, name: str):
+    def save_dataset(self, name: str, assign_after_save=True):
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
         That way you can persist and share your queries.
@@ -566,11 +625,17 @@ class Datasource:
 
         Args:
             name: Name of the dataset
+            assign_after_save: Keep the reference to the dataset after saving.
+                This makes other functions like :func:`clear_query`, :func:`log_to_mlflow` and :func:`save_to_file`
+                refer to the dataset.
         """
         send_analytics_event("Client_DataEngine_QuerySaved", repo=self.source.repoApi)
 
         self.source.client.save_dataset(self, name)
         log_message(f"Dataset {name} saved")
+
+        if assign_after_save:
+            self.load_from_dataset(dataset_name=name, change_query=False)
 
     def log_to_mlflow(self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME):
         """
@@ -600,7 +665,7 @@ class Datasource:
             The path to the saved file
         """
         res = self._serialize()
-        file_path = os.path.join(path, (name or res.name) + ".dagshub")
+        file_path = os.path.join(path, (name or res.datasource_name) + ".dagshub")
         with open(file_path, "w") as file:
             file.write(json.dumps(res.to_dict(), indent=4))
         log_message(f"Datasource saved to '{file_path}'")
@@ -608,21 +673,45 @@ class Datasource:
         return file_path
 
     def _serialize(self) -> DatasourceSerializedState:
-        return DatasourceSerializedState(
-            id=self._source.id,
-            repo=self._source.repo,
-            name=self._source.name,
-            datasetQuery=self.serialize_gql_query_input(),
+        res = DatasourceSerializedState(
+            repo=self.source.repo,
+            datasource_id=self.source.id,
+            datasource_name=self.source.name,
+            query=self.serialize_gql_query_input(),
+            timestamp=datetime.datetime.now().timestamp(),
+            modified=self.is_query_different_from_dataset,
         )
+        if self.assigned_dataset is not None:
+            res.dataset_id = self.assigned_dataset.dataset_id
+            res.dataset_name = self.assigned_dataset.dataset_name
+        return res
+
+    @property
+    def is_query_different_from_dataset(self) -> Optional[bool]:
+        if self.assigned_dataset is None:
+            return None
+        return self._query.to_dict() != self.assigned_dataset.query.to_dict()
 
     @staticmethod
-    def load_from_serialized_state(state: DatasourceSerializedState) -> "Datasource":
-        ds_state = DatasourceState(repo=state.repo, name=state.name, id=state.id)
+    def load_from_serialized_state(state: Dict) -> "Datasource":
+        """
+        Load a Datasource that was saved with :func:`save_to_file`
+
+        Args:
+            state: Serialized JSON object
+        """
+
+        state: DatasourceSerializedState = dacite.from_dict(DatasourceSerializedState, state, config=dacite_config)
+
+        ds_state = DatasourceState(repo=state.repo, name=state.datasource_name, id=state.datasource_id)
         ds_state.get_from_dagshub()
         ds = Datasource(ds_state)
 
         if state.has_query:
-            ds._deserialize_gql_result(state.datasetQuery)
+            ds._deserialize_from_gql_result(state.query)
+
+        if state.dataset_id is not None:
+            ds.load_from_dataset(state.dataset_id, state.dataset_name, change_query=False)
 
         return ds
 
@@ -824,6 +913,11 @@ class Datasource:
     def __repr__(self):
         res = f"Datasource {self.source.name}"
         res += f"\n\tRepo: {self.source.repo}, path: {self.source.path}"
+        if self.assigned_dataset:
+            res += (
+                f"\n\tAssigned Dataset: {self.assigned_dataset.dataset_name} "
+                f"(Query was modified: {self.is_query_different_from_dataset})"
+            )
         res += f"\n\t{self._query}"
         res += "\n\tFields:"
         for f in self.fields:
