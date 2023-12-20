@@ -103,7 +103,7 @@ class DatasourceState:
     @property
     def source_prefix(self) -> PurePosixPath:
         parts = self.path_parts()
-        if "prefix" in parts:
+        if parts["prefix"]:
             return PurePosixPath(parts["prefix"].strip("/"))
         else:
             return PurePosixPath()
