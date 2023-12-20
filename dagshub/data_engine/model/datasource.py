@@ -182,7 +182,7 @@ class Datasource:
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__(), self._select, self._global_as_of)
 
-        # Carry over the update context, that way we'll keep track of the stuff being uploaded
+        # Carry over the update context, that way we'll keep track of the metadata being uploaded
         res._implicit_update_ctx = self._implicit_update_ctx
 
         return res
