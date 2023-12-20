@@ -125,7 +125,13 @@ class Field:
 
 
 class Datasource:
-    def __init__(self, datasource: "DatasourceState", query: Optional[DatasourceQuery] = None, select=None, as_of=None):
+    def __init__(
+        self,
+        datasource: "DatasourceState",
+        query: Optional[DatasourceQuery] = None,
+        select=None,
+        as_of=None,
+    ):
         self._source = datasource
         if query is None:
             query = DatasourceQuery()
@@ -134,10 +140,10 @@ class Datasource:
         self._global_as_of = as_of
         self.serialize_gql_query_input()
         # a per datasource context used for dict update syntax
-        self._implicit_update_ctx = None
+        self._implicit_update_ctx: Optional[MetadataContextManager] = None
         # this ref marks if source is currently used in
         # meta-data update 'with' block
-        self._explicit_update_ctx = None
+        self._explicit_update_ctx: Optional[MetadataContextManager] = None
 
     @property
     def has_explicit_context(self):
@@ -175,6 +181,10 @@ class Datasource:
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__(), self._select, self._global_as_of)
+
+        # Carry over the update context, that way we'll keep track of the stuff being uploaded
+        res._implicit_update_ctx = self._implicit_update_ctx
+
         return res
 
     def get_query(self):
