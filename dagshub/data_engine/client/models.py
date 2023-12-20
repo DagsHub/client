@@ -93,7 +93,7 @@ class DatasetResult:
 
 @dataclass_json
 @dataclass
-class DatasourceFileStruct:
+class DatasourceSerializedState:
     id: Union[str, int]
     repo: str
     name: str

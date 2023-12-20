@@ -96,6 +96,8 @@ def init(
         os.environ["MLFLOW_TRACKING_USERNAME"] = token
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
+        log_message(f"Initialized MLflow to track repo \"{repo_owner}/{repo_name}\"")
+
     # Configure DVC
     if dvc:
         Path(root / ".dvc").mkdir(parents=True, exist_ok=True)

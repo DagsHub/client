@@ -1,15 +1,22 @@
 import json
 import dacite
 import logging
-from typing import Optional, Union, List
+from typing import Optional, Union, List, TYPE_CHECKING
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
-from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceFileStruct
-from dagshub.data_engine.model.datasource import Datasource
+from dagshub.common.util import lazy_load
+from dagshub.data_engine.client.data_client import DataClient, dacite_config
+from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME, DatasourceSerializedState
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
 from dagshub.data_engine.model.errors import DatasourceNotFoundError
+
+if TYPE_CHECKING:
+    import mlflow
+    import mlflow.artifacts as mlflow_artifacts
+else:
+    mlflow = lazy_load("mlflow")
+    mlflow_artifacts = lazy_load("mlflow.artifacts", "mlflow")
 
 logger = logging.getLogger(__name__)
 
@@ -140,16 +147,11 @@ def get_datasource_from_file(path: str) -> Datasource:
     Returns:
         ds: Datasource that was logged to the file
     """
-    with open(path, 'r') as file:
-        res = dacite.from_dict(DatasourceFileStruct, json.load(file))
-    ds_state = DatasourceState(repo=res.repo, name=res.name, id=res.id)
-    ds_state.get_from_dagshub()
-    ds = Datasource(ds_state)
-
-    if res.has_query:
-        ds._deserialize_gql_result(res.datasetQuery)
-
-    return ds
+    with open(path, "r") as file:
+        res: DatasourceSerializedState = dacite.from_dict(
+            DatasourceSerializedState, json.load(file), config=dacite_config
+        )
+    return res.load()
 
 
 def get_datasources(repo: str) -> List[Datasource]:
@@ -166,6 +168,22 @@ def get_datasources(repo: str) -> List[Datasource]:
     client = DataClient(repo)
     sources = client.get_datasources(None, None)
     return [Datasource(DatasourceState.from_gql_result(repo, source)) for source in sources]
+
+
+def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> Datasource:
+    if run_id is None:
+        run = mlflow.active_run()
+    else:
+        run = mlflow.get_run(run_id)
+
+    artifact_uri = run.info.artifact_uri
+    artifact_path = f"{artifact_uri}/{artifact_name}"
+
+    ds_state_dict = mlflow_artifacts.load_dict(artifact_path)
+    ds_state: DatasourceSerializedState = dacite.from_dict(
+        DatasourceSerializedState, ds_state_dict, config=dacite_config
+    )
+    return Datasource.load_from_serialized_state(ds_state)
 
 
 def get(*args, **kwargs) -> Datasource:
