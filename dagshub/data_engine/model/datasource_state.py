@@ -103,7 +103,7 @@ class DatasourceState:
     @property
     def source_prefix(self) -> PurePosixPath:
         parts = self.path_parts()
-        if "prefix" in parts:
+        if parts.get("prefix"):
             return PurePosixPath(parts["prefix"].strip("/"))
         else:
             return PurePosixPath()
@@ -143,7 +143,7 @@ class DatasourceState:
         parts = self.path_parts()
         if self.source_type == DatasourceType.BUCKET:
             path_elems = [parts["schema"], parts["bucket"]]
-            if parts["prefix"] is not None:
+            if parts.get("prefix"):
                 path_elems.append(parts["prefix"])
             path_prefix = "/".join(path_elems)
             if path_type == "raw":
@@ -179,7 +179,7 @@ class DatasourceState:
         # Couldn't do that with regexes, so handling it here
         if self.source_type == DatasourceType.REPOSITORY:
             res["revision"] = None
-            if res["prefix"] is not None:
+            if res.get("prefix"):
                 prefix = res["prefix"]
                 if ":" in prefix:
                     revision, prefix = prefix.split(":", 1)
