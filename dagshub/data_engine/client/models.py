@@ -101,6 +101,7 @@ class DatasourceSerializedState:
     Also carries additional information about which dataset it had assigned,
     if the state of the datasource at the point of saving differed from the dataset, the timestamp of saving
     """
+
     repo: str
     """Repository this datasource is on"""
     datasource_id: Union[str, int]
@@ -117,6 +118,8 @@ class DatasourceSerializedState:
     """Timestamp of serialization"""
     modified: Optional[bool] = None
     """Does the query differ from the query in the assigned dataset"""
+    link: Optional[str] = None
+    """URL to open this datasource on DagsHub"""
 
     @property
     def has_query(self):

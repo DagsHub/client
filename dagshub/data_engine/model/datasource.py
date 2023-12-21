@@ -58,7 +58,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.json"
+DEFAULT_MLFLOW_ARTIFACT_NAME = "dagshub_datasource.json"
 
 
 @dataclass_json
@@ -645,7 +645,7 @@ class Datasource:
             artifact_name: Name of the artifact that will be stored in the MLflow run
         """
         run = mlflow.active_run()
-        mlflow.log_dict(self._serialize().to_dict(), artifact_name)
+        mlflow.log_dict(self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
 
     def save_to_file(self, path: str = ".", name: str = "") -> str:
@@ -664,10 +664,10 @@ class Datasource:
         Returns:
             The path to the saved file
         """
-        res = self._serialize()
-        file_path = os.path.join(path, (name or res.datasource_name) + ".dagshub")
+        res = self._to_dict()
+        file_path = os.path.join(path, (name or self.source.name) + ".dagshub")
         with open(file_path, "w") as file:
-            file.write(json.dumps(res.to_dict(), indent=4))
+            file.write(json.dumps(res, indent=4))
         log_message(f"Datasource saved to '{file_path}'")
 
         return file_path
@@ -684,6 +684,12 @@ class Datasource:
         if self.assigned_dataset is not None:
             res.dataset_id = self.assigned_dataset.dataset_id
             res.dataset_name = self.assigned_dataset.dataset_name
+        return res
+
+    def _to_dict(self) -> Dict:
+        res = self._serialize().to_dict()
+        # Skip Nones in the result
+        res = {k: v for k, v in res.items() if v is not None}
         return res
 
     @property
