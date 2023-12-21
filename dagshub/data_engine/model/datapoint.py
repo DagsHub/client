@@ -47,10 +47,20 @@ class Datapoint:
 
     def save(self):
         """
-        call save to commit changes to metadata done with
-        one ore more dictionary assignment syntax usages, example:
-         'specific_data_point[metadata-name] = value
-         specific_data_point.save()'
+        Commit metadata changes on this datapoint.
+
+        Example::
+
+            datapoint["field"] = value
+            datapoint.save()
+
+        .. note::
+            If done inside a metadata context, ``save()`` doesn't need to be called,
+            all changes will be uploaded on context exit::
+
+                with ds.metadata_context():
+                    for i, dp in ds.all():
+                        dp["number"] = i
         """
 
         # if in context block, don't _upload_metadata, it will be done at context end

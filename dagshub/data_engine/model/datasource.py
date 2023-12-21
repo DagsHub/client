@@ -639,7 +639,7 @@ class Datasource:
 
     def log_to_mlflow(self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME):
         """
-        Logs the datasource's state to MLflow as an artifact
+        Logs the current datasource state to MLflow as an artifact.
 
         Args:
             artifact_name: Name of the artifact that will be stored in the MLflow run
@@ -650,22 +650,23 @@ class Datasource:
 
     def save_to_file(self, path: str = ".", name: str = "") -> str:
         """
-        [EXPERIMENTAL]
-        Saves a text file representing the datasource or dataset information to a file which can be committed to Git.
+        Saves a text file representing the current state of datasource or dataset
+        to a file ``<name>.json`` which can be committed to Git.
         Useful for connecting code versions to the datasource used for training.
 
         .. note::
-            Does not save dataset contents, only a pointer file.
+            Does not save dataset contents.
 
         Args:
-            path: Path to save the datasource or dataset file in, defaults to current directory
-            name: Optional: name of the file. if not provided, datasource or dataset name will be used instead.
+            path: Path to the directory where to save the datasource or dataset file.
+                Defaults to current working directory.
+            name: Optional: name of the file. if not provided, datasource name will be used instead.
 
         Returns:
             The path to the saved file
         """
+        file_path = os.path.join(path, (name or self.source.name) + ".json")
         res = self._to_dict()
-        file_path = os.path.join(path, (name or self.source.name) + ".dagshub")
         with open(file_path, "w") as file:
             file.write(json.dumps(res, indent=4))
         log_message(f"Datasource saved to '{file_path}'")

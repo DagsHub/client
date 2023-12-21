@@ -169,6 +169,16 @@ def get_datasources(repo: str) -> List[Datasource]:
 
 
 def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> Datasource:
+    """
+    Load a datasource from an MLflow run.
+
+    To save a datasource to MLflow, use
+    :func:`Datasource.log_to_mlflow()<dagshub.data_engine.model.datasource.Datasource.log_to_mlflow>`.
+
+    Args:
+        run_id: ID of the MLflow run to load the datasource from. If ``None``, gets it from the current active run.
+        artifact_name: Name of the artifact in the run.
+    """
     if run_id is None:
         run = mlflow.active_run()
     else:
@@ -203,4 +213,5 @@ __all__ = [
     get_datasources.__name__,
     get.__name__,
     get_or_create.__name__,
+    get_from_mlflow.__name__,
 ]
