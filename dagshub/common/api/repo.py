@@ -294,16 +294,18 @@ class RepoAPI:
         Downloads the contents of the repository at "remote_path" to the "local_path"
 
         Args:
-            remote_path: path of the folder or folder to download in the repository
-            local_path: where to download the files. Defaults to current working directory.
-            revision: repo revision, if not specified - uses default repo branch
-            recursive: whether to download files recursively
-            keep_source_prefix: whether to keep the path of the folder in the download path or not
-                example: Given remote_path "src/data" and file "test/file.txt"
-                if True: will download to "<local_path>/src/data/test/file.txt"
-                if False: will download to "<local_path>/test/file.txt"
-            redownload: whether to redownload an already existing file
-                The downloader doesn't do any hash comparisons and only checks if a file already exists in the local filesystem or not
+            remote_path: Path in the repository of the folder or file to download.
+            local_path: Where to download the files. Defaults to current working directory.
+            revision: Repo revision or branch, if not specified - uses default repo branch.
+                Ignored for downloading from buckets.
+            recursive: Whether to download files recursively.
+            keep_source_prefix: | Whether to keep the path of the folder in the download path or not.
+                | Example: Given remote_path ``src/data`` and file ``test/file.txt``
+                | if ``True``: will download to ``<local_path>/src/data/test/file.txt``
+                | if ``False``: will download to ``<local_path>/test/file.txt``
+            redownload: Whether to redownload files that already exist on the local filesystem.
+                The downloader doesn't do any hash comparisons and only checks
+                if a file already exists in the local filesystem or not.
         """
         files = self._get_files_in_path(remote_path, revision, recursive)
         file_tuples = []
