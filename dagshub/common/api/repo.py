@@ -275,7 +275,7 @@ class RepoAPI:
                 if True: will download to "<local_path>/src/data/test/file.txt"
                 if False: will download to "<local_path>/test/file.txt"
             redownload: whether to redownload an already existing file
-                The downloader doesn't do any hash comparisons and only checks if a file already exists in the FS or not
+                The downloader doesn't do any hash comparisons and only checks if a file already exists in the local filesystem or not
         """
         files = self._get_files_in_path(remote_path, revision, recursive)
         file_tuples = []
