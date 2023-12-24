@@ -660,12 +660,18 @@ class Datasource:
         Args:
             path: Path to the directory where to save the datasource or dataset file.
                 Defaults to current working directory.
-            name: Optional: name of the file. if not provided, datasource name will be used instead.
+            name: Optional: name of the file. if not provided, dataset name will be used instead.
+                If no dataset assigned, then uses the datasource name
 
         Returns:
             The path to the saved file
         """
-        file_path = os.path.join(path, (name or self.source.name) + ".json")
+        if not name:
+            if self.assigned_dataset is not None:
+                name = self.assigned_dataset.dataset_name
+            else:
+                name = self.source.name
+        file_path = os.path.join(path, name + ".json")
         res = self._to_dict()
         with open(file_path, "w") as file:
             file.write(json.dumps(res, indent=4))
