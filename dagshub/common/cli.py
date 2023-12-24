@@ -130,7 +130,9 @@ if False: will download to "<local_path>/test/file.txt"
 @click.argument("repo", callback=validate_repo)
 @click.argument("remote_path")
 @click.argument("local_path", required=False, type=click.Path())
-@click.option("-b", "--branch", help="Branch or revision to download from. If left unspecified, use the default branch.")
+@click.option(
+    "-b", "--branch", help="Branch or revision to download from. " "If left unspecified, use the default branch."
+)
 @click.option("--keep-prefix", is_flag=True, default=False, help=KEEP_PREFIX_HELP)
 @click.option("--not-recursive", is_flag=True, help="Don't download nested folders")
 @click.option("--redownload", is_flag=True, help="Redownload files, even if they already exist locally")
