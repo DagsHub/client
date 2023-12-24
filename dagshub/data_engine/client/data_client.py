@@ -51,6 +51,16 @@ class DataClient:
         return client
 
     def create_datasource(self, ds: "DatasourceState") -> DatasourceResult:
+        """
+        Create a new datasource using the provided datasource state.
+
+        Args:
+            ds (DatasourceState): The datasource state containing information about the datasource.
+
+        Returns:
+            DatasourceResult: The result of creating the datasource.
+
+        """
         q = GqlMutations.create_datasource()
 
         assert ds.name is not None
@@ -62,6 +72,17 @@ class DataClient:
         return dacite.from_dict(DatasourceResult, res["createDatasource"], config=dacite_config)
 
     def head(self, datasource: Datasource, size: Optional[int] = None) -> QueryResult:
+        """
+        Retrieve a subset of data from the datasource headers.
+
+        Args:
+            datasource (Datasource): The datasource to retrieve data from.
+            size (Optional[int], optional): The number of entries to retrieve. Defaults to None.
+
+        Returns:
+            QueryResult: The query result containing the retrieved data.(By Default returns the first 100 samples)
+
+        """
         if size is None:
             size = self.HEAD_QUERY_SIZE
 
@@ -75,6 +96,17 @@ class DataClient:
         return QueryResult.from_gql_query(resp, datasource)
 
     def sample(self, datasource: Datasource, n: Optional[int], include_metadata: bool) -> QueryResult:
+        """
+        Sample data from the datasource.
+
+        Args:
+            datasource (Datasource): The datasource to sample data from.
+            n (Optional[int]): The number of data points to sample.
+            include_metadata (bool): Whether to include metadata in the sampled data.
+
+        Returns:
+            QueryResult: The query result containing the sampled data.
+        """
         if n is None:
             return self._get_all(datasource, include_metadata)
 
@@ -147,6 +179,17 @@ class DataClient:
         return self._exec(q, params)["datasourceQuery"]
 
     def update_metadata(self, datasource: Datasource, entries: List[DatapointMetadataUpdateEntry]):
+        """
+        Update the Datasource with the metadata entry
+
+        Args:
+            datasource (Datasource): The datasource instance to be updated
+            entries (List[DatapointMetadataUpdateEntry]): The new metadata entries
+
+        Returns:
+            Updates the Datasource.
+
+        """
         q = GqlMutations.update_metadata()
 
         assert datasource.source.id is not None
@@ -155,7 +198,6 @@ class DataClient:
         params = GqlMutations.update_metadata_params(
             datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
         )
-
         return self._exec(q, params)
 
     def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
@@ -171,6 +213,16 @@ class DataClient:
         return self._exec(q, params)
 
     def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
+        """
+        Retrieve a list of datasources based on optional filtering criteria.
+
+        Args:
+            id (Optional[str]): Optional datasource ID to filter by.
+            name (Optional[str]): Optional datasource name to filter by.
+
+        Returns:
+            List[DatasourceResult]: A list of datasources that match the filtering criteria.
+        """
         q = GqlQueries.datasource()
         params = GqlQueries.datasource_params(id=id, name=name)
 
@@ -180,6 +232,11 @@ class DataClient:
         return [dacite.from_dict(DatasourceResult, val, config=dacite_config) for val in res]
 
     def delete_datasource(self, datasource: Datasource):
+        """
+        Delete a specified datasource.
+         Args:
+            datasource (Datasource): The datasource instance to be deleted.
+        """
         q = GqlMutations.delete_datasource()
 
         assert datasource.source.id is not None
@@ -188,6 +245,12 @@ class DataClient:
         return self._exec(q, params)
 
     def scan_datasource(self, datasource: Datasource, options: Optional[List[ScanOption]]):
+        """
+        Initiate a scan operation on the specified datasource.
+
+         Args:
+            datasource (Datasource): The datasource instance to be updated
+        """
         q = GqlMutations.scan_datasource()
 
         assert datasource.source.id is not None
@@ -196,6 +259,17 @@ class DataClient:
         return self._exec(q, params)
 
     def save_dataset(self, datasource: Datasource, name: str):
+        """
+        Save a dataset using the specified datasource and name.
+
+        Args:
+            datasource (Datasource): The datasource instance to be saved.
+            name (str) : Name of the new datasource instance
+
+        Example:
+            For a detailed description of how to create and save datasets, refer to this link:
+                "https://dagshub.com/docs/use_cases/data_engine/query_and_create_subsets/#querying-and-saving-subsets-of-your-data
+        """
         q = GqlMutations.save_dataset()
 
         assert name is not None
@@ -206,6 +280,16 @@ class DataClient:
         return self._exec(q, params)
 
     def get_datasets(self, id: Optional[Union[str, int]], name: Optional[str]) -> List[DatasetResult]:
+        """
+        Retrieve a list of datasets based on optional filtering criteria.
+
+        Args:
+            id (Optional[Union[str, int]): Optional dataset ID or name to filter by.
+            name (Optional[str]): Optional dataset name to filter by.
+
+        Returns:
+            List[DatasetResult]: A list of datasets that match the filtering criteria.
+        """
         q = GqlQueries.dataset()
         params = GqlQueries.dataset_params(id=id, name=name)
 

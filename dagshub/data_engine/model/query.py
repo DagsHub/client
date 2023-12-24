@@ -54,13 +54,19 @@ UNFILLED_NODE_TAG = "undefined"
 
 
 class DatasourceQuery:
-    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None):
+    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None, as_of: Optional[int] = None):
         self._operand_tree: Tree = Tree()
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name, will be filled later
-            self._operand_tree.create_node(UNFILLED_NODE_TAG, data={"field": column_or_query})
+            data = {"field": column_or_query}
+            if as_of:
+                data["as_of"] = int(as_of)
+            self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
+
+        if as_of:
+            self._as_of = as_of
 
     def __repr__(self):
         if self.is_empty:
@@ -75,6 +81,35 @@ class DatasourceQuery:
         return filter_node.data["field"]
 
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
+        """
+        Compose the current query with another query or a value using the specified operator.
+
+        Args:
+            op (str): The operator to use for composing the query.
+            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]):
+                The query or value to compose with.
+
+        Raises:
+            RuntimeError: If the operation is not supported or if there is a mismatch in usage.
+
+        Notes:
+            - If the current query contains only a column filter,
+                it will be composed into a tree with the specified operator and value.
+            - If the operation is 'isnull', it can only be applied to a column filter;
+                otherwise, a RuntimeError is raised.
+            - If the operation is 'not', a 'not' node is added to the query tree.
+            - If either query is empty, the composition is adjusted accordingly.
+
+        Example:
+            ```
+            ds['col1'] > 5
+            ds['col2'].is_null()
+            ```
+            The above queries can be composed as:
+            ```
+            ds['col1'] > 5 and ds['col2'].is_null()
+            ```
+        """
         if self._column_filter_node is not None:
             # If there was an unfilled query node with a column - put the operand in that node
             node = self._column_filter_node
@@ -142,6 +177,8 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
+            as_of = node.data.get("as_of")
+
             value_type = metadataTypeLookup[type(value)].value
             if type(value) is bytes:
                 # TODO: this will need to probably be changed when we allow actual binary field comparisons
@@ -153,7 +190,7 @@ class DatasourceQuery:
                     f"Value type {value_type} is not supported for querying.\r\n"
                     f"Supported types: {list(metadataTypeLookup.keys())}"
                 )
-            return {
+            res = {
                 "filter": {
                     "key": key,
                     "value": str(value),
@@ -161,6 +198,9 @@ class DatasourceQuery:
                     "comparator": query_op.value,
                 }
             }
+            if as_of:
+                res["filter"]["asOf"] = as_of
+            return res
 
     @staticmethod
     def deserialize(serialized_query: Dict) -> "DatasourceQuery":
@@ -192,7 +232,8 @@ class DatasourceQuery:
             value_type = metadataTypeLookupReverse[val["valueType"]]
             converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
             value = converter(val["value"])
-            node = Node(tag=comparator, data={"field": key, "value": value})
+            as_of = val.get("asOf")
+            node = Node(tag=comparator, data={"field": key, "value": value, "as_of": as_of})
             tree.add_node(node, parent_node)
         elif op_type in ("and", "or"):
             main_node = Node(tag=op_type)

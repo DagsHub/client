@@ -12,7 +12,23 @@ from dagshub.common import config, rich_console
 logger = logging.getLogger(__name__)
 
 
-def oauth_flow(host: str, client_id: Optional[str] = None) -> OAuthDagshubToken:
+def oauth_flow(
+    host: str,
+    client_id: Optional[str] = None
+) -> OAuthDagshubToken:
+
+    """
+    Initiate the OAuth 2.0 flow for obtaining an access token.
+
+    Args:
+        host (str): The URL of the OAuth provider.
+        client_id (Optional[str], optional): The client ID used for authentication.
+            If not provided, it will use the default client ID from the configuration.
+
+    Returns:
+        Dict: A dictionary containing the obtained access token.
+    """
+
     host = host.strip("/")
     dagshub_url = urllib.parse.urljoin(host, "login/oauth")
     client_id = client_id or config.client_id
