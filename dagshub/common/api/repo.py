@@ -267,7 +267,7 @@ class RepoAPI:
 
         Args:
             remote_path: path of the folder or folder to download in the repository
-            local_path: where to download the files. Defaults to CWD
+            local_path: where to download the files. Defaults to current working directory.
             revision: repo revision, if not specified - uses default repo branch
             recursive: whether to download files recursively
             keep_source_prefix: whether to keep the path of the folder in the download path or not
