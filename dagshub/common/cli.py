@@ -123,7 +123,7 @@ def to_log_level(verbosity):
 @click.argument("repo", callback=validate_repo)
 @click.argument("remote_path")
 @click.argument("local_path", required=False, type=click.Path())
-@click.option("-b", "--branch", help="Branch or revision to download from")
+@click.option("-b", "--branch", help="Branch or revision to download from. If left unspecified, use the default branch.")
 @click.option(
     "--keep-prefix", is_flag=True, default=False, help="Whether to keep the path of the folder in the downloaded path"
 )
