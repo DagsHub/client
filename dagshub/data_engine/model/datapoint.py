@@ -56,10 +56,11 @@ class Datapoint:
 
         .. note::
             If done inside a metadata context, ``save()`` doesn't need to be called,
-            all changes will be uploaded on context exit::
+            all changes will be batched together and uploaded on context exit.
+            This is the recommended way to edit a lot of datapoints at once::
 
                 with ds.metadata_context():
-                    for i, dp in ds.all():
+                    for i, dp in enumerate(ds.all()):
                         dp["number"] = i
         """
 
