@@ -119,14 +119,19 @@ def to_log_level(verbosity):
         return logging.DEBUG
 
 
+KEEP_PREFIX_HELP = """ Whether to keep the path of the folder in the download path or not.
+Example: Given remote_path "src/data" and file "test/file.txt"
+if True: will download to "<local_path>/src/data/test/file.txt"
+if False: will download to "<local_path>/test/file.txt"
+"""
+
+
 @cli.command()
 @click.argument("repo", callback=validate_repo)
 @click.argument("remote_path")
 @click.argument("local_path", required=False, type=click.Path())
 @click.option("-b", "--branch", help="Branch or revision to download from. If left unspecified, use the default branch.")
-@click.option(
-    "--keep-prefix", is_flag=True, default=False, help="Whether to keep the path of the folder in the downloaded path"
-)
+@click.option("--keep-prefix", is_flag=True, default=False, help=KEEP_PREFIX_HELP)
 @click.option("--not-recursive", is_flag=True, help="Don't download nested folders")
 @click.option("--redownload", is_flag=True, help="Redownload files, even if they already exist locally")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
