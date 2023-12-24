@@ -1,13 +1,12 @@
 import json
-import dacite
 import logging
 from typing import Optional, Union, List, TYPE_CHECKING
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.client.data_client import DataClient, dacite_config
-from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME, DatasourceSerializedState
+from dagshub.data_engine.client.data_client import DataClient
+from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
 from dagshub.data_engine.model.errors import DatasourceNotFoundError
 
