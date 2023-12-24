@@ -14,6 +14,7 @@ from dagshub.common.api.responses import (
 from dagshub.common.download import download_files
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
+from functools import partial
 
 try:
     from functools import cached_property
@@ -264,26 +265,50 @@ class RepoAPI:
         Walks through the path of the repo, returning non-dir entries
         """
 
-        dir_queue = [path]
+        dir_queue = []
         files = []
+
+        list_fn_folder = partial(self.list_path, revision=revision)
+        list_fn_storage = self.list_storage_path
+
+        def push_folder(folder_path):
+            dir_queue.append((folder_path, list_fn_folder))
+
+        def push_storage(storage_path):
+            dir_queue.append((storage_path, list_fn_storage))
+
+        # Initialize the queue
+        is_storage_path = str(path).lstrip("/").split("/")[0] in {"s3:", "gs:", "azure:"}
+        if is_storage_path:
+            # Handle storage paths - they start with s3:/, gs:/ or azure:/
+            path = str(path).replace(":", "", 1)
+            push_storage(path)
+        else:
+            push_folder(path)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         task = progress.add_task("Traversing directories...", total=None)
 
-        def step(step_path):
-            res = self.list_path(step_path, revision)
+        def step(step_path, list_fn):
+            """
+            step_path: path in the repo to list
+            list_fn: which function to use to list it (can be list_path or list_storage_path)
+            """
+            res = list_fn(step_path)
             for entry in res:
                 if entry.type == "file":
                     files.append(entry)
-                elif entry.type == "dir" and recursive:
-                    dir_queue.append(entry.path)
-                # TODO: storage
+                elif recursive:
+                    if entry.versioning == "bucket":
+                        push_storage(entry.path)
+                    else:
+                        push_folder(entry.path)
             progress.update(task, advance=1)
 
         with progress:
             while len(dir_queue):
-                query_path = dir_queue.pop(0)
-                step(query_path)
+                query_path, list_fn = dir_queue.pop(0)
+                step(query_path, list_fn)
 
         return files
 
@@ -314,6 +339,11 @@ class RepoAPI:
         local_path = Path(local_path)
         # Strip the slashes from the beginning so the relative_to logic works
         remote_path = str(remote_path).lstrip("/")
+        if not remote_path:
+            remote_path = "/"
+        # For storage paths get rid of the colon in the beginning of the schema, the download urls won't have it either
+        if remote_path.split("/")[0] in {"s3:", "gs:", "azure:"}:
+            remote_path = remote_path.replace(":", "", 1)
         # Edge case - if the user requested a single file - different output path semantics
         if len(files) == 1 and files[0].path == remote_path:
             f = files[0]
