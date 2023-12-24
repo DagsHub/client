@@ -674,7 +674,7 @@ class Datasource:
         file_path = os.path.join(path, name + ".json")
         res = self._to_dict()
         with open(file_path, "w") as file:
-            file.write(json.dumps(res, indent=4))
+            json.dump(res, file, indent=4, sort_keys=True)
         log_message(f"Datasource saved to '{file_path}'")
 
         return file_path
