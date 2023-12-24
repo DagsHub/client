@@ -311,8 +311,7 @@ class RepoAPI:
             local_path = "."
         local_path = Path(local_path)
         # Strip the slashes from the beginning so the relative_to logic works
-        if str(remote_path.startswith("/")):
-            remote_path = str(remote_path).lstrip("/")
+        remote_path = str(remote_path).lstrip("/")
         # Edge case - if the user requested a single file - different output path semantics
         if len(files) == 1 and files[0].path == remote_path:
             f = files[0]
