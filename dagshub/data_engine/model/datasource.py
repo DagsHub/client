@@ -701,6 +701,11 @@ class Datasource:
 
     @property
     def is_query_different_from_dataset(self) -> Optional[bool]:
+        """
+        Is the current query of the object different from the one in the assigned dataset.
+
+        If no dataset is assigned, returns ``None``.
+        """
         if self.assigned_dataset is None:
             return None
         return self._query.to_dict() != self.assigned_dataset.query.to_dict()

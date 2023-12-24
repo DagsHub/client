@@ -96,10 +96,12 @@ class DatasetResult:
 class DatasourceSerializedState:
     """
     Serialized state of the datasource.
-    This should be enough to recreate the exact copy of the datasource back (with some requests maybe)
+    This should be enough to recreate the exact copy of the datasource back (with additional requests)
 
-    Also carries additional information about which dataset it had assigned,
-    if the state of the datasource at the point of saving differed from the dataset, the timestamp of saving
+    Also carries additional information that might be useful for the user:
+        - if the state of the datasource at the point of saving differed from the dataset
+        - the timestamp of saving
+        - link to open the datasource on DagsHub
     """
 
     repo: str

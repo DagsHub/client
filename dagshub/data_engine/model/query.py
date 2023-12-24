@@ -107,7 +107,7 @@ class DatasourceQuery:
             ```
             The above queries can be composed as:
             ```
-            ds['col1'] > 5 and ds['col2'].is_null()
+            (ds['col1'] > 5) & (ds['col2'].is_null())
             ```
         """
         if self._column_filter_node is not None:
