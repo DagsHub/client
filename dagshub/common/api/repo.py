@@ -313,7 +313,7 @@ class RepoAPI:
         return files
 
     def download(
-        self, remote_path, local_path=".", revision=None, recursive=True, keep_source_prefix=True, redownload=False
+        self, remote_path, local_path=".", revision=None, recursive=True, keep_source_prefix=False, redownload=False
     ):
         """
         Downloads the contents of the repository at "remote_path" to the "local_path"
