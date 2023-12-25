@@ -260,7 +260,9 @@ class RepoAPI:
             raise RuntimeError(error_msg)
         return res.content
 
-    def _get_files_in_path(self, path, revision=None, recursive=False) -> List[ContentAPIEntry]:
+    def _get_files_in_path(
+        self, path, revision=None, recursive=False, traverse_storages=False
+    ) -> List[ContentAPIEntry]:
         """
         Walks through the path of the repo, returning non-dir entries
         """
@@ -300,7 +302,8 @@ class RepoAPI:
                     files.append(entry)
                 elif recursive:
                     if entry.versioning == "bucket":
-                        push_storage(entry.path)
+                        if traverse_storages:
+                            push_storage(entry.path)
                     else:
                         push_folder(entry.path)
             progress.update(task, advance=1)
@@ -313,7 +316,14 @@ class RepoAPI:
         return files
 
     def download(
-        self, remote_path, local_path=".", revision=None, recursive=True, keep_source_prefix=False, redownload=False
+        self,
+        remote_path,
+        local_path=".",
+        revision=None,
+        recursive=True,
+        keep_source_prefix=False,
+        redownload=False,
+        download_storages=False,
     ):
         """
         Downloads the contents of the repository at "remote_path" to the "local_path"
@@ -331,8 +341,19 @@ class RepoAPI:
             redownload: Whether to redownload files that already exist on the local filesystem.
                 The downloader doesn't do any hash comparisons and only checks
                 if a file already exists in the local filesystem or not.
+            download_storages: If downloading the whole repo, by default we're not downloading the integrated storages
+                Toggle this to ``True`` to change this behavior
         """
-        files = self._get_files_in_path(remote_path, revision, recursive)
+        traverse_storages = True
+        if str(remote_path) == "/" and not download_storages:
+            log_message(
+                "Skipping downloading from connected storages. "
+                "Set the `download_storages` flag if you want "
+                "to download the whole content of the connected storages."
+            )
+            traverse_storages = False
+
+        files = self._get_files_in_path(remote_path, revision, recursive, traverse_storages=traverse_storages)
         file_tuples = []
         if local_path is None:
             local_path = "."
@@ -363,10 +384,10 @@ class RepoAPI:
             for f in files:
                 file_path_in_remote = PurePosixPath(f.path)
                 remote_path_obj = PurePosixPath(remote_path)
-                if keep_source_prefix:
-                    file_path = file_path_in_remote
-                else:
+                if not keep_source_prefix and remote_path != "/":
                     file_path = file_path_in_remote.relative_to(remote_path_obj)
+                else:
+                    file_path = file_path_in_remote
                 file_path = local_path / file_path
                 file_tuples.append((f.download_url, file_path))
         download_files(file_tuples, skip_if_exists=not redownload)
