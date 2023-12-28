@@ -183,8 +183,8 @@ def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> 
     else:
         run = mlflow.get_run(run_id)
 
-    artifact_uri = run.info.artifact_uri
-    artifact_path = f"{artifact_uri}/{artifact_name}"
+    artifact_uri: str = run.info.artifact_uri
+    artifact_path = f"{artifact_uri.rstrip('/')}/{artifact_name.lstrip('/')}"
 
     ds_state = mlflow_artifacts.load_dict(artifact_path)
     return Datasource.load_from_serialized_state(ds_state)
