@@ -143,7 +143,6 @@ class Datasource:
         self._query = query
         self._select = select or []
         self._global_as_of = as_of
-        self.serialize_gql_query_input()
         # a per datasource context used for dict update syntax
         self._implicit_update_ctx: Optional[MetadataContextManager] = None
         # this ref marks if source is currently used in
@@ -617,25 +616,26 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def save_dataset(self, name: str, assign_after_save=True):
+    def save_dataset(self, name: str) -> "Datasource":
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
         That way you can persist and share your queries.
-        You can get the dataset back by calling :func:`.datasets.get_dataset()`
+        You can get the dataset back later by calling :func:`.datasets.get_dataset()`
 
         Args:
             name: Name of the dataset
-            assign_after_save: Keep the reference to the dataset after saving.
-                This makes other functions like :func:`clear_query`, :func:`log_to_mlflow` and :func:`save_to_file`
-                refer to the dataset.
+
+        Returns:
+            A datasource object with the dataset assigned to it
         """
         send_analytics_event("Client_DataEngine_QuerySaved", repo=self.source.repoApi)
 
         self.source.client.save_dataset(self, name)
         log_message(f"Dataset {name} saved")
 
-        if assign_after_save:
-            self.load_from_dataset(dataset_name=name, change_query=False)
+        copy_with_ds_assigned = self.__deepcopy__()
+        copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
+        return copy_with_ds_assigned
 
     def log_to_mlflow(self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME):
         """
