@@ -9,6 +9,7 @@ import time
 import webbrowser
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
 
@@ -648,36 +649,34 @@ class Datasource:
         mlflow.log_dict(self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
 
-    def save_to_file(self, path: str = ".", name: str = "") -> str:
+    def save_to_file(self, path: Union[str, PathLike] = ".") -> Path:
         """
-        Saves a text file representing the current state of datasource or dataset
-        to a file ``<name>.json`` which can be committed to Git.
+        Saves a JSON file representing the current state of datasource or dataset.
         Useful for connecting code versions to the datasource used for training.
 
         .. note::
-            Does not save dataset contents.
+            Does not save the actual contents of the datasource/dataset, only the query.
 
         Args:
-            path: Path to the directory where to save the datasource or dataset file.
-                Defaults to current working directory.
-            name: Optional: name of the file. if not provided, dataset name will be used instead.
-                If no dataset assigned, then uses the datasource name
+            path: Where to save the file. If path is an existing folder, saves to ``<path>/<ds_name>.json``.
 
         Returns:
             The path to the saved file
         """
-        if not name:
+        path = Path(path)
+        if path.is_dir():
             if self.assigned_dataset is not None:
                 name = self.assigned_dataset.dataset_name
             else:
                 name = self.source.name
-        file_path = os.path.join(path, name + ".json")
+            path = path / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
         res = self._to_dict()
-        with open(file_path, "w") as file:
+        with open(path, "w") as file:
             json.dump(res, file, indent=4, sort_keys=True)
-        log_message(f"Datasource saved to '{file_path}'")
+        log_message(f"Datasource saved to '{path}'")
 
-        return file_path
+        return path
 
     def _serialize(self) -> DatasourceSerializedState:
         res = DatasourceSerializedState(
