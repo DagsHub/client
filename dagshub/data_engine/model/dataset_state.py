@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Dict, Optional, List, Union
+from typing import Dict, Optional, Union
 
 from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine.model.query import DatasourceQuery

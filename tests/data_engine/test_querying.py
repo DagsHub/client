@@ -457,7 +457,9 @@ def test_isnull_raises_not_on_field(ds):
 def test_false_deserialization(ds):
     add_boolean_fields(ds, "col_bool")
     queried = ds["col_bool"] == False  # noqa
-    serialized = {"query": {"filter": {"key": "col_bool", "value": "False", "valueType": "BOOLEAN", "comparator": "EQUAL"}}}
+    serialized = {
+        "query": {"filter": {"key": "col_bool", "value": "False", "valueType": "BOOLEAN", "comparator": "EQUAL"}}
+    }
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
 

@@ -13,7 +13,6 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
 
-import dacite
 import rich.progress
 from dataclasses_json import dataclass_json, config
 from pathvalidate import sanitize_filepath
@@ -24,7 +23,6 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp
-from dagshub.data_engine.client.data_client import dacite_config
 from dagshub.data_engine.client.models import (
     PreprocessingStatus,
     MetadataFieldSchema,

@@ -5,7 +5,6 @@ from typing import Any, List, Union, Optional, Set
 
 from dataclasses_json import dataclass_json, config
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
-from dagshub.data_engine.model.query import DatasourceQuery
 
 logger = logging.getLogger(__name__)
 
