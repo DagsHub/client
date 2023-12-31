@@ -65,9 +65,6 @@ class DatasourceQuery:
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
 
-        if as_of:
-            self._as_of = as_of
-
     def __repr__(self):
         if self.is_empty:
             return "Query: empty"
