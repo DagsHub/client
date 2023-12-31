@@ -168,7 +168,7 @@ class Datasource:
             self._query = DatasourceQuery()
 
     def __deepcopy__(self, memodict={}) -> "Datasource":
-        res = Datasource(self._source, self._query.__deepcopy__(), self._select, self._global_as_of)
+        res = Datasource(self._source, self._query.__deepcopy__())
         res.assigned_dataset = self.assigned_dataset
 
         # Carry over the update context, that way we'll keep track of the metadata being uploaded
