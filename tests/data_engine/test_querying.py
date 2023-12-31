@@ -161,7 +161,10 @@ def test_versioning_dataset_deserialize(ds):
     }
 
     ds._deserialize_from_gql_result(query)
-    assert ds._select == [{"name": "x", "asOf": 1700651566}, {"name": "y", "alias": "y_t1", "asOf": 1700651563}]
+    assert ds.get_query().selects == [
+        {"name": "x", "asOf": 1700651566},
+        {"name": "y", "alias": "y_t1", "asOf": 1700651563},
+    ]
 
 
 def test_composite_filter(ds):
@@ -292,7 +295,7 @@ def test_serialization(ds):
             {"filter": {"key": "col4", "value": str(5.0), "valueType": "FLOAT", "comparator": "EQUAL"}},
         ]
     }
-    assert ds2.get_query().serialize_graphql() == expected
+    assert ds2.get_query().serialize_graphql()["query"] == expected
 
 
 def test_deserialization_complex(ds):
@@ -301,41 +304,43 @@ def test_deserialization_complex(ds):
     add_float_fields(ds, "col4")
     queried = ds[((ds["col1"] > 5) & (ds["col2"] <= 3)) | ds["col3"].contains("aaa") | (ds["col4"] == 5.0)]
     serialized = {
-        "or": [
-            {
-                "or": [
-                    {
-                        "and": [
-                            {
-                                "filter": {
-                                    "key": "col1",
-                                    "value": str(5),
-                                    "valueType": "INTEGER",
-                                    "comparator": "GREATER_THAN",
-                                }
-                            },
-                            {
-                                "filter": {
-                                    "key": "col2",
-                                    "value": str(3),
-                                    "valueType": "INTEGER",
-                                    "comparator": "LESS_EQUAL_THAN",
-                                }
-                            },
-                        ]
-                    },
-                    {
-                        "filter": {
-                            "key": "col3",
-                            "value": "aaa",
-                            "valueType": "STRING",
-                            "comparator": "CONTAINS",
-                        }
-                    },
-                ]
-            },
-            {"filter": {"key": "col4", "value": str(5.0), "valueType": "FLOAT", "comparator": "EQUAL"}},
-        ]
+        "query": {
+            "or": [
+                {
+                    "or": [
+                        {
+                            "and": [
+                                {
+                                    "filter": {
+                                        "key": "col1",
+                                        "value": str(5),
+                                        "valueType": "INTEGER",
+                                        "comparator": "GREATER_THAN",
+                                    }
+                                },
+                                {
+                                    "filter": {
+                                        "key": "col2",
+                                        "value": str(3),
+                                        "valueType": "INTEGER",
+                                        "comparator": "LESS_EQUAL_THAN",
+                                    }
+                                },
+                            ]
+                        },
+                        {
+                            "filter": {
+                                "key": "col3",
+                                "value": "aaa",
+                                "valueType": "STRING",
+                                "comparator": "CONTAINS",
+                            }
+                        },
+                    ]
+                },
+                {"filter": {"key": "col4", "value": str(5.0), "valueType": "FLOAT", "comparator": "EQUAL"}},
+            ]
+        }
     }
 
     deserialized = DatasourceQuery.deserialize(serialized)
@@ -376,7 +381,7 @@ def test_not_serialization(ds):
     add_string_fields(ds, "col1")
     queried = ds[ds["col1"] != "aaa"]
     expected = {"filter": {"key": "col1", "value": "aaa", "valueType": "STRING", "comparator": "EQUAL"}, "not": True}
-    assert queried.get_query().serialize_graphql() == expected
+    assert queried.get_query().serialize_graphql()["query"] == expected
 
 
 def test_nand_serialization(ds):
@@ -390,7 +395,7 @@ def test_nand_serialization(ds):
         ],
         "not": True,
     }
-    assert queried.get_query().serialize_graphql() == expected
+    assert queried.get_query().serialize_graphql()["query"] == expected
 
 
 def test_nand_deserialization(ds):
@@ -398,11 +403,13 @@ def test_nand_deserialization(ds):
     add_int_fields(ds, "col2")
     queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
     serialized = {
-        "and": [
-            {"filter": {"key": "col1", "value": "aaa", "valueType": "STRING", "comparator": "EQUAL"}},
-            {"filter": {"key": "col2", "value": str(5), "valueType": "INTEGER", "comparator": "GREATER_THAN"}},
-        ],
-        "not": True,
+        "query": {
+            "and": [
+                {"filter": {"key": "col1", "value": "aaa", "valueType": "STRING", "comparator": "EQUAL"}},
+                {"filter": {"key": "col2", "value": str(5), "valueType": "INTEGER", "comparator": "GREATER_THAN"}},
+            ],
+            "not": True,
+        }
     }
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
@@ -431,13 +438,13 @@ def test_isnull_serialization(ds):
     queried = ds["col1"].is_null()
     expected = {"filter": {"key": "col1", "value": "", "valueType": "STRING", "comparator": "IS_NULL"}}
 
-    assert queried.get_query().serialize_graphql() == expected
+    assert queried.get_query().serialize_graphql()["query"] == expected
 
 
 def test_isnull_deserialization(ds):
     add_string_fields(ds, "col1")
     queried = ds["col1"].is_null()
-    serialized = {"filter": {"key": "col1", "value": "", "valueType": "STRING", "comparator": "IS_NULL"}}
+    serialized = {"query": {"filter": {"key": "col1", "value": "", "valueType": "STRING", "comparator": "IS_NULL"}}}
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
 
@@ -450,7 +457,7 @@ def test_isnull_raises_not_on_field(ds):
 def test_false_deserialization(ds):
     add_boolean_fields(ds, "col_bool")
     queried = ds["col_bool"] == False  # noqa
-    serialized = {"filter": {"key": "col_bool", "value": "False", "valueType": "BOOLEAN", "comparator": "EQUAL"}}
+    serialized = {"query": {"filter": {"key": "col_bool", "value": "False", "valueType": "BOOLEAN", "comparator": "EQUAL"}}}
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
 
@@ -480,7 +487,7 @@ def test_blob_deserialization(ds):
     add_blob_fields(ds, "field_blob")
     queried = ds["field_blob"].is_null()
 
-    serialized = {"filter": {"key": "field_blob", "value": "", "valueType": "BLOB", "comparator": "IS_NULL"}}
+    serialized = {"query": {"filter": {"key": "field_blob", "value": "", "valueType": "BLOB", "comparator": "IS_NULL"}}}
     deserialized = DatasourceQuery.deserialize(serialized)
     assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
 

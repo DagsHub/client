@@ -5,6 +5,7 @@ from typing import Any, List, Union, Optional, Set
 
 from dataclasses_json import dataclass_json, config
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
+from dagshub.data_engine.model.query import DatasourceQuery
 
 logger = logging.getLogger(__name__)
 
@@ -89,40 +90,3 @@ class DatasetResult:
     name: str
     datasource: DatasourceResult
     datasetQuery: str
-
-
-@dataclass_json
-@dataclass
-class DatasourceSerializedState:
-    """
-    Serialized state of the datasource.
-    This should be enough to recreate the exact copy of the datasource back (with additional requests)
-
-    Also carries additional information that might be useful for the user:
-        - if the state of the datasource at the point of saving differed from the dataset
-        - the timestamp of saving
-        - link to open the datasource on DagsHub
-    """
-
-    repo: str
-    """Repository this datasource is on"""
-    datasource_id: Union[str, int]
-    """ID of the datasource"""
-    datasource_name: str
-    """Name of the datasource"""
-    query: Optional[dict] = None
-    """Query at the time of saving"""
-    dataset_id: Optional[Union[str, int]] = None
-    """ID of the assigned dataset"""
-    dataset_name: Optional[str] = None
-    """Name of the assigned dataset"""
-    timestamp: Optional[float] = None
-    """Timestamp of serialization"""
-    modified: Optional[bool] = None
-    """Does the query differ from the query in the assigned dataset"""
-    link: Optional[str] = None
-    """URL to open this datasource on DagsHub"""
-
-    @property
-    def has_query(self):
-        return (self.query is not None) and (self.query.get("query") is not None)

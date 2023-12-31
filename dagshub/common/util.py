@@ -1,6 +1,8 @@
+import datetime
 import types
 import logging
 import importlib
+from typing import Union
 from urllib.parse import urljoin, quote
 
 logger = logging.getLogger(__name__)
@@ -9,6 +11,16 @@ logger = logging.getLogger(__name__)
 def multi_urljoin(*parts):
     """Shoutout to https://stackoverflow.com/a/55722792"""
     return urljoin(parts[0] + "/", "/".join(quote(part.strip("/"), safe="/") for part in parts[1:]))
+
+
+def to_timestamp(ts: Union[float, int, datetime.datetime]) -> int:
+    """
+    Converts datetime objects or any timestamp-likes into an integer timestamp used by DagsHub
+    """
+    if isinstance(ts, datetime.datetime):
+        return int(ts.timestamp())
+    else:
+        return int(ts)
 
 
 def lazy_load(module_name, source_package=None, callback=None):

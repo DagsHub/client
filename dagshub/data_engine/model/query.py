@@ -1,6 +1,6 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union, Dict
+from typing import TYPE_CHECKING, Optional, Union, Dict, List
 
 from treelib import Tree, Node
 
@@ -54,13 +54,26 @@ UNFILLED_NODE_TAG = "undefined"
 
 
 class DatasourceQuery:
-    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None, as_of: Optional[int] = None):
+    def __init__(
+        self,
+        column_or_query: Optional[Union[str, "DatasourceQuery"]] = None,
+        field_as_of: Optional[int] = None,
+        query_as_of: Optional[int] = None,
+        selects: Optional[List] = None,
+    ):
+        self.query_as_of = query_as_of
+        """The global as_of for the query"""
+
+        self.selects = selects
+        """The custom defined fields for the query"""
+
         self._operand_tree: Tree = Tree()
+
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name, will be filled later
             data = {"field": column_or_query}
-            if as_of:
-                data["as_of"] = int(as_of)
+            if field_as_of:
+                data["as_of"] = int(field_as_of)
             self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
@@ -142,6 +155,10 @@ class DatasourceQuery:
             composite_tree.paste(root_node.identifier, self._operand_tree)
             composite_tree.paste(root_node.identifier, other._operand_tree)
             self._operand_tree = composite_tree
+            if other.query_as_of is not None:
+                self.query_as_of = other.query_as_of
+            if other.selects is not None:
+                self.selects = other.selects
 
     @property
     def _column_filter_node(self) -> Node:
@@ -151,10 +168,17 @@ class DatasourceQuery:
     def _operand_root(self) -> Node:
         return self._operand_tree[self._operand_tree.root]
 
-    def serialize_graphql(self):
-        if self.is_empty:
+    def serialize_graphql(self) -> Optional[Dict]:
+        res = {}
+        if not self.is_empty:
+            res["query"] = self._serialize_node(self._operand_root, self._operand_tree)
+        if self.selects is not None:
+            res["select"] = self.selects
+        if self.query_as_of is not None:
+            res["asOf"] = self.query_as_of
+        if res == {}:
             return None
-        return self._serialize_node(self._operand_root, self._operand_tree)
+        return res
 
     @staticmethod
     def _serialize_node(node: Node, tree: Tree) -> Dict:
@@ -201,10 +225,15 @@ class DatasourceQuery:
 
     @staticmethod
     def deserialize(serialized_query: Dict) -> "DatasourceQuery":
-        q = DatasourceQuery()
+        """
+        Deserializes the query from a dictionary that contains keys: "query", "asOf", "select"
+        """
+        q = DatasourceQuery(query_as_of=serialized_query.get("asOf"), selects=serialized_query.get("select"))
         op_tree = Tree()
 
-        DatasourceQuery._deserialize_node(serialized_query, op_tree)
+        if "query" in serialized_query:
+            # This function updates op_tree as a side effect
+            DatasourceQuery._deserialize_node(serialized_query["query"], op_tree)
 
         q._operand_tree = op_tree
         return q
@@ -244,7 +273,7 @@ class DatasourceQuery:
         return self._operand_tree.to_dict(with_data=True)
 
     def __deepcopy__(self, memodict={}):
-        q = DatasourceQuery()
+        q = DatasourceQuery(query_as_of=self.query_as_of, selects=self.selects)
         q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 

@@ -26,14 +26,6 @@ class DatasetState:
     """
     ID of the datasource with which this dataset is associated
     """
-    select: Optional[List[Dict]] = None
-    """
-    List of selection fields in this Dataset
-    """
-    as_of: Optional[float] = None
-    """
-    Global timestamp applied to this Dataset
-    """
     query: Optional[DatasourceQuery] = None
     """
     Query of this dataset
@@ -46,10 +38,7 @@ class DatasetState:
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)
         res = DatasetState(dataset_id=dataset_id, dataset_name=dataset_name, datasource_id=datasource_id)
-        if "query" in dataset_query:
-            res.query = DatasourceQuery.deserialize(dataset_query["query"])
-        res.select = dataset_query.get("select")
-        res.global_as_of = dataset_query.get("asOf")
+        res.query = DatasourceQuery.deserialize(dataset_query)
         return res
 
     @staticmethod
