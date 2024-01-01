@@ -372,7 +372,7 @@ class RepoAPI:
             # If local_path was specified, assume that the local_path is the exact name of the file
             if local_path != Path("."):
                 # Saving to existing dir - append the name of remote file to the end a-la cp
-                if local_path.exists() and local_path.is_dir():
+                if local_path.is_dir():
                     remote_path = remote_path if keep_source_prefix else remote_path.name
                     file_path = local_path / remote_path
                 else:
