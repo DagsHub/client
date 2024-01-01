@@ -1,4 +1,5 @@
 import logging
+from os import PathLike
 from pathlib import Path, PurePosixPath
 
 import rich.progress
@@ -21,7 +22,7 @@ try:
 except ImportError:
     from cached_property import cached_property
 
-from typing import Optional, Tuple, Any, List
+from typing import Optional, Tuple, Any, List, Union
 
 import dacite
 
@@ -280,10 +281,8 @@ class RepoAPI:
             dir_queue.append((storage_path, list_fn_storage))
 
         # Initialize the queue
-        is_storage_path = str(path).lstrip("/").split("/")[0] in {"s3:", "gs:", "azure:"}
+        path, is_storage_path = self._sanitize_storage_path(path)
         if is_storage_path:
-            # Handle storage paths - they start with s3:/, gs:/ or azure:/
-            path = str(path).replace(":", "", 1)
             push_storage(path)
         else:
             push_folder(path)
@@ -317,9 +316,9 @@ class RepoAPI:
 
     def download(
         self,
-        remote_path,
-        local_path=".",
-        revision=None,
+        remote_path: Union[str, PathLike],
+        local_path: Union[str, PathLike] = ".",
+        revision: Optional[str] = None,
         recursive=True,
         keep_source_prefix=False,
         redownload=False,
@@ -363,8 +362,7 @@ class RepoAPI:
         if not remote_path:
             remote_path = "/"
         # For storage paths get rid of the colon in the beginning of the schema, the download urls won't have it either
-        if remote_path.split("/")[0] in {"s3:", "gs:", "azure:"}:
-            remote_path = remote_path.replace(":", "", 1)
+        remote_path, _ = self._sanitize_storage_path(remote_path)
         # Edge case - if the user requested a single file - different output path semantics
         if len(files) == 1 and files[0].path == remote_path:
             f = files[0]
@@ -392,6 +390,21 @@ class RepoAPI:
                 file_tuples.append((f.download_url, file_path))
         download_files(file_tuples, skip_if_exists=not redownload)
         log_message(f"Downloaded {len(files)} file(s) to {local_path.resolve()}")
+
+    @staticmethod
+    def _sanitize_storage_path(path: Union[str, PathLike]) -> Tuple[str, bool]:
+        """
+        Sanitizes storage paths for use in the traversal/download functions.
+        When user asks for ``s3:/prefix/file``, we need to request ``storage/s3/prefix/file``.
+        This function checks that the user has asked for a storage path (by the schema in the beginning)
+        and returns a path that can be used for these types of requests.
+        If the path is not a storage path, path is returned as is (converted to string).
+        """
+        path = str(path)
+        if path.lstrip("/").split("/")[0] in {"s3:", "gs:", "azure:"}:
+            path = str(path).lstrip("/").replace(":", "", 1)
+            return path, True
+        return path, False
 
     @cached_property
     def default_branch(self) -> str:
