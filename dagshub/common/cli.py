@@ -136,11 +136,30 @@ if False: will download to "<local_path>/test/file.txt"
 @click.option("--keep-prefix", is_flag=True, default=False, help=KEEP_PREFIX_HELP)
 @click.option("--not-recursive", is_flag=True, help="Don't download nested folders")
 @click.option("--redownload", is_flag=True, help="Redownload files, even if they already exist locally")
+@click.option(
+    "--download-storages",
+    is_flag=True,
+    default=False,
+    help="[Valid only when remote_path is '/'] Download integrated storage buckets as well as the repo content",
+)
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
 @click.pass_context
-def download(ctx, repo, remote_path, local_path, branch, not_recursive, keep_prefix, verbose, quiet, host, redownload):
+def download(
+    ctx,
+    repo,
+    remote_path,
+    local_path,
+    branch,
+    not_recursive,
+    keep_prefix,
+    verbose,
+    quiet,
+    host,
+    redownload,
+    download_storages,
+):
     """
     Download REMOTE_PATH from REPO to LOCAL_PATH
 
@@ -165,6 +184,7 @@ def download(ctx, repo, remote_path, local_path, branch, not_recursive, keep_pre
         recursive=not not_recursive,
         keep_source_prefix=keep_prefix,
         redownload=redownload,
+        download_storages=download_storages
     )
 
 
