@@ -48,8 +48,8 @@ class Datapoint:
     def save(self):
         """
         Commit changes to metadata done with one or more dictionary assignment syntax usages.
-        `Learn more here <https://dagshub.com/docs/use_cases/data_engine/\
-        enrich_datasource/#3-enriching-with-with-dictionary-like-assignment>`_.
+        `Learn more here <https://dagshub.com/docs/use_cases/data_engine/enrich_datasource\
+        /#3-enriching-with-with-dictionary-like-assignment>`_.
 
         Example::
 
