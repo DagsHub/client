@@ -47,14 +47,15 @@ class Datapoint:
 
     def save(self):
         """
-        call save to commit changes to metadata done with
-        one ore more dictionary assignment syntax usages.  
-        `Learn more here <https://dagshub.com/docs/use_cases/data_engine/enrich_datasource/#3-enriching-with-with-dictionary-like-assignment`_\.  
+        Commit changes to metadata done with one or more dictionary assignment syntax usages.
+        `Learn more here <https://dagshub.com/docs/use_cases/data_engine/\
+        enrich_datasource/#3-enriching-with-with-dictionary-like-assignment>`_.
+
         Example:
-        
+
             specific_data_point['metadata_field_name'] = 42
             specific_data_point.save()
-        
+
         """
 
         # if in context block, don't _upload_metadata, it will be done at context end
