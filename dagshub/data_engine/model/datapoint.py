@@ -51,7 +51,7 @@ class Datapoint:
         `Learn more here <https://dagshub.com/docs/use_cases/data_engine/\
         enrich_datasource/#3-enriching-with-with-dictionary-like-assignment>`_.
 
-        Example:
+        Example::
 
             specific_data_point['metadata_field_name'] = 42
             specific_data_point.save()
