@@ -60,7 +60,7 @@ class QueryFilterTree:
 
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name, will be filled later
-            data = {"field": column_or_query}
+            data: Dict[str, Union[str, int]] = {"field": column_or_query}
             if field_as_of is not None:
                 data["as_of"] = int(field_as_of)
             self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
