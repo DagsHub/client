@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, List, Union, Optional, Set
 
-from dataclasses_json import dataclass_json, config
+from dataclasses_json import config, DataClassJsonMixin
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 
 logger = logging.getLogger(__name__)
@@ -53,9 +53,8 @@ class ScanOption(str, enum.Enum):
     """
 
 
-@dataclass_json
 @dataclass
-class MetadataFieldSchema:
+class MetadataFieldSchema(DataClassJsonMixin):
     # This should match the GraphQL schema: MetadataFieldProps
     name: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))

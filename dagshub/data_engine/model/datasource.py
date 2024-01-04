@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
 
 import rich.progress
-from dataclasses_json import dataclass_json, config, LetterCase
+from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
@@ -59,9 +59,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_MLFLOW_ARTIFACT_NAME = "dagshub_datasource.json"
 
 
-@dataclass_json
 @dataclass
-class DatapointMetadataUpdateEntry(json.JSONEncoder):
+class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     url: str
     key: str
     value: str
@@ -1198,10 +1197,9 @@ class MetadataContextManager:
         return self._metadata_entries
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
-class DatasourceQuery:
-    as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none))
+class DatasourceQuery(DataClassJsonMixin):
+    as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
@@ -1220,7 +1218,7 @@ class DatasourceQuery:
     def compose(
         self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "QueryFilterTree", "Datasource"]]
     ):
-        other_query = None
+        other_query: Optional["DatasourceQuery"] = None
         # Extract the filter tree for composition
         if isinstance(other, (DatasourceQuery, Datasource)):
             if type(other) is Datasource:
@@ -1238,9 +1236,8 @@ class DatasourceQuery:
                 self.as_of = other_query.as_of
 
 
-@dataclass_json
 @dataclass
-class DatasourceSerializedState:
+class DatasourceSerializedState(DataClassJsonMixin):
     """
     Serialized state of the datasource.
     This should be enough to recreate the exact copy of the datasource back (with additional requests)
@@ -1291,7 +1288,7 @@ class DatasetState:
     """
     ID of the datasource with which this dataset is associated
     """
-    query: Optional[DatasourceQuery] = None
+    query: DatasourceQuery
     """
     Query of this dataset
     """
@@ -1302,8 +1299,8 @@ class DatasetState:
     ) -> "DatasetState":
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)
-        res = DatasetState(dataset_id=dataset_id, dataset_name=dataset_name, datasource_id=datasource_id)
-        res.query = DatasourceQuery.from_dict(dataset_query)
+        query = DatasourceQuery.from_dict(dataset_query)
+        res = DatasetState(dataset_id=dataset_id, dataset_name=dataset_name, datasource_id=datasource_id, query=query)
         return res
 
     @staticmethod
