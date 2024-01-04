@@ -113,7 +113,7 @@ class Field:
         if not ds.has_field(self.field_name):
             raise FieldNotFoundError(self.field_name)
 
-        res_dict = {"name": self.field_name}
+        res_dict: Dict[str, Union[str, int, None]] = {"name": self.field_name}
         if self.as_of is not None:
             res_dict["asOf"] = self.as_of_timestamp
         if self.alias:
@@ -681,15 +681,15 @@ class Datasource:
         return self._query.to_dict() != self.assigned_dataset.query.to_dict()
 
     @staticmethod
-    def load_from_serialized_state(state: Dict) -> "Datasource":
+    def load_from_serialized_state(state_dict: Dict) -> "Datasource":
         """
         Load a Datasource that was saved with :func:`save_to_file`
 
         Args:
-            state: Serialized JSON object
+            state_dict: Serialized JSON object
         """
 
-        state = DatasourceSerializedState.from_dict(state)
+        state = DatasourceSerializedState.from_dict(state_dict)
 
         ds_state = DatasourceState(repo=state.repo, name=state.datasource_name, id=state.datasource_id)
         ds_state.get_from_dagshub()
@@ -1295,7 +1295,7 @@ class DatasetState:
 
     @staticmethod
     def from_dataset_query(
-        dataset_id: int, dataset_name: str, datasource_id: int, dataset_query: Union[Dict, str]
+        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int], dataset_query: Union[Dict, str]
     ) -> "DatasetState":
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)
