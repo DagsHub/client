@@ -1,7 +1,9 @@
 import enum
 import logging
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Union, Dict, List
 
+from dataclasses_json import dataclass_json, config, LetterCase
 from treelib import Tree, Node
 
 from dagshub.data_engine.model.errors import WrongOperatorError
@@ -53,20 +55,12 @@ for k, v in fieldFilterOperandMap.items():
 UNFILLED_NODE_TAG = "undefined"
 
 
-class DatasourceQuery:
+class QueryFilterTree:
     def __init__(
         self,
         column_or_query: Optional[Union[str, "DatasourceQuery"]] = None,
         field_as_of: Optional[int] = None,
-        query_as_of: Optional[int] = None,
-        selects: Optional[List] = None,
     ):
-        self.query_as_of = query_as_of
-        """The global as_of for the query"""
-
-        self.selects = selects
-        """The custom defined fields for the query"""
-
         self._operand_tree: Tree = Tree()
 
         if type(column_or_query) is str:
@@ -90,7 +84,9 @@ class DatasourceQuery:
             return None
         return filter_node.data["field"]
 
-    def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
+    def compose(
+        self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource", "QueryFilterTree"]]
+    ):
         """
         Compose the current query with another query or a value using the specified operator.
 
@@ -134,8 +130,10 @@ class DatasourceQuery:
             new_tree.paste(not_node.identifier, self._operand_tree)
             self._operand_tree = new_tree
         else:
-            # The query is an actual query with a tree - make a subtree
-            if type(other) is not DatasourceQuery:
+            # The other side is an actual query with its own tree - make a subtree
+            if type(other) is DatasourceQuery:
+                other = other.query
+            if type(other) is not QueryFilterTree:
                 raise RuntimeError(f"Expected other argument to be a dataset, got {type(other)} instead")
             if op not in ["and", "or"]:
                 raise RuntimeError(
@@ -168,28 +166,21 @@ class DatasourceQuery:
     def _operand_root(self) -> Node:
         return self._operand_tree[self._operand_tree.root]
 
-    def serialize_graphql(self) -> Optional[Dict]:
-        res = {}
-        if not self.is_empty:
-            res["query"] = self._serialize_node(self._operand_root, self._operand_tree)
-        if self.selects is not None:
-            res["select"] = self.selects
-        if self.query_as_of is not None:
-            res["asOf"] = self.query_as_of
-        if res == {}:
+    def serialize(self) -> Optional[Dict]:
+        if self.is_empty:
             return None
-        return res
+        return self._serialize_node(self._operand_root, self._operand_tree)
 
     @staticmethod
     def _serialize_node(node: Node, tree: Tree) -> Dict:
         operand = node.tag
         if operand in ["and", "or"]:
             # recursively serialize children subqueries
-            return {operand: [DatasourceQuery._serialize_node(child, tree) for child in tree.children(node.identifier)]}
+            return {operand: [QueryFilterTree._serialize_node(child, tree) for child in tree.children(node.identifier)]}
         if operand == "not":
             assert len(tree.children(node.identifier)) == 1
             child = tree.children(node.identifier)[0]
-            serialized = DatasourceQuery._serialize_node(child, tree)
+            serialized = QueryFilterTree._serialize_node(child, tree)
             serialized["not"] = True
             return serialized
         else:
@@ -224,16 +215,16 @@ class DatasourceQuery:
             return res
 
     @staticmethod
-    def deserialize(serialized_query: Dict) -> "DatasourceQuery":
+    def deserialize(serialized_query: Dict) -> "QueryFilterTree":
         """
         Deserializes the query from a dictionary that contains keys: "query", "asOf", "select"
         """
-        q = DatasourceQuery(query_as_of=serialized_query.get("asOf"), selects=serialized_query.get("select"))
+        q = QueryFilterTree(query_as_of=serialized_query.get("asOf"), selects=serialized_query.get("select"))
         op_tree = Tree()
 
         if "query" in serialized_query:
             # This function updates op_tree as a side effect
-            DatasourceQuery._deserialize_node(serialized_query["query"], op_tree)
+            QueryFilterTree._deserialize_node(serialized_query["query"], op_tree)
 
         q._operand_tree = op_tree
         return q
@@ -265,7 +256,7 @@ class DatasourceQuery:
             main_node = Node(tag=op_type)
             tree.add_node(main_node, parent_node)
             for nested_node in val:
-                DatasourceQuery._deserialize_node(nested_node, tree, main_node)
+                QueryFilterTree._deserialize_node(nested_node, tree, main_node)
         else:
             raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
 
@@ -273,10 +264,30 @@ class DatasourceQuery:
         return self._operand_tree.to_dict(with_data=True)
 
     def __deepcopy__(self, memodict={}):
-        q = DatasourceQuery(query_as_of=self.query_as_of, selects=self.selects)
+        q = QueryFilterTree(query_as_of=self.query_as_of, selects=self.selects)
         q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 
     @property
     def is_empty(self):
         return self._operand_tree.root is None or self._column_filter_node is not None
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
+class DatasourceQuery:
+    as_of: Optional[int] = None
+    select: Optional[List] = None
+    filter: "QueryFilterTree" = field(
+        default=QueryFilterTree(),
+        metadata=config(field_name="query", encoder=QueryFilterTree.serialize, decoder=QueryFilterTree.deserialize),
+    )
+
+    def __deepcopy__(self, memodict={}):
+        other = DatasourceQuery(
+            as_of=self.as_of,
+            filter=self.filter.__deepcopy__(),
+        )
+        if self.select is not None:
+            other.select = self.select.copy()
+        return other

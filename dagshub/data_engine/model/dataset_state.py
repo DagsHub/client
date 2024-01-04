@@ -38,7 +38,7 @@ class DatasetState:
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)
         res = DatasetState(dataset_id=dataset_id, dataset_name=dataset_name, datasource_id=datasource_id)
-        res.query = DatasourceQuery.deserialize(dataset_query)
+        res.query = DatasourceQuery.from_dict(dataset_query)
         return res
 
     @staticmethod

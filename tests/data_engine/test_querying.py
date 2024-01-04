@@ -6,7 +6,7 @@ from dagshub.data_engine.model.datasource import (
     Field,
 )
 from dagshub.data_engine.model.errors import WrongOrderError, DatasetFieldComparisonError, FieldNotFoundError
-from dagshub.data_engine.model.query import DatasourceQuery, bytes_deserializer
+from dagshub.data_engine.model.query import QueryFilterTree, bytes_deserializer
 from tests.data_engine.util import (
     add_int_fields,
     add_string_fields,
@@ -295,7 +295,7 @@ def test_serialization(ds):
             {"filter": {"key": "col4", "value": str(5.0), "valueType": "FLOAT", "comparator": "EQUAL"}},
         ]
     }
-    assert ds2.get_query().serialize_graphql()["query"] == expected
+    assert ds2.get_query().serialize()["query"] == expected
 
 
 def test_deserialization_complex(ds):
@@ -343,8 +343,8 @@ def test_deserialization_complex(ds):
         }
     }
 
-    deserialized = DatasourceQuery.deserialize(serialized)
-    assert deserialized.serialize_graphql() == queried.get_query().serialize_graphql()
+    deserialized = QueryFilterTree.deserialize(serialized)
+    assert deserialized.serialize() == queried.get_query().serialize()
 
 
 def test_not_equals(ds):
@@ -381,7 +381,7 @@ def test_not_serialization(ds):
     add_string_fields(ds, "col1")
     queried = ds[ds["col1"] != "aaa"]
     expected = {"filter": {"key": "col1", "value": "aaa", "valueType": "STRING", "comparator": "EQUAL"}, "not": True}
-    assert queried.get_query().serialize_graphql()["query"] == expected
+    assert queried.get_query().serialize()["query"] == expected
 
 
 def test_nand_serialization(ds):
@@ -395,7 +395,7 @@ def test_nand_serialization(ds):
         ],
         "not": True,
     }
-    assert queried.get_query().serialize_graphql()["query"] == expected
+    assert queried.get_query().serialize()["query"] == expected
 
 
 def test_nand_deserialization(ds):
@@ -411,8 +411,8 @@ def test_nand_deserialization(ds):
             "not": True,
         }
     }
-    deserialized = DatasourceQuery.deserialize(serialized)
-    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+    deserialized = QueryFilterTree.deserialize(serialized)
+    assert queried.get_query().serialize() == deserialized.serialize()
 
 
 def test_isnull(ds):
@@ -438,15 +438,15 @@ def test_isnull_serialization(ds):
     queried = ds["col1"].is_null()
     expected = {"filter": {"key": "col1", "value": "", "valueType": "STRING", "comparator": "IS_NULL"}}
 
-    assert queried.get_query().serialize_graphql()["query"] == expected
+    assert queried.get_query().serialize()["query"] == expected
 
 
 def test_isnull_deserialization(ds):
     add_string_fields(ds, "col1")
     queried = ds["col1"].is_null()
     serialized = {"query": {"filter": {"key": "col1", "value": "", "valueType": "STRING", "comparator": "IS_NULL"}}}
-    deserialized = DatasourceQuery.deserialize(serialized)
-    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+    deserialized = QueryFilterTree.deserialize(serialized)
+    assert queried.get_query().serialize() == deserialized.serialize()
 
 
 def test_isnull_raises_not_on_field(ds):
@@ -460,8 +460,8 @@ def test_false_deserialization(ds):
     serialized = {
         "query": {"filter": {"key": "col_bool", "value": "False", "valueType": "BOOLEAN", "comparator": "EQUAL"}}
     }
-    deserialized = DatasourceQuery.deserialize(serialized)
-    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+    deserialized = QueryFilterTree.deserialize(serialized)
+    assert queried.get_query().serialize() == deserialized.serialize()
 
 
 def test_throws_on_nonexistent_field(ds):
@@ -490,8 +490,8 @@ def test_blob_deserialization(ds):
     queried = ds["field_blob"].is_null()
 
     serialized = {"query": {"filter": {"key": "field_blob", "value": "", "valueType": "BLOB", "comparator": "IS_NULL"}}}
-    deserialized = DatasourceQuery.deserialize(serialized)
-    assert queried.get_query().serialize_graphql() == deserialized.serialize_graphql()
+    deserialized = QueryFilterTree.deserialize(serialized)
+    assert queried.get_query().serialize() == deserialized.serialize()
 
 
 def test_sequential_querying(ds):

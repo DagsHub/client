@@ -40,7 +40,7 @@ from dagshub.data_engine.model.errors import (
     DatasetNotFoundError,
 )
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
-from dagshub.data_engine.model.query import DatasourceQuery
+from dagshub.data_engine.model.query import QueryFilterTree, DatasourceQuery
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 from dagshub.data_engine.model.datasource_state import DatasourceState
 
@@ -190,13 +190,13 @@ class Datasource:
 
         :meta private:
         """
-        return self._query.serialize_graphql()
+        return self._query.to_dict()
 
     def _deserialize_from_gql_result(self, query_dict: Dict):
         """
         Imports query information from ``query_dict``
         """
-        self._query = DatasourceQuery.deserialize(query_dict)
+        self._query = DatasourceQuery.from_dict(query_dict)
 
     def load_from_dataset(
         self, dataset_id: Optional[Union[str, int]] = None, dataset_name: Optional[str] = None, change_query=True
@@ -927,7 +927,7 @@ class Datasource:
         if type(other) is str:
             if not self.has_field(other):
                 raise FieldNotFoundError(other)
-            other_query = DatasourceQuery(other, query_as_of=self._query.query_as_of, selects=self._query.selects)
+            other_query = QueryFilterTree(other)
             if self._query.is_empty:
                 new_ds._query = other_query
             else:
@@ -936,11 +936,9 @@ class Datasource:
         elif type(other) is Field:
             if not self.has_field(other.field_name):
                 raise FieldNotFoundError(other.field_name)
-            new_ds._query = DatasourceQuery(
+            new_ds._query = QueryFilterTree(
                 other.field_name,
                 field_as_of=other.as_of_timestamp,
-                query_as_of=self._query.query_as_of,
-                selects=self._query.selects,
             )
             return new_ds
         # "index" is a datasource with a query - return the datasource inside
@@ -1055,7 +1053,7 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "DatasourceQuery"]] = None
+        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree"]] = None
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
@@ -1219,10 +1217,7 @@ class DatasourceSerializedState:
     """ID of the datasource"""
     datasource_name: str
     """Name of the datasource"""
-    query: Optional[DatasourceQuery] = field(default=None, metadata=config(
-        encoder=DatasourceQuery.serialize_graphql,
-        decoder=DatasourceQuery.deserialize,
-    ))
+    query: DatasourceQuery
     """Query at the time of saving"""
     dataset_id: Optional[Union[str, int]] = None
     """ID of the assigned dataset"""
