@@ -1,6 +1,6 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union, Dict
+from typing import Optional, Union, Dict
 
 from treelib import Tree, Node
 
@@ -79,9 +79,7 @@ class QueryFilterTree:
             return None
         return filter_node.data["field"]
 
-    def compose(
-        self, op: str, other: Optional[Union[str, int, float, "QueryFilterTree"]]
-    ):
+    def compose(self, op: str, other: Optional[Union[str, int, float, "QueryFilterTree"]]):
         """
         Compose the current query with another query or a value using the specified operator.
 
@@ -253,4 +251,3 @@ class QueryFilterTree:
     @property
     def is_empty(self):
         return self._operand_tree.root is None or self._column_filter_node is not None
-
