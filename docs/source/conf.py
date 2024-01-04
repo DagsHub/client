@@ -6,6 +6,11 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
+import sys
+project_root = os.path.join(__file__, "../../..")
+sys.path.insert(0, os.path.abspath(project_root))
+
 project = "DagsHub Client"
 copyright = "2023, DagsHub"
 author = "DagsHub"

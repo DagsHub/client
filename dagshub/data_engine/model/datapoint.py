@@ -47,21 +47,15 @@ class Datapoint:
 
     def save(self):
         """
-        Commit metadata changes on this datapoint.
+        Commit changes to metadata done with one or more dictionary assignment syntax usages.
+        `Learn more here <https://dagshub.com/docs/use_cases/data_engine/enrich_datasource\
+        /#3-enriching-with-with-dictionary-like-assignment>`_.
 
         Example::
 
-            datapoint["field"] = value
-            datapoint.save()
+            specific_data_point['metadata_field_name'] = 42
+            specific_data_point.save()
 
-        .. note::
-            If done inside a metadata context, ``save()`` doesn't need to be called,
-            all changes will be batched together and uploaded on context exit.
-            This is the recommended way to edit a lot of datapoints at once::
-
-                with ds.metadata_context():
-                    for i, dp in enumerate(ds.all()):
-                        dp["number"] = i
         """
 
         # if in context block, don't _upload_metadata, it will be done at context end
