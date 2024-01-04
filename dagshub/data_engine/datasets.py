@@ -4,8 +4,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine import datasources
-from dagshub.data_engine.model.dataset_state import DatasetState
-from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME
+from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME, DatasetState
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DatasetNotFoundError
 

@@ -1,16 +1,11 @@
 import enum
 import logging
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, Union, Dict, List
+from typing import TYPE_CHECKING, Optional, Union, Dict
 
-from dataclasses_json import dataclass_json, config, LetterCase
 from treelib import Tree, Node
 
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
-
-if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +53,7 @@ UNFILLED_NODE_TAG = "undefined"
 class QueryFilterTree:
     def __init__(
         self,
-        column_or_query: Optional[Union[str, "DatasourceQuery"]] = None,
+        column_or_query: Optional[Union[str, "QueryFilterTree"]] = None,
         field_as_of: Optional[int] = None,
     ):
         self._operand_tree: Tree = Tree()
@@ -66,7 +61,7 @@ class QueryFilterTree:
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name, will be filled later
             data = {"field": column_or_query}
-            if field_as_of:
+            if field_as_of is not None:
                 data["as_of"] = int(field_as_of)
             self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
         elif column_or_query is not None:
@@ -75,7 +70,7 @@ class QueryFilterTree:
     def __repr__(self):
         if self.is_empty:
             return "Query: empty"
-        return f"Query: {self.to_dict()}"
+        return f"Query: {self.tree_to_dict()}"
 
     @property
     def column_filter(self) -> Optional[str]:
@@ -85,7 +80,7 @@ class QueryFilterTree:
         return filter_node.data["field"]
 
     def compose(
-        self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource", "QueryFilterTree"]]
+        self, op: str, other: Optional[Union[str, int, float, "QueryFilterTree"]]
     ):
         """
         Compose the current query with another query or a value using the specified operator.
@@ -131,8 +126,6 @@ class QueryFilterTree:
             self._operand_tree = new_tree
         else:
             # The other side is an actual query with its own tree - make a subtree
-            if type(other) is DatasourceQuery:
-                other = other.query
             if type(other) is not QueryFilterTree:
                 raise RuntimeError(f"Expected other argument to be a dataset, got {type(other)} instead")
             if op not in ["and", "or"]:
@@ -153,10 +146,6 @@ class QueryFilterTree:
             composite_tree.paste(root_node.identifier, self._operand_tree)
             composite_tree.paste(root_node.identifier, other._operand_tree)
             self._operand_tree = composite_tree
-            if other.query_as_of is not None:
-                self.query_as_of = other.query_as_of
-            if other.selects is not None:
-                self.selects = other.selects
 
     @property
     def _column_filter_node(self) -> Node:
@@ -216,16 +205,9 @@ class QueryFilterTree:
 
     @staticmethod
     def deserialize(serialized_query: Dict) -> "QueryFilterTree":
-        """
-        Deserializes the query from a dictionary that contains keys: "query", "asOf", "select"
-        """
-        q = QueryFilterTree(query_as_of=serialized_query.get("asOf"), selects=serialized_query.get("select"))
+        q = QueryFilterTree()
         op_tree = Tree()
-
-        if "query" in serialized_query:
-            # This function updates op_tree as a side effect
-            QueryFilterTree._deserialize_node(serialized_query["query"], op_tree)
-
+        QueryFilterTree._deserialize_node(serialized_query, op_tree)
         q._operand_tree = op_tree
         return q
 
@@ -260,11 +242,11 @@ class QueryFilterTree:
         else:
             raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
 
-    def to_dict(self):
+    def tree_to_dict(self):
         return self._operand_tree.to_dict(with_data=True)
 
     def __deepcopy__(self, memodict={}):
-        q = QueryFilterTree(query_as_of=self.query_as_of, selects=self.selects)
+        q = QueryFilterTree()
         q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 
@@ -272,22 +254,3 @@ class QueryFilterTree:
     def is_empty(self):
         return self._operand_tree.root is None or self._column_filter_node is not None
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class DatasourceQuery:
-    as_of: Optional[int] = None
-    select: Optional[List] = None
-    filter: "QueryFilterTree" = field(
-        default=QueryFilterTree(),
-        metadata=config(field_name="query", encoder=QueryFilterTree.serialize, decoder=QueryFilterTree.deserialize),
-    )
-
-    def __deepcopy__(self, memodict={}):
-        other = DatasourceQuery(
-            as_of=self.as_of,
-            filter=self.filter.__deepcopy__(),
-        )
-        if self.select is not None:
-            other.select = self.select.copy()
-        return other

@@ -13,6 +13,11 @@ def multi_urljoin(*parts):
     return urljoin(parts[0] + "/", "/".join(quote(part.strip("/"), safe="/") for part in parts[1:]))
 
 
+def exclude_if_none(value):
+    """For skipping serializing None values in dataclasses_json"""
+    return value is None
+
+
 def to_timestamp(ts: Union[float, int, datetime.datetime]) -> int:
     """
     Converts datetime objects or any timestamp-likes into an integer timestamp used by DagsHub

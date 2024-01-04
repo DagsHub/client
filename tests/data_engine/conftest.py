@@ -2,8 +2,7 @@ import pytest
 
 from dagshub.data_engine import datasources
 from dagshub.data_engine.model.datapoint import Datapoint
-from dagshub.data_engine.model.dataset_state import DatasetState
-from dagshub.data_engine.model.datasource import Datasource
+from dagshub.data_engine.model.datasource import Datasource, DatasetState
 from dagshub.data_engine.model.query_result import QueryResult
 from tests.data_engine.util import add_string_fields
 
