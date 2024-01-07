@@ -193,6 +193,8 @@ class HTTPBearerAuth(Auth):
     """Attaches HTTP Bearer Authorization to the given Request object."""
 
     def __init__(self, token):
+        if token == "":
+            raise ValueError("token can't be empty")
         self.token = token
 
     def auth_flow(self, request: Request) -> Generator[Request, Response, None]:
