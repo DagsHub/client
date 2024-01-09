@@ -163,7 +163,7 @@ class DataClient:
         try:
             resp = self.client.execute(q, variable_values=params)
         except TransportQueryError as e:
-            raise TransportQueryError(f"Support-Id: {self.client.transport.response_headers['X-DagsHub-Support-Id']}") from e
+            raise TransportQueryError(f"Support-Id: {self.client.transport.response_headers.get('X-DagsHub-Support-Id')}") from e
         return resp
 
     def _datasource_query(
