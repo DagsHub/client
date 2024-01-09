@@ -25,6 +25,7 @@ from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
@@ -163,7 +164,7 @@ class DataClient:
         try:
             resp = self.client.execute(q, variable_values=params)
         except TransportQueryError as e:
-            raise TransportQueryError(f"Support-Id: {self.client.transport.response_headers.get('X-DagsHub-Support-Id')}") from e
+            raise DataEngineGqlError(self.client.transport.response_headers.get('X-DagsHub-Support-Id')) from e
         return resp
 
     def _datasource_query(

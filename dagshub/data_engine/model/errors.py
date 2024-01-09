@@ -32,6 +32,15 @@ class FieldNotFoundError(Exception):
         return f"Field {self.field} does not exist on this datasource"
 
 
+class DataEngineGqlError(Exception):
+    def __init__(self, support_id: str):
+        super().__init__()
+        self.support_id = support_id
+
+    def __str__(self):
+        return f"Support Id: {self.support_id}"
+
+
 class DatasourceAlreadyExistsError(Exception):
     def __init__(self, datasource):
         super().__init__()
