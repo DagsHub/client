@@ -159,7 +159,11 @@ class DataClient:
         if params is not None:
             logger.debug(f"Params: {params}")
         q = gql.gql(query)
-        resp = self.client.execute(q, variable_values=params)
+        try:
+            resp = self.client.execute(q, variable_values=params)
+        except gql.transport.exceptions.TransportQueryError as e:
+            print(f"Support-Id header: {self.client.transport.response_headers['X-DagsHub-Support-Id']}")
+            raise e
         return resp
 
     def _datasource_query(
