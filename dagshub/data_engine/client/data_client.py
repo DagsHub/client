@@ -4,6 +4,7 @@ from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Set
 import dacite
 import gql
 import rich.progress
+from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
 import dagshub.auth
@@ -161,9 +162,8 @@ class DataClient:
         q = gql.gql(query)
         try:
             resp = self.client.execute(q, variable_values=params)
-        except gql.transport.exceptions.TransportQueryError as e:
-            print(f"Support-Id header: {self.client.transport.response_headers['X-DagsHub-Support-Id']}")
-            raise e
+        except TransportQueryError as e:
+            raise TransportQueryError(f"Support-Id: {self.client.transport.response_headers['X-DagsHub-Support-Id']}") from e
         return resp
 
     def _datasource_query(
