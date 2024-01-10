@@ -164,7 +164,7 @@ class DataClient:
         try:
             resp = self.client.execute(q, variable_values=params)
         except TransportQueryError as e:
-            raise DataEngineGqlError(self.client.transport.response_headers.get('X-DagsHub-Support-Id')) from e
+            raise DataEngineGqlError(e, self.client.transport.response_headers.get('X-DagsHub-Support-Id'))
         return resp
 
     def _datasource_query(

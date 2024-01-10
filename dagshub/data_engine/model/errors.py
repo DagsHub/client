@@ -33,12 +33,14 @@ class FieldNotFoundError(Exception):
 
 
 class DataEngineGqlError(Exception):
-    def __init__(self, support_id: str):
+    def __init__(self, original_exception, support_id):
         super().__init__()
+        self.original_exception = original_exception
         self.support_id = support_id
 
     def __str__(self):
-        return f"Support Id: {self.support_id}"
+        return f"original exception: {self.original_exception.__class__.__name__} - {self.original_exception} \n" \
+               f"support id: {self.support_id}"
 
 
 class DatasourceAlreadyExistsError(Exception):
