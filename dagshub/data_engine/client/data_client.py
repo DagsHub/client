@@ -4,6 +4,7 @@ from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Set
 import dacite
 import gql
 import rich.progress
+from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
 import dagshub.auth
@@ -24,6 +25,7 @@ from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
@@ -159,7 +161,10 @@ class DataClient:
         if params is not None:
             logger.debug(f"Params: {params}")
         q = gql.gql(query)
-        resp = self.client.execute(q, variable_values=params)
+        try:
+            resp = self.client.execute(q, variable_values=params)
+        except TransportQueryError as e:
+            raise DataEngineGqlError(e, self.client.transport.response_headers.get('X-DagsHub-Support-Id'))
         return resp
 
     def _datasource_query(
