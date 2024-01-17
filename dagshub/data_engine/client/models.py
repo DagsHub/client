@@ -61,6 +61,7 @@ class MetadataFieldSchema:
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     multiple: bool
     tags: Optional[Set[str]]
+    deleted: Optional[bool]
 
     def __repr__(self):
         res = f"{self.name} ({self.valueType.value})"

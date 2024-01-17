@@ -46,6 +46,10 @@ class MetadataFieldBuilder:
             )
         return self._schema
 
+    def delete(self):
+        self._schema.deleted = True
+        return self
+
     def set_type(self, t: Union[Type, DagshubDataType]) -> "MetadataFieldBuilder":
         """
         Set the type of the field.
@@ -58,7 +62,7 @@ class MetadataFieldBuilder:
 
         if self._schema is None:
             self._schema = MetadataFieldSchema(
-                name=self._field_name, valueType=backing_type, multiple=False, tags=set()
+                name=self._field_name, valueType=backing_type, multiple=False, tags=set(), deleted=False
             )
             if issubclass(t, DagshubDataType) and t.custom_tags is not None:
                 self._schema.tags = t.custom_tags.copy()
