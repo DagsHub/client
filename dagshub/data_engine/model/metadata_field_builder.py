@@ -46,6 +46,10 @@ class MetadataFieldBuilder:
             )
         return self._schema
 
+    def delete(self):
+        self._schema.remove = True
+        return self
+
     def set_type(self, t: Union[Type, DagshubDataType]) -> "MetadataFieldBuilder":
         """
         Set the type of the field.
