@@ -24,6 +24,10 @@ from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.query_result import QueryResult
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
@@ -175,8 +179,27 @@ class DataClient:
             first=limit,
             after=after,
         )
+        q.validate_params(params, self.introspection_dict)
+        return self._exec(q.generate(), params)["datasourceQuery"]
 
-        return self._exec(q, params)["datasourceQuery"]
+    @cached_property
+    def introspection_dict(self):
+        introspection = """
+{
+  __schema {
+    types {
+      name
+      inputFields {
+        name
+        type {
+          name
+        }
+      }
+    }
+  }
+}
+        """
+        return self._exec(introspection)
 
     def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
         """

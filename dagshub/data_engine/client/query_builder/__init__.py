@@ -9,7 +9,8 @@
 # coding: utf-8
 
 
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any, Callable
+ParamValidator = Callable[[Dict[str, Any], Dict[str, Any]], None]
 
 
 class GqlQuery:
@@ -19,6 +20,7 @@ class GqlQuery:
         self.query_field: str = ""
         self.operation_field: str = ""
         self.fragment_field: str = ""
+        self.params_validators: List[ParamValidator] = []
 
     def remove_duplicate_spaces(self, query: str) -> str:
         return " ".join(query.split())
@@ -94,6 +96,10 @@ class GqlQuery:
         self.fragment_field = f"fragment {name} on {interface}"
         return self
 
+    def param_validator(self, validator: ParamValidator):
+        self.params_validators.append(validator)
+        return self
+
     def generate(self) -> str:
         if self.fragment_field != "":
             self.object = f"{self.fragment_field} {self.return_field}"
@@ -106,3 +112,7 @@ class GqlQuery:
                 self.object = self.operation_field + " { " + self.query_field + " " + self.return_field + " }"
 
         return self.remove_duplicate_spaces(self.object)
+
+    def validate_params(self, params: Dict[str, Any], introspection_dict: Dict[str, any]):
+        for validator in self.params_validators:
+            validator(params, introspection_dict)
