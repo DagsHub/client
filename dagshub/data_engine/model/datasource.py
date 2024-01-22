@@ -61,6 +61,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
+    removeDatapoint: bool = False
 
 
 @dataclass
@@ -959,7 +960,7 @@ class MetadataContextManager:
         self._metadata_entries: List[DatapointMetadataUpdateEntry] = []
         self._multivalue_fields = datasource._get_multivalue_fields()
 
-    def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any]):
+    def update_metadata(self, datapoints: Union[List[str], str], metadata: Dict[str, Any], remove_datapoint=False):
         """
         Update metadata for the specified datapoints.
 
@@ -993,6 +994,17 @@ class MetadataContextManager:
         field_value_types = {f.name: f.valueType for f in self._datasource.fields}
 
         for dp in datapoints:
+            if remove_datapoint:
+                self._metadata_entries.append(
+                    DatapointMetadataUpdateEntry(
+                        url=dp,
+                        removeDatapoint=remove_datapoint,
+                        key=0,
+                        value=0,
+                        valueType=MetadataFieldType.INTEGER,
+                    )
+                )
+                continue
             for k, v in metadata.items():
                 if v is None:
                     continue
