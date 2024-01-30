@@ -208,7 +208,7 @@ class DataClient:
 
     def delete_metadata(self, datasource: Datasource, entries: List[DatapointDeleteMetadataEntry]):
         """
-        Update the Datasource with the metadata entry
+        Delete a metadata from a datapoint
 
         Args:
             datasource (Datasource): The datasource instance to be updated
