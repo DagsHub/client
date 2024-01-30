@@ -45,6 +45,9 @@ class Datapoint:
     def __setitem__(self, key, value):
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
+    def delete_metadata_value(self, key):
+        self.datasource.delete_metadata(self.path, key)
+
     def save(self):
         """
         Commit changes to metadata done with one or more dictionary assignment syntax usages.

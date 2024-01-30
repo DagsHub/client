@@ -63,6 +63,13 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     allowMultiple: bool = False
 
 
+@dataclass_json
+@dataclass
+class DatapointDeleteMetadataEntry(json.JSONEncoder):
+    url: str
+    key: str
+
+
 @dataclass
 class Field:
     """
@@ -539,6 +546,13 @@ class Datasource:
                 self.source.client.update_metadata(self, entries)
                 progress.update(total_task, advance=upload_batch_size)
             progress.update(total_task, completed=total_entries, refresh=True)
+
+        # Update the status from dagshub, so we get back the new metadata columns
+        self.source.get_from_dagshub()
+
+    def delete_metadata(self, path, key):
+        metadata_entries = [DatapointDeleteMetadataEntry(url=path, key=key)]
+        self.source.client.delete_metadata(self, metadata_entries)
 
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()

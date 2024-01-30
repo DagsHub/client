@@ -24,7 +24,8 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, \
+    DatapointDeleteMetadataEntry
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
@@ -204,6 +205,29 @@ class DataClient:
             datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
         )
         return self._exec(q, params)
+
+    def delete_metadata(self, datasource: Datasource, entries: List[DatapointDeleteMetadataEntry]):
+        """
+        Update the Datasource with the metadata entry
+
+        Args:
+            datasource (Datasource): The datasource instance to be updated
+            entries (List[DatapointDeleteMetadataUpdateEntry]): The new metadata entries
+
+        Returns:
+            Updates the Datasource.
+
+        """
+        q = GqlMutations.delete_metadata()
+
+        assert datasource.source.id is not None
+        assert len(entries) > 0
+
+        params = GqlMutations.delete_metadata_params(
+            datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
+        )
+        return self._exec(q, params)
+
 
     def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
         q = GqlMutations.update_metadata_field()
