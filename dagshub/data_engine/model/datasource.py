@@ -552,7 +552,7 @@ class Datasource:
         self.source.get_from_dagshub()
 
     def delete_metadata(self, path, id, key):
-        metadata_entries = [DatapointDeleteMetadataEntry(datapointId=id,  url=path, key=key)]
+        metadata_entries = [DatapointDeleteMetadataEntry(datapointId=id, url=path, key=key)]
         self.source.client.delete_metadata(self, metadata_entries)
 
         # Update the status from dagshub, so we get back the new metadata columns
