@@ -55,14 +55,10 @@ class GqlMutations:
             .operation(
                 "mutation",
                 name="deleteMetadata",
-                input={"$datasource": "ID!", "$datapoints": "[DatapointMetadataDeleteInput!]!"},
+                input={"$datasource": "ID!", "$metaDeletions": "[DatapointMetadataDeleteInput!]!"},
             )
-            .query("deleteMetadata", input={"datasource": "$datasource", "datapoints": "$datapoints"})
-            .fields(
-                [
-                    "path",
-                ]
-            )
+            .query("deleteMetadata", input={"datasource": "$datasource", "metaDeletions": "$metaDeletions"})
+
             .generate()
         )
         return q
@@ -98,10 +94,10 @@ class GqlMutations:
         }
 
     @staticmethod
-    def delete_metadata_params(datasource_id: Union[int, str], datapoints: List[Dict[str, Any]]):
+    def delete_metadata_params(datasource_id: Union[int, str], metaDeletions: List[Dict[str, Any]]):
         return {
             "datasource": datasource_id,
-            "datapoints": datapoints,
+            "metaDeletions": metaDeletions,
         }
 
     def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: List[Dict[str, Any]]):

@@ -66,6 +66,7 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
 @dataclass_json
 @dataclass
 class DatapointDeleteMetadataEntry(json.JSONEncoder):
+    datapointId: str
     url: str
     key: str
 
@@ -550,8 +551,8 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def delete_metadata(self, path, key):
-        metadata_entries = [DatapointDeleteMetadataEntry(url=path, key=key)]
+    def delete_metadata(self, path, id, key):
+        metadata_entries = [DatapointDeleteMetadataEntry(datapointId=id,  url=path, key=key)]
         self.source.client.delete_metadata(self, metadata_entries)
 
         # Update the status from dagshub, so we get back the new metadata columns

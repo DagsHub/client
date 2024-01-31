@@ -224,16 +224,14 @@ class DataClient:
         assert len(entries) > 0
 
         params = GqlMutations.delete_metadata_params(
-            datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
+            datasource_id=datasource.source.id, metaDeletions=[e.to_dict() for e in entries]
         )
         return self._exec(q, params)
-
 
     def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
         q = GqlMutations.update_metadata_field()
 
         assert datasource.source.id is not None
-        # assert len(entries) > 0
 
         params = GqlMutations.update_metadata_fields_params(
             datasource_id=datasource.source.id, metadata_field_props=[e.to_dict() for e in metadata_field_props]

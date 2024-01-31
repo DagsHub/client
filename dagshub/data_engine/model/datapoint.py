@@ -46,7 +46,7 @@ class Datapoint:
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
     def delete_metadata(self, name):
-        self.datasource.delete_metadata(self.path, name)
+        self.datasource.delete_metadata(self.path, self.datapoint_id, name)
 
     def save(self):
         """
