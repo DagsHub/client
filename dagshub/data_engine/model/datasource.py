@@ -56,7 +56,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MLFLOW_ARTIFACT_NAME = "dagshub_datasource.json"
+DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
 
 
 @dataclass
