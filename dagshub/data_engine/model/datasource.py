@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     import fiftyone as fo
     import pandas
     import mlflow
+    import mlflow.entities
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
@@ -609,15 +610,18 @@ class Datasource:
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
 
-    def log_to_mlflow(self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME):
+    def log_to_mlflow(self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional[mlflow.entities.Run] = None):
         """
         Logs the current datasource state to MLflow as an artifact.
 
         Args:
             artifact_name: Name of the artifact that will be stored in the MLflow run
         """
-        run = mlflow.active_run()
-        mlflow.log_dict(self._to_dict(), artifact_name)
+        if run is None:
+            run = mlflow.active_run()
+            if run is None:
+                raise RuntimeError("No mlflow run is currently active")
+        mlflow.MlflowClient().log_dict(run.info.run_id, self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
 
     def save_to_file(self, path: Union[str, PathLike] = ".") -> Path:
