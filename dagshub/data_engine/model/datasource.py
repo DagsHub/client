@@ -928,22 +928,18 @@ class Datasource:
 
         # Otherwise we're doing querying
         new_ds = self.__deepcopy__()
-        if type(other) is str:
-            if not self.has_field(other):
-                raise FieldNotFoundError(other)
-            other_query = QueryFilterTree(other)
+        if isinstance(other, (str, Field)):
+            query_field: Field = Field(other) if type(other) is str else other
+            other_query = QueryFilterTree(
+                query_field.field_name,
+                query_field.as_of_timestamp,
+            )
+            if not self.has_field(query_field.field_name):
+                raise FieldNotFoundError(query_field.field_name)
             if self._query.filter.is_empty:
                 new_ds._query.filter = other_query
             else:
                 new_ds._query.compose("and", other_query)
-            return new_ds
-        elif type(other) is Field:
-            if not self.has_field(other.field_name):
-                raise FieldNotFoundError(other.field_name)
-            new_ds._query.filter = QueryFilterTree(
-                other.field_name,
-                field_as_of=other.as_of_timestamp,
-            )
             return new_ds
         # "index" is a datasource with a query - return the datasource inside
         # Example:
