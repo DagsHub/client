@@ -9,8 +9,14 @@ import yaml
 from httpx import Auth
 
 from dagshub.auth import oauth
-from dagshub.auth.token_auth import HTTPBearerAuth, DagshubTokenABC, TokenDeserializationError, AppDagshubToken, \
-    EnvVarDagshubToken, DagshubAuthenticator
+from dagshub.auth.token_auth import (
+    HTTPBearerAuth,
+    DagshubTokenABC,
+    TokenDeserializationError,
+    AppDagshubToken,
+    EnvVarDagshubToken,
+    DagshubAuthenticator,
+)
 from dagshub.common import config
 from dagshub.common.helpers import http_request
 from dagshub.common.util import multi_urljoin
@@ -110,13 +116,13 @@ class TokenStorage:
 
     def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
         """
-         This function does following:
-         - Iterates over all tokens in the cache for the provided host
-         - Finds a first valid token and returns it
-         - If it finds an invalid token, it deletes it from the cache
+        This function does following:
+        - Iterates over all tokens in the cache for the provided host
+        - Finds a first valid token and returns it
+        - If it finds an invalid token, it deletes it from the cache
 
-         We're using a set of known good tokens to skip rechecking for token validity every time
-         """
+        We're using a set of known good tokens to skip rechecking for token validity every time
+        """
 
         host = host or config.host
         if host == config.host and config.token is not None:
@@ -156,11 +162,10 @@ class TokenStorage:
                 if fail_if_no_token:
                     raise RuntimeError(
                         f"No valid tokens found for host '{host}'.\n"
-                        "Log into DagsHub by executing `dagshub login` in your terminal")
-                else:
-                    logger.debug(
-                        f"No valid tokens found for host '{host}'. Authenticating with OAuth"
+                        "Log into DagsHub by executing `dagshub login` in your terminal"
                     )
+                else:
+                    logger.debug(f"No valid tokens found for host '{host}'. Authenticating with OAuth")
                     good_token = oauth.oauth_flow(host, **kwargs)
                     tokens.append(good_token)
                     good_token_set.add(good_token)
@@ -235,9 +240,7 @@ class TokenStorage:
                     return self._v1_token_list_parser(cache_yaml)
                 raise RuntimeError(f"Don't know how to parse token schema {version}")
         except Exception:
-            logger.error(
-                f"Error while loading DagsHub token cache: {traceback.format_exc()}"
-            )
+            logger.error(f"Error while loading DagsHub token cache: {traceback.format_exc()}")
             raise
 
     @staticmethod
@@ -275,9 +278,7 @@ class TokenStorage:
             with open(self.cache_location, "w") as f:
                 yaml.dump(dict_to_dump, f, yaml.Dumper)
         except Exception:
-            logger.error(
-                f"Error while storing DagsHub token cache: {traceback.format_exc()}"
-            )
+            logger.error(f"Error while storing DagsHub token cache: {traceback.format_exc()}")
             raise
 
     def __getstate__(self):
@@ -287,7 +288,7 @@ class TokenStorage:
         # However, I'm not sure of a good way to solve it
         access_lock_key = f"_{self.__class__.__name__}__token_access_lock"
         if access_lock_key in d:
-            del (d[access_lock_key])
+            del d[access_lock_key]
         return d
 
     def __setstate__(self, state):
@@ -306,38 +307,64 @@ def _get_token_storage(**kwargs):
 
 def get_authenticator(**kwargs) -> DagshubAuthenticator:
     """
-    Get an authenticator object.
-    This object can be used as auth argument for the httpx requests
+    Get an authenticator object that can be used to authenticate a request to DagsHub using an http library like
+    ``httpx`` or ``requests``.
 
-    The authenticator has renegotiation logic in case where a token gets invalidated
+    When used with ``httpx``, the authenticator has renegotiation logic. That means that if DagsHub rejects a token,
+    the authenticator will try to get another token from the cache, or fall back to OAuth.
+
+    If no valid token was found and ``fail_if_no_token`` wasn't set to ``True``, triggers OAuth flow.
+
+    Keyword Args:
+        fail_if_no_token: Whether to get an OAuth token if no valid token was found in cache initially.
+            If set to ``True``, raises a ``RuntimeError``.
+            If set to ``False`` (default), launches the OAuth flow.
+        cache_location: Path to an alternative cache location.
+            You can override the default cache location to be used by the client by setting the
+            ``DAGSHUB_CLIENT_TOKENS_CACHE`` environment variable.
+        host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
+
     """
     return _get_token_storage(**kwargs).get_authenticator(**kwargs)
 
 
 def get_token_object(**kwargs):
     """
-    Gets a DagsHub token, by default if no token is found authenticates with OAuth
+    Gets a DagsHub token object, by default if no token is found authenticates with OAuth.
+    The token object has additional information about the type and expiry of the token.
 
-    Kwargs:
-        host (str): URL of a dagshub instance (defaults to dagshub.com)
-        cache_location (str): Location of the cache file with the token (defaults to <cache_dir>/dagshub/tokens)
-        fail_if_no_token (bool): What to do if token is not found.
-            If set to False (default), goes through OAuth flow
-            If set to True, throws a RuntimeError
+    Keyword Args:
+        fail_if_no_token: Whether to get an OAuth token if no valid token was found in cache initially.
+            If set to ``True``, raises a ``RuntimeError``.
+            If set to ``False`` (default), launches the OAuth flow.
+        cache_location: Path to an alternative cache location.
+            You can override the default cache location to be used by the client by setting the
+            ``DAGSHUB_CLIENT_TOKENS_CACHE`` environment variable.
+        host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
+
     """
     return _get_token_storage(**kwargs).get_token_object(**kwargs)
 
 
-def get_token(**kwargs):
+def get_token(**kwargs) -> str:
     """
-    Gets a DagsHub token text, by default if no token is found authenticates with OAuth
+    Gets a DagsHub token in regular string form.
 
-    Kwargs:
-        host (str): URL of a dagshub instance (defaults to dagshub.com)
-        cache_location (str): Location of the cache file with the token (defaults to <cache_dir>/dagshub/tokens)
-        fail_if_no_token (bool): What to do if token is not found.
-            If set to False (default), goes through OAuth flow
-            If set to True, throws a RuntimeError
+    Use this function when you want to, for example,
+    manually authenticate with DagsHub's MLflow using ``MLFLOW_TRACKING_PASSWORD``.
+
+    If no valid token was found and ``fail_if_no_token`` wasn't set to ``True``, triggers OAuth flow.
+
+
+    Keyword Args:
+        fail_if_no_token: Whether to get an OAuth token if no valid token was found in cache initially.
+            If set to ``True``, raises a ``RuntimeError``.
+            If set to ``False`` (default), launches the OAuth flow.
+        cache_location: Path to an alternative cache location.
+            You can override the default cache location to be used by the client by setting the
+            ``DAGSHUB_CLIENT_TOKENS_CACHE`` environment variable.
+        host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
+
     """
     return _get_token_storage(**kwargs).get_token(**kwargs)
 
@@ -345,7 +372,16 @@ def get_token(**kwargs):
 def add_app_token(token: str, host: Optional[str] = None, **kwargs):
     """
     Adds an application token to the token cache.
-    This is a long-lived token that you can add/revoke in your profile settings on DagsHub
+    This is a long-lived token that you can add/revoke in your profile settings on DagsHub.
+
+    Args:
+        token: Token value
+        host: URL of the hosted DagsHub instance. Leave empty to use the default ``https://dagshub.com``.
+
+    Keyword Args:
+        cache_location: Path to an alternative cache location.
+            You can override the default cache location to be used by the client by setting the
+            ``DAGSHUB_CLIENT_TOKENS_CACHE`` environment variable.
     """
     token_obj = AppDagshubToken(token)
     _get_token_storage(**kwargs).add_token(token_obj, host)
@@ -354,8 +390,18 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
 def add_oauth_token(host: Optional[str] = None, **kwargs):
     """
     Launches the OAuth flow that generates a short-lived token.
-    This will open a new browser window, so this is not a CI/headless friendly function.
-    Consider using `add_app_token` or setting the `DAGSHUB_USER_TOKEN` env var in those cases.
+
+    .. note::
+        This will open a new browser window, so this is not a CI/headless friendly function.
+        Consider using :func:`.add_app_token` or setting the ``DAGSHUB_USER_TOKEN`` env var in those cases.
+
+    Args:
+        host: URL of the hosted DagsHub instance. Leave empty to use the default ``https://dagshub.com``.
+
+    Keyword Args:
+        cache_location: Path to an alternative cache location.
+            You can override the default cache location to be used by the client by setting the
+            ``DAGSHUB_CLIENT_TOKENS_CACHE`` environment variable.
     """
     host = host or config.host
     token = oauth.oauth_flow(host)

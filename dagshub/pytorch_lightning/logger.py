@@ -8,17 +8,17 @@ from ..logger import DAGsHubLogger as LoggerImpl
 
 
 class DAGsHubLogger(LightningLoggerBase):
-
-    def __init__(self,
-                 metrics_path: str = 'metrics.csv',
-                 should_log_metrics: bool = True,
-                 hparams_path: str = 'params.yml',
-                 should_log_hparams: bool = True,
-                 should_make_dirs: bool = True,
-                 status_hyperparam_name: str = 'status',
-                 name="default",
-                 version: Optional[Union[int, str]] = None,
-                 ):
+    def __init__(
+        self,
+        metrics_path: str = "metrics.csv",
+        should_log_metrics: bool = True,
+        hparams_path: str = "params.yml",
+        should_log_hparams: bool = True,
+        should_make_dirs: bool = True,
+        status_hyperparam_name: str = "status",
+        name="default",
+        version: Optional[Union[int, str]] = None,
+    ):
         """
         :param metrics_path: Where to save the single metrics CSV file.
         :param should_log_metrics: Whether to log metrics at all. Should probably always be True.
@@ -35,9 +35,14 @@ class DAGsHubLogger(LightningLoggerBase):
         """
         super(DAGsHubLogger, self).__init__()
         self.status_hyperparam_name = status_hyperparam_name
-        self.logger = LoggerImpl(metrics_path=metrics_path, should_log_metrics=should_log_metrics,
-                                 hparams_path=hparams_path, should_log_hparams=should_log_hparams,
-                                 should_make_dirs=should_make_dirs, eager_logging=False)
+        self.logger = LoggerImpl(
+            metrics_path=metrics_path,
+            should_log_metrics=should_log_metrics,
+            hparams_path=hparams_path,
+            should_log_hparams=should_log_hparams,
+            should_make_dirs=should_make_dirs,
+            eager_logging=False,
+        )
         self._name = name or ""
         self._version = version
 

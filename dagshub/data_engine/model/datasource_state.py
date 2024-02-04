@@ -6,8 +6,7 @@ from typing import Optional, Union, Mapping, Any, Dict, List
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, \
-    MetadataFieldSchema
+from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, MetadataFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 
@@ -83,7 +82,8 @@ class DatasourceState:
             raise DatasourceNotFoundError(self)
         elif len(sources) > 1:
             raise RuntimeError(
-                f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong")
+                f"Got too many ({len(sources)}) datasources with name '{self.name}' or id. Something went wrong"
+            )
         self._update_from_ds_result(sources[0])
 
     def content_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> str:
@@ -103,7 +103,7 @@ class DatasourceState:
     @property
     def source_prefix(self) -> PurePosixPath:
         parts = self.path_parts()
-        if "prefix" in parts:
+        if parts.get("prefix"):
             return PurePosixPath(parts["prefix"].strip("/"))
         else:
             return PurePosixPath()
@@ -143,7 +143,7 @@ class DatasourceState:
         parts = self.path_parts()
         if self.source_type == DatasourceType.BUCKET:
             path_elems = [parts["schema"], parts["bucket"]]
-            if parts["prefix"] is not None:
+            if parts.get("prefix"):
                 path_elems.append(parts["prefix"])
             path_prefix = "/".join(path_elems)
             if path_type == "raw":
@@ -170,14 +170,16 @@ class DatasourceState:
         regex = path_regexes[self.source_type]
         match = regex.fullmatch(self.path)
         if match is None:
-            raise InvalidPathFormatError(f"{self.path} is not valid path format for type {self.source_type}.\n"
-                                         f"Expected format: {expected_formats[self.source_type]}")
+            raise InvalidPathFormatError(
+                f"{self.path} is not valid path format for type {self.source_type}.\n"
+                f"Expected format: {expected_formats[self.source_type]}"
+            )
         res = match.groupdict()
         # For repository type - handle revision that is in format of repo://user/repo/branch:prefix
         # Couldn't do that with regexes, so handling it here
         if self.source_type == DatasourceType.REPOSITORY:
             res["revision"] = None
-            if res["prefix"] is not None:
+            if res.get("prefix"):
                 prefix = res["prefix"]
                 if ":" in prefix:
                     revision, prefix = prefix.split(":", 1)

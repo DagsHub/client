@@ -23,13 +23,20 @@ class DagsHubDataset:
         for_dataloader: bool = False,
     ):
         """
-        query_result: <dagshub.data_engine.client.models.QueryResult>
-        metadata_columns: columns that are returned from the metadata as part of the dataloader
-        file_columns: columns with a datapoint metadata that are files
-        strategy: preload|background|lazy; default: lazy
-        tensorizers: auto|image|<function>
-        savedir: location at which the dataset is stored
-        processes: number of parallel processes that download the dataset
+        Initialize a dataset using the specified parameters.
+
+        Args:
+        query_result (<dagshub.data_engine.client.models.QueryResult>): The query result containing dataset entries.
+        metadata_columns (List[str], optional):
+            columns that are returned from the metadata as part of the dataloader.Defaults to [].
+        file_columns (List[str], optional): columns with a datapoint metadata that are files. Defaults to None.
+        strategy (str, optional): Download strategy - preload|background|lazy. Defaults to "lazy".
+        tensorizers (Union[str, List[Union[str, FunctionType]]], optional):
+            Tensorization strategy - auto|image|<function>. Defaults to "auto".
+        savedir (str, optional): Location where the dataset is stored. Defaults to None.
+        processes (int, optional): number of parallel processes that download the dataset. Defaults to 8.
+        for_dataloader (bool, optional): Whether the dataset is used in a dataloader context. Defaults to False.
+
         """
         self.metadata_columns = metadata_columns
         self.entries = query_result.entries
@@ -44,9 +51,7 @@ class DagsHubDataset:
         self.strategy = strategy
         self.source = self.datasource.source.path.split("://")[0]
 
-        self.datasource_root = Path(
-            self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)]
-        )
+        self.datasource_root = Path(self.entries[0].path_in_repo.as_posix()[: -len(self.entries[0].path)])
         self.processes = processes
         self.order = None
         self.file_columns = file_columns or self._get_file_columns()
@@ -65,9 +70,7 @@ class DagsHubDataset:
                 return
             Process(target=self.pull).start()
         elif strategy != "lazy":
-            logger.warning(
-                "Invalid download strategy (none from preload|background|lazy); defaulting to lazy."
-            )
+            logger.warning("Invalid download strategy (none from preload|background|lazy); defaulting to lazy.")
 
     def __len__(self) -> int:
         return len(self.entries)
@@ -81,21 +84,12 @@ class DagsHubDataset:
             [self.entries[0].metadata[col] for col in self.metadata_columns],
         ):
             try:
-                if (
-                    self.datasource.source.source_type
-                    == self.datasource.source.source_type.REPOSITORY
-                ):
+                if self.datasource.source.source_type == self.datasource.source.source_type.REPOSITORY:
                     self.repo.list_path((self.datasource_root / str(value)).as_posix())
                 else:
                     self.repo.list_storage_path(
                         (
-                            Path(
-                                "/".join(
-                                    list(self.datasource.source.path_parts().values())[
-                                        :2
-                                    ]
-                                )
-                            )
+                            Path("/".join(list(self.datasource.source.path_parts().values())[:2]))
                             / self.datasource_root
                             / str(value)
                         ).as_posix()
@@ -106,6 +100,15 @@ class DagsHubDataset:
         return res
 
     def get(self, idx: int) -> list:
+        """
+        Retrieve data associated with a specific index in the dataset.
+
+        Args:
+            idx (int): The index of the data to retrieve.
+
+        Returns:
+            list: A list containing data associated with the specified index, including file paths and metadata.
+        """
         out = []
         entry = self.entries[idx]
 
@@ -120,13 +123,8 @@ class DagsHubDataset:
 
         return out
 
-    def __getitem__(
-        self, idx: int
-    ) -> List[Union["torch.Tensor", "tf.Tensor"]]:  # noqa: F821
-        return [
-            tensorizer(data)
-            for tensorizer, data in zip(self.tensorizers, self.get(idx))
-        ]
+    def __getitem__(self, idx: int) -> List[Union["torch.Tensor", "tf.Tensor"]]:  # noqa: F821
+        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, self.get(idx))]
 
     def pull(self) -> None:
         if self.order is not None:
@@ -160,9 +158,7 @@ class DagsHubDataset:
                 with open(filepath, "wb") as file:
                     file.write(data)
 
-    def _get_tensorizers(
-        self, datatypes: Union[str, List[Union[str, FunctionType]]]
-    ) -> FunctionType:
+    def _get_tensorizers(self, datatypes: Union[str, List[Union[str, FunctionType]]]) -> FunctionType:
         if datatypes in ["auto", "guess"]:  # guess is an easter egg argument
             logger.warning("`tensorizers` set to 'auto'; guessing the datatypes")
             tensorizers = []
@@ -196,13 +192,8 @@ class DagsHubDataset:
             return [
                 getattr(self.tensorlib, datatypes),
             ] * (len(self.metadata_columns) + 1)
-        elif (
-            type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1
-        ):
-            return [
-                getattr(self.tensorlib, datatype) if type(datatype) == str else datatype
-                for datatype in datatypes
-            ]
+        elif type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1:
+            return [getattr(self.tensorlib, datatype) if type(datatype) == str else datatype for datatype in datatypes]
         else:
             raise ValueError(
                 "Unable to set tensorizers. "

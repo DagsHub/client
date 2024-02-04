@@ -8,7 +8,7 @@
   either gets added automatically by DagsHub or that you can attach and modify whenever you want.
 * DagsHub gives a pandas-like Python client to query this giant metadata table and return only matching files from your
   datasource.
-* Further quality of life features will include things like versioning/auditing for the metadata, dataset curation, UI, data fetching optimizations, and more as we develop the product.
+* Further quality of life features will include things like dataset curation, UI, data fetching optimizations, and more as we develop the product.
 
 
 ## Creating/Getting a datasource
@@ -64,6 +64,7 @@ ds = datasources.get_datasource("simon/baby-yoda-segmentation-dataset", name="bu
 
 Before you can start querying and playing with data, you need to first add metadata.
 
+### with context
 To add metadata to a file path (we call them datapoints), we provide a `metadata_context` on the datasource object:
 
 ```python
@@ -79,8 +80,25 @@ with ds.metadata_context() as ctx:
   # Attach metadata to several files at once:
   ctx.update_metadata(["images/006.jpg","images/007.jpg"], metadata)
 ```
-
 Once the code exits the `metadata_context()`, all of the metadata is uploaded to the server.
+
+### with dictionary-like assignment
+```python
+datapoints = ds.all()
+datapoints["images/005.jpg"]["episode"] = 5
+datapoints["images/005.jpg"].save()
+```
+save() should be called for each datapoint eventually for changes to be commited.
+when looping over many datapoints the preferred method (to avoid many network writes) is to work in a context block.
+but dictionary syntax can still be used:
+```python
+with ds.metadata_context() as ctx:
+    for dp in datapoints:
+        dp["episode"] = 4
+        dp.save()
+```
+in the above example dp.save() can be omitted as a commit is done once the context is exited.
+
 
 **Note:**  The datapoint should be the path of the file relative to the root of the data source. So if you have a repo
 data source with path at `repo://simon/baby-yoda-segmentor/data` (starting from the data folder),
@@ -122,6 +140,26 @@ ds.upload_metadata_from_dataframe(df, path_column="path")
 `path_column` takes either the index or a name of the column to be used as the column with paths.
 All other columns are considered metadata columns.
 If `path_column` isn't specified, then the first column is considered as the path column.
+
+### Metadata tagging
+You can add additional information to your metadata fields, telling what these fields mean semantically.
+
+For example, marking a field as an annotation field will make it show up in FiftyOne visualization and LabelStudio projects on DagsHub.
+
+To mark a field as an annotation field:
+
+```python
+ds.metadata_field("field_name").set_annotation().apply()
+```
+
+You can also predefine a field with a certain type before uploading into it. Do that if you want to be sure you won't upload a wrong datatype accidentally on ingestion.
+For example, this is useful when you're uploading a pandas dataframe and want to enforce that the field will be an integer field and not a float field:
+
+```python
+ds.metadata_field("field_name").set_type(int).apply()
+```
+
+Keep in mind that you cannot change the type of an already existing field.
 
 ## Getting data
 
@@ -261,6 +299,59 @@ filtered_ds = ds[ds["episode"] > 5]
 filtered_ds2 = filtered_ds[filtered_ds["has_baby_yoda"] == True]
 ```
 
+### Versioning
+#### Query filtering:
+An extended syntax lets you query according to different versions of enrichments. For example:
+```python
+# size metadata is constantly changed and we want to address the one from 24h ago
+t = datetime.now(timezone.utc) - timedelta(hours=24)
+
+q1 = ds[Field("size", as_of=t] > 5
+```
+in the above example all datapoints whose "size" column updated no later than 't' that match the condition '>5' are returned.
+
+
+#### Query select:
+Using select() you can choose which columns will appear on the query result, what their names will be (alias) and from what time. For example:
+
+```python
+t = datetime.now(timezone.utc) - timedelta(hours=24)
+
+q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), Field("episode"))
+```
+in the above example the result set of datapoints will have 2 columns of metadata: "size_asof_24h_ago" and "episode".
+all other metadata columns are ommited.if the desired result is to get all metadata columns and in addition the selected list,
+add "*" to the list, example:
+```python
+q1 = (ds["size"] > 5).select(Field("size", as_of=t, alias="size_asof_24h_ago"), "*")
+```
+
+#### Global as_of time:
+Using as_of() applied on query allows you to view a snapshot of datapoint/enrichments. For example:
+
+```python
+t = datetime.now(timezone.utc) - timedelta(hours=24)
+
+q1 = (ds["size"] > 5).as_of(t)
+```
+in the above example all datapoints whose creation time is no later than 't' and that match the condition at 't' - are returned.
+
+
+#### Notes and limitations:
+
+##### Time parameter:
+- the time parameter can be POSIX timestamp or datetime object
+- pay attention to timezones - use timestamp if known, or relative datetime if known (as in the above examples). if you use a specific date such as  `dateutil.parser.parse("Tue 28 Nov 11:29 +2:00")` specify the utc delta as shown here, otherwise this date can translate to different timestamps in the machine that runs the client and in dagshub backend.
+##### Select list:
+- both "x" and `Field("x")` can be used
+- alias, as_of - are optional
+- we currently do not check the list for contradictions/overwrites/duplications, i.e  `select(Field("x", as_of=t1), Field("x", as_of=t2))` does not make sense since there is no alias to differentiate, the result will not reflect the intention. also `select("x","x")`
+##### Global as_of behavior:
+- it applies to all entities unless otherwise specified, i.e if we use Field("x", as_of=t1)) then t1 will precede over a t2 specified in .as_of(t2). the sensibility of the results is up to the caller. you could get datapoints that existed in t1 < t2 based on a condition applied on their enrichments in t2.
+
+
+
+
 ## Saving queries
 
 You can save the query you have on the datasource.
@@ -380,6 +471,25 @@ voxel_session.wait(-1)
 
 We plan to expand the voxel functionality soon to integrate it much more with the Data Engine :)
 
+## Sending data for annotation
+
+You can send a datasource or result of a query to annotation in Label Studio.
+
+Doing a `ds.annotate()` or `ds.head(...).annotate` will open up a wizard for creating a new Label Studio project on DagsHub.
+
+When sending to annotation, by default all metadata fields of the datapoints are also sent to Label Studio and will be displayed in its UI in designated columns. this behavior can be changed, example:
+```python
+# only field1 and field2 will be sent:
+ds.annotate(fields_to_embed=["field1", "field2"])
+
+# all fields except field1 and field2 will be sent:
+ds.annotate(fields_to_exclude=["field1", "field2"])
+```
+
+
+
+If you have a field that was marked as annotation already, you can export annotations into the project from them
+(See the Metadata Tagging section to learn how to tag fields as annotation fields)
 
 # Contributing
 

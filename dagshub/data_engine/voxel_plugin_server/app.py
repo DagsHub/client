@@ -17,19 +17,21 @@ async def homepage(request):
     return JSONResponse({"Hello": "from the dagshub voxel plugin server"})
 
 
-app = Starlette(debug=True,
-                middleware=[
-                    Middleware(
-                        CORSMiddleware,
-                        allow_origins=["*"],
-                        allow_methods=["*"],
-                    ),
-                ],
-                routes=[
-                    Route("/", homepage),
-                    Route("/labelstudio/", to_annotate, methods=["POST"]),
-                    Route("/dataset/save", save_dataset, methods=["POST"]),
-                    Route("/dataset/refresh", refresh_dataset),
-                    Route("/datasource/fields", get_fields),
-                    Route("/datasource/update_metadata", update_metadata, methods=["POST"]),
-                ])
+app = Starlette(
+    debug=True,
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+        ),
+    ],
+    routes=[
+        Route("/", homepage),
+        Route("/labelstudio/", to_annotate, methods=["POST"]),
+        Route("/dataset/save", save_dataset, methods=["POST"]),
+        Route("/dataset/refresh", refresh_dataset),
+        Route("/datasource/fields", get_fields),
+        Route("/datasource/update_metadata", update_metadata, methods=["POST"]),
+    ],
+)

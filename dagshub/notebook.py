@@ -4,24 +4,31 @@ import logging
 import tempfile
 from pathlib import Path, PurePosixPath
 from socket import gethostname, gethostbyname
+from typing import TYPE_CHECKING
 
 import httpx
 import urllib.parse
-from IPython import get_ipython
 
+from dagshub.common.util import lazy_load
 from dagshub.common.helpers import log_message
 from dagshub.upload import Repo
+
+if TYPE_CHECKING:
+    import IPython as IPy
+else:
+    IPy = lazy_load("IPython")
+
 
 logger = logging.getLogger(__name__)
 
 
 def _inside_notebook():
-    return get_ipython() is not None
+    return IPy.get_ipython() is not None
 
 
 def _inside_colab():
     try:
-        if get_ipython() and 'google.colab' in get_ipython().extension_manager.loaded:
+        if IPy.get_ipython() and "google.colab" in IPy.get_ipython().extension_manager.loaded:
             return True
     except Exception:
         pass
@@ -40,22 +47,29 @@ def _default_notebook_name():
     return f"notebook-{datetime.datetime.utcnow().strftime('%Y-%m-%d')}.ipynb"
 
 
-def save_notebook(repo, path="", branch=None, commit_message=None, versioning='git') -> None:
+def save_notebook(repo, path="", branch=None, commit_message=None, versioning="git") -> None:
     """
-    IPython wrapper for saving notebooks.
+    Save the notebook to DagsHub.
 
-    :param path (str): Where to save the notebook within the repository (including the filename).
-        If filename is not specified, we'll save it as "notebook-{datetime.now}.ipynb" under specified folder
-    :prama repo (str): repository in the format of "user/repo"
-    :param branch (str): The branch under which the notebook should be saved.
-        Will commit to the default repo branch if not specified
-    :param commit_message (str): The commit message for the update
-    :param versioning (str): ['git'|'dvc'] The VCS used to version the notebook
+    Args:
+        repo: Repository in the format of ``user/repo``.
+        path: Path of the notebook in repo, including the filename.
+             If left empty, saves the notebook to the root of the repo with format ``notebook-{date.now}.ipynb``.
+             If path is a directory and not a file (no extension), saves it to ``path/notebook-{date.now}.ipynb``.
+        branch: The branch under which to save the notebook. Uses the repo default if not specified.
+        commit_message: Message of the commit with the notebook upload. Default is ``"Uploaded notebook {name}"``
+        versioning: Either ``"git"`` or ``"dvc"``.
+
+
+    .. note::
+        Right now correctly saves only notebooks in a Colab environment.
+        Regular Jupyter environment will have the execution history saved instead of the notebook.
     """
 
     if not _inside_notebook():
-        log_message('Trying to save a notebook while not being in an IPython environment. No notebook will be saved',
-                    logger)
+        log_message(
+            "Trying to save a notebook while not being in an IPython environment. No notebook will be saved", logger
+        )
         return
 
     # Handle file path
@@ -80,18 +94,21 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning='g
         out_path = f"{tmp}/{file_path.name}"
         if _inside_colab():
             from google.colab import _message  # If inside colab, this import is guaranteed
+
             notebook_ipynb = _message.blocking_request("get_ipynb")
             if notebook_ipynb is None or "ipynb" not in notebook_ipynb:
                 raise RuntimeError("Couldn't get notebook data from colab.")
-            with open(out_path, 'w') as file:
+            with open(out_path, "w") as file:
                 file.write(json.dumps(notebook_ipynb["ipynb"], indent=4))
         else:
             log_message("Saving only the execution history for the notebook in Jupyter environments", logger)
-            get_ipython().run_line_magic('notebook', out_path)
+            IPy.get_ipython().run_line_magic("notebook", out_path)
 
         repo = Repo(owner, repo, branch=branch)
-        repo.upload(out_path,
-                    remote_path=remote_path.as_posix(),
-                    commit_message=commit_message,
-                    versioning=versioning,
-                    force=True)
+        repo.upload(
+            out_path,
+            remote_path=remote_path.as_posix(),
+            commit_message=commit_message,
+            versioning=versioning,
+            force=True,
+        )

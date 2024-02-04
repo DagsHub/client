@@ -1,24 +1,16 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union, Dict, Type
+from typing import TYPE_CHECKING, Optional, Union, Dict
 
 from treelib import Tree, Node
 
-from dagshub.data_engine.client.models import MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError
+from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
-
-_metadataTypeLookup = {
-    int: MetadataFieldType.INTEGER,
-    bool: MetadataFieldType.BOOLEAN,
-    float: MetadataFieldType.FLOAT,
-    str: MetadataFieldType.STRING,
-    bytes: MetadataFieldType.BLOB,
-}
 
 
 def bytes_deserializer(val: str) -> bytes:
@@ -32,10 +24,6 @@ _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
     bytes: bytes_deserializer,
 }
-
-_metadataTypeLookupReverse: Dict[str, Type] = {}
-for k, v in _metadataTypeLookup.items():
-    _metadataTypeLookupReverse[v.value] = k
 
 
 class FieldFilterOperand(enum.Enum):
@@ -62,16 +50,23 @@ fieldFilterOperandMapReverseMap: Dict[str, str] = {}
 for k, v in fieldFilterOperandMap.items():
     fieldFilterOperandMapReverseMap[v.value] = k
 
+UNFILLED_NODE_TAG = "undefined"
+
 
 class DatasourceQuery:
-    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None):
+    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None, as_of: Optional[int] = None):
         self._operand_tree: Tree = Tree()
-        self._column_filter: Optional[str] = None  # for storing filters when user does ds["column"]
         if type(column_or_query) is str:
-            # If it's ds["column"] then the root node is just the column name
-            self._column_filter = column_or_query
+            # If it's ds["column"] then the root node is just the column name, will be filled later
+            data = {"field": column_or_query}
+            if as_of:
+                data["as_of"] = int(as_of)
+            self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
+
+        if as_of:
+            self._as_of = as_of
 
     def __repr__(self):
         if self.is_empty:
@@ -80,13 +75,46 @@ class DatasourceQuery:
 
     @property
     def column_filter(self) -> Optional[str]:
-        return self._column_filter
+        filter_node = self._column_filter_node
+        if filter_node is None:
+            return None
+        return filter_node.data["field"]
 
     def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
-        if self._column_filter is not None:
-            # Just the column is in the query - compose into a tree
-            self._operand_tree.create_node(op, data={"field": self._column_filter, "value": other})
-            self._column_filter = None
+        """
+        Compose the current query with another query or a value using the specified operator.
+
+        Args:
+            op (str): The operator to use for composing the query.
+            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]):
+                The query or value to compose with.
+
+        Raises:
+            RuntimeError: If the operation is not supported or if there is a mismatch in usage.
+
+        Notes:
+            - If the current query contains only a column filter,
+                it will be composed into a tree with the specified operator and value.
+            - If the operation is 'isnull', it can only be applied to a column filter;
+                otherwise, a RuntimeError is raised.
+            - If the operation is 'not', a 'not' node is added to the query tree.
+            - If either query is empty, the composition is adjusted accordingly.
+
+        Example:
+            ```
+            ds['col1'] > 5
+            ds['col2'].is_null()
+            ```
+            The above queries can be composed as:
+            ```
+            ds['col1'] > 5 and ds['col2'].is_null()
+            ```
+        """
+        if self._column_filter_node is not None:
+            # If there was an unfilled query node with a column - put the operand in that node
+            node = self._column_filter_node
+            node.tag = op
+            node.data.update({"value": other})
         elif op == "isnull":
             # Can only do isnull on the column filter, if we got here, there's something wrong
             raise RuntimeError("is_null operation can only be done on a column (e.g. ds['col1'].is_null())")
@@ -100,21 +128,27 @@ class DatasourceQuery:
             if type(other) is not DatasourceQuery:
                 raise RuntimeError(f"Expected other argument to be a dataset, got {type(other)} instead")
             if op not in ["and", "or"]:
-                raise RuntimeError(f"Cannot use operator '{op}' to chain two queries together.\r\n"
-                                   f"Queries:\r\n"
-                                   f"\t{self}\r\n"
-                                   f"\t{other}\r\n")
+                raise RuntimeError(
+                    f"Cannot use operator '{op}' to chain two queries together.\r\n"
+                    f"Queries:\r\n"
+                    f"\t{self}\r\n"
+                    f"\t{other}\r\n"
+                )
             # Don't compose with an empty query, carry the other instead
             if self.is_empty:
                 self._operand_tree = other._operand_tree
                 return
-            elif other.is_empty:
+            elif other.is_empty and other._column_filter_node is None:
                 return
             composite_tree = Tree()
             root_node = composite_tree.create_node(op)
             composite_tree.paste(root_node.identifier, self._operand_tree)
             composite_tree.paste(root_node.identifier, other._operand_tree)
             self._operand_tree = composite_tree
+
+    @property
+    def _column_filter_node(self) -> Node:
+        return next(self._operand_tree.filter_nodes(lambda n: n.tag == UNFILLED_NODE_TAG), None)
 
     @property
     def _operand_root(self) -> Node:
@@ -143,23 +177,30 @@ class DatasourceQuery:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
             value = node.data["value"]
-            value_type = _metadataTypeLookup[type(value)].value
+            as_of = node.data.get("as_of")
+
+            value_type = metadataTypeLookup[type(value)].value
             if type(value) is bytes:
                 # TODO: this will need to probably be changed when we allow actual binary field comparisons
                 value = value.decode("utf-8")
             else:
                 value = str(value)
             if value_type is None:
-                raise RuntimeError(f"Value type {value_type} is not supported for querying.\r\n"
-                                   f"Supported types: {list(_metadataTypeLookup.keys())}")
-            return {
+                raise RuntimeError(
+                    f"Value type {value_type} is not supported for querying.\r\n"
+                    f"Supported types: {list(metadataTypeLookup.keys())}"
+                )
+            res = {
                 "filter": {
                     "key": key,
-                    "value": value,
+                    "value": str(value),
                     "valueType": value_type,
                     "comparator": query_op.value,
                 }
             }
+            if as_of:
+                res["filter"]["asOf"] = as_of
+            return res
 
     @staticmethod
     def deserialize(serialized_query: Dict) -> "DatasourceQuery":
@@ -188,10 +229,11 @@ class DatasourceQuery:
         if op_type == "filter":
             comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
             key = val["key"]
-            value_type = _metadataTypeLookupReverse[val["valueType"]]
+            value_type = metadataTypeLookupReverse[val["valueType"]]
             converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
             value = converter(val["value"])
-            node = Node(tag=comparator, data={"field": key, "value": value})
+            as_of = val.get("asOf")
+            node = Node(tag=comparator, data={"field": key, "value": value, "as_of": as_of})
             tree.add_node(node, parent_node)
         elif op_type in ("and", "or"):
             main_node = Node(tag=op_type)
@@ -206,12 +248,9 @@ class DatasourceQuery:
 
     def __deepcopy__(self, memodict={}):
         q = DatasourceQuery()
-        if self._column_filter is not None:
-            q._column_filter = self._column_filter
-        else:
-            q._operand_tree = Tree(tree=self._operand_tree, deep=True)
+        q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 
     @property
     def is_empty(self):
-        return self._column_filter is not None or self._operand_tree.root is None
+        return self._operand_tree.root is None or self._column_filter_node is not None

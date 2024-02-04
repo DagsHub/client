@@ -5,7 +5,7 @@ from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECK
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
-from dagshub.data_engine.client.models import MetadataFieldType
+from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -20,9 +20,21 @@ _generated_fields: Dict[str, Callable[["Datapoint"], Any]] = {
 @dataclass
 class Datapoint:
     datapoint_id: int
+    """
+    ID of the datapoint in the database
+    """
     path: str
+    """
+    Path of the datapoint, relative to the root of the datasource
+    """
     metadata: Dict[str, Any]
+    """
+    Dictionary with the metadata
+    """
     datasource: "Datasource"
+    """
+    Datasource this datapoint is from
+    """
 
     def __getitem__(self, item):
         gen_field = _generated_fields.get(item)
@@ -30,12 +42,40 @@ class Datapoint:
             return gen_field(self)
         return self.metadata[item]
 
+    def __setitem__(self, key, value):
+        self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
+
+    def save(self):
+        """
+        Commit changes to metadata done with one or more dictionary assignment syntax usages.
+        `Learn more here <https://dagshub.com/docs/use_cases/data_engine/enrich_datasource\
+        /#3-enriching-with-with-dictionary-like-assignment>`_.
+
+        Example::
+
+            specific_data_point['metadata_field_name'] = 42
+            specific_data_point.save()
+
+        """
+
+        # if in context block, don't _upload_metadata, it will be done at context end
+        if not self.datasource.has_explicit_context:
+            self.datasource.upload_metadata_of_implicit_context()
+
     @property
     def download_url(self):
+        """
+        str: URL that can be used to download the datapoint's file from DagsHub
+        """
         return self.datasource.source.raw_path(self)
 
     @property
     def path_in_repo(self):
+        """
+        Path of the datapoint in repo
+
+        :rtype: `PurePosixPath <https://docs.python.org/3/library/pathlib.html#pathlib.PurePosixPath>`_
+        """
         return self.datasource.source.file_path(self)
 
     @staticmethod
@@ -65,15 +105,15 @@ class Datapoint:
 
     def get_blob(self, column: str, cache_on_disk=True, store_value=False) -> bytes:
         """
-        Returns the blob stored in the binary column
+        Returns the blob stored in a binary column
 
         Args:
             column: where to get the blob from
             cache_on_disk: whether to store the downloaded blob on disk.
-                If you store the blob on disk, it means that it won't need to be re-downloaded in the future.
+                If you store the blob on disk, then it won't need to be re-downloaded in the future.
                 The contents of datapoint[column] will change to be the path of the blob on the disk.
             store_value: whether to store the blob in memory on the field attached to this datapoint,
-                which will make its bytes directly retrievable using datapoint[column]
+                which will make its value accessible later using datapoint[column]
         """
         current_value = self.metadata[column]
 
@@ -111,17 +151,24 @@ class Datapoint:
         else:
             raise ValueError(f"Can't extract blob metadata from value {current_value} of type {type(current_value)}")
 
-    def download_file(self, target: Optional[Union[PathLike, str]] = None, keep_source_prefix=True,
-                      redownload=False) -> PathLike:
+    def download_file(
+        self, target: Optional[Union[PathLike, str]] = None, keep_source_prefix=True, redownload=False
+    ) -> PathLike:
         """
         Downloads the datapoint to the target_dir directory
+
         Args:
-            target: Where to download the file (either a directory, or the full path).
-                If not specified, then downloads to ~/dagshub/datasets/<user>/<repo>/<ds_id>
-            keep_source_prefix: If True, includes the prefix of the datasource in the download path
-                Useful for cases where the download path is the root of the repository
-            redownload: Whether to redownload a file if it exists on the filesystem already
-                NOTE: We don't do any hashsum checks, so if it's possible that the file has been updated, turn it on
+            target: Where to download the file (either a directory, or the full path).\
+                If not specified, then downloads to\
+                :func:`datasource's default location \
+                <dagshub.data_engine.model.datasource.Datasource.default_dataset_location>`.
+            keep_source_prefix: If True, includes the prefix of the datasource in the download path.
+            redownload: Whether to redownload a file if it exists on the filesystem already.
+
+        .. note::
+            We don't do any hashsum checks, so if it's possible that the file has been updated,
+            set ``redownload`` to True
+
         Returns:
             Path to the downloaded file
         """
@@ -132,7 +179,8 @@ class Datapoint:
         # by checking if there's an extension, or it's an already existing file
         n = target_path.name
         target_is_already_file = (target_path.exists() and target_path.is_file()) or (
-            "." in n and not n.startswith("."))
+            "." in n and not n.startswith(".")
+        )
 
         if not target_is_already_file:
             if keep_source_prefix:
@@ -157,8 +205,9 @@ class Datapoint:
         return self.blob_url(sha), self.blob_cache_location / sha
 
 
-def _get_blob(url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk, return_blob) -> Optional[
-    Union[Path, str, bytes]]:
+def _get_blob(
+    url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk, return_blob
+) -> Optional[Union[Path, str, bytes]]:
     """
     Args:
         url: url to download the blob from

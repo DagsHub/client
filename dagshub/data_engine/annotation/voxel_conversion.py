@@ -10,7 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+    """
+    Adds annotation to the voxel sample.
+
+    Args:
+        sample (fo.Sample): FiftyOne sample to add the annotations to
+        datapoint (Datapoint): Data Engine datapoint to get metadata from
+        annotation_fields(str): JSON blobs of voxel annotations that are added to sample.
+    """
     from fiftyone import Label
+
     for field in annotation_fields:
         annotation_val = datapoint.get_blob(field)
         label = Label.from_json(annotation_val.decode())
@@ -27,8 +36,17 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
         annotation_fields: fields from which to get annotations
     """
     from fiftyone.utils.labelstudio import import_label_studio_annotation
-    from fiftyone import Detections, Detection, Classification, Classifications, Keypoint, Keypoints, Polylines, \
-        Polyline
+    from fiftyone import (
+        Detections,
+        Detection,
+        Classification,
+        Classifications,
+        Keypoint,
+        Keypoints,
+        Polylines,
+        Polyline,
+    )
+
     for field in annotation_fields:
         annotations = datapoint.metadata.get(field)
         if type(annotations) is not bytes:

@@ -15,11 +15,15 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.annotation.voxel_conversion import add_voxel_annotations, add_ls_annotations
+from dagshub.data_engine.annotation.voxel_conversion import (
+    add_voxel_annotations,
+    add_ls_annotations,
+)
 from dagshub.data_engine.client.models import DatasourceType
 from dagshub.data_engine.model.datapoint import Datapoint, _get_blob
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
+from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -34,13 +38,23 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizeError(Exception):
+    """:meta private:"""
     pass
 
 
 @dataclass
 class QueryResult:
+    """
+    Result of executing a query on a :class:`.Datasource`.
+
+    You can iterate over this object to get the :class:`datapoints <.Datapoint>`::
+
+        res = ds.head()
+        for dp in res:
+            print(dp.path_in_repo)
+
+    """
     _entries: List[Datapoint]
-    """ List of downloaded entries."""
     datasource: "Datasource"
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
 
@@ -49,6 +63,9 @@ class QueryResult:
 
     @property
     def entries(self):
+        """
+        list(Datapoint): Datapoints contained in this QueryResult
+        """
         return self._entries
 
     @entries.setter
@@ -63,6 +80,12 @@ class QueryResult:
 
     @property
     def dataframe(self):
+        """
+        Represent the contents of this QueryResult as a
+        `pandas.DataFrame <https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html>`_.
+
+        The created dataframe has a copy of the QueryResult's data.
+        """
         import pandas as pd
 
         metadata_keys = set()
@@ -70,23 +93,20 @@ class QueryResult:
             metadata_keys.update(e.metadata.keys())
 
         metadata_keys = list(sorted(metadata_keys))
-        return pd.DataFrame.from_records(
-            [dp.to_dict(metadata_keys) for dp in self.entries]
-        )
+        return pd.DataFrame.from_records([dp.to_dict(metadata_keys) for dp in self.entries])
 
     def __len__(self):
         return len(self.entries)
 
     def __iter__(self):
+        """You can iterate over a QueryResult to get containing datapoints"""
         return self.entries.__iter__()
 
     def __repr__(self):
         return f"QueryResult of datasource {self.datasource.source.name} with {len(self.entries)} datapoint(s)"
 
     @staticmethod
-    def from_gql_query(
-        query_resp: Dict[str, Any], datasource: "Datasource"
-    ) -> "QueryResult":
+    def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
         if "edges" not in query_resp:
             return QueryResult([], datasource)
         if query_resp["edges"] is None:
@@ -96,19 +116,40 @@ class QueryResult:
             datasource,
         )
 
-    def as_ml_dataset(self, flavor, **kwargs):
+    def as_ml_dataset(self, flavor: str, **kwargs):
         """
         Convert the QueryResult into a dataset for a machine learning framework
 
-        ARGS:
-        flavor: torch|tensorflow
+        Args:
+            flavor: Either of:
 
-        KWARGS:
-        metadata_columns: columns that are returned from the metadata as part of the dataset
-        strategy: preload|background|lazy; default: lazy
-        savedir: location at which the dataset is stored
-        processes: number of parallel processes that download the dataset
-        tensorizer: auto|image|<function>
+                - ``"torch"``: returns a \
+                `torch.utils.data.Dataset <https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset>`_
+                - ``"tensorflow"``: returns a \
+                `tf.data.Dataset <https://www.tensorflow.org/api_docs/python/tf/data/Dataset>`_
+
+
+        Keyword Args:
+            metadata_columns (list(str)): which fields to use in the dataset.
+            strategy (str): Datapoint file loading strategy. Possible values:
+
+                - ``"preload"`` - Download all datapoints before returning the dataset.
+                - ``"background"`` - Start downloading the datapoints in the background. \
+                    If an undownloaded datapoint is accessed, it gets downloaded.
+                - ``"lazy"`` (default) - Download each datapoint as it is being accessed by the dataset.
+
+            savedir (str|Path): Where to store the datapoint files. Default is :func:`datasource's default location \
+                <dagshub.data_engine.model.datasource.Datasource.default_dataset_location>`
+            processes (int): number of parallel processes to download the datapoints with. Default is 8.
+            tensorizers: How to transform the datapoint file/metadata into tensors. Possible values:
+
+                - ``"auto"`` - try to guess the tensorizers for every field.\
+                    For files the tensorizer will be the determined by the first file's extension.
+                - ``"image"`` | ``"audio"`` - tensorize all fields according to this type
+                - List of tensorizers. First is the tensorizer for the datapoint file and then \
+                    a tensorizer for each of the metadata fields. Tensorizer can either be strings\
+                     ``"image"``, ``"audio"``, ``"numeric"``, or your own function that receives the\
+                     metadata value of the field and turns it into a tensor.
         """
         flavor = flavor.lower()
         if flavor == "torch":
@@ -119,9 +160,7 @@ class QueryResult:
             from dagshub.data_engine.client.loaders.tf import TensorFlowDataset
 
             ds_builder = TensorFlowDataset(self, **kwargs)
-            ds = tf.data.Dataset.from_generator(
-                ds_builder.generator, output_signature=ds_builder.signature
-            )
+            ds = tf.data.Dataset.from_generator(ds_builder.generator, output_signature=ds_builder.signature)
             ds.__len__ = lambda: ds_builder.__len__()
             ds.__getitem__ = ds_builder.__getitem__
             ds.builder = ds_builder
@@ -134,20 +173,21 @@ class QueryResult:
         """
         Convert the QueryResult into a dataloader for a machine learning framework
 
-        ARGS:
-        flavor: torch|tensorflow
+        Args:
+            flavor: Either of:
 
-        KWARGS:
-        metadata_columns: columns that are returned from the metadata as part of the dataloader
-        strategy: preload|background|lazy; default: lazy
-        savedir: location at which the dataset is stored
-        processes: number of parallel processes that download the dataset
-        tensorizer: auto|image|<function>
-        for_dataloader: bool; internal argument, that begins background dataset download after
-                        the shuffle order is determined for the first epoch; default: False
+                - ``"torch"``: returns a \
+                `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_
+                - ``"tensorflow"``: returns a \
+                `tf.keras.utils.Sequence <https://www.tensorflow.org/api_docs/python/tf/keras/utils/Sequence>`_
+
+        Kwargs are the same as :func:`as_ml_dataset()`.
         """
 
-        send_analytics_event("Client_DataEngine_DataLoaderInitialized", repo=self.datasource.source.repoApi)
+        send_analytics_event(
+            "Client_DataEngine_DataLoaderInitialized",
+            repo=self.datasource.source.repoApi,
+        )
 
         def keypairs(keys):
             return {key: kwargs[key] for key in keys}
@@ -163,18 +203,14 @@ class QueryResult:
                 return TensorFlowDataLoader(flavor, **kwargs)
 
         kwargs["for_dataloader"] = True
-        dataset_kwargs = set(
-            list(inspect.signature(DagsHubDataset).parameters.keys())[1:]
-        )
+        dataset_kwargs = set(list(inspect.signature(DagsHubDataset).parameters.keys())[1:])
         global_kwargs = set(kwargs.keys())
         flavor = flavor.lower() if type(flavor) == str else flavor
         if flavor == "torch":
             from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 
             return PyTorchDataLoader(
-                self.as_ml_dataset(
-                    flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))
-                ),
+                self.as_ml_dataset(flavor, **keypairs(global_kwargs.intersection(dataset_kwargs))),
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         elif flavor == "tensorflow":
@@ -188,9 +224,7 @@ class QueryResult:
                 **keypairs(global_kwargs - dataset_kwargs),
             )
         else:
-            raise ValueError(
-                "supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>"
-            )
+            raise ValueError("supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>")
 
     def __getitem__(self, item: Union[str, int, slice]):
         """
@@ -205,24 +239,35 @@ class QueryResult:
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
-                f"needs to be either int or str or slice")
+                f"needs to be either int or str or slice"
+            )
 
-    def get_blob_fields(self, *fields: str, load_into_memory=False,
-                        cache_on_disk=True, num_proc: int = config.download_threads) -> "QueryResult":
+    def get_blob_fields(
+        self, *fields: str, load_into_memory=False, cache_on_disk=True, num_proc: int = config.download_threads
+    ) -> "QueryResult":
         """
         Downloads data from blob fields
 
         Args:
-            fields: list of binary fields to download blobs for
+            fields: list of binary fields to download blobs for. If empty, download all blob fields.
             load_into_memory: Whether to load the blobs into the datapoints, or just store them on disk
-                If True : the datapoints' specified fields will contain the blob data
+
+
+                If True: the datapoints' specified fields will contain the blob data
+
                 If False: the datapoints' specified fields will contain Path objects to the file of the downloaded blob
             cache_on_disk: Whether to cache the blobs on disk or not (valid only if load_into_memory is set to True)
-                Cache location is `~/dagshub/datasets/<user>/<repo>/<datasource_id>/.metadata_blobs/`
+                Cache location is ``~/dagshub/datasets/<repo>/<datasource_id>/.metadata_blobs/``
+            num_proc: number of download threads
         """
         send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
         if not load_into_memory:
             assert cache_on_disk
+
+        # If no fields are specified, include all blob fields from self.datasource.fields
+        if not fields:
+            fields = [field.name for field in self.datasource.fields if field.valueType == MetadataFieldType.BLOB]
+
         for fld in fields:
             logger.info(f"Downloading metadata for field {fld} with {num_proc} processes")
             cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
@@ -232,8 +277,13 @@ class QueryResult:
 
             blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(fld), self.entries))
             auth = self.datasource.source.repoApi.auth
-            func_args = zip(map(lambda bu: bu[0], blob_urls), map(lambda bu: bu[1], blob_urls), repeat(auth),
-                            repeat(cache_on_disk), repeat(load_into_memory))
+            func_args = zip(
+                map(lambda bu: bu[0], blob_urls),
+                map(lambda bu: bu[1], blob_urls),
+                repeat(auth),
+                repeat(cache_on_disk),
+                repeat(load_into_memory),
+            )
             with multiprocessing.pool.ThreadPool(num_proc) as pool:
                 res = pool.starmap(_get_blob, func_args)
 
@@ -244,29 +294,43 @@ class QueryResult:
 
         return self
 
-    def download_binary_columns(self, *columns: str, load_into_memory=True,
-                                cache_on_disk=True, num_proc: int = 32) -> "QueryResult":
+    def download_binary_columns(
+        self, *columns: str, load_into_memory=True, cache_on_disk=True, num_proc: int = 32
+    ) -> "QueryResult":
         """
         deprecated: Use get_blob_fields instead.
-        """
-        return self.get_blob_fields(*columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk,
-                                    num_proc=num_proc)
 
-    def download_files(self, target_dir: Optional[Union[str, PathLike]] = None, keep_source_prefix=True,
-                       redownload=False, path_field: Optional[str] = None) -> PathLike:
+        :meta private:
         """
-        Downloads the query result to the target_dir directory
+        return self.get_blob_fields(
+            *columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk, num_proc=num_proc
+        )
+
+    def download_files(
+        self,
+        target_dir: Optional[Union[str, PathLike]] = None,
+        keep_source_prefix=True,
+        redownload=False,
+        path_field: Optional[str] = None,
+    ) -> PathLike:
+        """
+        Downloads the datapoints to the ``target_dir`` directory
+
         Args:
-            target_dir: Where to download the files.
-                If not specified, then downloads to ~/dagshub/datasets/<user>/<repo>/<ds_id>
-            keep_source_prefix: If True, includes the prefix of the datasource in the download path
-                Useful for cases where the download path is the root of the repository
-            redownload: Whether to redownload a file if it exists on the filesystem already
-                NOTE: We don't do any hashsum checks, so if it's possible that the file has been updated, turn it on
-            path_field: If you want to download files from a field other than the datapoint's path.
-                NOTE: the path still needs to be in the same datasource
-                and have the same format as the path of the datapoint,
-                for now you can't download arbitrary paths/urls
+            target_dir: Where to download the files. Defaults to \
+                :func:`datasource's default location \
+                <dagshub.data_engine.model.datasource.Datasource.default_dataset_location>`
+            keep_source_prefix: If True, includes the prefix of the datasource in the download path.
+            redownload: Whether to redownload a file if it exists on the filesystem already.\
+                We don't do any hashsum checks, so if it's possible that the file has been updated, set to True
+            path_field: Set this to the name of the field with the file's path\
+                if you want to download files from a field other than the datapoint's path.
+
+        .. note::
+            For ``path_field`` the path in the field still needs to be in the same repo
+            and have the same format as the path of the datapoint, including not having the prefix.
+            For now, you can't download arbitrary paths/urls.
+
         Returns:
             Path to the directory with the downloaded files
         """
@@ -275,9 +339,15 @@ class QueryResult:
         logger.warning(f"Downloading {len(self.entries)} files to {str(target_path)}")
 
         if self.datasource.source.source_type == DatasourceType.BUCKET:
-            send_analytics_event("Client_DataEngine_downloadDatapointsFromBucket", repo=self.datasource.source.repoApi)
+            send_analytics_event(
+                "Client_DataEngine_downloadDatapointsFromBucket",
+                repo=self.datasource.source.repoApi,
+            )
         else:
-            send_analytics_event("Client_DataEngine_downloadDatapoints", repo=self.datasource.source.repoApi)
+            send_analytics_event(
+                "Client_DataEngine_downloadDatapoints",
+                repo=self.datasource.source.repoApi,
+            )
 
         def dp_path(dp: Datapoint):
             if path_field is not None:
@@ -308,16 +378,24 @@ class QueryResult:
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
-        Creates a voxel51 dataset that can be used with `fo.launch_app()` to run it
+        Creates a voxel51 dataset that can be used with\
+        `fo.launch_app()
+        <https://docs.voxel51.com/api/fiftyone.core.session.html?highlight=launch_app#fiftyone.core.session.launch_app>`_
+        to visualize it.
 
-        Kwargs:
-            name (str): name of the dataset (by default uses the same name as the datasource)
-            force_download (bool): download the dataset even if the size of the files is bigger than 100MB
-            files_location (str|PathLike): path to the location where to download the local files
-                default: ~/dagshub_datasets/user/repo/ds_name/
-            redownload (bool): Redownload files, replacing the ones that might exist on the filesystem
+        Keyword Args:
+            name (str): Name of the dataset. Default is the name of the datasource.
+            force_download (bool): Download the dataset even if the size of the files is bigger than 100MB.\
+                Default is False
+            files_location (str|PathLike): path to the location where to download the local files.
+                Default is :func:`datasource's default location \
+                <dagshub.data_engine.model.datasource.Datasource.default_dataset_location>`
+            redownload (bool): Redownload files, replacing the ones that might exist on the filesystem.\
+                Default is False.
             voxel_annotations (List[str]) : List of fields from which to load voxel annotations serialized with
                                         `to_json()`. This will override the labelstudio annotations
+
+        :rtype: `fo.Dataset <https://docs.voxel51.com/api/fiftyone.core.dataset.html#fiftyone.core.dataset.Dataset>`_
         """
         if len(self.entries) == 0:
             raise VisualizeError("No datapoints to visualize")
@@ -406,6 +484,21 @@ class QueryResult:
         return sum_size
 
     def visualize(self, **kwargs):
+        """
+        Visualize this QueryResult with Voxel51.
+
+        This function calls :func:`to_voxel51_dataset`, passing to it the keyword arguments,
+        and launches a fiftyone session showing the dataset.
+
+        Additionally, this function adds a DagsHub plugin into Voxel51 that you can use for additional interactions
+        with the datasource from within the voxel environment.
+
+        Returns the session object that you can ``wait()`` if you are using it\
+        outside a notebook and need to not close the script immediately::
+
+            session = ds.all().visualize()
+            session.wait(-1)
+        """
         set_voxel_envvars()
 
         send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
@@ -418,15 +511,26 @@ class QueryResult:
 
         return sess
 
-    def annotate(self, open_project=True, ignore_warning=True) -> Optional[str]:
+    def annotate(self, open_project=True,
+                 ignore_warning=True,
+                 fields_to_embed=None,
+                 fields_to_exclude=None
+                 ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 
-        :param open_project: Whether to automatically open the returned URL in your browser
-        :param ignore_warning: Suppress any non-lethal warnings that require user input
-        :return The URL of the created Label Studio workspace
+        Args:
+            open_project: Automatically open the Label Studio project in the browser
+            ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
+        Returns:
+            The URL of the created Label Studio workspace
         """
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
 
-        return self.datasource.send_datapoints_to_annotation(self.entries,
-                                                             open_project=open_project, ignore_warning=ignore_warning)
+        return self.datasource.send_datapoints_to_annotation(
+            self.entries, open_project=open_project, ignore_warning=ignore_warning, fields_to_exclude=fields_to_exclude,
+            fields_to_embed=fields_to_embed
+        )

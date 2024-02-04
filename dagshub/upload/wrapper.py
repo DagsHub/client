@@ -29,7 +29,7 @@ DEFAULT_DATASET_COMMIT_MESSAGE = "Initial dataset commit"
 REPO_CREATE_URL = "api/v1/user/repos"
 ORG_REPO_CREATE_URL = "api/v1/org/{orgname}/repos"
 USER_INFO_URL = "api/v1/user"
-DEFAULT_DATA_DIR_NAME = 'data'
+DEFAULT_DATA_DIR_NAME = "data"
 logger = logging.getLogger(__name__)
 
 s = httpx.Client()
@@ -40,15 +40,19 @@ s.headers.update(config.requests_headers)
 FileUploadStruct = Tuple[os.PathLike, BinaryIO]
 
 
-def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=False):
+def create_dataset(repo_name: str, local_path: str, glob_exclude: str = "", org_name: str = "", private=False):
     """
-    Create a new repository on DagsHub and upload an entire dataset to it
-    :param repo_name: Name of the repository to be created
-    :param local_path: local path where the dataset to upload is located
-    :param glob_exclude: regex to exclude certain files from the upload process
-    :param org_name: Organization name to be the repository owner
-    :param private: Flag to indicate the repository is going to be private
-    :return : Repo object of the repository created
+    Create a new repository on DagsHub and upload an entire folder dataset to it
+
+    Args:
+        repo_name: Name of the repository to be created.
+        local_path: local path where the dataset to upload is located.
+        glob_exclude: glob pattern to exclude certain files from being uploaded.
+        org_name (optional): Organization that will own the repo. Alternative to creating a repository owned by you.
+        private: Set to ``True`` to make the repository private.
+
+    Returns:
+        :class:`.Repo`: Repo object of the repository created.
     """
     repo = create_repo(repo_name, org_name=org_name, private=private)
     dir = repo.directory(repo_name)
@@ -56,45 +60,61 @@ def create_dataset(repo_name, local_path, glob_exclude="", org_name="", private=
     return repo
 
 
-def add_dataset_to_repo(repo,
-                        local_path,
-                        data_dir=DEFAULT_DATA_DIR_NAME):
+def add_dataset_to_repo(repo: "Repo", local_path: str, data_dir: str = DEFAULT_DATA_DIR_NAME):
     """
-    Given a repository created on dagshub - upload an entire dataset to it
-    :param repo: repository created beforehand
-    :param local_path: local path where the dataset to upload is located
-    :param data_dir: name of data directory that will be created inside repo
+    Given a repository created on dagshub - upload a dataset folder into it
+
+    Args:
+        repo: repository created beforehand
+        local_path: local path where the dataset to upload is located
+        data_dir: name of data directory that will be created inside repo
     """
     dir = repo.directory(data_dir)
     dir.add_dir(local_path, commit_message=DEFAULT_DATASET_COMMIT_MESSAGE)
 
 
 def create_repo(
-    repo_name,
-    org_name="",
-    description="",
-    private=False,
-    auto_init=False,
-    gitignores="Python",
-    license="",
-    readme="",
-    template="custom",
-    host=""
+    repo_name: str,
+    org_name: str = "",
+    description: str = "",
+    private: bool = False,
+    auto_init: bool = False,
+    gitignores: str = "Python",
+    license: str = "",
+    readme: str = "",
+    template: str = "custom",
+    host: str = "",
 ):
     """
-    Creates a repository on DagsHub for the current user (default) or an organization passed as an argument
+    Creates a repository on DagsHub for the current user or an organization passed as an argument
 
-    :param repo_name: Name of the repository to be created
-    :param org_name: Organization name to be the repository owner
-    :param description: Description for the repository
-    :param private: Flag to indicate the repository is going to be private
-    :param auto_init: Pass true to create an initial commit with README, .gitignore and LICENSE.
-    :param gitignores: Which gitignore template(s) to use (comma separated string)
-    :param license: Which license file to use
-    :param readme: Readme file path to upload
-    :param template: Which project template to use, options are: none, custom, notebook-template,
-    cookiecutter-dagshub-dvc. To learn more, check out https://dagshub.com/docs/feature_guide/project_templates/
-    :return: Repo object of the repository created
+    Args:
+        repo_name: Name of the repository to be created.
+        org_name (optional): Organization that will own the repo. Alternative to creating a repository owned by you.
+        description: Repository description.
+        private: Set to ``True`` to make repository private.
+        auto_init: Set to True to create an initial commit with README, .gitignore and LICENSE.
+        gitignores: Which gitignore template(s) to use in a comma separated string.
+        license: Which license file to use.
+        readme: Readme template to initialize with.
+        template: Which project template to use, options are:
+
+            - ``"none"`` - creates an empty repo
+            - ``"custom"`` - creates a repo with your specified ``gitignores``, ``license`` and ``readme``
+            - ``"notebook-template"``
+            - ``"cookiecutter-mlops"``
+            - ``"cookiecutter-dagshub-dvc"``
+
+            By default, creates an empty repo if none of ``gitignores``, ``license`` or ``readme`` were provided.
+            Otherwise, the template is ``"custom"``.
+
+        host: URL of the DagsHub instance to host the repo on.
+
+    .. note::
+        To learn more about the templates, visit https://dagshub.com/docs/feature_guide/project_templates/
+
+    Returns:
+        :class:`.Repo`: Repo object of the repository created.
     """
     if template == "":
         template = "none"
@@ -144,8 +164,12 @@ def create_repo(
 
     repo = res.json()
     return Repo(
-        owner=repo["owner"]["login"], name=repo["name"], username=username, password=password,
-        token=token, branch="main"
+        owner=repo["owner"]["login"],
+        name=repo["name"],
+        username=username,
+        password=password,
+        token=token,
+        branch="main",
     )
 
 
@@ -164,12 +188,16 @@ def upload_files(
     **kwargs,
 ):
     """
-    Convenience wrapper around Repo.upload
-    :param repo: Repo identifier in the form <username>/<reponame>
-    :param local_path: Specify the file or directory to be uploaded
-    :param commit_message: Specify an optional commit message
-    :param remote_path: Specify the path to upload the file to. Defaults to the relative path to the local_path.
-    :param kwargs: Pass in any additional parameters that are required for the upload function
+    Upload file(s) into a repository.
+
+    Args:
+        repo: Repo name in the form of ``<username>/<reponame>``.
+        local_path: File or directory to be uploaded.
+        commit_message (optional): Specify a commit message.
+        remote_path: Specify the path to upload the file to.\
+        Defaults to the relative component of ``local_path`` to CWD.
+
+    For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
     """
     owner, repo = validate_owner_repo(repo)
     repo = Repo(owner, repo)
@@ -178,23 +206,28 @@ def upload_files(
 
 class Repo:
     def __init__(
-        self, owner, name, username=None, password=None, token=None, branch=None
+        self,
+        owner: str,
+        name: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        token: Optional[str] = None,
+        branch: Optional[str] = None,
     ):
-
         """
-        Repo class constructor. If branch is not provided, then default branch is used.
+        Class that can be used to upload files into a repository on DagsHub
 
-        WARNING: this class is not thread safe.
-        Uploading files in parallel can lead to unexpected outcomes
+        .. warning::
+            This class is not thread safe.
+            Uploading files in parallel can lead to unexpected outcomes
 
-        :param owner: Store the username of the user who owns this repository
-        :param name: Identify the repository
-        :param username: Set the username to none if it is not provided
-        :param password : Set the password to none if it is not provided
-        :param token: Set the token
-        :param branch: Set the branch to the default branch
-        :return: The object of the class
-
+        Args:
+            owner: user or org that owns the repository.
+            name: name of the repository.
+            token (optional): Token to use for authentication. If unset, uses the cached token or goes through OAuth.
+            username: Username to log in with (alternative to token).
+            password: Password to log in with (alternative to token).
+            branch: Branch to upload files to.
         """
         self.owner = owner
         self.name = name
@@ -228,16 +261,16 @@ class Repo:
         **kwargs,
     ):
         """
-        The upload function is used to upload files to the repository.
-        It takes a file as an argument and logs the response status code and content.
+        Upload a file or a directory to the repo.
 
+        Args:
+            local_path: Path to file or directory to be uploaded
+            commit_message: Specify a commit message
+            remote_path: Specify the path to upload the file/dir to.
+                If unspecified, sets the value to the relative component of ``local_path`` to CWD.
+                If ``local_path`` is not relative to CWD, ``remote_path`` is the last component of the ``local_path``
 
-        :param local_path: Specify the file to be uploaded
-        :param commit_message: Specify a commit message
-        :param remote_path: Specify the path to upload the file to
-        :param **kwargs: Pass in any additional parameters that are required for the upload function
-        :return: None
-
+        The kwargs are the parameters of :func:`upload_files`
         """
         local_path = Path(local_path).resolve()
         if local_path.is_dir():
@@ -258,27 +291,32 @@ class Repo:
         self,
         files: List[FileUploadStruct],
         directory_path: str = "",
-        commit_message: str = DEFAULT_COMMIT_MESSAGE,
+        commit_message: Optional[str] = DEFAULT_COMMIT_MESSAGE,
         versioning: str = "auto",
         new_branch: str = None,
         last_commit: str = None,
         force: bool = False,
     ):
         """
-        The upload_files function uploads a list of files to the specified directory.
+        Upload a list of binary files to the specified directory.
+        This function is lower level than :func:`upload`,
+        but useful when you don't have the files stored on the filesystem.
 
         Args:
             files: List of Tuples of (path in repo, binaryIO) of files to upload
             directory_path: Directory in repo relative to which to upload files
             commit_message: Commit message
             versioning: Which versioning system to use to upload a file.
-                Possible options: git, dvc, auto (best effort guess)
-            new_branch: Create a new branch with the name of the passed argument
-            last_commit: Consistency argument - last revision of the files you want to upgrade.
-                Exists to prevent accidental overwrites
+                Possible options: ``"git"``, ``"dvc"``, ``"auto"`` (default, best effort guess)
+            new_branch: Create a new branch with this name
+            last_commit: Consistency argument - last revision of the files you want to commit on top of.
+                Exists to prevent accidental overwrites of data.
             force (bool): Force the upload of a file even if it is already present on the server.
                 Sets last_commit to be the tip of the branch
         """
+
+        if commit_message is None:
+            commit_message = DEFAULT_COMMIT_MESSAGE
 
         # Truncate the commit message because the max we allow is 100 symbols
         commit_message = commit_message[:100]
@@ -311,7 +349,9 @@ class Repo:
             self._uploading_to_new_branch = True
             log_message(
                 f"Uploading to a new branch {self.branch}, "
-                f"splitting it off from the default branch {self._api.default_branch}", logger)
+                f"splitting it off from the default branch {self._api.default_branch}",
+                logger,
+            )
             upload_url = self.get_request_url(directory=directory_path, branch=self._api.default_branch)
             new_branch = self.branch
 
@@ -391,7 +431,8 @@ class Repo:
         # Initial state - assume we can upload
         # Also can upload if last upload didn't have any changes
         if not self._uploading_to_new_branch and (
-            self._last_upload_revision is None or not self._last_upload_had_changes):
+            self._last_upload_revision is None or not self._last_upload_had_changes
+        ):
             return
 
         poll_interval = 1.0  # seconds
@@ -403,6 +444,7 @@ class Repo:
 
             def finish():
                 self.current_progress.remove_task(task)
+
         else:
             status = rich.status.Status("Waiting for the mirror to sync", console=rich_console)
             status.start()
@@ -424,8 +466,10 @@ class Repo:
                 return
 
         finish()
-        logger.warning(f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
-                       f"Trying to push anyway, which might not work.")
+        logger.warning(
+            f"Timed out while polling for a mirror sync finishing after {poll_timeout} s. "
+            f"Trying to push anyway, which might not work."
+        )
 
     @property
     def auth(self):
@@ -436,6 +480,7 @@ class Repo:
 
         :return: The HTTPAuth object
 
+        :meta private:
         """
         if self.username is not None and self.password is not None:
             return httpx.BasicAuth(self.username, self.password)
@@ -443,15 +488,13 @@ class Repo:
             return EnvVarDagshubToken(self.token)
         return dagshub.auth.get_authenticator()
 
-    def directory(self, path):
+    def directory(self, path: str) -> "DataSet":
         """
-        The directory function returns a DataSet object that represents the directory at the given path.
+        Create a :class:`~dagshub.upload.wrapper.DataSet` object that allows you to stage multiple files before\
+        pushing them all to DagsHub in a single commit with :func:`~dagshub.upload.wrapper.DataSet.commit`.
 
-
-        :param path: Specify the directory that will contain the data.
-                           This directory is the "root" of the dataset.
-        :return: A dataset object that represents the directory at the given path
-
+        Args:
+            path: The path of the directory in the repository relative to which the files will be uploaded.
         """
         return DataSet(self, path)
 
@@ -467,6 +510,7 @@ class Repo:
             Default is None, which uses the branch set on object creation
         :return: The url for uploading a file
 
+        :meta private:
         """
         return self.get_repo_url(CONTENT_UPLOAD_URL, directory, branch)
 
@@ -480,6 +524,7 @@ class Repo:
             then you could pass one of these strings into this function as an argument.
         :return: The url that you can navigate to in your browser to see the files
 
+        :meta private:
         """
         return self.get_repo_url(FILES_UI_URL, directory)
 
@@ -498,58 +543,55 @@ class Repo:
 
 
 class DataSet:
+    """
+    Not to be confused with DataEngine's datasets.
+    This class represents a folder with files that are going to be uploaded to a repo.
+    """
+
     def __init__(self, repo: Repo, directory: str):
-        """
-
-        :param repo: Pass a repo object
-        :param directory: Specify the directory of the repository
-        :return: A DataSet object
-
-        """
-
         self.files: Dict[os.PathLike, Tuple[os.PathLike, BinaryIO]] = {}
         self.repo = repo
         self.directory = self._clean_directory_name(directory)
 
     def add(self, file: Union[str, IOBase], path=None):
         """
-        The add function adds a file to the list of files that will be uploaded.
+        Add a file to upload. The file will not be uploaded unless you call :func:`commit`
 
-
-        :param file: Specify the file to be uploaded
-        :param path: Specify the path to upload the file
-        :return: None
-
+        Args:
+            file: Path to the file on the filesystem OR the contents of the file.
+            path: Where to store the file in the repo.
         """
 
         path, file = self.get_file(file, path)
         if file is not None:
             if path in self.files:
-                log_message(
-                    f'File already staged for upload on path "{path}". Overwriting', logger
-                )
+                log_message(f'File already staged for upload on path "{path}". Overwriting', logger)
             self.files[path] = (path, file)
 
     def add_dir(self, local_path, glob_exclude="", commit_message=None, **upload_kwargs):
         """
-        The add_dir function adds an entire dvc directory to a DagsHub repository.
-        It does this by iterating through all the files in the given directory and uploading them one-by-one.
-        The function also commits all of these changes at once, so as not to overload the API with requests.
+        Add *and upload* an entire directory to the DagsHub repository.
 
+        By default, this uploads a dvc folder.
 
-        :param local_path: Specify the local path where the dataset to upload is located
-        :param glob_exclude: Exclude certain files from the upload process
-        :param commit_message: Commit message
-        :param upload_kwargs: kwargs that are passed to the uploading function
-        :return: None
+        Args:
+            local_path: Local path of the directory to upload.
+            glob_exclude: Glob pattern to exclude some files from being uploaded.
+            commit_message: Message of the commit with the upload.
 
+        The keyword arguments are passed to :func:`Repo.upload_files() <dagshub.upload.Repo.upload_files>`.
         """
         upload_file_number = 100
         file_counter = 0
 
-        progress = rich.progress.Progress(rich.progress.SpinnerColumn(), *rich.progress.Progress.get_default_columns(),
-                                          rich.progress.MofNCompleteColumn(),
-                                          console=rich_console, transient=True, disable=config.quiet)
+        progress = rich.progress.Progress(
+            rich.progress.SpinnerColumn(),
+            *rich.progress.Progress.get_default_columns(),
+            rich.progress.MofNCompleteColumn(),
+            console=rich_console,
+            transient=True,
+            disable=config.quiet,
+        )
         total_task = progress.add_task("Uploading files...", total=None)
         self.repo.current_progress = progress
 
@@ -571,10 +613,7 @@ class DataSet:
                         for filename in files:
                             rel_file_path = posixpath.join(root, filename)
                             rel_remote_file_path = rel_file_path.replace(local_path, "")
-                            if (
-                                glob_exclude == ""
-                                or fnmatch.fnmatch(rel_file_path, glob_exclude) is False
-                            ):
+                            if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
                                 self.add(file=rel_file_path, path=rel_remote_file_path)
                                 if len(self.files) >= upload_file_number:
                                     file_counter += len(self.files)
@@ -593,8 +632,11 @@ class DataSet:
                     self.commit(commit_message, **upload_kwargs)
                     progress.update(total_task, completed=file_counter)
 
-            log_message(f"Directory upload complete, uploaded {file_counter} files"
-                        f" to {self.repo.get_files_ui_url(self.directory)}", logger)
+            log_message(
+                f"Directory upload complete, uploaded {file_counter} files"
+                f" to {self.repo.get_files_ui_url(self.directory)}",
+                logger,
+            )
         finally:
             self.repo.current_progress = None
 
@@ -627,15 +669,14 @@ class DataSet:
         :param path: Desired path of the file in the repository
         :return: A tuple of the path and a file object
 
+        :meta private:
         """
 
         try:
             # if path is not provided, fall back to the file name
             if path is None:
                 try:
-                    path = posixpath.basename(
-                        posixpath.normpath(file if type(file) is str else file.name)
-                    )
+                    path = posixpath.basename(posixpath.normpath(file if type(file) is str else file.name))
                 except Exception:
                     raise RuntimeError(
                         "Could not interpret your file's name. Please specify it in the keyword parameter 'path'."
@@ -646,9 +687,7 @@ class DataSet:
                     f = open(file, "rb")
                     return path, f
                 except IsADirectoryError:
-                    raise IsADirectoryError(
-                        "'file' must describe a file, not a directory."
-                    )
+                    raise IsADirectoryError("'file' must describe a file, not a directory.")
 
             return path, file
 
@@ -671,20 +710,15 @@ class DataSet:
 
     def commit(self, commit_message=DEFAULT_COMMIT_MESSAGE, *args, **kwargs):
         """
-        The commit function is used to commit the files in the dataset.
-        It takes a commit message as an argument,
-            if no argument is passed then it return default commit message "Upload files using DagsHub client".
-        The function returns nothing.
+        Commit files added with :func:`add` to the repo
 
+        Args:
+            commit_message: Message of the commit with the upload.
 
-        :param commit_message: Set the commit message
-        :param *args: Pass a non-keyworded, variable-length argument list to the function
-        :param **kwargs: Pass additional parameters to the function
-        :return: None
+        Other positional and keyword arguments are passed to
+        :func:`Repo.upload_files() <dagshub.upload.Repo.upload_files>`
         """
 
         file_list = list(self.files.values())
-        self.repo.upload_files(
-            file_list, self.directory, commit_message=commit_message, *args, **kwargs
-        )
+        self.repo.upload_files(file_list, self.directory, commit_message=commit_message, *args, **kwargs)
         self._reset_dataset()
