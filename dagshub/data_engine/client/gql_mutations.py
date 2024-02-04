@@ -49,7 +49,7 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
-    def delete_metadata():
+    def delete_metadata_of_datapoint():
         q = (
             GqlQuery()
             .operation(
@@ -58,7 +58,6 @@ class GqlMutations:
                 input={"$datasource": "ID!", "$metaDeletions": "[DatapointMetadataDeleteInput!]!"},
             )
             .query("deleteMetadata", input={"datasource": "$datasource", "metaDeletions": "$metaDeletions"})
-
             .generate()
         )
         return q

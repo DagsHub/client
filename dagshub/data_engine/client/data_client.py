@@ -206,7 +206,7 @@ class DataClient:
         )
         return self._exec(q, params)
 
-    def delete_metadata(self, datasource: Datasource, entries: List[DatapointDeleteMetadataEntry]):
+    def delete_metadata_of_datapoint(self, datasource: Datasource, entries: List[DatapointDeleteMetadataEntry]):
         """
         Delete a metadata from a datapoint
 
@@ -218,7 +218,7 @@ class DataClient:
             Updates the Datasource.
 
         """
-        q = GqlMutations.delete_metadata()
+        q = GqlMutations.delete_metadata_of_datapoint()
 
         assert datasource.source.id is not None
         assert len(entries) > 0
