@@ -615,7 +615,8 @@ class Datasource:
         Logs the current datasource state to MLflow as an artifact.
 
         Args:
-            artifact_name: Name of the artifact that will be stored in the MLflow run
+            artifact_name: Name of the artifact that will be stored in the MLflow run.
+            run: MLflow run to save to. If None, uses the active MLflow run.
         """
         if run is None:
             run = mlflow.active_run()
