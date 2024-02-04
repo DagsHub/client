@@ -554,7 +554,6 @@ class Datasource:
         metadata_entries = [DatapointDeleteMetadataEntry(datapointId=id, key=key)]
         self.source.client.delete_metadata_of_datapoint(self, metadata_entries)
 
-
     def save_dataset(self, name: str):
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
