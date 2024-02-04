@@ -90,6 +90,9 @@ class DagsHubFilesystem:
     :param password: DagsHub password (as an alternative to using the token)
     :param timeout: Timeout in seconds for HTTP requests.
         Influences all requests except for file download, which has no timeout
+    :param exclude_globs: One or more glob patterns to exclude from looking up on the server
+        This is useful in case your framework tries to look up cached files on disk that might not be there.
+        Example: YOLO and .npy files
     """
 
     already_mounted_filesystems: Dict[Path, "DagsHubFilesystem"] = {}
@@ -104,6 +107,7 @@ class DagsHubFilesystem:
         password: Optional[str] = None,
         token: Optional[str] = None,
         timeout: Optional[int] = None,
+        exclude_globs: Optional[Union[List[str], str]] = None,
     ):
         # Find root directory of Git project
         if not project_root:
@@ -139,6 +143,13 @@ class DagsHubFilesystem:
         self.password = password or config.password
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
+
+        if exclude_globs is None:
+            exclude_globs = []
+        elif exclude_globs is str:
+            exclude_globs = [exclude_globs]
+
+        self.exclude_globs: List[str] = exclude_globs
 
         self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
 
@@ -908,6 +919,7 @@ def install_hooks(
     password: Optional[str] = None,
     token: Optional[str] = None,
     timeout: Optional[int] = None,
+    exclude_globs: Optional[Union[List[str], str]] = None,
 ):
     """
     Monkey patches builtin Python functions to make them DagsHub-repo aware.
@@ -929,6 +941,7 @@ def install_hooks(
         password=password,
         token=token,
         timeout=timeout,
+        exclude_globs=exclude_globs,
     )
     fs.install_hooks()
 
