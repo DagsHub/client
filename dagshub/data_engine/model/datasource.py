@@ -610,20 +610,26 @@ class Datasource:
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
 
-    def log_to_mlflow(self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional["mlflow.entities.Run"] = None):
+    def log_to_mlflow(
+        self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional["mlflow.entities.Run"] = None
+    ) -> "mlflow.Entities.Run":
         """
         Logs the current datasource state to MLflow as an artifact.
 
         Args:
             artifact_name: Name of the artifact that will be stored in the MLflow run.
-            run: MLflow run to save to. If ``None``, uses the active MLflow run.
+            run: MLflow run to save to. If ``None``, uses the active MLflow run or creates a new run.
+
+        Returns:
+            Run to which the artifact was logged.
         """
         if run is None:
             run = mlflow.active_run()
             if run is None:
-                raise RuntimeError("No mlflow run is currently active")
+                run = mlflow.start_run()
         mlflow.MlflowClient().log_dict(run.info.run_id, self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
+        return run
 
     def save_to_file(self, path: Union[str, PathLike] = ".") -> Path:
         """
