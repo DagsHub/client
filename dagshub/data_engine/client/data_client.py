@@ -24,8 +24,7 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, \
-    DatapointDeleteEntry
+from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
@@ -206,16 +205,13 @@ class DataClient:
         )
         return self._exec(q, params)
 
-    def delete_datapoint(self, datasource: Datasource, entry: DatapointDeleteEntry):
+    def delete_datapoint(self, datasource: Datasource, datapoint_id: Union[str, int]):
         """
-        Delete a metadata from a datapoint
+        Delete a datapoint from the datasource.
 
         Args:
             datasource (Datasource): The datasource instance to be updated
-            entry: the datapoint to delete
-
-        Returns:
-            Updates the Datasource.
+            datapoint_id: the id of the datapoint to delete
 
         """
         q = GqlMutations.delete_datapoint()
@@ -223,7 +219,7 @@ class DataClient:
         assert datasource.source.id is not None
 
         params = GqlMutations.delete_datapoint_params(
-            datasource_id=datasource.source.id, datapoint=entry.to_dict()
+            datasource_id=datasource.source.id, datapoint={"datapointId": datapoint_id}
         )
         return self._exec(q, params)
 

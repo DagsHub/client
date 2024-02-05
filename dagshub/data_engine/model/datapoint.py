@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING
 
 from dagshub.common.download import download_files
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, prompt_user
 from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
@@ -45,11 +45,31 @@ class Datapoint:
     def __setitem__(self, key, value):
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
-    def delete(self):
+    def delete(self, force: bool = False):
         """
-        delete this datapoint
+        delete this datapoint.
+
+        1. datapoint will not show in datasource
+        2. does not delete the underlying file, only the data-engine representation
+        3. you can still query this datapoint and associated metadata with versioned queries whose time is before deletion time
+        4. this datapoint can be re-added by datasource.update_metadata
+        5. this datapoint will *not* be added by scanning the datasource
+
+        Args:
+            force: Skip the confirmation prompt
         """
-        self.datasource._delete_datapoint(self.datapoint_id)
+        prompt = (
+            f'You are about to delete a datapoint "{self.path}""\n'
+            f"Underlying file is not removed"
+            f"This can be later undone."
+        )
+        if not force:
+            user_response = prompt_user(prompt)
+            if not user_response:
+                print("Deletion cancelled")
+                return
+
+        self.datasource._delete_datapoint(self)
 
     def save(self):
         """
