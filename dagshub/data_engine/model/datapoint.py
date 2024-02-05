@@ -51,7 +51,8 @@ class Datapoint:
 
         1. datapoint will not show in datasource
         2. does not delete the underlying file, only the data-engine representation
-        3. you can still query this datapoint and associated metadata with versioned queries whose time is before deletion time
+        3. you can still query this datapoint and associated metadata with
+            versioned queries whose time is before deletion time
         4. this datapoint can be re-added by datasource.update_metadata
         5. this datapoint will *not* be added by scanning the datasource
 
@@ -59,9 +60,8 @@ class Datapoint:
             force: Skip the confirmation prompt
         """
         prompt = (
-            f'You are about to delete a datapoint "{self.path}""\n'
-            f"Underlying file is not removed"
-            f"This can be later undone."
+            f'You are about to delete this datapoint ("{self.path}")"\n'
+            f"Underlying file is not removed and this can be later undone."
         )
         if not force:
             user_response = prompt_user(prompt)
