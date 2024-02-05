@@ -49,7 +49,7 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
-    def delete_metadata_of_datapoint():
+    def delete_metadata_for_datapoint():
         q = (
             GqlQuery()
             .operation(

@@ -550,9 +550,9 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def _delete_metadata_of_datapoint(self, id, key):
+    def _delete_metadata_for_datapoint(self, id, key):
         metadata_entries = [DatapointDeleteMetadataEntry(datapointId=id, key=key)]
-        self.source.client.delete_metadata_of_datapoint(self, metadata_entries)
+        self.source.client.delete_metadata_for_datapoint(self, metadata_entries)
 
     def save_dataset(self, name: str):
         """
