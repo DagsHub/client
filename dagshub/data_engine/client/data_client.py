@@ -212,7 +212,7 @@ class DataClient:
 
         Args:
             datasource (Datasource): The datasource instance to be updated
-            entries (List[DatapointDeleteMetadataEntry]): The new metadata entries
+            entries (List[DatapointDeleteMetadataEntry]): The metadata entries to delete
 
         Returns:
             Updates the Datasource.
