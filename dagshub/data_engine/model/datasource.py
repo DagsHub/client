@@ -552,9 +552,6 @@ class Datasource:
     def _delete_datapoint(self, id):
         self.source.client.delete_datapoint(self, DatapointDeleteEntry(datapointId=id))
 
-        # Update the status from dagshub, so we get back the new metadata columns
-        self.source.get_from_dagshub()
-
     def save_dataset(self, name: str):
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
