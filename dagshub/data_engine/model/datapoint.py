@@ -63,7 +63,8 @@ class Datapoint:
         """
         prompt = (
             f'You are about to delete the datapoint [{self.path}]."\n'
-            f"This will remove the datapoint and metadata from unversioned queries, but not the underlying file."
+            f"This will remove the datapoint and metadata from unversioned queries, "
+            f"but won't delete the underlying file."
         )
         if not force:
             user_response = prompt_user(prompt)
