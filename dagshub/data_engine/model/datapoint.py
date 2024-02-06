@@ -47,14 +47,16 @@ class Datapoint:
 
     def delete(self, force: bool = False):
         """
-        delete this datapoint.
+        Delete this datapoint.
 
-        1. datapoint will not show in datasource
-        2. does not delete the underlying file, only the data-engine representation
-        3. you can still query this datapoint and associated metadata with
-            versioned queries whose time is before deletion time
-        4. this datapoint can be re-added by datasource.update_metadata
-        5. this datapoint will *not* be added by scanning the datasource
+        - This datapoint will no longer show up in queries.
+        - Does not delete the datapoint's file, only removing the data from the datasource.
+        - You can still query this datapoint and associated metadata with \
+            versioned queries whose time is before deletion time.
+        - You can re-add this datapoint to the datasource by uploading new metadata to it with, for example, \
+            :func:`Datasource.metadata_context <dagshub.data_engine.model.datasource.Datasource.metadata_context>`. \
+            This will create a new datapoint with new metadata records.
+        - Datasource scanning will *not* add this datapoint back.
 
         Args:
             force: Skip the confirmation prompt
