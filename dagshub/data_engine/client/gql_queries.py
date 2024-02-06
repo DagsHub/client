@@ -68,6 +68,7 @@ class GqlQueries:
                 [
                     f"edges {{ node {{ id path {metadata_fields} }} }}",
                     "pageInfo { hasNextPage endCursor }",
+                    "serverQueryTime"
                 ]
             )
             .generate()

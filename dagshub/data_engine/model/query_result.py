@@ -57,6 +57,7 @@ class QueryResult:
     _entries: List[Datapoint]
     datasource: "Datasource"
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
+    server_timestamp: int = field(init=False)
 
     def __post_init__(self):
         self._refresh_lookups()
