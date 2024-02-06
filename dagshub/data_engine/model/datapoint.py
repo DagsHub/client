@@ -55,15 +55,15 @@ class Datapoint:
             versioned queries whose time is before deletion time.
         - You can re-add this datapoint to the datasource by uploading new metadata to it with, for example, \
             :func:`Datasource.metadata_context <dagshub.data_engine.model.datasource.Datasource.metadata_context>`. \
-            This will create a new datapoint with new metadata records.
+            This will create a new datapoint with new id and new metadata records.
         - Datasource scanning will *not* add this datapoint back.
 
         Args:
             force: Skip the confirmation prompt
         """
         prompt = (
-            f'You are about to delete this datapoint ("{self.path}")"\n'
-            f"Underlying file is not removed and this can be later undone."
+            f'You are about to delete the datapoint [{self.path}]."\n'
+            f"This will remove the datapoint and metadata from unversioned queries, but not the underlying file."
         )
         if not force:
             user_response = prompt_user(prompt)
