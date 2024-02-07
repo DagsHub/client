@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING, Any, List
 from dataclasses import dataclass
 
 from dagshub.data_engine.model.datasource import Datasource
-from dagshub.data_engine.model.query import DatasourceQuery
+from dagshub.data_engine.model.query import QueryFilterTree
 
 if TYPE_CHECKING:
     import fiftyone as fo
@@ -32,26 +32,26 @@ class VoxelFilterState:
     values: Optional[List[Any]]
     filter_field: Optional[str]
 
-    def to_datasource_query(self) -> DatasourceQuery:
+    def to_datasource_query(self) -> QueryFilterTree:
         # TODO: handle exclude and isMatching
         if self.range is not None:
             # range: field >= min AND field <= max
-            resQuery = DatasourceQuery()
+            resQuery = QueryFilterTree()
             if self.range[0] is not None:
-                q1 = DatasourceQuery(self.filter_field)
+                q1 = QueryFilterTree(self.filter_field)
                 q1.compose("ge", self.range[0])
                 resQuery.compose("and", q1)
             if self.range[1] is not None:
-                q2 = DatasourceQuery(self.filter_field)
+                q2 = QueryFilterTree(self.filter_field)
                 q2.compose("le", self.range[1])
                 resQuery.compose("and", q2)
             return resQuery
 
         if self.values is not None:
             #
-            res_q = DatasourceQuery()
+            res_q = QueryFilterTree()
             for val in self.values:
-                q = DatasourceQuery(self.filter_field)
+                q = QueryFilterTree(self.filter_field)
                 q.compose("eq", val)
                 res_q.compose("or", q)
             return res_q

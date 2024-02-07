@@ -24,12 +24,12 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
+    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class DataClient:
         res = self._exec(q, params)
         return dacite.from_dict(DatasourceResult, res["createDatasource"], config=dacite_config)
 
-    def head(self, datasource: Datasource, size: Optional[int] = None) -> QueryResult:
+    def head(self, datasource: "Datasource", size: Optional[int] = None) -> QueryResult:
         """
         Retrieve a subset of data from the datasource headers.
 
@@ -97,7 +97,7 @@ class DataClient:
 
         return QueryResult.from_gql_query(resp, datasource)
 
-    def sample(self, datasource: Datasource, n: Optional[int], include_metadata: bool) -> QueryResult:
+    def sample(self, datasource: "Datasource", n: Optional[int], include_metadata: bool) -> QueryResult:
         """
         Sample data from the datasource.
 
@@ -132,10 +132,10 @@ class DataClient:
                 progress.update(total_task, advance=len(res.entries), refresh=True)
         return res
 
-    def get_datapoints(self, datasource: Datasource) -> QueryResult:
+    def get_datapoints(self, datasource: "Datasource") -> QueryResult:
         return self._get_all(datasource, True)
 
-    def _get_all(self, datasource: Datasource, include_metadata: bool) -> QueryResult:
+    def _get_all(self, datasource: "Datasource", include_metadata: bool) -> QueryResult:
         has_next_page = True
         after = None
         res = QueryResult([], datasource)
@@ -168,7 +168,7 @@ class DataClient:
         return resp
 
     def _datasource_query(
-        self, datasource: Datasource, include_metadata: bool, limit: Optional[int] = None, after: Optional[str] = None
+        self, datasource: "Datasource", include_metadata: bool, limit: Optional[int] = None, after: Optional[str] = None
     ):
         send_analytics_event("Client_DataEngine_QueryRun", repo=datasource.source.repoApi)
 
@@ -183,7 +183,7 @@ class DataClient:
 
         return self._exec(q, params)["datasourceQuery"]
 
-    def update_metadata(self, datasource: Datasource, entries: List[DatapointMetadataUpdateEntry]):
+    def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
         """
         Update the Datasource with the metadata entry
 
@@ -205,7 +205,7 @@ class DataClient:
         )
         return self._exec(q, params)
 
-    def update_metadata_fields(self, datasource: Datasource, metadata_field_props: List[MetadataFieldSchema]):
+    def update_metadata_fields(self, datasource: "Datasource", metadata_field_props: List[MetadataFieldSchema]):
         q = GqlMutations.update_metadata_field()
 
         assert datasource.source.id is not None
@@ -236,7 +236,7 @@ class DataClient:
             return []
         return [dacite.from_dict(DatasourceResult, val, config=dacite_config) for val in res]
 
-    def delete_datasource(self, datasource: Datasource):
+    def delete_datasource(self, datasource: "Datasource"):
         """
         Delete a specified datasource.
          Args:
@@ -249,7 +249,7 @@ class DataClient:
         params = GqlMutations.delete_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
 
-    def scan_datasource(self, datasource: Datasource, options: Optional[List[ScanOption]]):
+    def scan_datasource(self, datasource: "Datasource", options: Optional[List[ScanOption]]):
         """
         Initiate a scan operation on the specified datasource.
 
@@ -263,7 +263,7 @@ class DataClient:
         params = GqlMutations.scan_datasource_params(datasource_id=datasource.source.id, options=options)
         return self._exec(q, params)
 
-    def save_dataset(self, datasource: Datasource, name: str):
+    def save_dataset(self, datasource: "Datasource", name: str):
         """
         Save a dataset using the specified datasource and name.
 
