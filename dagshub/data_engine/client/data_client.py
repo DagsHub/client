@@ -225,7 +225,7 @@ class DataClient:
         assert len(entries) > 0
 
         params = GqlMutations.delete_metadata_params(
-            datasource_id=datasource.source.id, metaDeletions=[e.to_dict() for e in entries]
+            datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
         )
         return self._exec(q, params)
 
