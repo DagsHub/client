@@ -24,13 +24,12 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
-from dagshub.data_engine.model.datasource import DatapointDeleteEntry
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
-    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, DatapointDeleteEntry
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +205,7 @@ class DataClient:
         )
         return self._exec(q, params)
 
-    def delete_datapoints(self, datasource: Datasource, entries: List[DatapointDeleteEntry]):
+    def delete_datapoints(self, datasource: "Datasource", entries: List["DatapointDeleteEntry"]):
         """
         Delete a datapoints from the datasource.
 
