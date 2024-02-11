@@ -61,7 +61,7 @@ def get_dataset_from_file(path: str) -> Datasource:
     return datasources.get_datasource_from_file(path)
 
 
-def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> Datasource:
+def get_from_mlflow(run=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> Datasource:
     """
     Load a dataset from an MLflow run.
 
@@ -71,10 +71,11 @@ def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> 
     This is a copy of :func:`datasources.get_from_mlflow()<dagshub.data_engine.datasources.get_from_mlflow>`
 
     Args:
-        run_id: ID of the MLflow run to load the datasource from. If ``None``, gets it from the current active run.
+        run: Run or ID of the MLflow run to load the datasource from.
+            If ``None``, gets it from the current active run.
         artifact_name: Name of the artifact in the run.
     """
-    return datasources.get_from_mlflow(run_id, artifact_name)
+    return datasources.get_from_mlflow(run, artifact_name)
 
 
 def _get_datasets(repo: str, name: Optional[str] = None, id: Optional[Union[int, str]] = None) -> List[Datasource]:

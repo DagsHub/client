@@ -13,6 +13,7 @@ from dagshub.data_engine.model.errors import DatasourceNotFoundError
 if TYPE_CHECKING:
     import mlflow
     import mlflow.artifacts as mlflow_artifacts
+    import mlflow.entities
 else:
     mlflow = lazy_load("mlflow")
     mlflow_artifacts = lazy_load("mlflow.artifacts", "mlflow")
@@ -167,7 +168,9 @@ def get_datasources(repo: str) -> List[Datasource]:
     return [Datasource(DatasourceState.from_gql_result(repo, source)) for source in sources]
 
 
-def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> Datasource:
+def get_from_mlflow(
+    run: Optional[Union["mlflow.entities.Run", str]] = None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME
+) -> Datasource:
     """
     Load a datasource from an MLflow run.
 
@@ -175,15 +178,19 @@ def get_from_mlflow(run_id=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> 
     :func:`Datasource.log_to_mlflow()<dagshub.data_engine.model.datasource.Datasource.log_to_mlflow>`.
 
     Args:
-        run_id: ID of the MLflow run to load the datasource from. If ``None``, gets it from the current active run.
-        artifact_name: Name of the artifact in the run.
+        run: MLflow Run or its ID to load the datasource from.
+            If ``None``, loads datasource from the current active run.
+        artifact_name: Name of the datasource artifact in the run.
     """
-    if run_id is None:
-        run = mlflow.active_run()
+    mlflow_run: "mlflow.entities.Run"
+    if run is None:
+        mlflow_run = mlflow.active_run()
+    elif type(run) is str:
+        mlflow_run = mlflow.get_run(run)
     else:
-        run = mlflow.get_run(run_id)
+        mlflow_run = run
 
-    artifact_uri: str = run.info.artifact_uri
+    artifact_uri: str = mlflow_run.info.artifact_uri
     artifact_path = f"{artifact_uri.rstrip('/')}/{artifact_name.lstrip('/')}"
 
     ds_state = mlflow_artifacts.load_dict(artifact_path)

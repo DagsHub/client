@@ -650,7 +650,7 @@ class DataSet:
         they will be ignored and only alphanumeric characters (a-zA-Z0-9)
         will be kept.
 
-        :param directory (str): Specify the directory that will be cleaned
+        :param directory: Specify the directory that will be cleaned
         :return: The normalized path of the directory
                  (The directory name with the path separator normalized to a forward slash)
 
@@ -665,8 +665,8 @@ class DataSet:
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
         the file.
 
-        :param file (Union[str, IOBase]): File to upload
-        :param path (str): Desired path of the file in the repository
+        :param file: File to upload
+        :param path: Desired path of the file in the repository
         :return: A tuple of the path and a file object
 
         :meta private:

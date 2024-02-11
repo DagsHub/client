@@ -304,41 +304,41 @@ def test_deserialization_complex(ds):
     add_float_fields(ds, "col4")
     queried = ds[((ds["col1"] > 5) & (ds["col2"] <= 3)) | ds["col3"].contains("aaa") | (ds["col4"] == 5.0)]
     serialized = {
-            "or": [
-                {
-                    "or": [
-                        {
-                            "and": [
-                                {
-                                    "filter": {
-                                        "key": "col1",
-                                        "value": str(5),
-                                        "valueType": "INTEGER",
-                                        "comparator": "GREATER_THAN",
-                                    }
-                                },
-                                {
-                                    "filter": {
-                                        "key": "col2",
-                                        "value": str(3),
-                                        "valueType": "INTEGER",
-                                        "comparator": "LESS_EQUAL_THAN",
-                                    }
-                                },
-                            ]
-                        },
-                        {
-                            "filter": {
-                                "key": "col3",
-                                "value": "aaa",
-                                "valueType": "STRING",
-                                "comparator": "CONTAINS",
-                            }
-                        },
-                    ]
-                },
-                {"filter": {"key": "col4", "value": str(5.0), "valueType": "FLOAT", "comparator": "EQUAL"}},
-            ]
+        "or": [
+            {
+                "or": [
+                    {
+                        "and": [
+                            {
+                                "filter": {
+                                    "key": "col1",
+                                    "value": str(5),
+                                    "valueType": "INTEGER",
+                                    "comparator": "GREATER_THAN",
+                                }
+                            },
+                            {
+                                "filter": {
+                                    "key": "col2",
+                                    "value": str(3),
+                                    "valueType": "INTEGER",
+                                    "comparator": "LESS_EQUAL_THAN",
+                                }
+                            },
+                        ]
+                    },
+                    {
+                        "filter": {
+                            "key": "col3",
+                            "value": "aaa",
+                            "valueType": "STRING",
+                            "comparator": "CONTAINS",
+                        }
+                    },
+                ]
+            },
+            {"filter": {"key": "col4", "value": str(5.0), "valueType": "FLOAT", "comparator": "EQUAL"}},
+        ]
     }
 
     deserialized = QueryFilterTree.deserialize(serialized)
@@ -401,11 +401,11 @@ def test_nand_deserialization(ds):
     add_int_fields(ds, "col2")
     queried = ds[~((ds["col1"] == "aaa") & (ds["col2"] > 5))]
     serialized = {
-            "and": [
-                {"filter": {"key": "col1", "value": "aaa", "valueType": "STRING", "comparator": "EQUAL"}},
-                {"filter": {"key": "col2", "value": str(5), "valueType": "INTEGER", "comparator": "GREATER_THAN"}},
-            ],
-            "not": True,
+        "and": [
+            {"filter": {"key": "col1", "value": "aaa", "valueType": "STRING", "comparator": "EQUAL"}},
+            {"filter": {"key": "col2", "value": str(5), "valueType": "INTEGER", "comparator": "GREATER_THAN"}},
+        ],
+        "not": True,
     }
     deserialized = QueryFilterTree.deserialize(serialized)
     assert queried.get_query().filter.serialize() == deserialized.serialize()
@@ -505,6 +505,44 @@ def test_sequential_querying(ds):
         }
     }
     assert queried2.get_query().filter.tree_to_dict() == expected
+
+
+def test_composition_string_then_field(ds):
+    add_int_fields(ds, "col1")
+    add_int_fields(ds, "col2")
+    q1 = ds["col1"] == 0
+    q2 = q1[Field("col2")] == 0
+
+    expected = {
+        "and": {
+            "children": [
+                {"eq": {"data": {"field": "col1", "value": 0}}},
+                {"eq": {"data": {"field": "col2", "value": 0}}},
+            ],
+            "data": None,
+        }
+    }
+
+    assert q2.get_query().filter.tree_to_dict() == expected
+
+
+def test_composition_field_then_string(ds):
+    add_int_fields(ds, "col1")
+    add_int_fields(ds, "col2")
+    q1 = ds[Field("col1")] == 0
+    q2 = q1["col2"] == 0
+
+    expected = {
+        "and": {
+            "children": [
+                {"eq": {"data": {"field": "col1", "value": 0}}},
+                {"eq": {"data": {"field": "col2", "value": 0}}},
+            ],
+            "data": None,
+        }
+    }
+
+    assert q2.get_query().filter.tree_to_dict() == expected
 
 
 def test_dataset_query_change(ds_with_dataset):
