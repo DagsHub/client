@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
 
 import rich.progress
-from dataclasses_json import config, LetterCase, DataClassJsonMixin
+from dataclasses_json import config, LetterCase, DataClassJsonMixin, dataclass_json
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
@@ -73,7 +73,6 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
 @dataclass
 class DatapointDeleteEntry(json.JSONEncoder):
     datapointId: str
-
 
 
 @dataclass
@@ -587,7 +586,7 @@ class Datasource:
 
         with progress:
             for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start : start + upload_batch_size]
+                entries = metadata_entries[start: start + upload_batch_size]
                 logger.debug(f"Uploading {len(entries)} metadata entries...")
                 self.source.client.update_metadata(self, entries)
                 progress.update(total_task, advance=upload_batch_size)
