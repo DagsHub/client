@@ -63,6 +63,13 @@ class DatapointMetadataUpdateEntry(json.JSONEncoder):
     allowMultiple: bool = False
 
 
+@dataclass_json
+@dataclass
+class DatapointDeleteEntry(json.JSONEncoder):
+    datapointId: str
+
+
+
 @dataclass
 class Field:
     """
@@ -544,7 +551,7 @@ class Datasource:
         self.source.get_from_dagshub()
 
     def _delete_datapoint(self, datapoint: Datapoint):
-        self.source.client.delete_datapoint(self, datapoint.datapoint_id)
+        self.source.client.delete_datapoints(self, [DatapointDeleteEntry(datapointId=datapoint.datapoint_id)])
 
     def save_dataset(self, name: str):
         """

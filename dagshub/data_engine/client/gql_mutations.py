@@ -49,15 +49,20 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
-    def delete_datapoint():
+    def delete_datapoints():
         q = (
             GqlQuery()
             .operation(
                 "mutation",
-                name="deleteDatapoint",
-                input={"$datasource": "ID!", "$datapoint": "DatapointDeleteInput!"},
+                name="deleteDatapoints",
+                input={"$datasource": "ID!", "$datapoints": "[DatapointDeleteInput!]!"},
             )
-            .query("deleteDatapoint", input={"datasource": "$datasource", "datapoint": "$datapoint"})
+            .query("deleteDatapoint", input={"datasource": "$datasource", "datapoints": "$datapoints"})
+            .fields(
+                [
+                    "path",
+                ]
+            )
             .generate()
         )
         return q
@@ -93,10 +98,10 @@ class GqlMutations:
         }
 
     @staticmethod
-    def delete_datapoint_params(datasource_id: Union[int, str], datapoint: Dict[str, Any]):
+    def delete_datapoints_params(datasource_id: Union[int, str], datapoints: List[Dict[str, Any]]):
         return {
             "datasource": datasource_id,
-            "datapoint": datapoint,
+            "datapoints": datapoints,
         }
 
     def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: List[Dict[str, Any]]):
