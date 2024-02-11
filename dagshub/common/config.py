@@ -40,17 +40,17 @@ quiet = bool(os.environ.get(DAGSHUB_QUIET_KEY, False))
 CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"
 
 RECOMMENDED_ANNOTATE_LIMIT_KEY = "RECOMMENDED_ANNOTATE_LIMIT"
-recommended_annotate_limit = os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 1e5)
+recommended_annotate_limit = int(os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 1e5))
 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE"
-dataengine_metadata_upload_batch_size = os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, 15000)
+dataengine_metadata_upload_batch_size = int(os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, 15000))
 
 DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
 disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ
 
 DOWNLOAD_THREADS_KEY = "DAGSHUB_DOWNLOAD_THREADS"
 DEFAULT_DOWNLOAD_THREADS = 32
-download_threads = os.environ.get(DOWNLOAD_THREADS_KEY, DEFAULT_DOWNLOAD_THREADS)
+download_threads = int(os.environ.get(DOWNLOAD_THREADS_KEY, DEFAULT_DOWNLOAD_THREADS))
 
 if download_threads > DEFAULT_DOWNLOAD_THREADS:
     logger.warning(

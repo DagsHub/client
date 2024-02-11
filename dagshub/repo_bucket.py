@@ -56,16 +56,55 @@ def get_repo_bucket_client(repo: str, flavor: FlavorTypes = "boto"):
     Creates an S3 client for the specified repository's DagsHub storage bucket
 
     Available flavors are:
-        ``"boto"``: Returns a `boto3.client \
+        ``"boto"`` (Default): Returns a `boto3.client \
         <https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-examples.html>`_.\
             with predefined EndpointURL and credentials.
             The name of the bucket is the name of the repository,
-            and you will need to specify it for any request you make
+            and you will need to specify it for any request you make.
+
+            Example usage::
+
+                boto_client = get_repo_bucket_client("user/my-repo")
+
+                # Upload file
+                boto_client.upload_file(
+                    Bucket="my-repo",      # name of the repo
+                    Filename="local.csv",  # local path of file to upload
+                    Key="remote.csv",      # remote path where to upload the file
+                )
+                # Download file
+                boto_client.download_file(
+                    Bucket="my-repo",      # name of the repo
+                    Key="remote.csv",      # remote path from where to download the file
+                    Filename="local.csv",  # local path where to download the file
+                )
+
+
         ``"s3fs"``: Returns a \
             `s3fs.S3FileSystem <https://s3fs.readthedocs.io/en/latest/index.html#examples>`_\
              with predefined EndpointURL and credentials.
               The name of the bucket is the name of the repository,
               and you will need to specify it for any request you make
+
+              Example usage::
+
+                s3fs_client = get_repo_bucket_client("user/my-repo", flavor="s3fs")
+
+                # Read from file
+                with s3fs_client.open("my-repo/remote.csv", "rb") as f:
+                    print(f.read())
+
+                # Write to file
+                with s3fs_client.open("my-repo/remote.csv", "wb") as f:
+                    f.write(b"Content")
+
+                # Upload file (can also upload directories)
+                s3fs_client.put(
+                    "local.csv",           # local path of file/dir to upload
+                     "my-repo/remote.csv"  # remote path where to upload the file
+                )
+
+
 
     Args:
         repo: Name of the repo in the format of ``username/reponame``

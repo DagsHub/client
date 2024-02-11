@@ -1,14 +1,11 @@
 import enum
 import logging
-from typing import TYPE_CHECKING, Optional, Union, Dict
+from typing import Optional, Union, Dict
 
 from treelib import Tree, Node
 
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
-
-if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasource import Datasource
 
 logger = logging.getLogger(__name__)
 
@@ -53,25 +50,27 @@ for k, v in fieldFilterOperandMap.items():
 UNFILLED_NODE_TAG = "undefined"
 
 
-class DatasourceQuery:
-    def __init__(self, column_or_query: Optional[Union[str, "DatasourceQuery"]] = None, as_of: Optional[int] = None):
+class QueryFilterTree:
+    def __init__(
+        self,
+        column_or_query: Optional[Union[str, "QueryFilterTree"]] = None,
+        field_as_of: Optional[int] = None,
+    ):
         self._operand_tree: Tree = Tree()
+
         if type(column_or_query) is str:
             # If it's ds["column"] then the root node is just the column name, will be filled later
-            data = {"field": column_or_query}
-            if as_of:
-                data["as_of"] = int(as_of)
+            data: Dict[str, Union[str, int]] = {"field": column_or_query}
+            if field_as_of is not None:
+                data["as_of"] = int(field_as_of)
             self._operand_tree.create_node(UNFILLED_NODE_TAG, data=data)
         elif column_or_query is not None:
             self._operand_tree.create_node(column_or_query)
 
-        if as_of:
-            self._as_of = as_of
-
     def __repr__(self):
         if self.is_empty:
             return "Query: empty"
-        return f"Query: {self.to_dict()}"
+        return f"Query: {self.tree_to_dict()}"
 
     @property
     def column_filter(self) -> Optional[str]:
@@ -80,7 +79,7 @@ class DatasourceQuery:
             return None
         return filter_node.data["field"]
 
-    def compose(self, op: str, other: Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]]):
+    def compose(self, op: str, other: Optional[Union[str, int, float, "QueryFilterTree"]]):
         """
         Compose the current query with another query or a value using the specified operator.
 
@@ -107,7 +106,7 @@ class DatasourceQuery:
             ```
             The above queries can be composed as:
             ```
-            ds['col1'] > 5 and ds['col2'].is_null()
+            (ds['col1'] > 5) & (ds['col2'].is_null())
             ```
         """
         if self._column_filter_node is not None:
@@ -124,8 +123,8 @@ class DatasourceQuery:
             new_tree.paste(not_node.identifier, self._operand_tree)
             self._operand_tree = new_tree
         else:
-            # The query is an actual query with a tree - make a subtree
-            if type(other) is not DatasourceQuery:
+            # The other side is an actual query with its own tree - make a subtree
+            if type(other) is not QueryFilterTree:
                 raise RuntimeError(f"Expected other argument to be a dataset, got {type(other)} instead")
             if op not in ["and", "or"]:
                 raise RuntimeError(
@@ -154,7 +153,7 @@ class DatasourceQuery:
     def _operand_root(self) -> Node:
         return self._operand_tree[self._operand_tree.root]
 
-    def serialize_graphql(self):
+    def serialize(self) -> Optional[Dict]:
         if self.is_empty:
             return None
         return self._serialize_node(self._operand_root, self._operand_tree)
@@ -164,11 +163,11 @@ class DatasourceQuery:
         operand = node.tag
         if operand in ["and", "or"]:
             # recursively serialize children subqueries
-            return {operand: [DatasourceQuery._serialize_node(child, tree) for child in tree.children(node.identifier)]}
+            return {operand: [QueryFilterTree._serialize_node(child, tree) for child in tree.children(node.identifier)]}
         if operand == "not":
             assert len(tree.children(node.identifier)) == 1
             child = tree.children(node.identifier)[0]
-            serialized = DatasourceQuery._serialize_node(child, tree)
+            serialized = QueryFilterTree._serialize_node(child, tree)
             serialized["not"] = True
             return serialized
         else:
@@ -203,12 +202,10 @@ class DatasourceQuery:
             return res
 
     @staticmethod
-    def deserialize(serialized_query: Dict) -> "DatasourceQuery":
-        q = DatasourceQuery()
+    def deserialize(serialized_query: Dict) -> "QueryFilterTree":
+        q = QueryFilterTree()
         op_tree = Tree()
-
-        DatasourceQuery._deserialize_node(serialized_query, op_tree)
-
+        QueryFilterTree._deserialize_node(serialized_query, op_tree)
         q._operand_tree = op_tree
         return q
 
@@ -239,15 +236,15 @@ class DatasourceQuery:
             main_node = Node(tag=op_type)
             tree.add_node(main_node, parent_node)
             for nested_node in val:
-                DatasourceQuery._deserialize_node(nested_node, tree, main_node)
+                QueryFilterTree._deserialize_node(nested_node, tree, main_node)
         else:
             raise RuntimeError(f"Unknown serialized query dict: {node_dict}")
 
-    def to_dict(self):
+    def tree_to_dict(self):
         return self._operand_tree.to_dict(with_data=True)
 
     def __deepcopy__(self, memodict={}):
-        q = DatasourceQuery()
+        q = QueryFilterTree()
         q._operand_tree = Tree(tree=self._operand_tree, deep=True)
         return q
 

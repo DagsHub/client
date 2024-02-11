@@ -1,15 +1,22 @@
 import json
-import dacite
 import logging
-from typing import Optional, Union, List
+from typing import Optional, Union, List, TYPE_CHECKING
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
+from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceFileStruct
-from dagshub.data_engine.model.datasource import Datasource
+from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
 from dagshub.data_engine.model.errors import DatasourceNotFoundError
+
+if TYPE_CHECKING:
+    import mlflow
+    import mlflow.artifacts as mlflow_artifacts
+    import mlflow.entities
+else:
+    mlflow = lazy_load("mlflow")
+    mlflow_artifacts = lazy_load("mlflow.artifacts", "mlflow")
 
 logger = logging.getLogger(__name__)
 
@@ -140,16 +147,9 @@ def get_datasource_from_file(path: str) -> Datasource:
     Returns:
         ds: Datasource that was logged to the file
     """
-    with open(path, 'r') as file:
-        res = dacite.from_dict(DatasourceFileStruct, json.load(file))
-    ds_state = DatasourceState(repo=res.repo, name=res.name, id=res.id)
-    ds_state.get_from_dagshub()
-    ds = Datasource(ds_state)
-
-    if res.has_query:
-        ds._deserialize_gql_result(res.datasetQuery)
-
-    return ds
+    with open(path, "r") as file:
+        state = json.load(file)
+    return Datasource.load_from_serialized_state(state)
 
 
 def get_datasources(repo: str) -> List[Datasource]:
@@ -166,6 +166,35 @@ def get_datasources(repo: str) -> List[Datasource]:
     client = DataClient(repo)
     sources = client.get_datasources(None, None)
     return [Datasource(DatasourceState.from_gql_result(repo, source)) for source in sources]
+
+
+def get_from_mlflow(
+    run: Optional[Union["mlflow.entities.Run", str]] = None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME
+) -> Datasource:
+    """
+    Load a datasource from an MLflow run.
+
+    To save a datasource to MLflow, use
+    :func:`Datasource.log_to_mlflow()<dagshub.data_engine.model.datasource.Datasource.log_to_mlflow>`.
+
+    Args:
+        run: MLflow Run or its ID to load the datasource from.
+            If ``None``, loads datasource from the current active run.
+        artifact_name: Name of the datasource artifact in the run.
+    """
+    mlflow_run: "mlflow.entities.Run"
+    if run is None:
+        mlflow_run = mlflow.active_run()
+    elif type(run) is str:
+        mlflow_run = mlflow.get_run(run)
+    else:
+        mlflow_run = run
+
+    artifact_uri: str = mlflow_run.info.artifact_uri
+    artifact_path = f"{artifact_uri.rstrip('/')}/{artifact_name.lstrip('/')}"
+
+    ds_state = mlflow_artifacts.load_dict(artifact_path)
+    return Datasource.load_from_serialized_state(ds_state)
 
 
 def get(*args, **kwargs) -> Datasource:
@@ -190,4 +219,5 @@ __all__ = [
     get_datasources.__name__,
     get.__name__,
     get_or_create.__name__,
+    get_from_mlflow.__name__,
 ]
