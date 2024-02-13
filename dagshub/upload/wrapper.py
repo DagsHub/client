@@ -296,6 +296,7 @@ class Repo:
         new_branch: str = None,
         last_commit: str = None,
         force: bool = False,
+        quiet: bool = False,
     ):
         """
         Upload a list of binary files to the specified directory.
@@ -313,6 +314,8 @@ class Repo:
                 Exists to prevent accidental overwrites of data.
             force (bool): Force the upload of a file even if it is already present on the server.
                 Sets last_commit to be the tip of the branch
+            quiet (bool): Don't show messages about starting/successfully completing an upload.
+                Set to True when uploading a directory
         """
 
         if commit_message is None:
@@ -366,7 +369,8 @@ class Repo:
         if force:
             data["last_commit"] = self._last_upload_revision
 
-        log_message(f'Uploading files ({len(files)}) to "{self._api.full_name}"...', logger)
+        if not quiet:
+            log_message(f'Uploading files ({len(files)}) to "{self._api.full_name}"...', logger)
         res = s.put(
             upload_url,
             data=data,
@@ -374,7 +378,7 @@ class Repo:
             auth=self.auth,
             timeout=None,
         )
-        self._log_upload_details(data, res, files)
+        self._log_upload_details(data, res, files, quiet)
 
         # The ETag header contains the hash of the uploaded commit,
         # check against the one we have to determine if anything changed
@@ -382,7 +386,7 @@ class Repo:
             new_tip = res.headers["ETag"]
             self._last_upload_had_changes = new_tip != self._last_upload_revision
 
-    def _log_upload_details(self, data: Dict[str, Any], res: httpx.Response, files):
+    def _log_upload_details(self, data: Dict[str, Any], res: httpx.Response, files, quiet: bool):
         """
         The _log_upload_details function debug logs the request URL, data, and files.
         It also prints for the user the status of their upload if it was successful
@@ -392,6 +396,7 @@ class Repo:
             data: Executed request's body
             res: Server's response
             files: Uploaded file contents
+            quiet: Log successful upload
         """
 
         logger.debug(
@@ -406,7 +411,8 @@ class Repo:
                 if new_tip == self._last_upload_revision:
                     log_message("Upload successful, content was identical and no new commit was created", logger)
                     return
-            log_message("Upload finished successfully!", logger)
+            if not quiet:
+                log_message("Upload finished successfully!", logger)
         elif res.status_code == HTTPStatus.NO_CONTENT:
             log_message("Upload successful, content was identical and no new commit was created", logger)
         elif 200 < res.status_code < 300:
@@ -606,6 +612,8 @@ class DataSet:
         # If user hasn't specified versioning, then assume we're uploading dvc (this makes most sense for folders)
         if "versioning" not in upload_kwargs:
             upload_kwargs["versioning"] = "dvc"
+
+        upload_kwargs["quiet"] = True
 
         try:
             with progress:
