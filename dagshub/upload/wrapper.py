@@ -13,13 +13,14 @@ from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List
 import httpx
 import rich.progress
 import rich.status
+from tenacity import retry, retry_if_exception_type, wait_fixed, stop_after_attempt
 
 import dagshub.auth
 from dagshub.auth.token_auth import EnvVarDagshubToken
 from dagshub.common import config, rich_console
 from dagshub.common.api.repo import RepoAPI, BranchNotFoundError
 from dagshub.common.helpers import log_message
-from dagshub.upload.errors import determine_upload_api_error
+from dagshub.upload.errors import determine_upload_api_error, InternalServerErrorError
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -287,6 +288,7 @@ class Repo:
             file_to_upload = DataSet.get_file(str(local_path), remote_path)
             self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
+    @retry(retry=retry_if_exception_type(InternalServerErrorError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     def upload_files(
         self,
         files: List[FileUploadStruct],
