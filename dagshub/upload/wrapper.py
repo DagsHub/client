@@ -582,7 +582,15 @@ class DataSet:
         The keyword arguments are passed to :func:`Repo.upload_files() <dagshub.upload.Repo.upload_files>`.
         """
         upload_file_number = 100
+        max_batch_file_size = 100 * 1024 * 1024
         file_counter = 0
+
+        total_num_files = 0
+        for root, dirs, files in os.walk(local_path):
+            for filename in files:
+                rel_file_path = posixpath.join(root, filename)
+                if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
+                    total_num_files += 1
 
         progress = rich.progress.Progress(
             rich.progress.SpinnerColumn(),
@@ -592,7 +600,7 @@ class DataSet:
             transient=True,
             disable=config.quiet,
         )
-        total_task = progress.add_task("Uploading files...", total=None)
+        total_task = progress.add_task("Uploading files...", total=total_num_files)
         self.repo.current_progress = progress
 
         # If user hasn't specified versioning, then assume we're uploading dvc (this makes most sense for folders)
@@ -602,6 +610,9 @@ class DataSet:
         try:
             with progress:
                 for root, dirs, files in os.walk(local_path):
+                    if len(files) == 0:
+                        continue
+
                     folder_task = progress.add_task(f"Uploading files from {root}", total=len(files))
 
                     if commit_message is None:
@@ -609,28 +620,35 @@ class DataSet:
                     if "commit_message" in upload_kwargs:
                         del upload_kwargs["commit_message"]
 
-                    if len(files) > 0:
-                        for filename in files:
-                            rel_file_path = posixpath.join(root, filename)
-                            rel_remote_file_path = rel_file_path.replace(local_path, "")
-                            if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
-                                self.add(file=rel_file_path, path=rel_remote_file_path)
-                                if len(self.files) >= upload_file_number:
-                                    file_counter += len(self.files)
-                                    self.commit(commit_message, **upload_kwargs)
-                                    progress.update(folder_task, advance=len(self.files), refresh=True)
-                                    progress.update(total_task, completed=file_counter, refresh=True)
-                        if len(self.files) >= upload_file_number:
-                            file_counter += len(self.files)
-                            self.commit(commit_message, **upload_kwargs)
-                            progress.update(folder_task, advance=len(self.files), refresh=True)
-                            progress.update(total_task, completed=file_counter, refresh=True)
-                    progress.remove_task(folder_task)
+                    file_batchs = []
+                    curr_file_batch = []
+                    curr_batch_file_size = 0
 
-                if len(self.files) > 0:
-                    file_counter += len(self.files)
-                    self.commit(commit_message, **upload_kwargs)
-                    progress.update(total_task, completed=file_counter)
+                    for filename in files:
+                        rel_file_path = posixpath.join(root, filename)
+                        if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
+                            curr_file_batch.append(rel_file_path)
+                            curr_batch_file_size += os.path.getsize(rel_file_path)
+
+                            if len(curr_file_batch) >= upload_file_number or curr_batch_file_size >= max_batch_file_size:
+                                file_batchs.append(curr_file_batch)
+                                curr_file_batch = []
+                                curr_batch_file_size = 0
+
+                    if curr_file_batch:
+                        file_batchs.append(curr_file_batch)
+
+                    for batch in file_batchs:
+                        for rel_file_path in batch:
+                            rel_remote_file_path = rel_file_path.replace(local_path, "")
+                            self.add(file=rel_file_path, path=rel_remote_file_path)
+
+                        file_counter += len(self.files)
+                        self.commit(commit_message, **upload_kwargs)
+                        progress.update(folder_task, advance=len(batch), refresh=True)
+                        progress.update(total_task, completed=file_counter, refresh=True)
+
+                    progress.remove_task(folder_task)
 
             log_message(
                 f"Directory upload complete, uploaded {file_counter} files"
