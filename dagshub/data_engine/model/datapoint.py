@@ -53,7 +53,7 @@ class Datapoint:
         Args:
              name - name of field
         """
-        self.datasource._delete_metadata_for_datapoint(self.datapoint_id, name)
+        self.datasource.delete_metadata_from_datapoints([self], [name])
 
     def save(self):
         """
