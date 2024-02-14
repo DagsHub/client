@@ -72,7 +72,7 @@ class Datapoint:
                 print("Deletion cancelled")
                 return
 
-        self.datasource._delete_datapoint(self)
+        self.datasource.delete_datapoints([self], force=True)
 
     def save(self):
         """

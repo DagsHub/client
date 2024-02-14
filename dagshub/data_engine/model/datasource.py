@@ -595,9 +595,6 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def _delete_datapoint(self, datapoint: Datapoint):
-        self.source.client.delete_datapoints(self, [DatapointDeleteEntry(datapointId=datapoint.datapoint_id)])
-
     def delete_datapoints(self, datapoints: List[Datapoint], force: bool = False):
         """
         Delete these datapoints.
@@ -612,7 +609,8 @@ class Datasource:
         - Datasource scanning will *not* add these datapoints back.
 
         Args:
-        force: Skip the confirmation prompt
+            datapoints: list of datapoints objects to delete
+            force: Skip the confirmation prompt
         """
         prompt = (
             f'You are about to delete the datapoints {[d.path for d in datapoints]}."\n'
