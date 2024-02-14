@@ -598,6 +598,35 @@ class Datasource:
     def _delete_datapoint(self, datapoint: Datapoint):
         self.source.client.delete_datapoints(self, [DatapointDeleteEntry(datapointId=datapoint.datapoint_id)])
 
+    def delete_datapoints(self, datapoints: List[Datapoint], force: bool = False):
+        """
+        Delete these datapoints.
+
+        - These datapoint will no longer show up in queries.
+        - Does not delete the datapoint's file, only removing the data from the datasource.
+        - You can still query these datapoints and associated metadata with \
+        versioned queries whose time is before deletion time.
+        - You can re-add these datapoints to the datasource by uploading new metadata to it with, for example, \
+        :func:`Datasource.metadata_context <dagshub.data_engine.model.datasource.Datasource.metadata_context>`. \
+        This will create a new datapoint with new id and new metadata records.
+        - Datasource scanning will *not* add these datapoints back.
+
+        Args:
+        force: Skip the confirmation prompt
+        """
+        prompt = (
+        f'You are about to delete the datapoints {[d.path for d in datapoints]}."\n'
+        f"This will remove the datapoint and metadata from unversioned queries, "
+        f"but won't delete the underlying file."
+        )
+        if not force:
+            user_response = prompt_user(prompt)
+            if not user_response:
+                print("Deletion cancelled")
+                return
+
+        self.source.client.delete_datapoints(self, [DatapointDeleteEntry(datapointId=d.datapoint_id) for d in datapoints])
+
     def save_dataset(self, name: str) -> "Datasource":
         """
         Save the dataset, which is a combination of datasource + query, on the backend.
