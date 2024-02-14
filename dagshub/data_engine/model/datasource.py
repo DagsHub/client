@@ -554,6 +554,22 @@ class Datasource:
         metadata_entries = [DatapointDeleteMetadataEntry(datapointId=id, key=key)]
         self.source.client.delete_metadata_for_datapoint(self, metadata_entries)
 
+    def delete_metadata_from_datapoints(self, datapoints: List[Datapoint], names: List[str]):
+        """
+        delete a metadata fields from these datapoints
+        the deleted values can be accessed using versioned query
+        with time before the deletion
+        Args:
+             datapoints - data points to act upon
+             names - name of fields to delete
+        """
+
+        metadata_entries = []
+        for d in datapoints:
+            for n in names:
+                metadata_entries.append(DatapointDeleteMetadataEntry(datapointId=d.datapoint_id, key=n))
+        self.source.client.delete_metadata_for_datapoint(self, metadata_entries)
+
     def save_dataset(self, name: str):
         """
         Save the dataset, which is a combination of datasource + query, on the backend.

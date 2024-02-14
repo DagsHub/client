@@ -48,6 +48,8 @@ class Datapoint:
     def delete_metadata_field(self, name):
         """
         delete a metadata field from this datapoint
+        the deleted value can be accessed using versioned query
+        with time before the deletion
         Args:
              name - name of field
         """
