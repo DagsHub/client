@@ -106,8 +106,9 @@ class DagsHubFilesystem:
 
     # Framework-specific override functions.
     # These functions will be patched with a function that calls fs.open() before calling the original function
+    # Classes are marked by $, so if you need to change a static/class method, use module.$class.func
     _framework_override_map: Dict[str, List[str]] = {
-        "transformers": ["safetensors.safe_open"],
+        "transformers": ["safetensors.safe_open", "tokenizers.$Tokenizer.from_file"],
     }
 
 
@@ -862,6 +863,8 @@ class DagsHubFilesystem:
         DagsHubFilesystem.hooked_instance = self
 
     _framework_key_prefix = "framework_"
+
+
     def _install_framework_hooks(self):
         """
         Installs custom hook functions for frameworks
@@ -873,9 +876,22 @@ class DagsHubFilesystem:
             funcs = self._framework_override_map[framework]
             for func in funcs:
                 module_name, func_name = func.rsplit(".", 1)
+                class_name = None
+                patch_class = None
+
+                # Handle static class methods - we'll need to get the class from the module first
+                if "$" in module_name:
+                    module_name, class_name = module_name.split("$")
+                    # Get rid of the . in the module name
+                    module_name = module_name[:-1]
+
                 try:
-                    m = importlib.import_module(module_name)
-                    orig_fn = getattr(m, func_name)
+                    patch_module = importlib.import_module(module_name)
+                    if class_name is not None:
+                        patch_class = getattr(patch_module, class_name)
+                        orig_fn = getattr(patch_class, func_name)
+                    else:
+                        orig_fn = getattr(patch_module, func_name)
                 except ModuleNotFoundError:
                     logger.warning(f"Module [{module_name}] not found, so function [{func}] isn't being patched")
                     continue
@@ -883,7 +899,10 @@ class DagsHubFilesystem:
                     logger.warning(f"Function [{func}] not found, not patching it")
                     continue
                 self.__class__.__unpatched[f"{self._framework_key_prefix}{func}"] = orig_fn
-                setattr(m, func_name, self._passthrough_decorator(orig_fn))
+                if patch_class is not None:
+                    setattr(patch_class, func_name, self._passthrough_decorator(orig_fn))
+                else:
+                    setattr(patch_module, func_name, self._passthrough_decorator(orig_fn))
 
 
     def _passthrough_decorator(self, orig_func, filearg: Union[int, str]=0) -> Callable:
@@ -944,10 +963,20 @@ class DagsHubFilesystem:
             orig_func_name = func
 
             func = func[len(cls._framework_key_prefix):]
-            print(f"Getting rid of {func}")
             module_name, func_name = func.rsplit(".", 1)
+            class_name = None
+
+            if "$" in module_name:
+                module_name, class_name = module_name.split("$")
+                # Get rid of the . in the module name
+                module_name = module_name[:-1]
+
             m = importlib.import_module(module_name)
-            setattr(m, func_name, orig_fn)
+            if class_name is not None:
+                patch_class = getattr(m, class_name)
+                setattr(patch_class, func_name, orig_fn)
+            else:
+                setattr(m, func_name, orig_fn)
 
             del(cls.__unpatched[orig_func_name])
 
