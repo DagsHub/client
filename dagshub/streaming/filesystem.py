@@ -1,4 +1,5 @@
 import builtins
+import importlib
 import io
 import logging
 import os
@@ -10,7 +11,7 @@ from functools import wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path, PurePosixPath
-from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Any, Callable
 from urllib.parse import urlparse, ParseResult
 
 import dacite
@@ -74,6 +75,7 @@ def _is_server_error(resp: Response):
     return resp.status_code >= 500
 
 
+
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
     """
@@ -93,10 +95,21 @@ class DagsHubFilesystem:
     :param exclude_globs: One or more glob patterns to exclude from looking up on the server
         This is useful in case your framework tries to look up cached files on disk that might not be there.
         Example: YOLO and .npy files
+    :param frameworks: List of frameworks that need custom patched openers.
+        Right now the following is supported:
+
+        - ``transformers`` - patches ``safetensors``
     """
 
     already_mounted_filesystems: Dict[Path, "DagsHubFilesystem"] = {}
     hooked_instance: Optional["DagsHubFilesystem"] = None
+
+    # Framework-specific override functions.
+    # These functions will be patched with a function that calls fs.open() before calling the original function
+    _framework_override_map: Dict[str, List[str]] = {
+        "transformers": ["safetensors.safe_open"],
+    }
+
 
     def __init__(
         self,
@@ -108,6 +121,7 @@ class DagsHubFilesystem:
         token: Optional[str] = None,
         timeout: Optional[int] = None,
         exclude_globs: Optional[Union[List[str], str]] = None,
+        frameworks: Optional[List[str]] = None,
     ):
         # Find root directory of Git project
         if not project_root:
@@ -137,6 +151,7 @@ class DagsHubFilesystem:
         self.parsed_repo_url = urlparse(repo_url)
         # Key: path, value: dict of {name, type} on that path (in remote)
         self.remote_tree: Dict[str, Dict[str, str]] = {}
+        self.frameworks = frameworks
 
         # Determine if any authentication is needed
         self.username = username or config.username
@@ -842,7 +857,55 @@ class DagsHubFilesystem:
             _pathlib.listdir = self.listdir
             _pathlib.scandir = self.scandir
 
+        self._install_framework_hooks()
+
         DagsHubFilesystem.hooked_instance = self
+
+    _framework_key_prefix = "framework_"
+    def _install_framework_hooks(self):
+        """
+        Installs custom hook functions for frameworks
+        """
+        for framework in self.frameworks:
+            if framework not in self._framework_override_map:
+                logger.warning(f"Framework {framework} not available for override, skipping")
+                continue
+            funcs = self._framework_override_map[framework]
+            for func in funcs:
+                module_name, func_name = func.rsplit(".", 1)
+                try:
+                    m = importlib.import_module(module_name)
+                    orig_fn = getattr(m, func_name)
+                except ModuleNotFoundError:
+                    logger.warning(f"Module [{module_name}] not found, so function [{func}] isn't being patched")
+                    continue
+                except AttributeError:
+                    logger.warning(f"Function [{func}] not found, not patching it")
+                    continue
+                self.__class__.__unpatched[f"{self._framework_key_prefix}{func}"] = orig_fn
+                setattr(m, func_name, self._passthrough_decorator(orig_fn))
+
+
+    def _passthrough_decorator(self, orig_func, filearg: Union[int, str]=0) -> Callable:
+        """
+        Decorator function over some other random function that assumes a file exists locally,
+        but isn't using python's open(). These might be C++/Rust functions that use their respective opens.
+        Examples: opencv, anything using pyo3
+
+        Working around the problem by first calling open().close() to get the file.
+
+        :param orig_func: the original function that needs to be called
+        :param filearg: int or string, which arg/kwarg to use to get the filename
+        :return: Wrapped orig_func
+        """
+        def passed_through(*args, **kwargs):
+            if type(filearg) is str:
+                filename = kwargs[filearg]
+            else:
+                filename = args[filearg]
+            self.open(filename).close()
+            return orig_func(*args, **kwargs)
+        return passed_through
 
     @classmethod
     def uninstall_hooks(cls):
@@ -868,9 +931,26 @@ class DagsHubFilesystem:
                 if instance is not None and hasattr(instance, "user_ns"):
                     instance.user_ns["open"] = cls.__unpatched["notebook_open"]
 
+            cls._uninstall_framework_hooks()
+
         if DagsHubFilesystem.hooked_instance is not None:
             DagsHubFilesystem.hooked_instance.cleanup()
             DagsHubFilesystem.hooked_instance = None
+
+    @classmethod
+    def _uninstall_framework_hooks(cls):
+        for func in list(filter(lambda key: key.startswith(cls._framework_key_prefix), cls.__unpatched.keys())):
+            orig_fn = cls.__unpatched[func]
+            orig_func_name = func
+
+            func = func[len(cls._framework_key_prefix):]
+            print(f"Getting rid of {func}")
+            module_name, func_name = func.rsplit(".", 1)
+            m = importlib.import_module(module_name)
+            setattr(m, func_name, orig_fn)
+
+            del(cls.__unpatched[orig_func_name])
+
 
     def _mkdirs(self, absolute_path: Path):
         for parent in list(absolute_path.parents)[::-1]:
@@ -920,6 +1000,7 @@ def install_hooks(
     token: Optional[str] = None,
     timeout: Optional[int] = None,
     exclude_globs: Optional[Union[List[str], str]] = None,
+    frameworks: Optional[List[str]] = None,
 ):
     """
     Monkey patches builtin Python functions to make them DagsHub-repo aware.
@@ -942,6 +1023,7 @@ def install_hooks(
         token=token,
         timeout=timeout,
         exclude_globs=exclude_globs,
+        frameworks=frameworks,
     )
     fs.install_hooks()
 
