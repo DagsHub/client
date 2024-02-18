@@ -12,6 +12,7 @@ import dagshub.common.config
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
+from dagshub.data_engine.client.gql_introspections import GqlIntrospections, QueryInputIntrospection
 from dagshub.data_engine.client.models import (
     DatasourceResult,
     DatasourceType,
@@ -26,6 +27,10 @@ from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
@@ -180,8 +185,14 @@ class DataClient:
             first=limit,
             after=after,
         )
+        q.validate_params(params, self.query_introspection)
+        return self._exec(q.generate(), params)["datasourceQuery"]
 
-        return self._exec(q, params)["datasourceQuery"]
+    @cached_property
+    def query_introspection(self) -> QueryInputIntrospection:
+        introspection = GqlIntrospections.input_fields()
+        introspection_dict = self._exec(introspection)
+        return dacite.from_dict(data_class=QueryInputIntrospection, data=introspection_dict["__schema"])
 
     def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
         """
@@ -228,7 +239,7 @@ class DataClient:
         Returns:
             List[DatasourceResult]: A list of datasources that match the filtering criteria.
         """
-        q = GqlQueries.datasource()
+        q = GqlQueries.datasource().generate()
         params = GqlQueries.datasource_params(id=id, name=name)
 
         res = self._exec(q, params)["datasource"]
@@ -295,7 +306,7 @@ class DataClient:
         Returns:
             List[DatasetResult]: A list of datasets that match the filtering criteria.
         """
-        q = GqlQueries.dataset()
+        q = GqlQueries.dataset().generate()
         params = GqlQueries.dataset_params(id=id, name=name)
 
         res = self._exec(q, params)["dataset"]

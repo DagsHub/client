@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple
 
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
@@ -334,6 +334,41 @@ class Datasource:
         new_ds._query.as_of = to_timestamp(time)
         return new_ds
 
+    def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
+        """
+        Sort the query result by the specified fields.
+        Any previously set order will be overwritten.
+
+        Args:
+            Fields to sort by. Can be either of:
+                - Name of the field to sort by: ``"field"``.
+                - A tuple of ``(field_name, ascending)``: ``("field", True)``.
+                - A tuple of ``(field_name, "asc"|"desc")``: ``("field", "asc")``.
+
+        Examples::
+
+            ds.order_by("size").all()                   # Order by ascending size
+            ds.order_by(("date", "desc"), "size).all()  # Order by descending date, then ascending size
+        """
+        new_ds = self.__deepcopy__()
+        orders = []
+        for arg in args:
+            if isinstance(arg, str):
+                orders.append({"field": arg, "order": "ASC"})
+            else:
+                if len(arg) != 2:
+                    raise RuntimeError(
+                        f"Invalid sort argument {arg}, must be a tuple (<field>, 'asc'|'desc'|True|False)")
+                if isinstance(arg[1], bool):
+                    order = "ASC" if arg[1] else "DESC"
+                elif isinstance(arg[1], str) and arg[1].upper() in ["ASC", "DESC"]:
+                    order = arg[1].upper()
+                else:
+                    raise RuntimeError(f"Invalid sort argument {arg}, second value must be 'asc'|'desc'|True|False")
+                orders.append({"field": arg[0], "order": order})
+        new_ds.get_query().order_by = orders
+        return new_ds
+
     def _check_preprocess(self):
         self.source.get_from_dagshub()
         if (
@@ -580,7 +615,7 @@ class Datasource:
 
         with progress:
             for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start : start + upload_batch_size]
+                entries = metadata_entries[start: start + upload_batch_size]
                 logger.debug(f"Uploading {len(entries)} metadata entries...")
                 self.source.client.update_metadata(self, entries)
                 progress.update(total_task, advance=upload_batch_size)
@@ -1212,6 +1247,8 @@ class DatasourceQuery(DataClassJsonMixin):
         default=QueryFilterTree(),
         metadata=config(field_name="query", encoder=QueryFilterTree.serialize, decoder=QueryFilterTree.deserialize),
     )
+    order_by: Optional[List] = field(default=None,
+                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
 
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
@@ -1220,6 +1257,8 @@ class DatasourceQuery(DataClassJsonMixin):
         )
         if self.select is not None:
             other.select = self.select.copy()
+        if self.order_by is not None:
+            other.order_by = self.order_by.copy()
         return other
 
     def compose(
@@ -1235,12 +1274,14 @@ class DatasourceQuery(DataClassJsonMixin):
 
         self.filter.compose(op, other)
 
-        # If composition went successfully, carry over the as_of and select from the other query
+        # If composition went successfully, carry over the as_of, select and order_by from the other query
         if other_query is not None:
             if other_query.select is not None:
                 self.select = other_query.select
             if other_query.as_of is not None:
                 self.as_of = other_query.as_of
+            if other_query.order_by is not None:
+                self.order_by = other_query.order_by
 
 
 @dataclass
@@ -1302,7 +1343,8 @@ class DatasetState:
 
     @staticmethod
     def from_dataset_query(
-        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int], dataset_query: Union[Dict, str]
+        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int],
+        dataset_query: Union[Dict, str]
     ) -> "DatasetState":
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)

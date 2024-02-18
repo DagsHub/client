@@ -1,13 +1,14 @@
 import functools
 from typing import Optional, Any, Dict, Union
 
+from dagshub.data_engine.client.gql_introspections import Validators
 from dagshub.data_engine.client.query_builder import GqlQuery
 
 
 class GqlQueries:
     @staticmethod
     @functools.lru_cache()
-    def datasource() -> str:
+    def datasource() -> GqlQuery:
         q = (
             GqlQuery()
             .operation("query", name="datasource", input={"$id": "ID", "$name": "String"})
@@ -28,7 +29,6 @@ class GqlQueries:
                     "metadataFields {name valueType multiple tags}" "type",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -41,7 +41,7 @@ class GqlQueries:
 
     @staticmethod
     @functools.lru_cache()
-    def datasource_query(include_metadata: bool) -> str:
+    def datasource_query(include_metadata: bool) -> GqlQuery:
         metadata_fields = "metadata { key value }" if include_metadata else ""
         q = (
             GqlQuery()
@@ -70,8 +70,9 @@ class GqlQueries:
                     "pageInfo { hasNextPage endCursor }",
                 ]
             )
-            .generate()
         )
+
+        q.param_validator(Validators.query_input_validator)
         return q
 
     @staticmethod
@@ -87,7 +88,7 @@ class GqlQueries:
 
     @staticmethod
     @functools.lru_cache()
-    def dataset() -> str:
+    def dataset() -> GqlQuery:
         q = (
             GqlQuery()
             .operation("query", name="dataset", input={"$id": "ID", "$name": "String"})
@@ -107,7 +108,6 @@ class GqlQueries:
                     "datasetQuery",
                 ]
             )
-            .generate()
         )
         return q
 
