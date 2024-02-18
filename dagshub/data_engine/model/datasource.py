@@ -612,7 +612,7 @@ class Datasource:
             datapoints: list of datapoints objects to delete
             force: Skip the confirmation prompt
         """
-        dps_str = "\n\t".join([""]+[d.path for d in datapoints])
+        dps_str = "\n\t".join([""] + [d.path for d in datapoints])
         prompt = (
             f"You are about to delete the following datapoint(s): {dps_str}\n"
             f"This will remove the datapoint and metadata from unversioned queries, "

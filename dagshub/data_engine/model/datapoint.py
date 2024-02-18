@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING
 
 from dagshub.common.download import download_files
-from dagshub.common.helpers import http_request, prompt_user
+from dagshub.common.helpers import http_request
 from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
