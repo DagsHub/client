@@ -1,6 +1,6 @@
 import os.path
 import pytest
-from dagshub.streaming import DagsHubFilesystem
+from dagshub.streaming import DagsHubFilesystem, uninstall_hooks, install_hooks
 
 
 def test_sets_current_revision(mock_api):
@@ -64,3 +64,16 @@ def test_nested_open_throws_nonexistent_dir(mock_api, repo_with_hooks):
     with pytest.raises(FileNotFoundError):
         with open(path, "w") as f:
             f.write(content)
+
+
+def test_dont_open_glob_exclude(mock_api, dagshub_repo):
+    file_path = "fail.npy"
+    mock_api.add_file(file_path, "test failed")
+
+    try:
+        install_hooks(exclude_globs="*.npy")
+        with pytest.raises(FileNotFoundError):
+            with open(file_path) as f:
+                print(f.read())
+    finally:
+        uninstall_hooks()

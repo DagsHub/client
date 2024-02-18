@@ -5,7 +5,7 @@ import dacite
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from dagshub.data_engine.model.query import DatasourceQuery
+from dagshub.data_engine.model.query import QueryFilterTree
 from dagshub.data_engine.voxel_plugin_server.models import VoxelFilterState
 from dagshub.data_engine.voxel_plugin_server.routes.util import error_handler
 from dagshub.data_engine.voxel_plugin_server.utils import get_plugin_state
@@ -92,7 +92,7 @@ def apply_filters_to_datasource(ds: "Datasource", filters: List[VoxelFilterState
     Returns:
         Datasource: The modified datasource with the applied filters.
     """
-    voxel_query = DatasourceQuery()
+    voxel_query = QueryFilterTree()
     for f in filters:
         filter_query = f.to_datasource_query()
         voxel_query.compose("and", filter_query)
