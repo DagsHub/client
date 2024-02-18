@@ -597,14 +597,12 @@ class Datasource:
 
     def delete_metadata_from_datapoints(self, datapoints: List[Datapoint], fields: List[str]):
         """
-        delete metadata fields from datapoints.
-        the deleted values can be accessed using versioned query with time before the deletion
+        Delete metadata from datapoints.
+        The deleted values can be accessed using versioned query with time set before the deletion
 
         Args:
-            datapoints: data points to act upon
-            fields: name of fields to delete
-        Returns:
-            A datasource object with the dataset assigned to it
+            datapoints: datapoints to delete metadata from
+            fields: fields to delete
         """
         metadata_entries = []
         for d in datapoints:
