@@ -334,9 +334,10 @@ class Datasource:
         new_ds._query.as_of = to_timestamp(time)
         return new_ds
 
-    def order_by(self, *args: Union[str, Tuple[str, bool], Tuple[str, str]]):
+    def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
         """
         Sort the query result by the specified fields.
+        Any previously set order will be overwritten.
 
         Args:
             Fields to sort by. Can be either of:
@@ -346,24 +347,26 @@ class Datasource:
 
         Examples::
 
-            ds.sort_by("size", ("date", "desc")).all()
-            ds.sort_by("size", ("date", False)).all()
+            ds.order_by("size").all()                   # Order by ascending size
+            ds.order_by(("date", "desc"), "size).all()  # Order by descending date, then ascending size
         """
         new_ds = self.__deepcopy__()
-        new_ds.get_query().order_by = []
+        orders = []
         for arg in args:
             if isinstance(arg, str):
-                new_ds.get_query().order_by.append({"field": arg, "order": "ASC"})
+                orders.append({"field": arg, "order": "ASC"})
             else:
                 if len(arg) != 2:
-                    raise RuntimeError(f"Invalid sort argument {arg}")
+                    raise RuntimeError(
+                        f"Invalid sort argument {arg}, must be a tuple (<field>, 'asc'|'desc'|True|False)")
                 if isinstance(arg[1], bool):
                     order = "ASC" if arg[1] else "DESC"
                 elif isinstance(arg[1], str) and arg[1].upper() in ["ASC", "DESC"]:
                     order = arg[1].upper()
                 else:
-                    raise RuntimeError(f"Invalid sort argument {arg}")
-                new_ds.get_query().order_by.append({"field": arg[0], "order": order})
+                    raise RuntimeError(f"Invalid sort argument {arg}, second value must be 'asc'|'desc'|True|False")
+                orders.append({"field": arg[0], "order": order})
+        new_ds.get_query().order_by = orders
         return new_ds
 
     def _check_preprocess(self):

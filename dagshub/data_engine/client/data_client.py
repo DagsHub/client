@@ -12,6 +12,7 @@ import dagshub.common.config
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
+from dagshub.data_engine.client.gql_introspections import GqlIntrospections
 from dagshub.data_engine.client.models import (
     DatasourceResult,
     DatasourceType,
@@ -189,21 +190,7 @@ class DataClient:
 
     @cached_property
     def introspection_dict(self):
-        introspection = """
-{
-  __schema {
-    types {
-      name
-      inputFields {
-        name
-        type {
-          name
-        }
-      }
-    }
-  }
-}
-        """
+        introspection = GqlIntrospections.input_fields()
         return self._exec(introspection)
 
     def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
