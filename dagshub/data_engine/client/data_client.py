@@ -205,7 +205,7 @@ class DataClient:
         )
         return self._exec(q, params)
 
-    def delete_metadata_for_datapoint(self, datasource: Datasource, entries: List[DatapointDeleteMetadataEntry]):
+    def delete_metadata_for_datapoint(self, datasource: "Datasource", entries: List["DatapointDeleteMetadataEntry"]):
         """
         Delete a metadata from a datapoint
 

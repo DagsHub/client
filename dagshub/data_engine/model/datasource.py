@@ -69,9 +69,8 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     allowMultiple: bool = False
 
 
-@dataclass_json
 @dataclass
-class DatapointDeleteMetadataEntry(json.JSONEncoder):
+class DatapointDeleteMetadataEntry(DataClassJsonMixin):
     datapointId: str
     key: str
 
