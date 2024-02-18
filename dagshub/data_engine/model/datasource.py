@@ -595,19 +595,20 @@ class Datasource:
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
 
-    def delete_metadata_from_datapoints(self, datapoints: List[Datapoint], names: List[str]):
+    def delete_metadata_from_datapoints(self, datapoints: List[Datapoint], fields: List[str]):
         """
-        delete a metadata fields from these datapoints
-        the deleted values can be accessed using versioned query
-        with time before the deletion
-        Args:
-             datapoints - data points to act upon
-             names - name of fields to delete
-        """
+        delete metadata fields from datapoints.
+        the deleted values can be accessed using versioned query with time before the deletion
 
+        Args:
+            datapoints: data points to act upon
+            fields: name of fields to delete
+        Returns:
+            A datasource object with the dataset assigned to it
+        """
         metadata_entries = []
         for d in datapoints:
-            for n in names:
+            for n in fields:
                 metadata_entries.append(DatapointDeleteMetadataEntry(datapointId=d.datapoint_id, key=n))
         self.source.client.delete_metadata_for_datapoint(self, metadata_entries)
 

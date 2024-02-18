@@ -45,15 +45,16 @@ class Datapoint:
     def __setitem__(self, key, value):
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
-    def delete_metadata_field(self, name):
+    def delete_metadata_field(self, field):
         """
-        delete a metadata field from this datapoint
-        the deleted value can be accessed using versioned query
-        with time before the deletion
+        delete a metadata field from this datapoint.
+
+        the deleted value can be accessed using versioned query with time before the deletion
+
         Args:
-             name - name of field
+            field: name of field
         """
-        self.datasource.delete_metadata_from_datapoints([self], [name])
+        self.datasource.delete_metadata_from_datapoints([self], [field])
 
     def save(self):
         """
