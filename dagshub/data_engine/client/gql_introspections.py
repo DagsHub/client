@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 import functools
 from typing import Any, Dict, List
-
-import dacite
-
 from dagshub.data_engine.client.query_builder import GqlQuery
 
 
