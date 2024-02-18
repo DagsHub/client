@@ -597,9 +597,9 @@ class Datasource:
 
     def delete_datapoints(self, datapoints: List[Datapoint], force: bool = False):
         """
-        Delete these datapoints.
+        Delete datapoints.
 
-        - These datapoint will no longer show up in queries.
+        - These datapoints will no longer show up in queries.
         - Does not delete the datapoint's file, only removing the data from the datasource.
         - You can still query these datapoints and associated metadata with \
         versioned queries whose time is before deletion time.
