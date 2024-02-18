@@ -12,7 +12,7 @@ import dagshub.common.config
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.data_engine.client.gql_introspections import GqlIntrospections
+from dagshub.data_engine.client.gql_introspections import GqlIntrospections, QueryInputIntrospection
 from dagshub.data_engine.client.models import (
     DatasourceResult,
     DatasourceType,
@@ -185,13 +185,14 @@ class DataClient:
             first=limit,
             after=after,
         )
-        q.validate_params(params, self.introspection_dict)
+        q.validate_params(params, self.query_introspection)
         return self._exec(q.generate(), params)["datasourceQuery"]
 
     @cached_property
-    def introspection_dict(self):
+    def query_introspection(self) -> QueryInputIntrospection:
         introspection = GqlIntrospections.input_fields()
-        return self._exec(introspection)
+        introspection_dict = self._exec(introspection)
+        return dacite.from_dict(data_class=QueryInputIntrospection, data=introspection_dict["__schema"])
 
     def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
         """

@@ -10,7 +10,7 @@
 
 
 from typing import Dict, List, Union, Any, Callable
-ParamValidator = Callable[[Dict[str, Any], Dict[str, Any]], None]
+ParamValidator = Callable[[Dict[str, Any], Any], None]
 
 
 class GqlQuery:
@@ -113,6 +113,6 @@ class GqlQuery:
 
         return self.remove_duplicate_spaces(self.object)
 
-    def validate_params(self, params: Dict[str, Any], introspection_dict: Dict[str, any]):
+    def validate_params(self, params: Dict[str, Any], introspection):
         for validator in self.params_validators:
-            validator(params, introspection_dict)
+            validator(params, introspection)

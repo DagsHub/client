@@ -47,9 +47,7 @@ class QueryInputIntrospection:
 
 class Validators:
     @staticmethod
-    def query_input_validator(params: Dict[str, Any], query_input_introspection: Dict[str, Any]):
-        query_input_introspection = dacite.from_dict(data_class=QueryInputIntrospection,
-                                                     data=query_input_introspection["__schema"])
+    def query_input_validator(params: Dict[str, Any], query_input_introspection: QueryInputIntrospection):
         # Get fields of input field QueryInput
         introspect_query_input_fields = [
             f for f in query_input_introspection.types
