@@ -61,18 +61,7 @@ class Datapoint:
         Args:
             force: Skip the confirmation prompt
         """
-        prompt = (
-            f'You are about to delete the datapoint [{self.path}]."\n'
-            f"This will remove the datapoint and metadata from unversioned queries, "
-            f"but won't delete the underlying file."
-        )
-        if not force:
-            user_response = prompt_user(prompt)
-            if not user_response:
-                print("Deletion cancelled")
-                return
-
-        self.datasource.delete_datapoints([self], force=True)
+        self.datasource.delete_datapoints([self], force=force)
 
     def save(self):
         """
