@@ -154,7 +154,6 @@ class DataClient:
 
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
-                res.server_timestamp = resp["serverQueryTime"] # get latest
                 progress.update(total_task, advance=len(new_entries.entries), refresh=True)
         return res
 
