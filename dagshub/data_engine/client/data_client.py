@@ -29,7 +29,7 @@ from dagshub.data_engine.model.query_result import QueryResult
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
-    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry
+    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, DatapointDeleteMetadataEntry
 
 logger = logging.getLogger(__name__)
 
