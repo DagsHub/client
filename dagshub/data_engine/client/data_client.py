@@ -238,7 +238,7 @@ class DataClient:
         Returns:
             List[DatasourceResult]: A list of datasources that match the filtering criteria.
         """
-        q = GqlQueries.datasource()
+        q = GqlQueries.datasource().generate()
         params = GqlQueries.datasource_params(id=id, name=name)
 
         res = self._exec(q, params)["datasource"]
@@ -305,7 +305,7 @@ class DataClient:
         Returns:
             List[DatasetResult]: A list of datasets that match the filtering criteria.
         """
-        q = GqlQueries.dataset()
+        q = GqlQueries.dataset().generate()
         params = GqlQueries.dataset_params(id=id, name=name)
 
         res = self._exec(q, params)["dataset"]

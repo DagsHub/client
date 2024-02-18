@@ -8,7 +8,7 @@ from dagshub.data_engine.client.query_builder import GqlQuery
 class GqlQueries:
     @staticmethod
     @functools.lru_cache()
-    def datasource() -> str:
+    def datasource() -> GqlQuery:
         q = (
             GqlQuery()
             .operation("query", name="datasource", input={"$id": "ID", "$name": "String"})
@@ -29,7 +29,6 @@ class GqlQueries:
                     "metadataFields {name valueType multiple tags}" "type",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -89,7 +88,7 @@ class GqlQueries:
 
     @staticmethod
     @functools.lru_cache()
-    def dataset() -> str:
+    def dataset() -> GqlQuery:
         q = (
             GqlQuery()
             .operation("query", name="dataset", input={"$id": "ID", "$name": "String"})
@@ -109,7 +108,6 @@ class GqlQueries:
                     "datasetQuery",
                 ]
             )
-            .generate()
         )
         return q
 
