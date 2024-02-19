@@ -865,6 +865,8 @@ class DagsHubFilesystem:
         """
         Installs custom hook functions for frameworks
         """
+        if self.frameworks is None:
+            return
         for framework in self.frameworks:
             if framework not in self._framework_override_map:
                 logger.warning(f"Framework {framework} not available for override, skipping")
