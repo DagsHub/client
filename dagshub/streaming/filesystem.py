@@ -75,7 +75,6 @@ def _is_server_error(resp: Response):
     return resp.status_code >= 500
 
 
-
 # TODO: Singleton metaclass that lets us keep a "main" DvcFilesystem instance
 class DagsHubFilesystem:
     """
@@ -110,7 +109,6 @@ class DagsHubFilesystem:
     _framework_override_map: Dict[str, List[str]] = {
         "transformers": ["safetensors.safe_open", "tokenizers.$Tokenizer.from_file"],
     }
-
 
     def __init__(
         self,
@@ -350,8 +348,7 @@ class DagsHubFilesystem:
         # TODO Include more information in this file
         return b"v0\n"
 
-    def open(self, file, mode='r', buffering=-1, encoding=None,
-             errors=None, newline=None, closefd=True, opener=None):
+    def open(self, file, mode="r", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
         """
         NOTE: This is a wrapper function for python's built-in file operations
             (https://docs.python.org/3/library/functions.html#open)
@@ -569,7 +566,7 @@ class DagsHubFilesystem:
         else:
             self.__chdir(path)
 
-    def listdir(self, path='.'):
+    def listdir(self, path="."):
         """
         NOTE: This is a wrapper function for python's built-in file operations
             (https://docs.python.org/3/library/os.html#os.listdir)
@@ -864,7 +861,6 @@ class DagsHubFilesystem:
 
     _framework_key_prefix = "framework_"
 
-
     def _install_framework_hooks(self):
         """
         Installs custom hook functions for frameworks
@@ -904,8 +900,7 @@ class DagsHubFilesystem:
                 else:
                     setattr(patch_module, func_name, self._passthrough_decorator(orig_fn))
 
-
-    def _passthrough_decorator(self, orig_func, filearg: Union[int, str]=0) -> Callable:
+    def _passthrough_decorator(self, orig_func, filearg: Union[int, str] = 0) -> Callable:
         """
         Decorator function over some other random function that assumes a file exists locally,
         but isn't using python's open(). These might be C++/Rust functions that use their respective opens.
@@ -917,6 +912,7 @@ class DagsHubFilesystem:
         :param filearg: int or string, which arg/kwarg to use to get the filename
         :return: Wrapped orig_func
         """
+
         def passed_through(*args, **kwargs):
             if type(filearg) is str:
                 filename = kwargs[filearg]
@@ -924,6 +920,7 @@ class DagsHubFilesystem:
                 filename = args[filearg]
             self.open(filename).close()
             return orig_func(*args, **kwargs)
+
         return passed_through
 
     @classmethod
@@ -962,7 +959,7 @@ class DagsHubFilesystem:
             orig_fn = cls.__unpatched[func]
             orig_func_name = func
 
-            func = func[len(cls._framework_key_prefix):]
+            func = func[len(cls._framework_key_prefix) :]
             module_name, func_name = func.rsplit(".", 1)
             class_name = None
 
@@ -978,8 +975,7 @@ class DagsHubFilesystem:
             else:
                 setattr(m, func_name, orig_fn)
 
-            del(cls.__unpatched[orig_func_name])
-
+            del cls.__unpatched[orig_func_name]
 
     def _mkdirs(self, absolute_path: Path):
         for parent in list(absolute_path.parents)[::-1]:
