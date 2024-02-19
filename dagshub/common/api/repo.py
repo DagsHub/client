@@ -1,4 +1,8 @@
 import logging
+from os import PathLike
+from pathlib import Path, PurePosixPath
+
+import rich.progress
 
 from dagshub.common.api.responses import (
     RepoAPIResponse,
@@ -8,21 +12,24 @@ from dagshub.common.api.responses import (
     ContentAPIEntry,
     StorageContentAPIResult,
 )
+from dagshub.common.download import download_files
+from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
+from functools import partial
 
 try:
     from functools import cached_property
 except ImportError:
     from cached_property import cached_property
 
-from typing import Optional, Tuple, Any, List
+from typing import Optional, Tuple, Any, List, Union
 
 import dacite
 
 import dagshub.auth
 from dagshub.common import config
 
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, log_message
 
 logger = logging.getLogger("dagshub")
 
@@ -253,6 +260,151 @@ class RepoAPI:
             logger.debug(res.content)
             raise RuntimeError(error_msg)
         return res.content
+
+    def _get_files_in_path(
+        self, path, revision=None, recursive=False, traverse_storages=False
+    ) -> List[ContentAPIEntry]:
+        """
+        Walks through the path of the repo, returning non-dir entries
+        """
+
+        dir_queue = []
+        files = []
+
+        list_fn_folder = partial(self.list_path, revision=revision)
+        list_fn_storage = self.list_storage_path
+
+        def push_folder(folder_path):
+            dir_queue.append((folder_path, list_fn_folder))
+
+        def push_storage(storage_path):
+            dir_queue.append((storage_path, list_fn_storage))
+
+        # Initialize the queue
+        path, is_storage_path = self._sanitize_storage_path(path)
+        if is_storage_path:
+            push_storage(path)
+        else:
+            push_folder(path)
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Traversing directories...", total=None)
+
+        def step(step_path, list_fn):
+            """
+            step_path: path in the repo to list
+            list_fn: which function to use to list it (can be list_path or list_storage_path)
+            """
+            res = list_fn(step_path)
+            for entry in res:
+                if entry.type == "file":
+                    files.append(entry)
+                elif recursive:
+                    if entry.versioning == "bucket":
+                        if traverse_storages:
+                            push_storage(entry.path)
+                    else:
+                        push_folder(entry.path)
+            progress.update(task, advance=1)
+
+        with progress:
+            while len(dir_queue):
+                query_path, list_fn = dir_queue.pop(0)
+                step(query_path, list_fn)
+
+        return files
+
+    def download(
+        self,
+        remote_path: Union[str, PathLike],
+        local_path: Union[str, PathLike] = ".",
+        revision: Optional[str] = None,
+        recursive=True,
+        keep_source_prefix=False,
+        redownload=False,
+        download_storages=False,
+    ):
+        """
+        Downloads the contents of the repository at "remote_path" to the "local_path"
+
+        Args:
+            remote_path: Path in the repository of the folder or file to download.
+            local_path: Where to download the files. Defaults to current working directory.
+            revision: Repo revision or branch, if not specified - uses default repo branch.
+                Ignored for downloading from buckets.
+            recursive: Whether to download files recursively.
+            keep_source_prefix: | Whether to keep the path of the folder in the download path or not.
+                | Example: Given remote_path ``src/data`` and file ``test/file.txt``
+                | if ``True``: will download to ``<local_path>/src/data/test/file.txt``
+                | if ``False``: will download to ``<local_path>/test/file.txt``
+            redownload: Whether to redownload files that already exist on the local filesystem.
+                The downloader doesn't do any hash comparisons and only checks
+                if a file already exists in the local filesystem or not.
+            download_storages: If downloading the whole repo, by default we're not downloading the integrated storages
+                Toggle this to ``True`` to change this behavior
+        """
+        traverse_storages = True
+        if str(remote_path) == "/" and not download_storages:
+            log_message(
+                "Skipping downloading from connected storages. "
+                "Set the `download_storages` flag if you want "
+                "to download the whole content of the connected storages."
+            )
+            traverse_storages = False
+
+        files = self._get_files_in_path(remote_path, revision, recursive, traverse_storages=traverse_storages)
+        file_tuples = []
+        if local_path is None:
+            local_path = "."
+        local_path = Path(local_path)
+        # Strip the slashes from the beginning so the relative_to logic works
+        remote_path = str(remote_path).lstrip("/")
+        if not remote_path:
+            remote_path = "/"
+        # For storage paths get rid of the colon in the beginning of the schema, the download urls won't have it either
+        remote_path, _ = self._sanitize_storage_path(remote_path)
+        # Edge case - if the user requested a single file - different output path semantics
+        if len(files) == 1 and files[0].path == remote_path:
+            f = files[0]
+            remote_path = PurePosixPath(f.path)
+            # If local_path was specified, assume that the local_path is the exact name of the file
+            if local_path != Path("."):
+                # Saving to existing dir - append the name of remote file to the end a-la cp
+                if local_path.is_dir():
+                    remote_path = remote_path if keep_source_prefix else remote_path.name
+                    file_path = local_path / remote_path
+                else:
+                    file_path = local_path
+            else:
+                file_path = remote_path if keep_source_prefix else remote_path.name
+            file_tuples.append((f.download_url, file_path))
+        else:
+            for f in files:
+                file_path_in_remote = PurePosixPath(f.path)
+                remote_path_obj = PurePosixPath(remote_path)
+                if not keep_source_prefix and remote_path != "/":
+                    file_path = file_path_in_remote.relative_to(remote_path_obj)
+                else:
+                    file_path = file_path_in_remote
+                file_path = local_path / file_path
+                file_tuples.append((f.download_url, file_path))
+        download_files(file_tuples, skip_if_exists=not redownload)
+        log_message(f"Downloaded {len(files)} file(s) to {local_path.resolve()}")
+
+    @staticmethod
+    def _sanitize_storage_path(path: Union[str, PathLike]) -> Tuple[str, bool]:
+        """
+        Sanitizes storage paths for use in the traversal/download functions.
+        When user asks for ``s3:/prefix/file``, we need to request ``storage/s3/prefix/file``.
+        This function checks that the user has asked for a storage path (by the schema in the beginning)
+        and returns a path that can be used for these types of requests.
+        If the path is not a storage path, path is returned as is (converted to string).
+        """
+        path = str(path)
+        if path.lstrip("/").split("/")[0] in {"s3:", "gs:", "azure:"}:
+            path = str(path).lstrip("/").replace(":", "", 1)
+            return path, True
+        return path, False
 
     @cached_property
     def default_branch(self) -> str:
