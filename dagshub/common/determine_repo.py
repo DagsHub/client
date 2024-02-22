@@ -11,6 +11,16 @@ import git
 
 
 def parse_dagshub_remote(remote_url: urllib.parse.ParseResult, host_url: urllib.parse.ParseResult) -> Optional[str]:
+    """
+    Tries to parse the remote url, extracting the name of a DagsHub repo from it and returning it
+
+    Args:
+        remote_url: parsed URL of the remote
+        host_url: parsed URL of the DagsHub host
+
+    Returns:
+        Repository name in the `<user>/<repo>` format
+    """
     if remote_url.hostname != host_url.hostname:
         return None
 
@@ -28,6 +38,13 @@ def parse_dagshub_remote(remote_url: urllib.parse.ParseResult, host_url: urllib.
 
 def determine_repo(path: Optional[Union[str, Path]] = None, host: Optional[str] = None) -> Tuple[RepoAPI, str]:
     """
+    Tries to find a DagsHub repository in the specified path by traversing up the tree
+    and looking for a git repo with the DagsHub remote.
+
+    Args:
+        path: Path where to look for the repo. If None, looks in current working directory
+        host: DagsHub host, defaults to https://dagshub.com
+
     Returns:
         RepoAPI object of the repo + name of the current branch
     """
