@@ -55,8 +55,11 @@ def init(
 
     # URL specified - ignore repo name and owner args, prioritize url over it
     # Alternatively, if any of repo owner or name is unset, then unset both of them
-    if url is not None or None in [repo_owner, repo_name]:
+    if url is not None:
         repo_owner, repo_name = None, None
+
+    if None in [repo_owner, repo_name] and (repo_owner is not None or repo_name is not None):
+        raise AttributeError("Both repo_owner and repo_name should be set")
 
     # Build URL from repo owner and name
     if repo_owner and repo_name:
@@ -82,6 +85,7 @@ def init(
     try:
         repo_api.get_repo_info()
     except RepoNotFoundError:
+        log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
         create_repo(repo_name)
 
     # Configure MLFlow
