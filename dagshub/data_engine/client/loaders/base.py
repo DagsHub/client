@@ -58,7 +58,7 @@ class DagsHubDataset:
 
         self.tensorizers = (
             self._get_tensorizers(tensorizers)
-            if type(tensorizers) == str or type(tensorizers[0]) == str
+            if type(tensorizers) is str or type(tensorizers[0]) is str
             else tensorizers
         )
 
@@ -192,8 +192,8 @@ class DagsHubDataset:
             return [
                 getattr(self.tensorlib, datatypes),
             ] * (len(self.metadata_columns) + 1)
-        elif type(datatypes) == list and len(datatypes) == len(self.metadata_columns) + 1:
-            return [getattr(self.tensorlib, datatype) if type(datatype) == str else datatype for datatype in datatypes]
+        elif type(datatypes) is list and len(datatypes) == len(self.metadata_columns) + 1:
+            return [getattr(self.tensorlib, datatype) if type(datatype) is str else datatype for datatype in datatypes]
         else:
             raise ValueError(
                 "Unable to set tensorizers. "

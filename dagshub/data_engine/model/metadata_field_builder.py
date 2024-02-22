@@ -105,7 +105,7 @@ class MetadataFieldBuilder:
         if issubclass(t, DagshubDataType):
             return t.backing_field_type
 
-        if type(t) == type:
+        if type(t) is type:
             if t not in metadataTypeLookup.keys():
                 raise ValueError(f"Primitive type {type(t)} is not supported")
             return metadataTypeLookup[t]

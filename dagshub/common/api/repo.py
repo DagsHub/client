@@ -167,7 +167,7 @@ class RepoAPI:
             raise RuntimeError(error_msg)
 
         content = res.json()
-        if type(content) == dict:
+        if type(content) is dict:
             content = [content]
         return [dacite.from_dict(ContentAPIEntry, entry) for entry in content]
 
