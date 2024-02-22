@@ -54,7 +54,6 @@ def init(
         root = os.path.abspath(".")
 
     # URL specified - ignore repo name and owner args, prioritize url over it
-    # Alternatively, if any of repo owner or name is unset, then unset both of them
     if url is not None:
         repo_owner, repo_name = None, None
 
