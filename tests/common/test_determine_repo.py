@@ -6,7 +6,6 @@ from typing import Generator, TypeVar
 import pytest
 import pytest_git
 
-from dagshub.common.api import RepoAPI
 from dagshub.common.determine_repo import determine_repo, parse_dagshub_remote
 import dagshub.common.config
 from dagshub.common.errors import DagsHubRepoNotFoundError

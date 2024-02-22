@@ -9,7 +9,6 @@ from typing import Optional
 import git
 
 from dagshub.auth import get_token
-from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.api import RepoAPI
 from dagshub.common.api.repo import RepoNotFoundError
