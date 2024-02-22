@@ -1,6 +1,7 @@
 import configparser
 import os
 import urllib
+import urllib.parse
 from os.path import exists
 from pathlib import Path
 from typing import Optional
@@ -10,6 +11,9 @@ import git
 from dagshub.auth import get_token
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
+from dagshub.common.api import RepoAPI
+from dagshub.common.api.repo import RepoNotFoundError
+from dagshub.common.determine_repo import parse_dagshub_remote, determine_repo
 from dagshub.common.helpers import get_project_root, http_request, log_message
 from dagshub.upload import create_repo
 
@@ -19,7 +23,7 @@ def init(
     repo_owner: Optional[str] = None,
     url: Optional[str] = None,
     root: Optional[str] = None,
-    host: str = config.host,
+    host: Optional[str] = None,
     mlflow: bool = True,
     dvc: bool = False,
 ):
@@ -43,51 +47,41 @@ def init(
         mlflow: Configure MLflow to log experiments to DagsHub.
         dvc: Configure a dvc remote in the repository.
     """
-    # Setup required variables
-    if dvc:
-        root = root or get_project_root(Path(os.path.abspath(".")))
-        if not exists(root / ".git"):
-            raise ValueError(
-                f"No git project found! (stopped at mountpoint {root}). \
-                               Please run this command in a git repository."
-            )
+    if host is None:
+        host = config.host
 
-    if url and (repo_name or repo_owner):
-        repo_name, repo_owner = None, None
+    if root is None:
+        root = os.path.abspath(".")
 
-    if not url:
-        if repo_name is not None and repo_owner is not None:
-            url = urllib.parse.urljoin(f"{host}/", f"{repo_owner}/{repo_name}")
-        elif dvc:
-            for remote in git.Repo(root).remotes:
-                if host in remote.url:
-                    url = remote.url[:-4]
-    if not url:
-        raise ValueError("No host remote found! Please specify the remote using the url variable, or --url argument.")
-    elif url[-4] == ".":
-        url = url[:-4]
+    # URL specified - ignore repo name and owner args, prioritize url over it
+    # Alternatively, if any of repo owner or name is unset, then unset both of them
+    if url is not None or None in [repo_owner, repo_name]:
+        repo_owner, repo_name = None, None
 
-    if not (repo_name and repo_owner):
-        splitter = lambda x: (x[-1], x[-2])  # noqa E721
-        repo_name, repo_owner = splitter(url.split("/"))
+    # Build URL from repo owner and name
+    if repo_owner and repo_name:
+        url = urllib.parse.urljoin(f"{host}/", f"{repo_owner}/{repo_name}")
+    else:
+        if not url:
+            # Try to get the url of the repo from the git repo
+            repo, branch = determine_repo(root)
+            url = repo.repo_url
 
-    if None in [repo_name, repo_owner, url]:
-        raise ValueError(
-            "Could not parse repository owner and name. Make sure you specify either a link \
-                          to the repository with --url or a pair of --repo-owner and --repo-name"
-        )
+        if url.endswith(".git"):
+            url = url[:-4]
+        # Extract the owner and name from the repo_url
+        parts = url.split("/")
+        repo_owner, repo_name = parts[-2], parts[-1]
 
     # Setup authentication
-    token = config.token or get_token(host=host)
+    token = get_token(host=host)
     bearer = HTTPBearerAuth(token)
 
-    # Configure repository
-    res = http_request(
-        "GET",
-        urllib.parse.urljoin(f"{host}/", config.REPO_INFO_URL.format(owner=repo_owner, reponame=repo_name)),
-        auth=bearer,
-    )
-    if res.status_code == 404:
+    # Create the repo if it wasn't created
+    repo_api = RepoAPI(f"{repo_owner}/{repo_name}", host=host)
+    try:
+        repo_api.get_repo_info()
+    except RepoNotFoundError:
         create_repo(repo_name)
 
     # Configure MLFlow
@@ -96,17 +90,20 @@ def init(
         os.environ["MLFLOW_TRACKING_USERNAME"] = token
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
-        log_message(f"Initialized MLflow to track repo \"{repo_owner}/{repo_name}\"")
+        log_message(f'Initialized MLflow to track repo "{repo_owner}/{repo_name}"')
 
     # Configure DVC
     if dvc:
-        Path(root / ".dvc").mkdir(parents=True, exist_ok=True)
+        git_repo = git.Repo(root, search_parent_directories=True)
+        git_repo_path = Path(git_repo.git_dir)
+
+        Path(git_repo_path / ".dvc").mkdir(parents=True, exist_ok=True)
         write = True
 
         dvc_config = configparser.ConfigParser()
         dvc_config_local = configparser.ConfigParser()
-        dvc_config.read(root / ".dvc" / "config")
-        dvc_config_local.read(root / ".dvc" / "config.local")
+        dvc_config.read(git_repo_path / ".dvc" / "config")
+        dvc_config_local.read(git_repo_path / ".dvc" / "config.local")
 
         for section in dvc_config.sections():
             if "url" in dvc_config[section] and host in dvc_config[section]["url"]:
@@ -117,15 +114,15 @@ def init(
             dvc_config_local[f"'remote \"{remote}\"'"] = {"auth": "basic", "user": token, "password": token}
             dvc_config[f"'remote \"{remote}\"'"] = {"url": f"{url}.dvc"}
 
-            with open(root / ".dvc" / "config", "w") as config_file, open(
-                root / ".dvc" / "config.local", "w"
+            with open(git_repo_path / ".dvc" / "config", "w") as config_file, open(
+                git_repo_path / ".dvc" / "config.local", "w"
             ) as config_local_file:
                 dvc_config.write(config_file)
                 dvc_config_local.write(config_local_file)
                 log_message(f'Added new remote "{remote}" with url = {url}')
 
-        if not exists(root / ".dvc" / ".gitignore"):
-            with open(root / ".dvc" / ".gitignore", "w") as config_gitignore:
+        if not exists(git_repo_path / ".dvc" / ".gitignore"):
+            with open(git_repo_path / ".dvc" / ".gitignore", "w") as config_gitignore:
                 config_gitignore.write(config.CONFIG_GITIGNORE)
 
-    log_message("Repository initialized!")
+    log_message(f"Repository {repo_owner}/{repo_name} initialized!")
