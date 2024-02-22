@@ -1,4 +1,3 @@
-import os
 import urllib.parse
 from pathlib import Path
 from typing import Optional, Union, Tuple

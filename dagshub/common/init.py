@@ -13,8 +13,8 @@ from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common import config
 from dagshub.common.api import RepoAPI
 from dagshub.common.api.repo import RepoNotFoundError
-from dagshub.common.determine_repo import parse_dagshub_remote, determine_repo
-from dagshub.common.helpers import get_project_root, http_request, log_message
+from dagshub.common.determine_repo import determine_repo
+from dagshub.common.helpers import log_message
 from dagshub.upload import create_repo
 
 
@@ -76,10 +76,6 @@ def init(
         parts = url.split("/")
         repo_owner, repo_name = parts[-2], parts[-1]
 
-    # Setup authentication
-    token = get_token(host=host)
-    bearer = HTTPBearerAuth(token)
-
     # Create the repo if it wasn't created
     repo_api = RepoAPI(f"{repo_owner}/{repo_name}", host=host)
     try:
@@ -87,6 +83,9 @@ def init(
     except RepoNotFoundError:
         log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
         create_repo(repo_name)
+
+    # Get the token for the configs
+    token = get_token(host=host)
 
     # Configure MLFlow
     if mlflow:
