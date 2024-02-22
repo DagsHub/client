@@ -124,6 +124,6 @@ def test_cant_find_repo_when_theres_no_repo(tmp_path):
         ("https://token:@dagshub.com/user/repo.git", "https://dagshub.com", "user/repo"),
     ],
 )
-def test_is_dagshub_remote(url, host, expected):
+def test_parse_dagshub_remote(url, host, expected):
     actual = parse_dagshub_remote(urllib.parse.urlparse(url), urllib.parse.urlparse(host))
     assert expected == actual
