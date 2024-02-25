@@ -75,9 +75,8 @@ class DatapointDeleteMetadataEntry(DataClassJsonMixin):
     key: str
 
 
-@dataclass_json
 @dataclass
-class DatapointDeleteEntry(json.JSONEncoder):
+class DatapointDeleteEntry(DataClassJsonMixin):
     datapointId: str
 
 
