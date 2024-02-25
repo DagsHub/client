@@ -34,7 +34,8 @@ except ImportError:
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
-    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, DatapointDeleteEntry
+    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, \
+        DatapointDeleteMetadataEntry, DatapointDeleteEntry
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,28 @@ class DataClient:
         assert len(entries) > 0
 
         params = GqlMutations.update_metadata_params(
+            datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
+        )
+        return self._exec(q, params)
+
+    def delete_metadata_for_datapoint(self, datasource: "Datasource", entries: List["DatapointDeleteMetadataEntry"]):
+        """
+        Delete a metadata from a datapoint
+
+        Args:
+            datasource (Datasource): The datasource instance to be updated
+            entries (List[DatapointDeleteMetadataEntry]): The metadata entries to delete
+
+        Returns:
+            Updates the Datasource.
+
+        """
+        q = GqlMutations.delete_metadata_for_datapoint()
+
+        assert datasource.source.id is not None
+        assert len(entries) > 0
+
+        params = GqlMutations.delete_metadata_params(
             datasource_id=datasource.source.id, datapoints=[e.to_dict() for e in entries]
         )
         return self._exec(q, params)

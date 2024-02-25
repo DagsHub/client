@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple
 
 import rich.progress
-from dataclasses_json import config, LetterCase, DataClassJsonMixin, dataclass_json
+from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
@@ -69,9 +69,14 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     allowMultiple: bool = False
 
 
-@dataclass_json
 @dataclass
-class DatapointDeleteEntry(json.JSONEncoder):
+class DatapointDeleteMetadataEntry(DataClassJsonMixin):
+    datapointId: str
+    key: str
+
+
+@dataclass
+class DatapointDeleteEntry(DataClassJsonMixin):
     datapointId: str
 
 
@@ -629,6 +634,21 @@ class Datasource:
 
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
+
+    def delete_metadata_from_datapoints(self, datapoints: List[Datapoint], fields: List[str]):
+        """
+        Delete metadata from datapoints.
+        The deleted values can be accessed using versioned query with time set before the deletion
+
+        Args:
+            datapoints: datapoints to delete metadata from
+            fields: fields to delete
+        """
+        metadata_entries = []
+        for d in datapoints:
+            for n in fields:
+                metadata_entries.append(DatapointDeleteMetadataEntry(datapointId=d.datapoint_id, key=n))
+        self.source.client.delete_metadata_for_datapoint(self, metadata_entries)
 
     def delete_datapoints(self, datapoints: List[Datapoint], force: bool = False):
         """
