@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple
 
 import rich.progress
-from dataclasses_json import config, LetterCase, DataClassJsonMixin, dataclass_json
+from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
