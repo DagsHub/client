@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple
 
 import rich.progress
-from dataclasses_json import config, LetterCase, DataClassJsonMixin
+from dataclasses_json import config, LetterCase, DataClassJsonMixin, dataclass_json
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
@@ -67,6 +67,12 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
+
+
+@dataclass_json
+@dataclass
+class DatapointDeleteEntry(json.JSONEncoder):
+    datapointId: str
 
 
 @dataclass
@@ -623,6 +629,38 @@ class Datasource:
 
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
+
+    def delete_datapoints(self, datapoints: List[Datapoint], force: bool = False):
+        """
+        Delete datapoints.
+
+        - These datapoints will no longer show up in queries.
+        - Does not delete the datapoint's file, only removing the data from the datasource.
+        - You can still query these datapoints and associated metadata with \
+        versioned queries whose time is before deletion time.
+        - You can re-add these datapoints to the datasource by uploading new metadata to it with, for example, \
+        :func:`Datasource.metadata_context <dagshub.data_engine.model.datasource.Datasource.metadata_context>`. \
+        This will create a new datapoint with new id and new metadata records.
+        - Datasource scanning will *not* add these datapoints back.
+
+        Args:
+            datapoints: list of datapoints objects to delete
+            force: Skip the confirmation prompt
+        """
+        dps_str = "\n\t".join([""] + [d.path for d in datapoints])
+        prompt = (
+            f"You are about to delete the following datapoint(s): {dps_str}\n"
+            f"This will remove the datapoint and metadata from unversioned queries, "
+            f"but won't delete the underlying file."
+        )
+        if not force:
+            user_response = prompt_user(prompt)
+            if not user_response:
+                print("Deletion cancelled")
+                return
+
+        self.source.client.delete_datapoints(self,
+                                             [DatapointDeleteEntry(datapointId=d.datapoint_id) for d in datapoints])
 
     def save_dataset(self, name: str) -> "Datasource":
         """

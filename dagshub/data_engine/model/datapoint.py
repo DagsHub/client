@@ -45,6 +45,24 @@ class Datapoint:
     def __setitem__(self, key, value):
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
+    def delete(self, force: bool = False):
+        """
+        Delete this datapoint.
+
+        - This datapoint will no longer show up in queries.
+        - Does not delete the datapoint's file, only removing the data from the datasource.
+        - You can still query this datapoint and associated metadata with \
+            versioned queries whose time is before deletion time.
+        - You can re-add this datapoint to the datasource by uploading new metadata to it with, for example, \
+            :func:`Datasource.metadata_context <dagshub.data_engine.model.datasource.Datasource.metadata_context>`. \
+            This will create a new datapoint with new id and new metadata records.
+        - Datasource scanning will *not* add this datapoint back.
+
+        Args:
+            force: Skip the confirmation prompt
+        """
+        self.datasource.delete_datapoints([self], force=force)
+
     def save(self):
         """
         Commit changes to metadata done with one or more dictionary assignment syntax usages.
