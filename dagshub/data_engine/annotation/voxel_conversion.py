@@ -59,6 +59,8 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
             for res in ann["result"]:
                 try:
                     converted = import_label_studio_annotation(res)
+                    if type(converted) is tuple:
+                        converted = converted[1]
                     annotations.append(converted)
                 except Exception:
                     logger.warning(f"Couldn't convert LS annotation {ann} to voxel annotation")

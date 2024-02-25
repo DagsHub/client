@@ -15,6 +15,7 @@ import dagshub.auth
 import dagshub.common.logging_util
 from dagshub import init, __version__
 from dagshub.common import config, rich_console
+from dagshub.common.api.repo import RepoAPI
 from dagshub.upload import create_repo, Repo
 from dagshub.common.helpers import http_request, log_message
 from dagshub.upload.errors import UpdateNotAllowedError
@@ -116,6 +117,75 @@ def to_log_level(verbosity):
         return logging.INFO
     elif verbosity >= 2:
         return logging.DEBUG
+
+
+KEEP_PREFIX_HELP = """ Whether to keep the path of the folder in the download path or not.
+Example: Given remote_path "src/data" and file "test/file.txt"
+if True: will download to "<local_path>/src/data/test/file.txt"
+if False: will download to "<local_path>/test/file.txt"
+"""
+
+
+@cli.command()
+@click.argument("repo", callback=validate_repo)
+@click.argument("remote_path")
+@click.argument("local_path", required=False, type=click.Path())
+@click.option(
+    "-b", "--branch", help="Branch or revision to download from. " "If left unspecified, use the default branch."
+)
+@click.option("--keep-prefix", is_flag=True, default=False, help=KEEP_PREFIX_HELP)
+@click.option("--not-recursive", is_flag=True, help="Don't download nested folders")
+@click.option("--redownload", is_flag=True, help="Redownload files, even if they already exist locally")
+@click.option(
+    "--download-storages",
+    is_flag=True,
+    default=False,
+    help="[Valid only when remote_path is '/'] Download integrated storage buckets as well as the repo content",
+)
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.option("--host", help="DagsHub instance to which you want to login")
+@click.pass_context
+def download(
+    ctx,
+    repo,
+    remote_path,
+    local_path,
+    branch,
+    not_recursive,
+    keep_prefix,
+    verbose,
+    quiet,
+    host,
+    redownload,
+    download_storages,
+):
+    """
+    Download REMOTE_PATH from REPO to LOCAL_PATH
+
+    REMOTE_PATH can be either directory or a file
+
+    If LOCAL_PATH is left blank, downloads to the current directory
+
+    Example:
+        dagshub download nirbarazida/CheXNet data_labeling/data ./data
+    """
+    host = host or ctx.obj["host"]
+    config.quiet = quiet or ctx.obj["quiet"]
+
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
+
+    repoApi = RepoAPI(f"{repo[0]}/{repo[1]}", host=host)
+    repoApi.download(
+        remote_path,
+        local_path,
+        revision=branch,
+        recursive=not not_recursive,
+        keep_source_prefix=keep_prefix,
+        redownload=redownload,
+        download_storages=download_storages
+    )
 
 
 @cli.command()

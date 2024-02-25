@@ -11,10 +11,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple
 
 import rich.progress
-from dataclasses_json import config, LetterCase, DataClassJsonMixin
+from dataclasses_json import config, LetterCase, DataClassJsonMixin, dataclass_json
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
@@ -73,6 +73,12 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
 class DatapointDeleteMetadataEntry(DataClassJsonMixin):
     datapointId: str
     key: str
+
+
+@dataclass_json
+@dataclass
+class DatapointDeleteEntry(json.JSONEncoder):
+    datapointId: str
 
 
 @dataclass
@@ -340,6 +346,41 @@ class Datasource:
         new_ds._query.as_of = to_timestamp(time)
         return new_ds
 
+    def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
+        """
+        Sort the query result by the specified fields.
+        Any previously set order will be overwritten.
+
+        Args:
+            Fields to sort by. Can be either of:
+                - Name of the field to sort by: ``"field"``.
+                - A tuple of ``(field_name, ascending)``: ``("field", True)``.
+                - A tuple of ``(field_name, "asc"|"desc")``: ``("field", "asc")``.
+
+        Examples::
+
+            ds.order_by("size").all()                   # Order by ascending size
+            ds.order_by(("date", "desc"), "size).all()  # Order by descending date, then ascending size
+        """
+        new_ds = self.__deepcopy__()
+        orders = []
+        for arg in args:
+            if isinstance(arg, str):
+                orders.append({"field": arg, "order": "ASC"})
+            else:
+                if len(arg) != 2:
+                    raise RuntimeError(
+                        f"Invalid sort argument {arg}, must be a tuple (<field>, 'asc'|'desc'|True|False)")
+                if isinstance(arg[1], bool):
+                    order = "ASC" if arg[1] else "DESC"
+                elif isinstance(arg[1], str) and arg[1].upper() in ["ASC", "DESC"]:
+                    order = arg[1].upper()
+                else:
+                    raise RuntimeError(f"Invalid sort argument {arg}, second value must be 'asc'|'desc'|True|False")
+                orders.append({"field": arg[0], "order": order})
+        new_ds.get_query().order_by = orders
+        return new_ds
+
     def _check_preprocess(self):
         self.source.get_from_dagshub()
         if (
@@ -586,7 +627,7 @@ class Datasource:
 
         with progress:
             for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start : start + upload_batch_size]
+                entries = metadata_entries[start: start + upload_batch_size]
                 logger.debug(f"Uploading {len(entries)} metadata entries...")
                 self.source.client.update_metadata(self, entries)
                 progress.update(total_task, advance=upload_batch_size)
@@ -609,6 +650,38 @@ class Datasource:
             for n in fields:
                 metadata_entries.append(DatapointDeleteMetadataEntry(datapointId=d.datapoint_id, key=n))
         self.source.client.delete_metadata_for_datapoint(self, metadata_entries)
+
+    def delete_datapoints(self, datapoints: List[Datapoint], force: bool = False):
+        """
+        Delete datapoints.
+
+        - These datapoints will no longer show up in queries.
+        - Does not delete the datapoint's file, only removing the data from the datasource.
+        - You can still query these datapoints and associated metadata with \
+        versioned queries whose time is before deletion time.
+        - You can re-add these datapoints to the datasource by uploading new metadata to it with, for example, \
+        :func:`Datasource.metadata_context <dagshub.data_engine.model.datasource.Datasource.metadata_context>`. \
+        This will create a new datapoint with new id and new metadata records.
+        - Datasource scanning will *not* add these datapoints back.
+
+        Args:
+            datapoints: list of datapoints objects to delete
+            force: Skip the confirmation prompt
+        """
+        dps_str = "\n\t".join([""] + [d.path for d in datapoints])
+        prompt = (
+            f"You are about to delete the following datapoint(s): {dps_str}\n"
+            f"This will remove the datapoint and metadata from unversioned queries, "
+            f"but won't delete the underlying file."
+        )
+        if not force:
+            user_response = prompt_user(prompt)
+            if not user_response:
+                print("Deletion cancelled")
+                return
+
+        self.source.client.delete_datapoints(self,
+                                             [DatapointDeleteEntry(datapointId=d.datapoint_id) for d in datapoints])
 
     def save_dataset(self, name: str) -> "Datasource":
         """
@@ -1233,6 +1306,8 @@ class DatasourceQuery(DataClassJsonMixin):
         default=QueryFilterTree(),
         metadata=config(field_name="query", encoder=QueryFilterTree.serialize, decoder=QueryFilterTree.deserialize),
     )
+    order_by: Optional[List] = field(default=None,
+                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
 
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
@@ -1241,6 +1316,8 @@ class DatasourceQuery(DataClassJsonMixin):
         )
         if self.select is not None:
             other.select = self.select.copy()
+        if self.order_by is not None:
+            other.order_by = self.order_by.copy()
         return other
 
     def compose(
@@ -1256,12 +1333,14 @@ class DatasourceQuery(DataClassJsonMixin):
 
         self.filter.compose(op, other)
 
-        # If composition went successfully, carry over the as_of and select from the other query
+        # If composition went successfully, carry over the as_of, select and order_by from the other query
         if other_query is not None:
             if other_query.select is not None:
                 self.select = other_query.select
             if other_query.as_of is not None:
                 self.as_of = other_query.as_of
+            if other_query.order_by is not None:
+                self.order_by = other_query.order_by
 
 
 @dataclass
@@ -1323,7 +1402,8 @@ class DatasetState:
 
     @staticmethod
     def from_dataset_query(
-        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int], dataset_query: Union[Dict, str]
+        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int],
+        dataset_query: Union[Dict, str]
     ) -> "DatasetState":
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)

@@ -192,7 +192,7 @@ class QueryResult:
         def keypairs(keys):
             return {key: kwargs[key] for key in keys}
 
-        if type(flavor) != str:
+        if type(flavor) is not str:
             if flavor.type == "torch":
                 from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 
@@ -205,7 +205,7 @@ class QueryResult:
         kwargs["for_dataloader"] = True
         dataset_kwargs = set(list(inspect.signature(DagsHubDataset).parameters.keys())[1:])
         global_kwargs = set(kwargs.keys())
-        flavor = flavor.lower() if type(flavor) == str else flavor
+        flavor = flavor.lower() if type(flavor) is str else flavor
         if flavor == "torch":
             from dagshub.data_engine.client.loaders.torch import PyTorchDataLoader
 

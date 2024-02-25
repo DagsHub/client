@@ -95,7 +95,7 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning="g
         if _inside_colab():
             from google.colab import _message  # If inside colab, this import is guaranteed
 
-            notebook_ipynb = _message.blocking_request("get_ipynb")
+            notebook_ipynb = _message.blocking_request("get_ipynb", timeout_sec=20)
             if notebook_ipynb is None or "ipynb" not in notebook_ipynb:
                 raise RuntimeError("Couldn't get notebook data from colab.")
             with open(out_path, "w") as file:

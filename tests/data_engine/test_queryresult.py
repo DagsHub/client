@@ -17,7 +17,7 @@ def test_getitem_index(query_result):
 
 def test_getitem_slice_returns_query_result(query_result):
     qr = query_result[0:len(query_result):2]
-    assert type(qr) == QueryResult
+    assert type(qr) is QueryResult
     assert len(qr) == math.ceil(len(query_result) / 2)
     for i in range(len(qr)):
         assert qr[i].datapoint_id is query_result[i * 2].datapoint_id
