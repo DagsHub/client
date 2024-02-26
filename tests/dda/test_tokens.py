@@ -14,13 +14,16 @@ from dagshub.auth.tokens import (
 
 def valid_token_side_effect(request: httpx.Request) -> httpx.Response:
     if request.headers["Authorization"] == "Bearer good-token":
-        return httpx.Response(200, json={
-            "id": 1,
-            "login": "user",
-            "full_name": "user",
-            "avatar_url": "random_url",
-            "username": "user",
-        })
+        return httpx.Response(
+            200,
+            json={
+                "id": 1,
+                "login": "user",
+                "full_name": "user",
+                "avatar_url": "random_url",
+                "username": "user",
+            },
+        )
     else:
         return httpx.Response(401)
 
@@ -153,6 +156,7 @@ def test_env_var_tokens_gets_returned_no_matter_what(token_cache, valid_token):
 # The authenticator needs to be picklable in order to work in multiprocess environment
 def test_authenticator_is_picklable(token_cache, valid_token):
     import pickle
+
     token_cache.add_token(valid_token, skip_validation=True)
     auth = token_cache.get_authenticator()
     pickled_auth = pickle.dumps(auth)

@@ -27,6 +27,7 @@ from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
+
 try:
     from functools import cached_property
 except ImportError:
@@ -34,8 +35,12 @@ except ImportError:
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
-    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, \
-        DatapointDeleteMetadataEntry, DatapointDeleteEntry
+    from dagshub.data_engine.model.datasource import (
+        Datasource,
+        DatapointMetadataUpdateEntry,
+        DatapointDeleteMetadataEntry,
+        DatapointDeleteEntry,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +175,7 @@ class DataClient:
         try:
             resp = self.client.execute(q, variable_values=params)
         except TransportQueryError as e:
-            raise DataEngineGqlError(e, self.client.transport.response_headers.get('X-DagsHub-Support-Id'))
+            raise DataEngineGqlError(e, self.client.transport.response_headers.get("X-DagsHub-Support-Id"))
         return resp
 
     def _datasource_query(

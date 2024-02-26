@@ -60,8 +60,7 @@ class DagshubAuthenticator(Auth):
         return self._token(request)
 
 
-class TokenDeserializationError(Exception):
-    ...
+class TokenDeserializationError(Exception): ...
 
 
 class DagshubTokenABC(metaclass=ABCMeta):
@@ -74,22 +73,18 @@ class DagshubTokenABC(metaclass=ABCMeta):
 
     @staticmethod
     @abstractmethod
-    def deserialize(values: Dict[str, Any]):
-        ...
+    def deserialize(values: Dict[str, Any]): ...
 
     @abstractmethod
-    def serialize(self) -> Dict[str, Any]:
-        ...
+    def serialize(self) -> Dict[str, Any]: ...
 
     @property
     @abstractmethod
-    def token_text(self) -> str:
-        ...
+    def token_text(self) -> str: ...
 
     @property
     @abstractmethod
-    def is_expired(self) -> bool:
-        ...
+    def is_expired(self) -> bool: ...
 
 
 class OAuthDagshubToken(DagshubTokenABC):

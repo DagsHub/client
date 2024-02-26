@@ -8,6 +8,7 @@
 
 import os
 import sys
+
 project_root = os.path.join(__file__, "../../..")
 sys.path.insert(0, os.path.abspath(project_root))
 

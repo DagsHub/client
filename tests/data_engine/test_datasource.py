@@ -11,7 +11,7 @@ def metadata_df():
         "file": ["test1", "test2", "test3"],
         "key1": [1, 2, 3],
         "key2": [4.0, 5.0, 6.0],
-        "key3": ["7", "8", "9"]
+        "key3": ["7", "8", "9"],
     }
     return pd.DataFrame.from_dict(data_dict)
 

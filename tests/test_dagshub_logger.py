@@ -14,9 +14,7 @@ def in_tmp_dir(f):
 
 def test_context_manager_no_eager_logging():
     def f(metrics_path, hparams_path):
-        with dagshub_logger(
-            metrics_path=metrics_path, hparams_path=hparams_path, eager_logging=False
-        ) as logger:
+        with dagshub_logger(metrics_path=metrics_path, hparams_path=hparams_path, eager_logging=False) as logger:
             logger.log_metrics({"a": 1, "b": 2})
             logger.log_hyperparams({"R": 2, "D": 2})
             logger.log_metrics(a=3, c=42, step_num=2)
@@ -43,9 +41,7 @@ def test_context_manager_no_eager_logging():
 
 def test_eager_logging():
     def f(metrics_path, hparams_path):
-        logger = DAGsHubLogger(
-            metrics_path=metrics_path, hparams_path=hparams_path, eager_logging=True
-        )
+        logger = DAGsHubLogger(metrics_path=metrics_path, hparams_path=hparams_path, eager_logging=True)
         assert os.path.exists(metrics_path)
         assert os.path.exists(hparams_path)
         logger.close()
@@ -55,9 +51,7 @@ def test_eager_logging():
 
 def test_forbidden_csv_chars_in_metric_names():
     def f(metrics_path, hparams_path):
-        with dagshub_logger(
-            metrics_path=metrics_path, hparams_path=hparams_path
-        ) as logger:
+        with dagshub_logger(metrics_path=metrics_path, hparams_path=hparams_path) as logger:
             logger.log_metrics(
                 {
                     "this/is/forbidden": 1,

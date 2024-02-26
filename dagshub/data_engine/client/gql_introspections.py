@@ -11,23 +11,32 @@ class GqlIntrospections:
         q = (
             GqlQuery()
             .operation("query", name="introspection")
-            .query("__schema").fields([
-                GqlQuery().fields(name="types", fields=[
-                    "name",
-                    GqlQuery().fields(name="inputFields", fields=[
-                        "name",
-                        GqlQuery().fields(name="type", fields=[
-                            "name"
-                        ]).generate()
-                    ]).generate(),
-                    GqlQuery().fields(name="fields", fields=[
-                        "name",
-                        GqlQuery().fields(name="type", fields=[
-                            "name"
-                        ]).generate()
-                    ]).generate()
-                ]).generate()
-            ]).generate()
+            .query("__schema")
+            .fields(
+                [
+                    GqlQuery()
+                    .fields(
+                        name="types",
+                        fields=[
+                            "name",
+                            GqlQuery()
+                            .fields(
+                                name="inputFields",
+                                fields=["name", GqlQuery().fields(name="type", fields=["name"]).generate()],
+                            )
+                            .generate(),
+                            GqlQuery()
+                            .fields(
+                                name="fields",
+                                fields=["name", GqlQuery().fields(name="type", fields=["name"]).generate()],
+                            )
+                            .generate(),
+                        ],
+                    )
+                    .generate()
+                ]
+            )
+            .generate()
         )
         return q
 
@@ -40,14 +49,14 @@ class Field:
 @dataclass
 class IntrospectionType:
     name: str
-    fields: List[Field]
     inputFields: List[Field]
+    fields: List[Field]
 
     def __hash__(self):
         return hash(self.hash_str())
 
     def hash_str(self):
-        return self.name+"".join([f.name for f in self.fields])+"".join([f.name for f in self.inputFields])
+        return self.name + "".join([f.name for f in self.fields]) + "".join([f.name for f in self.inputFields])
 
 
 @dataclass
@@ -74,20 +83,10 @@ class Validators:
             raise ValueError(f"QueryInput fields are not supported: {unsupported_fields}")
 
     @staticmethod
-    def datapoints_connection_validator(fields: List[str], datapoints_connection_introspection: TypesIntrospection):
-        datapoints_connection_fields = Validators.get_fields(datapoints_connection_introspection, "DatapointsConnection")
-
-        # Get sent fields
-        unsupported_fields = [f for f in fields if f not in datapoints_connection_fields]
-        if len(unsupported_fields) > 0:
-            raise ValueError(f"DatapointsConnection fields are not supported: {unsupported_fields}")
-
-    @staticmethod
-    def get_fields(datapoints_connection_introspection: TypesIntrospection, type_name: str, attr: str = "fields") -> List[str]:
-        datapoints_connection_fields = [
-            f for f in datapoints_connection_introspection.types
-            if f.name == type_name
-        ]
+    def get_fields(
+        datapoints_connection_introspection: TypesIntrospection, type_name: str, attr: str = "fields"
+    ) -> List[str]:
+        datapoints_connection_fields = [f for f in datapoints_connection_introspection.types if f.name == type_name]
         if len(datapoints_connection_fields) == 0:
             raise ValueError(f"{type_name} is not defined")
         datapoints_connection_fields = getattr(datapoints_connection_fields[0], attr)
@@ -97,7 +96,9 @@ class Validators:
         return datapoints_connection_fields
 
     @staticmethod
-    def filter_supported_fields(fields: List[str], response_obj_name: str, introspection: TypesIntrospection) -> List[str]:
+    def filter_supported_fields(
+        fields: List[str], response_obj_name: str, introspection: TypesIntrospection
+    ) -> List[str]:
         root_fields = [f.split(" ")[0] for f in fields]
         supported_fields = Validators.get_fields(introspection, response_obj_name)
         return [fields[i] for i, rf in enumerate(root_fields) if rf in supported_fields]

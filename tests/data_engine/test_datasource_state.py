@@ -20,7 +20,7 @@ import pytest
         ("repo://user/repo/main:", "user", "repo", "main", "/"),
         ("repo://user/repo.with.dots/main:", "user", "repo.with.dots", "main", "/"),
         ("repo://user/repo/branch/with/slashes:/", "user", "repo", "branch/with/slashes", "/"),
-    ]
+    ],
 )
 def test_repo_regex(in_str, user, repo, revision, prefix):
     ds = DatasourceState(repo="user/repo")
@@ -38,14 +38,7 @@ def test_repo_regex(in_str, user, repo, revision, prefix):
 
 
 @pytest.mark.parametrize(
-    "in_str",
-    [
-        "s3://user/repo/prefix",
-        "user/repo/",
-        "repo://user/",
-        "repo://"
-        "repo://user/repo/wrong\\branch:"
-    ]
+    "in_str", ["s3://user/repo/prefix", "user/repo/", "repo://user/", "repo://" "repo://user/repo/wrong\\branch:"]
 )
 def test_repo_regex_incorrect(in_str):
     ds = DatasourceState(repo="user/repo")
@@ -65,7 +58,7 @@ def test_repo_regex_incorrect(in_str):
         ("gs://bucket/prefix", "gs", "bucket", "/prefix"),
         ("s3://bucket/longer/prefix", "s3", "bucket", "/longer/prefix"),
         ("s3://bucket_with.weird-chars/longer/prefix", "s3", "bucket_with.weird-chars", "/longer/prefix"),
-    ]
+    ],
 )
 def test_bucket_regex(in_str, schema, bucket, prefix):
     ds = DatasourceState(repo="user/repo")
@@ -73,11 +66,7 @@ def test_bucket_regex(in_str, schema, bucket, prefix):
     ds.source_type = DatasourceType.BUCKET
     res = ds.path_parts()
 
-    expected = {
-        "schema": schema,
-        "bucket": bucket,
-        "prefix": prefix
-    }
+    expected = {"schema": schema, "bucket": bucket, "prefix": prefix}
     assert res == expected
 
 
@@ -87,7 +76,7 @@ def test_bucket_regex(in_str, schema, bucket, prefix):
         "notreallys3://bucket/prefix",
         "s3://",
         "s3://bucket.www.com/prefix",
-    ]
+    ],
 )
 def test_bucket_regex_incorrect(in_str):
     ds = DatasourceState(repo="user/repo")

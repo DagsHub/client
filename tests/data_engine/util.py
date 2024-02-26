@@ -30,8 +30,9 @@ def add_boolean_fields(ds: Datasource, *names: str):
         add_metadata_field(ds, name, MetadataFieldType.BOOLEAN)
 
 
-def add_metadata_field(ds: Datasource, name: str, value_type: MetadataFieldType, is_multiple: bool = False,
-                       tags: List[str] = None):
+def add_metadata_field(
+    ds: Datasource, name: str, value_type: MetadataFieldType, is_multiple: bool = False, tags: List[str] = None
+):
     if tags is None:
         tags = set()
     field = MetadataFieldSchema(name, value_type, is_multiple, tags)

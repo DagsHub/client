@@ -369,7 +369,8 @@ class Datasource:
             else:
                 if len(arg) != 2:
                     raise RuntimeError(
-                        f"Invalid sort argument {arg}, must be a tuple (<field>, 'asc'|'desc'|True|False)")
+                        f"Invalid sort argument {arg}, must be a tuple (<field>, 'asc'|'desc'|True|False)"
+                    )
                 if isinstance(arg[1], bool):
                     order = "ASC" if arg[1] else "DESC"
                 elif isinstance(arg[1], str) and arg[1].upper() in ["ASC", "DESC"]:
@@ -626,7 +627,7 @@ class Datasource:
 
         with progress:
             for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start: start + upload_batch_size]
+                entries = metadata_entries[start : start + upload_batch_size]
                 logger.debug(f"Uploading {len(entries)} metadata entries...")
                 self.source.client.update_metadata(self, entries)
                 progress.update(total_task, advance=upload_batch_size)
@@ -679,8 +680,9 @@ class Datasource:
                 print("Deletion cancelled")
                 return
 
-        self.source.client.delete_datapoints(self,
-                                             [DatapointDeleteEntry(datapointId=d.datapoint_id) for d in datapoints])
+        self.source.client.delete_datapoints(
+            self, [DatapointDeleteEntry(datapointId=d.datapoint_id) for d in datapoints]
+        )
 
     def save_dataset(self, name: str) -> "Datasource":
         """
@@ -1305,8 +1307,9 @@ class DatasourceQuery(DataClassJsonMixin):
         default=QueryFilterTree(),
         metadata=config(field_name="query", encoder=QueryFilterTree.serialize, decoder=QueryFilterTree.deserialize),
     )
-    order_by: Optional[List] = field(default=None,
-                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    order_by: Optional[List] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
 
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
@@ -1401,8 +1404,7 @@ class DatasetState:
 
     @staticmethod
     def from_dataset_query(
-        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int],
-        dataset_query: Union[Dict, str]
+        dataset_id: Union[str, int], dataset_name: str, datasource_id: Union[str, int], dataset_query: Union[Dict, str]
     ) -> "DatasetState":
         if type(dataset_query) is str:
             dataset_query = json.loads(dataset_query)

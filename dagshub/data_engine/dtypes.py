@@ -5,6 +5,7 @@ from typing import Set
 
 class ReservedTags(enum.Enum):
     """:meta private:"""
+
     ANNOTATION = "annotation"
 
 
@@ -13,6 +14,7 @@ class MetadataFieldType(enum.Enum):
     """
     Backing types in the Data Engine's database
     """
+
     BOOLEAN = "BOOLEAN"
     """Python's ``bool``"""
     INTEGER = "INTEGER"
@@ -42,11 +44,13 @@ class DagshubDataType(metaclass=ABCMeta):
 
 class Int(DagshubDataType):
     """Basic python ``int``"""
+
     backing_field_type = MetadataFieldType.INTEGER
 
 
 class String(DagshubDataType):
     """Basic python ``str``"""
+
     backing_field_type = MetadataFieldType.STRING
 
 
@@ -59,6 +63,7 @@ class Blob(DagshubDataType):
         Check out :func:`Datapoint.get_blob() <dagshub.data_engine.model.datapoint.Datapoint.get_blob>`
         to learn how to download the blob value.
     """
+
     backing_field_type = MetadataFieldType.BLOB
 
 
@@ -66,6 +71,7 @@ class Float(DagshubDataType):
     """
     Basic python ``float``
     """
+
     backing_field_type = MetadataFieldType.FLOAT
 
 
@@ -73,6 +79,7 @@ class Bool(DagshubDataType):
     """
     Basic python ``bool``
     """
+
     backing_field_type = MetadataFieldType.BOOLEAN
 
 
@@ -81,6 +88,7 @@ class LabelStudioAnnotation(DagshubDataType):
     LabelStudio annotation. Backing type is blob.
     Has the annotation tag set.
     """
+
     backing_field_type = MetadataFieldType.BLOB
     custom_tags = {ReservedTags.ANNOTATION.value}
 
@@ -90,5 +98,6 @@ class Voxel51Annotation(DagshubDataType):
     Voxel51 annotation. Backing type is blob.
     Has the annotation tag set.
     """
+
     backing_field_type = MetadataFieldType.BLOB
     custom_tags = {ReservedTags.ANNOTATION.value}
