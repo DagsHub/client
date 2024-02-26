@@ -178,7 +178,7 @@ class DataClient:
     ):
         send_analytics_event("Client_DataEngine_QueryRun", repo=datasource.source.repoApi)
 
-        q = GqlQueries.datasource_query(include_metadata)
+        q = GqlQueries.datasource_query(include_metadata, self.query_introspection)
 
         params = GqlQueries.datasource_query_params(
             datasource_id=datasource.source.id,
@@ -186,13 +186,12 @@ class DataClient:
             first=limit,
             after=after,
         )
-        q.validate_fields(self.query_introspection)
         q.validate_params(params, self.query_introspection)
         return self._exec(q.generate(), params)["datasourceQuery"]
 
     @cached_property
     def query_introspection(self) -> TypesIntrospection:
-        introspection = GqlIntrospections.input_fields()
+        introspection = GqlIntrospections.obj_fields()
         introspection_dict = self._exec(introspection)
         return dacite.from_dict(data_class=TypesIntrospection, data=introspection_dict["__schema"])
 
