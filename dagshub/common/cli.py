@@ -201,8 +201,11 @@ def download(
 @click.option(
     "--versioning", help="Versioning system to be used to upload the file(s)", type=click.Choice(["git", "dvc", "auto"])
 )
+@click.option(
+    "--to-bucket", is_flag=True, help="Upload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)"
+)
 @click.pass_context
-def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet, host, versioning, **kwargs):
+def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet, host, versioning, to_bucket, **kwargs):
     """
     Upload FILENAME to REPO at location TARGET.
 
@@ -224,7 +227,12 @@ def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet,
     repo = Repo(owner=owner, name=repo_name, branch=branch)
     try:
         repo.upload(
-            local_path=filename, remote_path=target, commit_message=message, force=update, versioning=versioning
+            local_path=filename,
+            remote_path=target,
+            commit_message=message,
+            to_bucket=to_bucket,
+            force=update,
+            versioning=versioning,
         )
     except UpdateNotAllowedError:
         log_message(

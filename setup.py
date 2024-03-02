@@ -41,7 +41,8 @@ install_requires = [
     "treelib~=1.6.4",
     "pathvalidate~=3.0.0",
     "python-dateutil",
-    "tenacity~=8.2.3"
+    "tenacity~=8.2.3",
+    "boto3~=1.34.54"
 ]
 
 extras_require = {

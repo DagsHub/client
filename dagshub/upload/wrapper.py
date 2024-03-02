@@ -9,6 +9,7 @@ from http import HTTPStatus
 from io import IOBase
 from pathlib import Path
 from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import rich.progress
@@ -21,6 +22,7 @@ from dagshub.common import config, rich_console
 from dagshub.common.api.repo import RepoAPI, BranchNotFoundError
 from dagshub.common.helpers import log_message
 from dagshub.upload.errors import determine_upload_api_error, InternalServerErrorError
+from dagshub.repo_bucket import get_repo_bucket_client
 
 # todo: handle api urls in common package
 CONTENT_UPLOAD_URL = "api/v1/repos/{owner}/{reponame}/content/{branch}/{path}"
@@ -259,6 +261,7 @@ class Repo:
         local_path: Union[str, IOBase],
         commit_message=DEFAULT_COMMIT_MESSAGE,
         remote_path: str = None,
+        to_bucket: bool = False,
         **kwargs,
     ):
         """
@@ -270,6 +273,8 @@ class Repo:
             remote_path: Specify the path to upload the file/dir to.
                 If unspecified, sets the value to the relative component of ``local_path`` to CWD.
                 If ``local_path`` is not relative to CWD, ``remote_path`` is the last component of the ``local_path``
+            to_bucket: Upload to the DagsHub Storage bucket (s3-compatible) without versioning, if this is set to true,
+            commit_message will be ignored.
 
         The kwargs are the parameters of :func:`upload_files`
         """
@@ -282,9 +287,14 @@ class Repo:
                     # local_path is outside cwd, use only its basename
                     remote_path = local_path.name
             remote_path = Path(remote_path).as_posix()
-            dir_to_upload = self.directory(remote_path)
-            dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
+            if to_bucket:
+                self.upload_files_to_bucket(local_path, remote_path, recursive=True, **kwargs)
+            else:
+                dir_to_upload = self.directory(remote_path)
+                dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
         else:
+            if to_bucket:
+                self.upload_files_to_bucket(local_path, remote_path, **kwargs)
             file_to_upload = DataSet.get_file(str(local_path), remote_path)
             self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
@@ -548,6 +558,62 @@ class Repo:
                 path=urllib.parse.quote(directory, safe=""),
             ),
         )
+
+    def upload_file_to_s3(self, s3_client, local_path, bucket_name, remote_path):
+        """
+        Upload a single file to S3.
+
+        :param s3_client: An instance of boto3 S3 client
+        :param local_path: The local path to the file
+        :param bucket_name: The S3 bucket name
+        :param remote_path: The S3 path where the file will be uploaded
+        """
+        s3_client.upload_file(local_path, bucket_name, remote_path)
+        log_message(f'Uploaded {os.path.relpath(local_path, os.getcwd())} to "{self._api.full_name}"...', logger)
+
+    def upload_files_to_bucket(
+        self,
+        local_path,
+        remote_path,
+        recursive=False,
+        max_workers=config.upload_threads,
+        **kwargs
+    ):
+        """
+        Upload a file or directory to an S3 bucket, preserving the directory structure.
+
+        :param local_path: Path to the local directory to upload
+        :param remote_path: The directory path within the S3 bucket
+        :param recursive: True if this is a directory upload, or False if single file
+        :param max_workers: The maximum number of threads to use
+        """
+        s3 = get_repo_bucket_client(self._api.full_name)
+        if remote_path.split("/")[0] == self.name:
+            remote_path = remote_path.split("/", 1)[1]
+        if not recursive:
+            self.upload_file_to_s3(s3_client=s3, local_path=local_path, bucket_name=self.name, remote_path=remote_path)
+        else:
+            upload_tasks = []
+            # Walk through the local directory
+            for root, dirs, files in os.walk(local_path):
+                for filename in files:
+                    file_path = os.path.join(root, filename)
+                    relative_path = os.path.relpath(file_path, local_path)
+                    s3_path = os.path.join(remote_path, relative_path)
+                    s3_path = s3_path.replace(os.path.sep, "/")  # Ensure correct path separator for S3
+                    upload_tasks.append((file_path, s3_path))
+
+            # Use ThreadPoolExecutor to upload files in parallel
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(
+                    self.upload_file_to_s3,
+                    s3_client=s3,
+                    local_path=task[0],
+                    bucket_name=self.name,
+                    remote_path=task[1],
+                ) for task in upload_tasks]
+                for future in futures:
+                    future.result()  # Wait for all futures to complete
 
 
 class DataSet:

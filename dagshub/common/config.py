@@ -52,6 +52,10 @@ DOWNLOAD_THREADS_KEY = "DAGSHUB_DOWNLOAD_THREADS"
 DEFAULT_DOWNLOAD_THREADS = 32
 download_threads = int(os.environ.get(DOWNLOAD_THREADS_KEY, DEFAULT_DOWNLOAD_THREADS))
 
+UPLOAD_THREADS_KEY = "DAGSHUB_UPLOAD_THREADS"
+DEFAULT_UPLOAD_THREADS = 8
+upload_threads = int(os.environ.get(UPLOAD_THREADS_KEY, DEFAULT_UPLOAD_THREADS))
+
 if download_threads > DEFAULT_DOWNLOAD_THREADS:
     logger.warning(
         f"Number of download threads was set to {download_threads}. "
