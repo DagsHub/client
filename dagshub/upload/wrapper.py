@@ -188,6 +188,7 @@ def upload_files(
     local_path: Union[str, IOBase],
     commit_message=DEFAULT_COMMIT_MESSAGE,
     remote_path: str = None,
+    to_bucket: bool = False,
     **kwargs,
 ):
     """
@@ -199,12 +200,13 @@ def upload_files(
         commit_message (optional): Specify a commit message.
         remote_path: Specify the path to upload the file to.\
         Defaults to the relative component of ``local_path`` to CWD.
+        to_bucket: Upload the file(s) to the DagsHub Storage bucket
 
     For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
     """
     owner, repo = validate_owner_repo(repo)
     repo = Repo(owner, repo)
-    repo.upload(local_path, commit_message=commit_message, remote_path=remote_path, **kwargs)
+    repo.upload(local_path, commit_message=commit_message, remote_path=remote_path, to_bucket=to_bucket, **kwargs)
 
 
 class Repo:
@@ -587,6 +589,8 @@ class Repo:
         :param recursive: True if this is a directory upload, or False if single file
         :param max_workers: The maximum number of threads to use
         """
+        file_exceptions = ['.DS_Store']  # Default list of files to skip
+
         s3 = get_repo_bucket_client(self._api.full_name)
         if remote_path.split("/")[0] == self.name:
             remote_path = remote_path.split("/", 1)[1]
@@ -597,6 +601,8 @@ class Repo:
             # Walk through the local directory
             for root, dirs, files in os.walk(local_path):
                 for filename in files:
+                    if filename in file_exceptions:
+                        continue
                     file_path = os.path.join(root, filename)
                     relative_path = os.path.relpath(file_path, local_path)
                     s3_path = os.path.join(remote_path, relative_path)
