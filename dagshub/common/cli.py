@@ -202,10 +202,10 @@ def download(
     "--versioning", help="Versioning system to be used to upload the file(s)", type=click.Choice(["git", "dvc", "auto"])
 )
 @click.option(
-    "--to-bucket", is_flag=True, help="Upload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)"
+    "--bucket", is_flag=True, help="Upload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)"
 )
 @click.pass_context
-def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet, host, versioning, to_bucket, **kwargs):
+def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet, host, versioning, bucket, **kwargs):
     """
     Upload FILENAME to REPO at location TARGET.
 
@@ -230,7 +230,7 @@ def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet,
             local_path=filename,
             remote_path=target,
             commit_message=message,
-            to_bucket=to_bucket,
+            bucket=bucket,
             force=update,
             versioning=versioning,
         )

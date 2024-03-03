@@ -22,6 +22,7 @@ from dagshub.common import config, rich_console
 from dagshub.common.api.repo import RepoAPI, BranchNotFoundError
 from dagshub.common.helpers import log_message
 from dagshub.upload.errors import determine_upload_api_error, InternalServerErrorError
+from dagshub.common.rich_util import get_rich_progress
 from dagshub.repo_bucket import get_repo_bucket_client
 
 # todo: handle api urls in common package
@@ -188,7 +189,7 @@ def upload_files(
     local_path: Union[str, IOBase],
     commit_message=DEFAULT_COMMIT_MESSAGE,
     remote_path: str = None,
-    to_bucket: bool = False,
+    bucket: bool = False,
     **kwargs,
 ):
     """
@@ -200,13 +201,33 @@ def upload_files(
         commit_message (optional): Specify a commit message.
         remote_path: Specify the path to upload the file to.\
         Defaults to the relative component of ``local_path`` to CWD.
-        to_bucket: Upload the file(s) to the DagsHub Storage bucket
+        bucket: Upload the file(s) to the DagsHub Storage bucket
 
     For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
     """
     owner, repo = validate_owner_repo(repo)
     repo = Repo(owner, repo)
-    repo.upload(local_path, commit_message=commit_message, remote_path=remote_path, to_bucket=to_bucket, **kwargs)
+    repo.upload(local_path, commit_message=commit_message, remote_path=remote_path, bucket=bucket, **kwargs)
+
+
+def upload_file_to_s3(s3_client, local_path, bucket_name, remote_path, progress=None, task=None):
+    """
+    Upload a single file to S3.
+
+    :param s3_client: An instance of boto3 S3 client
+    :param local_path: The local path to the file
+    :param bucket_name: The S3 bucket name
+    :param remote_path: The S3 path where the file will be uploaded
+    :param progress: (rich.progress.Progress, optional) A Rich library Progress instance for visual progress tracking.
+    If provided, `task_id` must also be given. Default is None.
+    :param task: The task ID associated with this upload task in the Rich Progress instance.
+    Required if `progress` is provided. Default is None.
+    """
+    s3_client.upload_file(local_path, bucket_name, remote_path)
+    if progress is not None and task is not None:
+        progress.update(task, advance=1)
+    else:
+        log_message(f"Uploaded {local_path} to s3://{bucket_name}/{remote_path}")
 
 
 class Repo:
@@ -263,7 +284,7 @@ class Repo:
         local_path: Union[str, IOBase],
         commit_message=DEFAULT_COMMIT_MESSAGE,
         remote_path: str = None,
-        to_bucket: bool = False,
+        bucket: bool = False,
         **kwargs,
     ):
         """
@@ -275,7 +296,7 @@ class Repo:
             remote_path: Specify the path to upload the file/dir to.
                 If unspecified, sets the value to the relative component of ``local_path`` to CWD.
                 If ``local_path`` is not relative to CWD, ``remote_path`` is the last component of the ``local_path``
-            to_bucket: Upload to the DagsHub Storage bucket (s3-compatible) without versioning, if this is set to true,
+            bucket: Upload to the DagsHub Storage bucket (s3-compatible) without versioning, if this is set to true,
             commit_message will be ignored.
 
         The kwargs are the parameters of :func:`upload_files`
@@ -289,16 +310,17 @@ class Repo:
                     # local_path is outside cwd, use only its basename
                     remote_path = local_path.name
             remote_path = Path(remote_path).as_posix()
-            if to_bucket:
-                self.upload_files_to_bucket(local_path, remote_path, recursive=True, **kwargs)
+            if bucket:
+                self.upload_files_to_bucket(local_path, remote_path, **kwargs)
             else:
                 dir_to_upload = self.directory(remote_path)
                 dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
         else:
-            if to_bucket:
+            if bucket:
                 self.upload_files_to_bucket(local_path, remote_path, **kwargs)
-            file_to_upload = DataSet.get_file(str(local_path), remote_path)
-            self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
+            else:
+                file_to_upload = DataSet.get_file(str(local_path), remote_path)
+                self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
     @retry(retry=retry_if_exception_type(InternalServerErrorError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     def upload_files(
@@ -561,23 +583,10 @@ class Repo:
             ),
         )
 
-    def upload_file_to_s3(self, s3_client, local_path, bucket_name, remote_path):
-        """
-        Upload a single file to S3.
-
-        :param s3_client: An instance of boto3 S3 client
-        :param local_path: The local path to the file
-        :param bucket_name: The S3 bucket name
-        :param remote_path: The S3 path where the file will be uploaded
-        """
-        s3_client.upload_file(local_path, bucket_name, remote_path)
-        log_message(f'Uploaded {os.path.relpath(local_path, os.getcwd())} to "{self._api.full_name}"...', logger)
-
     def upload_files_to_bucket(
         self,
         local_path,
         remote_path,
-        recursive=False,
         max_workers=config.upload_threads,
         **kwargs
     ):
@@ -586,23 +595,19 @@ class Repo:
 
         :param local_path: Path to the local directory to upload
         :param remote_path: The directory path within the S3 bucket
-        :param recursive: True if this is a directory upload, or False if single file
         :param max_workers: The maximum number of threads to use
         """
-        file_exceptions = ['.DS_Store']  # Default list of files to skip
 
         s3 = get_repo_bucket_client(self._api.full_name)
         if remote_path.split("/")[0] == self.name:
             remote_path = remote_path.split("/", 1)[1]
-        if not recursive:
-            self.upload_file_to_s3(s3_client=s3, local_path=local_path, bucket_name=self.name, remote_path=remote_path)
+        if local_path.is_file():
+            upload_file_to_s3(s3_client=s3, local_path=local_path, bucket_name=self.name, remote_path=remote_path)
         else:
             upload_tasks = []
             # Walk through the local directory
             for root, dirs, files in os.walk(local_path):
                 for filename in files:
-                    if filename in file_exceptions:
-                        continue
                     file_path = os.path.join(root, filename)
                     relative_path = os.path.relpath(file_path, local_path)
                     s3_path = os.path.join(remote_path, relative_path)
@@ -610,16 +615,22 @@ class Repo:
                     upload_tasks.append((file_path, s3_path))
 
             # Use ThreadPoolExecutor to upload files in parallel
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(
-                    self.upload_file_to_s3,
-                    s3_client=s3,
-                    local_path=task[0],
-                    bucket_name=self.name,
-                    remote_path=task[1],
-                ) for task in upload_tasks]
-                for future in futures:
-                    future.result()  # Wait for all futures to complete
+            progress = get_rich_progress(rich.progress.MofNCompleteColumn(), transient=False)
+            task_id = progress.add_task("Uploading files...", total=len(upload_tasks))
+
+            with progress:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(
+                        upload_file_to_s3,
+                        s3_client=s3,
+                        local_path=task[0],
+                        bucket_name=self.name,
+                        remote_path=task[1],
+                        progress=progress,
+                        task=task_id,
+                    ) for task in upload_tasks]
+                    for future in futures:
+                        future.result()  # Wait for all futures to complete
 
 
 class DataSet:
