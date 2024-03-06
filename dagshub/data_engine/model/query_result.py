@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 class VisualizeError(Exception):
     """:meta private:"""
+
     pass
 
 
@@ -54,6 +55,7 @@ class QueryResult:
             print(dp.path_in_repo)
 
     """
+
     _entries: List[Datapoint]
     datasource: "Datasource"
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
@@ -455,7 +457,7 @@ class QueryResult:
         return ds
 
     def _check_downloaded_dataset_size(self):
-        download_size_prompt_threshold = 100 * (2 ** 20)  # 100 Megabytes
+        download_size_prompt_threshold = 100 * (2**20)  # 100 Megabytes
         dp_size = self._calculate_datapoint_size()
         if dp_size is not None and dp_size > download_size_prompt_threshold:
             prompt = f"You're about to download {sizeof_fmt(dp_size)} of images locally."
@@ -511,11 +513,9 @@ class QueryResult:
 
         return sess
 
-    def annotate(self, open_project=True,
-                 ignore_warning=True,
-                 fields_to_embed=None,
-                 fields_to_exclude=None
-                 ) -> Optional[str]:
+    def annotate(
+        self, open_project=True, ignore_warning=True, fields_to_embed=None, fields_to_exclude=None
+    ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
 
@@ -531,6 +531,9 @@ class QueryResult:
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
 
         return self.datasource.send_datapoints_to_annotation(
-            self.entries, open_project=open_project, ignore_warning=ignore_warning, fields_to_exclude=fields_to_exclude,
-            fields_to_embed=fields_to_embed
+            self.entries,
+            open_project=open_project,
+            ignore_warning=ignore_warning,
+            fields_to_exclude=fields_to_exclude,
+            fields_to_embed=fields_to_embed,
         )

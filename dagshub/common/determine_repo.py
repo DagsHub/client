@@ -28,7 +28,7 @@ def parse_dagshub_remote(remote_url: urllib.parse.ParseResult, host_url: urllib.
     if not (remote_url.path.startswith(host_url.path) and remote_url.path.endswith(".git")):
         return None
 
-    subpath = remote_url.path[len(host_url.path):]
+    subpath = remote_url.path[len(host_url.path) :]
     # Should leave the subpath of the host, if the remote is correct it should be just "/user/repo.git"
     subpath = subpath.lstrip("/")
     if subpath.count("/") > 1:

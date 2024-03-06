@@ -32,11 +32,11 @@ def test_passthrough_path(path, expected):
     assert actual == expected
 
 
-@pytest.mark.parametrize("a_path, b_path, create_folder", [
-    (".", ".", False),
-    (".", "./subpath", True),
-    (".", "../", False)
-], ids=["Same dir", "Sub dir", "Parent dir"])
+@pytest.mark.parametrize(
+    "a_path, b_path, create_folder",
+    [(".", ".", False), (".", "./subpath", True), (".", "../", False)],
+    ids=["Same dir", "Sub dir", "Parent dir"],
+)
 def test_cant_mount_multiples(mock_api, a_path, b_path, create_folder):
     new_branch = "new"
     sha = secrets.token_hex(nbytes=20)

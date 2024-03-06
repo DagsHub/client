@@ -14,9 +14,7 @@ class MockApi(MockRouter):
         self.storage_bucket_path = "storage-bucket/prefix"
 
         self._endpoints, self._responses = self._default_endpoints_and_responses()
-        route_dict = {
-            k: (self._endpoints[k], self._responses[k]) for k in self._endpoints
-        }
+        route_dict = {k: (self._endpoints[k], self._responses[k]) for k in self._endpoints}
         for route_name in route_dict:
             endpoint_regex, return_value = route_dict[route_name]
             self.route(name=route_name, url__regex=endpoint_regex).mock(return_value)
@@ -65,7 +63,7 @@ class MockApi(MockRouter):
             "branch": rf"{self.repoapipath}/branches/(main|master)$",
             "branches": rf"{self.repoapipath}/branches/?$",
             "list_root": rf"{self.repoapipath}/content/{self.current_revision}/$",
-            "storages": rf"{self.repoapipath}/storage/?$"
+            "storages": rf"{self.repoapipath}/storage/?$",
         }
 
         responses = {
@@ -83,7 +81,7 @@ class MockApi(MockRouter):
                     "name": self.reponame,
                     "full_name": self.repourlpath,
                     "description": "Open Source Data Science (OSDS) Monocular Depth Estimation "
-                                   "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
+                    "– Turn 2d photos into 3d photos – show your grandma the awesome results.",
                     "private": False,
                     "fork": False,
                     "parent": None,
@@ -202,10 +200,10 @@ class MockApi(MockRouter):
                     {
                         "name": self.storage_bucket_path,
                         "protocol": "s3",
-                        "list_path": f"{self.repoapipath}/storage/content/s3/{self.storage_bucket_path}"
+                        "list_path": f"{self.repoapipath}/storage/content/s3/{self.storage_bucket_path}",
                     }
-                ]
-            )
+                ],
+            ),
         }
 
         return endpoints, responses
@@ -234,9 +232,7 @@ class MockApi(MockRouter):
             route = self.route(url=f"{self.api_storage_list_path}/{path}")
         else:
             route = self.route(url=f"{self.api_list_path(revision)}/{path}")
-        content = [
-            self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
-        ]
+        content = [self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents]
         route.mock(Response(status, json=content))
         return route
 
@@ -250,9 +246,7 @@ class MockApi(MockRouter):
             url += f"&from_token={from_token}"
         route = self.route(url=url)
         content = {
-            "entries": [
-                self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents
-            ],
+            "entries": [self.generate_list_entry(os.path.join(path, c[0]), c[1]) for c in contents],
             "limit": len(contents),
         }
         if next_token is not None:
@@ -261,9 +255,7 @@ class MockApi(MockRouter):
         return route
 
     def enable_uploads(self, branch="main"):
-        route = self.put(
-            name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/{branch}/.*"
-        )
+        route = self.put(name="upload", url__regex=f"api/v1/repos/{self.repourlpath}/content/{branch}/.*")
         route.mock(Response(200))
         return route
 
@@ -299,7 +291,7 @@ class MockApi(MockRouter):
                 "removed": None,
                 "modified": None,
                 "timestamp": "2021-08-10T09:03:32Z",
-            }
+            },
         }
         branch_route = self.get(url=f"/api/v1/repos/{self.repourlpath}/branches/{branch}")
         branch_route.mock(Response(200, json=resp_json))

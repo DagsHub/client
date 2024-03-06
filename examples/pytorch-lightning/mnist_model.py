@@ -2,6 +2,7 @@
 Just a simple CNN for MNIST.
 Note that you need to define which values you want to log when returning from training_step, validation_end
 """
+
 from pathlib import Path
 import torch
 from torch.nn import functional as F
@@ -39,18 +40,18 @@ class MnistModel(pl.LightningModule):
         x, y = batch
         y_hat = self.forward(x)
         loss = F.cross_entropy(y_hat, y)
-        return self.log('loss', loss)
+        return self.log("loss", loss)
 
     def validation_step(self, batch, batch_idx):
         # OPTIONAL
         x, y = batch
         y_hat = self.forward(x)
-        return {'val_loss': F.cross_entropy(y_hat, y)}
+        return {"val_loss": F.cross_entropy(y_hat, y)}
 
     def validation_end(self, outputs):
         # OPTIONAL
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        return self.log('avg_val_loss', avg_loss, prog_bar=True)
+        avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        return self.log("avg_val_loss", avg_loss, prog_bar=True)
 
     def configure_optimizers(self):
         # REQUIRED
@@ -59,18 +60,21 @@ class MnistModel(pl.LightningModule):
 
     def train_dataloader(self):
         # REQUIRED
-        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
-                          batch_size=self.batch_size)
+        return DataLoader(
+            MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()), batch_size=self.batch_size
+        )
 
     def val_dataloader(self):
         # OPTIONAL
-        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
-                          batch_size=self.batch_size)
+        return DataLoader(
+            MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()), batch_size=self.batch_size
+        )
 
     def test_dataloader(self):
         # OPTIONAL
-        return DataLoader(MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()),
-                          batch_size=self.batch_size)
+        return DataLoader(
+            MNIST(self.data_dir, train=True, download=True, transform=transforms.ToTensor()), batch_size=self.batch_size
+        )
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -79,10 +83,10 @@ class MnistModel(pl.LightningModule):
         """
         # MODEL specific
         parser = ArgumentParser(parents=[parent_parser])
-        parser.add_argument('--learning_rate', default=0.02, type=float)
-        parser.add_argument('--batch_size', default=32, type=int)
+        parser.add_argument("--learning_rate", default=0.02, type=float)
+        parser.add_argument("--batch_size", default=32, type=int)
 
         # training specific (for this model)
-        parser.add_argument('--max_nb_epochs', default=2, type=int)
+        parser.add_argument("--max_nb_epochs", default=2, type=int)
 
         return parser

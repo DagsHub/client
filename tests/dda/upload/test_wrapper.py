@@ -71,16 +71,16 @@ def test_upload_folder_absolute_path_outside_cwd(mock_api: MockApi, upload_repo:
 
 def test_upload_folder_relative_path_outside_cwd(mock_api: MockApi, upload_repo: Repo, temp_dir: str):
     relpath = os.path.relpath(temp_dir, os.getcwd())
-    assert relpath.startswith('..')
+    assert relpath.startswith("..")
     do_upload_folder_test(mock_api, relpath, "foldername", upload_repo)
 
 
 def do_upload_folder_test(mock_api: MockApi, src_dirs: str, dst_dirs: str, upload_repo: Repo):
     upload_repo.upload(local_path=src_dirs)
-    upload_route = mock_api.routes['upload']
+    upload_route = mock_api.routes["upload"]
     upload_route.calls.assert_called_once()
     call = upload_route.calls.last
     assert call.response.status_code == 200
-    assert call.request.method == 'PUT'
-    expected = f'/api/v1/repos/{upload_repo.owner}/{upload_repo.name}/content/{upload_repo.branch}/{dst_dirs}'
+    assert call.request.method == "PUT"
+    expected = f"/api/v1/repos/{upload_repo.owner}/{upload_repo.name}/content/{upload_repo.branch}/{dst_dirs}"
     assert call.request.url.path == expected

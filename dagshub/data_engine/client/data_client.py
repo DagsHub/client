@@ -12,7 +12,7 @@ import dagshub.common.config
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.data_engine.client.gql_introspections import GqlIntrospections, QueryInputIntrospection
+from dagshub.data_engine.client.gql_introspections import GqlIntrospections, TypesIntrospection
 from dagshub.data_engine.client.models import (
     DatasourceResult,
     DatasourceType,
@@ -27,6 +27,7 @@ from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
+
 try:
     from functools import cached_property
 except ImportError:
@@ -34,8 +35,12 @@ except ImportError:
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
-    from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, \
-        DatapointDeleteMetadataEntry, DatapointDeleteEntry
+    from dagshub.data_engine.model.datasource import (
+        Datasource,
+        DatapointMetadataUpdateEntry,
+        DatapointDeleteMetadataEntry,
+        DatapointDeleteEntry,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +175,7 @@ class DataClient:
         try:
             resp = self.client.execute(q, variable_values=params)
         except TransportQueryError as e:
-            raise DataEngineGqlError(e, self.client.transport.response_headers.get('X-DagsHub-Support-Id'))
+            raise DataEngineGqlError(e, self.client.transport.response_headers.get("X-DagsHub-Support-Id"))
         return resp
 
     def _datasource_query(
@@ -178,7 +183,7 @@ class DataClient:
     ):
         send_analytics_event("Client_DataEngine_QueryRun", repo=datasource.source.repoApi)
 
-        q = GqlQueries.datasource_query(include_metadata)
+        q = GqlQueries.datasource_query(include_metadata, self.query_introspection)
 
         params = GqlQueries.datasource_query_params(
             datasource_id=datasource.source.id,
@@ -190,10 +195,10 @@ class DataClient:
         return self._exec(q.generate(), params)["datasourceQuery"]
 
     @cached_property
-    def query_introspection(self) -> QueryInputIntrospection:
-        introspection = GqlIntrospections.input_fields()
+    def query_introspection(self) -> TypesIntrospection:
+        introspection = GqlIntrospections.obj_fields()
         introspection_dict = self._exec(introspection)
-        return dacite.from_dict(data_class=QueryInputIntrospection, data=introspection_dict["__schema"])
+        return dacite.from_dict(data_class=TypesIntrospection, data=introspection_dict["__schema"])
 
     def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
         """

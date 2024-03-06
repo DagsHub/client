@@ -7,6 +7,4 @@ class DagsHubRepoNotFoundError(Exception):
         self.path = path
 
     def __str__(self):
-        return (
-            f"Couldn't find a DagsHub repo in the path {self.path} or its parents"
-        )
+        return f"Couldn't find a DagsHub repo in the path {self.path} or its parents"
