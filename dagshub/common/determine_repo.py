@@ -5,8 +5,9 @@ from typing import Optional, Union, Tuple
 from dagshub.common import config
 from dagshub.common.api import RepoAPI
 from dagshub.common.errors import DagsHubRepoNotFoundError
+from dagshub.common.util import lazy_load
 
-import git
+git = lazy_load("git")
 
 
 def parse_dagshub_remote(remote_url: urllib.parse.ParseResult, host_url: urllib.parse.ParseResult) -> Optional[str]:
