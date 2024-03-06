@@ -6,7 +6,9 @@ from os.path import exists
 from pathlib import Path
 from typing import Optional
 
-import git
+
+from dagshub.common.util import lazy_load
+git = lazy_load("git")
 
 from dagshub.auth import get_token
 from dagshub.common import config
