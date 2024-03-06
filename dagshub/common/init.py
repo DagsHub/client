@@ -6,10 +6,6 @@ from os.path import exists
 from pathlib import Path
 from typing import Optional
 
-
-from dagshub.common.util import lazy_load
-git = lazy_load("git")
-
 from dagshub.auth import get_token
 from dagshub.common import config
 from dagshub.common.api import RepoAPI
@@ -17,6 +13,10 @@ from dagshub.common.api.repo import RepoNotFoundError
 from dagshub.common.determine_repo import determine_repo
 from dagshub.common.helpers import log_message
 from dagshub.upload import create_repo
+
+from dagshub.common.util import lazy_load
+
+git = lazy_load("git")
 
 
 def init(
