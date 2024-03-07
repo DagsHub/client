@@ -5,7 +5,7 @@ from dataclasses import field, dataclass
 from itertools import repeat
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Literal
 
 import rich.progress
 
@@ -485,7 +485,7 @@ class QueryResult:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
-    def visualize(self, **kwargs):
+    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "dagshub", **kwargs) -> Union[str, "fo.Session"]:
         """
         Visualize this QueryResult with Voxel51.
 
@@ -501,17 +501,20 @@ class QueryResult:
             session = ds.all().visualize()
             session.wait(-1)
         """
-        set_voxel_envvars()
+        if visualizer == "dagshub":
+            return self.datasource.visualize(visualizer, **kwargs)
+        if visualizer == "fiftyone":
+            set_voxel_envvars()
 
-        send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
+            send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
 
-        ds = self.to_voxel51_dataset(**kwargs)
+            ds = self.to_voxel51_dataset(**kwargs)
 
-        sess = fo.launch_app(ds)
-        # Launch the server for plugin interaction
-        plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
+            sess = fo.launch_app(ds)
+            # Launch the server for plugin interaction
+            plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
 
-        return sess
+            return sess
 
     def annotate(
         self, open_project=True, ignore_warning=True, fields_to_embed=None, fields_to_exclude=None
