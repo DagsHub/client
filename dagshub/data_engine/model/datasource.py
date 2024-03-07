@@ -21,7 +21,6 @@ import dagshub.common.config
 from dagshub.common import rich_console
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.helpers import prompt_user, http_request, log_message
-from dagshub.common.notebook import open_notebook_iframe
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none
 from dagshub.data_engine.client.models import (
