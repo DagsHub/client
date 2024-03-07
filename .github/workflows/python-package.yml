@@ -28,7 +28,7 @@ jobs:
       run: |
         sudo apt -qq install -y libfuse3-dev
         python -m ensurepip --upgrade
-        python -m pip install flake8
+        python -m pip install wheel flake8
         python -m pip install -r requirements-dev.txt
         pip install .
     - name: Lint with flake8
