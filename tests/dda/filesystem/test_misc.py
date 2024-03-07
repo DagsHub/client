@@ -60,3 +60,21 @@ def test_can_mount_multiple_in_different_dirs(mock_api):
     mock_api.get(url=f"/api/v1/repos/user/repo/content/{sha}/").mock(resp)
 
     _ = DagsHubFilesystem(project_root=other_path, repo_url="https://dagshub.com/user/repo", branch=new_branch)
+
+
+def test_path_isfile(mock_api, repo_with_hooks):
+    path = "a.txt"  # a.txt is in the listdir of mock_api
+    content = b"Hello, streaming world!"
+    nonexistent_path = "nonexistent.txt"
+    assert os.path.isfile(path)
+    assert not os.path.isfile(nonexistent_path)
+
+
+def test_path_isdir(mock_api, repo_with_hooks):
+    path = "subdir"
+    assert os.path.isdir(path)
+    assert not os.path.isfile(path)
+
+    nonexistent_dir = "subdir2"
+    assert not os.path.isdir(nonexistent_dir)
+    assert not os.path.isfile(nonexistent_dir)

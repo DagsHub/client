@@ -184,6 +184,15 @@ class MockApi(MockRouter):
                         "content_url": "some_url",
                     },
                     {
+                        "path": "subdir",
+                        "type": "dir",
+                        "size": 0,
+                        "hash": "some_hash",
+                        "versioning": "dvc",
+                        "download_url": "some_url",
+                        "content_url": "some_url",
+                    },
+                    {
                         "path": "a.txt.dvc",
                         "type": "file",
                         "size": 0,
