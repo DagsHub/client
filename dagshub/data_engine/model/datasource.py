@@ -838,12 +838,11 @@ class Datasource:
         """
         if visualizer == "dagshub":
             link = self._generate_visualize_url()
-            webbrowser.open(link)
 
             print("The visualization is available at the following link:")
             print(link)
 
-            open_notebook_iframe(link)
+            webbrowser.open(link)
 
             return link
 
