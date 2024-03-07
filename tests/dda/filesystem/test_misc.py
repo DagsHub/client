@@ -64,7 +64,6 @@ def test_can_mount_multiple_in_different_dirs(mock_api):
 
 def test_path_isfile(mock_api, repo_with_hooks):
     path = "a.txt"  # a.txt is in the listdir of mock_api
-    content = b"Hello, streaming world!"
     nonexistent_path = "nonexistent.txt"
     assert os.path.isfile(path)
     assert not os.path.isfile(nonexistent_path)
