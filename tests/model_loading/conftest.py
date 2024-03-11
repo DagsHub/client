@@ -41,7 +41,7 @@ def repo_with_yaml_repo_model(repo_mock) -> Tuple[MockRepoAPI, PurePosixPath]:
 
 @pytest.fixture
 def repo_with_yaml_dh_storage_model(repo_mock) -> Tuple[MockRepoAPI, PurePosixPath]:
-    model_dir = f"dir"
+    model_dir = "dir"
     yaml_content = f'model_dir: "dagshub_storage/{model_dir}"'.encode("utf-8")
     repo_mock.add_repo_file(".dagshub/model.yaml", yaml_content)
 
@@ -56,7 +56,7 @@ def repo_with_yaml_bucket_model(repo_mock, bucket_name, protocol) -> Tuple[MockR
 
     full_bucket_name = f"{protocol}/{bucket_name}"
 
-    model_dir = f"dir"
+    model_dir = "dir"
     yaml_content = f'model_dir: "{bucket_name}/{model_dir}"'.encode("utf-8")
     repo_mock.add_repo_file(".dagshub/model.yaml", yaml_content)
 

@@ -4,7 +4,6 @@ import pytest
 
 from dagshub.models.model_loaders import RepoModelLoader, BucketModelLoader, DagsHubStorageModelLoader
 from dagshub.models.model_locator import ModelLocator, ModelNotFoundError
-from tests.mocks.repo_api import MockRepoAPI
 
 
 def test_not_found_in_empty_repo(locator, repo_mock):

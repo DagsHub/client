@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from pathlib import Path, PosixPath, PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from dagshub.common.api import RepoAPI

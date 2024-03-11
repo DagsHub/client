@@ -5,9 +5,7 @@ from typing import List, Dict, Optional
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common.api import RepoAPI
 from dagshub.common.api.repo import PathNotFoundError
-from dagshub.common.api.responses import StorageAPIEntry, RepoAPIResponse, ContentAPIEntry, CommitAPIResponse
-
-from typing_extensions import Self
+from dagshub.common.api.responses import StorageAPIEntry, ContentAPIEntry, CommitAPIResponse
 
 
 class MockError(Exception):
@@ -99,7 +97,6 @@ class MockRepoAPI(RepoAPI):
 
     def add_dagshub_storage_contents(self, path, **kwargs):
         self.add_storage_contents(path=f"s3/{self.repo_name}/{path}", **kwargs)
-
 
     @staticmethod
     def generate_content_api_entry(path, is_dir=False, versioning="dvc") -> ContentAPIEntry:
