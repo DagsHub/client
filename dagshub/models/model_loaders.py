@@ -46,7 +46,10 @@ class RepoModelLoader(ModelLoader):
         self.path = path
 
     def _eager_load(self, download_dest: Path) -> Path:
-        raise NotImplementedError
+        remote_path = self.path
+        local_path = download_dest / self.model_path
+        self.repo_api.download(remote_path, local_path=local_path, redownload=True)
+        return local_path
 
     @property
     def model_path(self) -> Path:
@@ -59,7 +62,10 @@ class DagsHubStorageModelLoader(ModelLoader):
         self.path = path
 
     def _eager_load(self, download_dest: Path) -> Path:
-        raise NotImplementedError
+        remote_path = PurePosixPath(f"s3:/{self.repo_api.repo_name}") / self.path
+        local_path = download_dest / self.model_path
+        self.repo_api.download(remote_path, local_path=local_path, redownload=True)
+        return local_path
 
     @property
     def model_path(self) -> Path:
@@ -72,7 +78,11 @@ class BucketModelLoader(ModelLoader):
         self.path = path
 
     def _eager_load(self, download_dest: Path) -> Path:
-        raise NotImplementedError
+        # Need to change from s3/bucket/bla-bla to s3:/bucket/bla-bla for download to work
+        remote_path = str(self.path).replace("/", ":/", 1)
+        local_path = download_dest / self.model_path
+        self.repo_api.download(remote_path, local_path=local_path, redownload=True)
+        return local_path
 
     @property
     def model_path(self) -> Path:
