@@ -10,6 +10,7 @@ import dacite
 import yaml
 from pathvalidate import sanitize_filepath
 
+from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api import RepoAPI
 from dagshub.common.api.repo import PathNotFoundError
 from dagshub.common.api.responses import StorageAPIEntry
@@ -52,7 +53,6 @@ class ModelLocator:
     def __init__(
         self,
         repo: Optional[Union[str | RepoAPI]] = None,
-        host: Optional[str] = None,
         path: Optional[str] = None,
         bucket: Optional[str] = None,
         git_ref: Optional[str] = None,
@@ -62,7 +62,6 @@ class ModelLocator:
         download_type: Literal["lazy", "eager"] = "eager",
     ):
         self._repo = repo
-        self.host = host
         self.path = path
         self.bucket = bucket
         self._git_ref = git_ref
@@ -76,11 +75,11 @@ class ModelLocator:
         if isinstance(self._repo, RepoAPI):
             return self._repo
         if self._repo is None:
-            repo_api, git_ref = determine_repo(self.host)
+            repo_api, git_ref = determine_repo()
             if self._git_ref is None:
                 self._git_ref = git_ref
             return repo_api
-        return RepoAPI(self._repo, self.host)
+        return RepoAPI(self._repo)
 
     @property
     def git_ref(self):
@@ -246,29 +245,75 @@ class ModelLocator:
         raise ModelNotFoundError
 
     def get_model_path(self) -> Path:
+        send_analytics_event("Client_Models_GetModelPath")
         model_loader = self.find_model()
         return model_loader.load_model(self.download_type, self.download_destination)
 
 
 def get_model_path(
     repo: Optional[str] = None,
-    host: Optional[str] = None,
     path: Optional[str] = None,
     bucket: Optional[str] = None,
     git_ref: Optional[str] = None,
-    mlflow_model: Optional[str] = None,
-    mlflow_artifact: Optional[str] = None,
+    # mlflow_model: Optional[str] = None,
+    # mlflow_artifact: Optional[str] = None,
     download_dest: Optional[Union[str, os.PathLike]] = None,
-    download_type: Literal["lazy", "eager"] = "eager",
+    download_type: Literal["lazy", "eager"] = "lazy",
 ) -> Path:
+    """
+    Load a model from a DagsHub repository.
+
+    The function looks for the model in following places in the repository, in this order:
+
+    - **.dagshub/model.yaml** file in the repository. The file format should be::
+
+        model_dir: <path_to_model_dir_in_repo>
+
+    - **model** and **models** dvc/git directories in the root of the repository
+    - **model** and **models** directories in repository's DagsHub Storage
+
+    If either ``path`` or ``bucket`` argument is specified, this lookup gets ignored.
+
+    After a model has been found, it is either downloaded or mounted to a local directory,
+    and the path to the directory with the model files is returned.
+
+    Args:
+        repo: Name of the repository to load the model from in the format of ``<user>/<repo>``. \
+        If ``None`` tries to get a DagsHub repository from a git repository in the current working directory
+        path: Path to the directory with the model in the repository. This skips the model resolution step.
+        bucket: Name of the bucket with the model. If specified, the model will be loaded from either \
+        ``<bucket>/model`` or ``<bucket>/models`` directories. This skips the model resolution step.
+        git_ref: Specific git revision/branch to load model from. This only works for models versioned with dvc.
+        download_dest: Path to the directory where to download the model. If ``None``, the model will be downloaded to \
+        ``~/dagshub/models/<user>/<repo>/<path_to_model_in_repo>``. If specified, the model will be downloaded to \
+        ``<download_dest>/<path_to_model_in_repo>``
+        download_type: How to load the models. Possible values:
+
+            - ``lazy``: Mounts a streaming filesystem with :func:`install_hooks() <dagshub.streaming.install_hooks>` \
+            that will download files on demand.
+            - ``eager``: Downloads the whole model directory at once. Faster for models with a lot of files.
+
+    .. warning::
+        In order for download to work consistently between eager and lazy loading, the resulting path to the model \
+        is always included in the returned path.
+
+    .. note::
+        If using .dagshub/model.yaml file or a path argument, and you want to use a bucket, specify:
+
+        - ``dagshub_storage/<path_to_model_dir>`` to point to a folder in DagsHub Storage
+        - ``<bucket_name>/<path_to_model_dir>`` if using an integrated bucket. For ``s3://my-bucket``,\
+         the bucket name is ``my-bucket``
+
+    Returns:
+        Path to the directory with the models.
+    """
     loader = ModelLocator(
         repo=repo,
-        host=host,
         path=path,
         bucket=bucket,
         git_ref=git_ref,
-        mlflow_model=mlflow_model,
-        mlflow_artifact=mlflow_artifact,
+        # mlflow_model=mlflow_model,
+        # mlflow_artifact=mlflow_artifact,
         download_dest=download_dest,
         download_type=download_type,
     )

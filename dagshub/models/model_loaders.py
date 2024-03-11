@@ -22,7 +22,6 @@ class ModelLoader:
     def _eager_load(self, download_dest: Path) -> Path:
         ...
 
-    @abstractmethod
     def _lazy_load(self, download_dest: Path) -> Path:
         fs = DagsHubFilesystem(project_root=download_dest, repo_url=self.repo_api.repo_url)
         res_path = download_dest / self.model_path
