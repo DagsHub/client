@@ -52,7 +52,7 @@ class StorageType(IntEnum):
 class ModelLocator:
     def __init__(
         self,
-        repo: Optional[Union[str | RepoAPI]] = None,
+        repo: Optional[Union[str, RepoAPI]] = None,
         path: Optional[str] = None,
         bucket: Optional[str] = None,
         git_ref: Optional[str] = None,
