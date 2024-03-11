@@ -58,7 +58,7 @@ class ModelLocator:
         git_ref: Optional[str] = None,
         mlflow_model: Optional[str] = None,
         mlflow_artifact: Optional[str] = None,
-        download_dest: Optional[str] = None,
+        download_dest: Optional[Union[str, os.PathLike]] = None,
         download_type: Literal["lazy", "eager"] = "eager",
     ):
         self._repo = repo
@@ -258,7 +258,7 @@ def get_model_path(
     git_ref: Optional[str] = None,
     mlflow_model: Optional[str] = None,
     mlflow_artifact: Optional[str] = None,
-    download_dest: Optional[str] = None,
+    download_dest: Optional[Union[str, os.PathLike]] = None,
     download_type: Literal["lazy", "eager"] = "eager",
 ) -> Path:
     loader = ModelLocator(
