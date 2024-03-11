@@ -1,11 +1,11 @@
+import datetime
 import os.path
-from pathlib import PosixPath
 from typing import List, Dict, Optional
 
 from dagshub.auth.token_auth import HTTPBearerAuth
 from dagshub.common.api import RepoAPI
 from dagshub.common.api.repo import PathNotFoundError
-from dagshub.common.api.responses import StorageAPIEntry, RepoAPIResponse, ContentAPIEntry
+from dagshub.common.api.responses import StorageAPIEntry, RepoAPIResponse, ContentAPIEntry, CommitAPIResponse
 
 from typing_extensions import Self
 
@@ -147,3 +147,16 @@ class MockRepoAPI(RepoAPI):
         if content is None:
             raise PathNotFoundError
         return content
+
+    def last_commit(self, branch: Optional[str] = None) -> CommitAPIResponse:
+        return CommitAPIResponse(
+            id="deadbeef",
+            message="random-commit",
+            url="http://local.invalid/commit",
+            author=None,
+            committer=None,
+            added=None,
+            removed=None,
+            modified=None,
+            timestamp=str(datetime.datetime.now().timestamp()),
+        )
