@@ -247,7 +247,7 @@ class ModelLocator:
     def get_model_path(self) -> Path:
         send_analytics_event("Client_Models_GetModelPath")
         model_loader = self.find_model()
-        return model_loader.load_model(self.download_type, self.download_destination)
+        return model_loader.load_model(self.download_type, self.download_destination, self.git_ref)
 
 
 def get_model_path(
@@ -258,7 +258,7 @@ def get_model_path(
     # mlflow_model: Optional[str] = None,
     # mlflow_artifact: Optional[str] = None,
     download_dest: Optional[Union[str, os.PathLike]] = None,
-    download_type: Literal["lazy", "eager"] = "lazy",
+    download_type: Literal["lazy", "eager"] = "eager",
 ) -> Path:
     """
     Load a model from a DagsHub repository.

@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from pathlib import Path, PurePosixPath
-from typing import Literal
+from typing import Literal, Optional
 
 from dagshub.common.api import RepoAPI
 from dagshub.common.helpers import log_message
@@ -11,19 +11,26 @@ class ModelLoader:
     def __init__(self, repo_api: RepoAPI):
         self.repo_api = repo_api
 
-    def load_model(self, mode: Literal["eager", "lazy"], download_dest: Path) -> Path:
+    def load_model(self, mode: Literal["eager", "lazy"], download_dest: Path, revision: Optional[str] = None) -> Path:
         if mode == "eager":
             return self._eager_load(download_dest)
         elif mode == "lazy":
-            return self._lazy_load(download_dest)
+            if revision is None:
+                revision = self.repo_api.default_branch
+            return self._lazy_load(download_dest, revision)
         raise RuntimeError(f"Unknown model load mode [{mode}]")
 
     @abstractmethod
     def _eager_load(self, download_dest: Path) -> Path:
         ...
 
-    def _lazy_load(self, download_dest: Path) -> Path:
-        fs = DagsHubFilesystem(project_root=download_dest, repo_url=self.repo_api.repo_url)
+    def _lazy_load(self, download_dest: Path, revision: str) -> Path:
+        fs = DagsHubFilesystem(
+            project_root=download_dest,
+            repo_url=self.repo_api.repo_url,
+            branch=revision,
+            frameworks=["transformers"]
+        )
         res_path = download_dest / self.model_path
         log_message(
             f"Running install_hooks() in dir {download_dest}, "
@@ -90,9 +97,6 @@ class BucketModelLoader(ModelLoader):
 
 class MLflowArtifactModelLoader(ModelLoader):
     def _eager_load(self, download_dest: Path) -> Path:
-        raise NotImplementedError
-
-    def _lazy_load(self, download_dest: Path) -> Path:
         raise NotImplementedError
 
     @property
