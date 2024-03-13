@@ -8,7 +8,7 @@ except ImportError:
     from cached_property import cached_property
 
 if TYPE_CHECKING:
-    from dagshub.streaming import DagsHubFilesystem
+    from filesystem import DagsHubFilesystem
 
 storage_schemas = ["s3", "gs", "azure"]
 
