@@ -152,21 +152,22 @@ class DagsHubFilesystem:
         self.token = token or config.token
         self.timeout = timeout or config.http_timeout
 
+        self.exclude_globs: List[str]
         if exclude_globs is None:
-            exclude_globs = []
-        elif exclude_globs is str:
-            exclude_globs = [exclude_globs]
+            self.exclude_globs = []
+        elif isinstance(exclude_globs, str):
+            self.exclude_globs = [exclude_globs]
+        else:
+            self.exclude_globs = exclude_globs
 
-        self.exclude_globs: List[str] = exclude_globs
-
-        self._listdir_cache: Dict[str, Optional[Tuple[List[ContentAPIEntry], bool]]] = {}
+        self._listdir_cache: Dict[str, Tuple[Optional[List[ContentAPIEntry]], bool]] = {}
 
         self._api = self._generate_repo_api(self.parsed_repo_url)
 
         self.check_project_root_use()
 
         # Check that the repo is accessible by accessing the content root
-        response = self._api_listdir(DagshubPath(self, self.project_root, Path(), Path()))
+        response = self._api_listdir(DagshubPath(self, self.project_root))
         if response is None:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError("DagsHub credentials required, however none provided or discovered")
@@ -264,7 +265,9 @@ class DagsHubFilesystem:
             logger.debug("Failed to perform OAuth in a non interactive shell")
 
         # Try to fetch credentials from the git credential file
-        proc = subprocess.run(["git", "credential", "fill"], input=f"url={self.repo_url}".encode(), capture_output=True)
+        proc = subprocess.run(
+            ["git", "credential", "fill"], input=f"url={self.parsed_repo_url.geturl()}".encode(), capture_output=True
+        )
         answer = {line[: line.index("=")]: line[line.index("=") + 1 :] for line in proc.stdout.decode().splitlines()}
         if "username" in answer and "password" in answer:
             return answer["username"], answer["password"]
@@ -299,23 +302,6 @@ class DagsHubFilesystem:
         # Remove from map of mounted filesystems
         if hasattr(self, "project_root") and self.project_root in DagsHubFilesystem.already_mounted_filesystems:
             DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
-
-    def _parse_path(self, file: Union[str, bytes, PathLike, DagshubPath]) -> DagshubPath:
-        if isinstance(file, DagshubPath):
-            return file
-        if isinstance(file, bytes):
-            file = os.fsdecode(file)
-        orig_path = Path(file)
-        if file == "":
-            return DagshubPath(self, None, None, orig_path)
-        abspath = Path(os.path.abspath(file))
-        try:
-            relpath = abspath.relative_to(os.path.abspath(self.project_root))
-            if str(relpath).startswith("<"):
-                return DagshubPath(self, abspath, None, orig_path)
-            return DagshubPath(self, abspath, relpath, orig_path)
-        except ValueError:
-            return DagshubPath(self, abspath, None, orig_path)
 
     @staticmethod
     def _special_file():
@@ -361,13 +347,13 @@ class DagsHubFilesystem:
 
         if isinstance(file, bytes):
             file = os.fsdecode(file)
-        path = self._parse_path(file)
+        path = DagshubPath(self, file)
         if path.is_in_repo:
             assert path.relative_path is not None
             assert path.absolute_path is not None
             if opener is not None:
                 raise NotImplementedError("DagsHub's patched open() does not support custom openers")
-            if path.is_passthrough_path:
+            if path.is_passthrough_path(self):
                 return self.__open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
             elif path.relative_path == SPECIAL_FILE:
                 return io.BytesIO(self._special_file())
@@ -426,9 +412,8 @@ class DagsHubFilesystem:
         if dir_fd is not None:  # If dir_fd supplied, path is relative to that dir's fd, will handle in the future
             logger.debug("fs.os_open - NotImplemented")
             raise NotImplementedError("DagsHub's patched os.open() (for pathlib only) does not support dir_fd")
-        dh_path = self._parse_path(path)
+        dh_path = DagshubPath(self, path)
         if dh_path.is_in_repo:
-            assert dh_path.absolute_path is not None
             assert dh_path.relative_path is not None
             try:
                 open_mode = "r"
@@ -471,13 +456,13 @@ class DagsHubFilesystem:
         if dir_fd is not None or not follow_symlinks:
             logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError("DagsHub's patched stat() does not support dir_fd or follow_symlinks")
-        parsed_path = self._parse_path(path)
+        parsed_path = DagshubPath(self, path)
         # todo: remove False
         if parsed_path.is_in_repo:
             assert parsed_path.relative_path is not None
             assert parsed_path.absolute_path is not None
             logger.debug("fs.stat - is relative path")
-            if parsed_path.is_passthrough_path:
+            if parsed_path.is_passthrough_path(self):
                 return self.__stat(parsed_path.absolute_path)
             elif parsed_path.relative_path == SPECIAL_FILE:
                 return DagshubStatResult(self, parsed_path, is_directory=False, custom_size=len(self._special_file()))
@@ -536,7 +521,7 @@ class DagsHubFilesystem:
 
         if isinstance(path, bytes):
             path = os.fsdecode(path)
-        parsed_path = self._parse_path(path)
+        parsed_path = DagshubPath(self, path)
         if parsed_path.is_in_repo:
             try:
                 self.__chdir(parsed_path.absolute_path)
@@ -585,9 +570,9 @@ class DagsHubFilesystem:
             str_path = os.fsdecode(path)
         else:
             str_path = path
-        parsed_path = self._parse_path(str_path)
+        parsed_path = DagshubPath(self, str_path)
         if parsed_path.is_in_repo:
-            if parsed_path.is_passthrough_path:
+            if parsed_path.is_passthrough_path(self):
                 return self.listdir(parsed_path.original_path)
             else:
                 dircontents: Set[str] = set()
@@ -622,7 +607,7 @@ class DagsHubFilesystem:
 
     @cached_property
     def project_root_dagshub_path(self):
-        return DagshubPath(absolute_path=self.project_root, relative_path=Path(), original_path=Path(), fs=self)
+        return DagshubPath(self, self.project_root)
 
     @wrapreturn(DagshubScandirIterator)
     def scandir(self, path="."):
@@ -637,8 +622,8 @@ class DagsHubFilesystem:
             str_path = os.fsdecode(path)
         else:
             str_path = path
-        parsed_path = self._parse_path(str_path)
-        if parsed_path.is_in_repo and not parsed_path.is_passthrough_path:
+        parsed_path = DagshubPath(self, str_path)
+        if parsed_path.is_in_repo and not parsed_path.is_passthrough_path(self):
             path = Path(str_path)
             local_filenames = set()
             try:
@@ -704,7 +689,10 @@ class DagsHubFilesystem:
                 res = self._api.list_storage_path(storage_path, include_size=include_size)
             else:
                 res = self._api.list_path(repo_path, self._current_revision, include_size=include_size)
-        except (PathNotFoundError, DagsHubHTTPError):
+        except PathNotFoundError:
+            self._listdir_cache[repo_path] = (None, True)
+            return None
+        except DagsHubHTTPError:
             return None
 
         self._listdir_cache[repo_path] = (res, include_size)
