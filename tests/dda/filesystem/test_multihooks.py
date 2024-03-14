@@ -55,26 +55,53 @@ def test_mock_fs_works(repo_1, tmp_path):
     pass
 
 
-def test_two_mock_fs(repo_1, repo_2, tmp_path):
-    path1 = tmp_path / "repo1"
-    path2 = tmp_path / "repo2"
+@pytest.mark.parametrize(
+    "repo_1_dir, repo_2_dir", [("repo1", "repo2"), ("mount", "mount/repo2"), ("mount/repo1", "mount")]
+)
+def test_two_mock_fs(repo_1, repo_2, tmp_path, repo_1_dir, repo_2_dir):
+    path1 = tmp_path / repo_1_dir
+    path2 = tmp_path / repo_2_dir
     fs1 = generate_mock_fs(repo_1, path1)
     fs2 = generate_mock_fs(repo_2, path2)
-    assert fs1.open(path1 / "a/b.txt", "rb").read() == b"content repo 1"
-    assert fs2.open(path2 / "a/b.txt", "rb").read() == b"content repo 2"
-
-
-def test_install_hooks_two_fs(repo_1, repo_2, tmp_path):
-    path1 = tmp_path / "repo1"
-    path2 = tmp_path / "repo2"
-    fs1 = generate_mock_fs(repo_1, path1)
-    fs2 = generate_mock_fs(repo_2, path2)
-
     try:
         fs1.install_hooks()
         fs2.install_hooks()
 
         assert open(path1 / "a/b.txt", "rb").read() == b"content repo 1"
+        assert open(path2 / "a/b.txt", "rb").read() == b"content repo 2"
+    finally:
+        uninstall_hooks()
+
+
+def test_nesting_priority(repo_1, repo_2, tmp_path):
+    path1 = tmp_path / "mount"
+    path2 = tmp_path / "mount/repo2"
+
+    repo_1.add_repo_file("repo2/a/b.txt", b"FAILED")
+
+    fs1 = generate_mock_fs(repo_1, path1)
+    fs2 = generate_mock_fs(repo_2, path2)
+    try:
+        fs1.install_hooks()
+        fs2.install_hooks()
+
+        assert open(path2 / "a/b.txt", "rb").read() == b"content repo 2"
+    finally:
+        uninstall_hooks()
+
+
+def test_nesting_priority_reverse_order(repo_1, repo_2, tmp_path):
+    path1 = tmp_path / "mount"
+    path2 = tmp_path / "mount/repo2"
+
+    repo_1.add_repo_file("repo2/a/b.txt", b"FAILED")
+
+    fs1 = generate_mock_fs(repo_1, path1)
+    fs2 = generate_mock_fs(repo_2, path2)
+    try:
+        fs2.install_hooks()
+        fs1.install_hooks()
+
         assert open(path2 / "a/b.txt", "rb").read() == b"content repo 2"
     finally:
         uninstall_hooks()

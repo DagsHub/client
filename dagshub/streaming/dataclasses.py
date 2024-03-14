@@ -26,15 +26,18 @@ class DagshubPath:
         relative_path (Optional[Path]): Path relative to the root of the encapsulating FileSystem.
                                         If None, path is outside the FS
         original_path (Path): Original path as it was accessed by the user
+        is_binary_path_requested (bool): For functions like scandir and listdir that have
+            different behaviour whether user requested a string or a binary path
     """
 
     def __init__(self, fs: "DagsHubFilesystem", file_path: Union[str, bytes, PathLike, "DagshubPath"]):
         self.fs = fs
+        self.is_binary_path_requested = isinstance(file_path, bytes)
         self.absolute_path, self.relative_path, self.original_path = self.parse_path(file_path)
 
     def parse_path(self, file_path: Union[str, bytes, PathLike, "DagshubPath"]) -> Tuple[Path, Optional[Path], Path]:
-        print(self.fs.project_root)
         if isinstance(file_path, DagshubPath):
+            self.is_binary_path_requested = file_path.is_binary_path_requested
             if file_path.fs != self.fs:
                 relativized = DagshubPath(self.fs, file_path.absolute_path)
                 return relativized.absolute_path, relativized.relative_path, relativized.original_path
@@ -100,7 +103,134 @@ class DagshubPath:
         return any((self.relative_path.match(glob) for glob in fs.exclude_globs))
 
     def __truediv__(self, other):
-        return DagshubPath(
+        new = DagshubPath(
             self.fs,
             self.original_path / other,
         )
+        new.is_binary_path_requested = self.is_binary_path_requested
+        return new
+
+
+class DagshubScandirIterator:
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def __iter__(self):
+        return self._iterator
+
+    def __next__(self):
+        return self._iterator.__next__()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return self
+
+
+class DagshubStatResult:
+    def __init__(
+        self, fs: "DagsHubFilesystem", path: DagshubPath, is_directory: bool, custom_size: Optional[int] = None
+    ):
+        self._fs = fs
+        self._path = path
+        self._is_directory = is_directory
+        self._custom_size = custom_size
+        self._true_stat: Optional[os.stat_result] = None
+        assert not self._is_directory  # TODO make folder stats lazy?
+
+    def __getattr__(self, name: str):
+        if not name.startswith("st_"):
+            raise AttributeError
+        if self._true_stat is not None:
+            return os.stat_result.__getattribute__(self._true_stat, name)
+        if name == "st_uid":
+            return os.getuid()
+        elif name == "st_gid":
+            return os.getgid()
+        elif name == "st_atime" or name == "st_mtime" or name == "st_ctime":
+            return 0
+        elif name == "st_mode":
+            return 0o100644
+        elif name == "st_size":
+            if self._custom_size is not None:
+                return self._custom_size
+            return 1100  # hardcoded size because size requests take a disproportionate amount of time
+        self._fs.open(self._path)
+        self._true_stat = self._fs.original_stat(self._path.absolute_path)
+        return os.stat_result.__getattribute__(self._true_stat, name)
+
+    def __repr__(self):
+        inner = repr(self._true_stat) if self._true_stat is not None else "pending..."
+        return f"dagshub_stat_result({inner}, path={self._path})"
+
+
+class DagshubDirEntry:
+    def __init__(self, fs: "DagsHubFilesystem", path: DagshubPath, is_directory: bool = False, is_binary: bool = False):
+        self._fs = fs
+        self._path = path
+        self._is_directory = is_directory
+        self._is_binary = is_binary
+        self._true_direntry: Optional[os.DirEntry] = None
+
+    @property
+    def name(self):
+        if self._true_direntry is not None:
+            name = self._true_direntry.name
+        else:
+            name = self._path.name
+        return os.fsencode(name) if self._is_binary else name
+
+    @property
+    def path(self):
+        if self._true_direntry is not None:
+            path = self._true_direntry.path
+        else:
+            path = str(self._path.original_path)
+        return os.fsencode(path) if self._is_binary else path
+
+    def is_dir(self):
+        if self._true_direntry is not None:
+            return self._true_direntry.is_dir()
+        else:
+            return self._is_directory
+
+    def is_file(self):
+        if self._true_direntry is not None:
+            return self._true_direntry.is_file()
+        else:
+            # TODO: Symlinks should return false
+            return not self._is_directory
+
+    def stat(self):
+        if self._true_direntry is not None:
+            return self._true_direntry.stat()
+        else:
+            return self._fs.stat(self._path.original_path)
+
+    def __getattr__(self, name: str):
+        if name == "_true_direntry":
+            raise AttributeError
+        if self._true_direntry is not None:
+            return os.DirEntry.__getattribute__(self._true_direntry, name)
+
+        # Either create a dir, or download the file
+        if self._is_directory:
+            self._fs.mkdirs(self._path.absolute_path)
+        else:
+            self._fs.open(self._path.absolute_path)
+
+        for direntry in self._fs.original_stat(self._path.original_path):
+            if direntry.name == self._path.name:
+                self._true_direntry = direntry
+                return os.DirEntry.__getattribute__(self._true_direntry, name)
+        else:
+            raise FileNotFoundError
+
+    def __repr__(self):
+        cached = " (cached)" if self._true_direntry is not None else ""
+        return f"<dagshub_DirEntry '{self.name}'{cached}>"
+
+
+PathType = Union[str, int, bytes, PathLike]
+PathTypeWithDagshubPath = Union[PathType, DagshubPath]

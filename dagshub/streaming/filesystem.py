@@ -1,33 +1,30 @@
-import builtins
-import importlib
 import io
 import logging
 import os
 import re
 import subprocess
-import sys
 from configparser import ConfigParser
-from functools import wraps
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path, PurePosixPath
-from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List, Callable
+from typing import Optional, TypeVar, Union, Dict, Set, Tuple, List
 from urllib.parse import urlparse, ParseResult
 
 from tenacity import RetryError
 
-from dagshub.common import config, is_inside_notebook, is_inside_colab
+from dagshub.common import config
 from dagshub.common.api.repo import RepoAPI, CommitNotFoundError, PathNotFoundError, DagsHubHTTPError
 from dagshub.common.api.responses import ContentAPIEntry
 from dagshub.common.helpers import get_project_root
-from dagshub.streaming.dataclasses import DagshubPath
-from dagshub.streaming.errors import FilesystemAlreadyMountedError
-
-# Pre 3.11 - need to patch _NormalAccessor for _pathlib, because it pre-caches open and other functions.
-# In 3.11 _NormalAccessor was removed
-PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
-if PRE_PYTHON3_11:
-    from pathlib import _NormalAccessor as _pathlib  # noqa
+from dagshub.streaming.dataclasses import (
+    DagshubPath,
+    DagshubScandirIterator,
+    DagshubDirEntry,
+    DagshubStatResult,
+    PathTypeWithDagshubPath,
+)
+from dagshub.streaming.hook_router import HookRouter
+from dagshub.streaming.util import wrapreturn
 
 try:
     from functools import cached_property
@@ -36,34 +33,6 @@ except ImportError:
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
-
-
-def wrapreturn(wrappertype):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return wrappertype(func(*args, **kwargs))
-
-        return wrapper
-
-    return decorator
-
-
-class DagshubScandirIterator:
-    def __init__(self, iterator):
-        self._iterator = iterator
-
-    def __iter__(self):
-        return self._iterator
-
-    def __next__(self):
-        return self._iterator.__next__()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return self
 
 
 SPECIAL_FILE = Path(".dagshub-streaming")
@@ -93,16 +62,6 @@ class DagsHubFilesystem:
 
         - ``transformers`` - patches ``safetensors``
     """
-
-    already_mounted_filesystems: Dict[Path, "DagsHubFilesystem"] = {}
-    hooked_instance: Optional["DagsHubFilesystem"] = None
-
-    # Framework-specific override functions.
-    # These functions will be patched with a function that calls fs.open() before calling the original function
-    # Classes are marked by $, so if you need to change a static/class method, use module.$class.func
-    _framework_override_map: Dict[str, List[str]] = {
-        "transformers": ["safetensors.safe_open", "tokenizers.$Tokenizer.from_file"],
-    }
 
     def __init__(
         self,
@@ -163,8 +122,6 @@ class DagsHubFilesystem:
         self._listdir_cache: Dict[str, Tuple[Optional[List[ContentAPIEntry]], bool]] = {}
 
         self._api = self._generate_repo_api(self.parsed_repo_url)
-
-        self.check_project_root_use()
 
         # Check that the repo is accessible by accessing the content root
         response = self._api_listdir(DagshubPath(self, self.project_root))
@@ -232,26 +189,6 @@ class DagsHubFilesystem:
         except CommitNotFoundError:
             return False
 
-    def check_project_root_use(self):
-        """
-        Checks that there's no other filesystem being mounted at the current project root
-        If there is one, throw an error
-
-        :meta private:
-        """
-
-        def is_subpath(a: Path, b: Path) -> bool:
-            # Checks if either a or b are subpaths of each other
-            a_str = a.as_posix()
-            b_str = b.as_posix()
-            return a_str.startswith(b_str) or b_str.startswith(a_str)
-
-        for p, f in DagsHubFilesystem.already_mounted_filesystems.items():
-            if is_subpath(p, self.project_root):
-                raise FilesystemAlreadyMountedError(self.project_root, f.parsed_repo_url.path[1:], f._current_revision)
-
-        DagsHubFilesystem.already_mounted_filesystems[self.project_root] = self
-
     @property
     def auth(self):
         import dagshub.auth
@@ -295,14 +232,6 @@ class DagsHubFilesystem:
             res_remotes.append(remote.geturl())
         return res_remotes
 
-    def __del__(self):
-        self.cleanup()
-
-    def cleanup(self):
-        # Remove from map of mounted filesystems
-        if hasattr(self, "project_root") and self.project_root in DagsHubFilesystem.already_mounted_filesystems:
-            DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
-
     @staticmethod
     def _special_file():
         # TODO Include more information in this file
@@ -310,7 +239,7 @@ class DagsHubFilesystem:
 
     def open(
         self,
-        file: Union[str, int, bytes, PathLike, DagshubPath],
+        file: PathTypeWithDagshubPath,
         mode="r",
         buffering=-1,
         encoding=None,
@@ -343,7 +272,7 @@ class DagsHubFilesystem:
         """
         # FD passthrough
         if isinstance(file, int):
-            return self.__open(file, mode, buffering, encoding, errors, newline, closefd)
+            return self.original_open(file, mode, buffering, encoding, errors, newline, closefd)
 
         if isinstance(file, bytes):
             file = os.fsdecode(file)
@@ -354,12 +283,12 @@ class DagsHubFilesystem:
             if opener is not None:
                 raise NotImplementedError("DagsHub's patched open() does not support custom openers")
             if path.is_passthrough_path(self):
-                return self.__open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
+                return self.original_open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
             elif path.relative_path == SPECIAL_FILE:
                 return io.BytesIO(self._special_file())
             else:
                 try:
-                    return self.__open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
+                    return self.original_open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
                 except FileNotFoundError as err:
                     # Open for reading - try to download the file
                     if "r" in mode:
@@ -369,11 +298,13 @@ class DagsHubFilesystem:
                             raise RuntimeError(f"Couldn't download {path.relative_path} after multiple attempts")
                         except PathNotFoundError:
                             raise FileNotFoundError(f"Error finding {path.relative_path} in repo or on DagsHub")
-                        self._mkdirs(path.absolute_path.parent)
+                        self.mkdirs(path.absolute_path.parent)
                         # TODO: Handle symlinks
-                        with self.__open(path.absolute_path, "wb") as output:
+                        with self.original_open(path.absolute_path, "wb") as output:
                             output.write(contents)
-                        return self.__open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
+                        return self.original_open(
+                            path.absolute_path, mode, buffering, encoding, errors, newline, closefd
+                        )
                     # Write modes - make sure that the folder is a tracked folder (create if it doesn't exist on disk),
                     # and then let the user write to file
                     else:
@@ -390,12 +321,14 @@ class DagsHubFilesystem:
                                 raise RuntimeError(f"Couldn't download {path.relative_path} after multiple attempts")
                             except PathNotFoundError:
                                 raise FileNotFoundError(f"Error finding {path.relative_path} in repo or on DagsHub")
-                            with self.__open(path.absolute_path, "wb") as output:
+                            with self.original_open(path.absolute_path, "wb") as output:
                                 output.write(contents)
-                        return self.__open(path.absolute_path, mode, buffering, encoding, errors, newline, closefd)
+                        return self.original_open(
+                            path.absolute_path, mode, buffering, encoding, errors, newline, closefd
+                        )
 
         else:
-            return self.__open(file, mode, buffering, encoding, errors, newline, closefd, opener)
+            return self.original_open(file, mode, buffering, encoding, errors, newline, closefd, opener)
 
     def os_open(self, path: Union[str, bytes, PathLike, DagshubPath], flags, mode=0o777, *, dir_fd=None):
         """
@@ -429,7 +362,7 @@ class DagsHubFilesystem:
                 logger.debug("fs.os_open - failed to materialize path, os.open will throw")
         return os.open(dh_path.absolute_path, flags, mode, dir_fd=dir_fd)
 
-    def stat(self, path: Union[str, int, bytes, PathLike], *args, dir_fd=None, follow_symlinks=True):
+    def stat(self, path: PathTypeWithDagshubPath, *args, dir_fd=None, follow_symlinks=True):
         """
         NOTE: This is a wrapper function for python's built-in file operations
             (https://docs.python.org/3/library/os.html#os.stat)
@@ -449,7 +382,7 @@ class DagsHubFilesystem:
         """
         # FD passthrough
         if isinstance(path, int):
-            return self.__stat(path, *args, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+            return self.original_stat(path, *args, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
 
         if isinstance(path, bytes):
             path = os.fsdecode(path)
@@ -457,19 +390,18 @@ class DagsHubFilesystem:
             logger.debug("fs.stat - NotImplemented")
             raise NotImplementedError("DagsHub's patched stat() does not support dir_fd or follow_symlinks")
         parsed_path = DagshubPath(self, path)
-        # todo: remove False
         if parsed_path.is_in_repo:
             assert parsed_path.relative_path is not None
             assert parsed_path.absolute_path is not None
             logger.debug("fs.stat - is relative path")
             if parsed_path.is_passthrough_path(self):
-                return self.__stat(parsed_path.absolute_path)
+                return self.original_stat(parsed_path.absolute_path)
             elif parsed_path.relative_path == SPECIAL_FILE:
                 return DagshubStatResult(self, parsed_path, is_directory=False, custom_size=len(self._special_file()))
             else:
                 try:
                     logger.debug(f"fs.stat - calling __stat - relative_path: {path}")
-                    return self.__stat(parsed_path.absolute_path)
+                    return self.original_stat(parsed_path.absolute_path)
                 except FileNotFoundError as err:
                     logger.debug("fs.stat - FileNotFoundError")
                     logger.debug(f"remote_tree: {self.remote_tree}")
@@ -494,15 +426,14 @@ class DagsHubFilesystem:
                     if filetype == "file":
                         return DagshubStatResult(self, parsed_path, is_directory=False)
                     elif filetype == "dir":
-                        self._mkdirs(parsed_path.absolute_path)
-                        return self.__stat(parsed_path.absolute_path)
+                        self.mkdirs(parsed_path.absolute_path)
+                        return self.original_stat(parsed_path.absolute_path)
                     else:
                         raise RuntimeError(f"Unknown file type {filetype} for path {str(parsed_path)}")
-
         else:
-            return self.__stat(path, follow_symlinks=follow_symlinks)
+            return self.original_stat(path, follow_symlinks=follow_symlinks)
 
-    def chdir(self, path):
+    def chdir(self, path: PathTypeWithDagshubPath):
         """
          NOTE: This is a wrapper function for python's built-in file operations
             (https://docs.python.org/3/library/os.html#os.chdir)
@@ -517,26 +448,26 @@ class DagsHubFilesystem:
         """
         # FD check
         if isinstance(path, int):
-            return self.__chdir(path)
+            return self.original_chdir(path)
 
         if isinstance(path, bytes):
             path = os.fsdecode(path)
         parsed_path = DagshubPath(self, path)
         if parsed_path.is_in_repo:
             try:
-                self.__chdir(parsed_path.absolute_path)
+                self.original_chdir(parsed_path.absolute_path)
             except FileNotFoundError:
                 resp = self._api_listdir(parsed_path)
                 # FIXME: if path is file, return FileNotFound instead of the listdir error
                 if resp is not None:
-                    self._mkdirs(parsed_path.absolute_path)
-                    self.__chdir(parsed_path.absolute_path)
+                    self.mkdirs(parsed_path.absolute_path)
+                    self.original_chdir(parsed_path.absolute_path)
                 else:
                     raise
         else:
-            self.__chdir(path)
+            self.original_chdir(path)
 
-    def listdir(self, path="."):
+    def listdir(self, path: PathTypeWithDagshubPath = "."):
         """
         NOTE: This is a wrapper function for python's built-in file operations
             (https://docs.python.org/3/library/os.html#os.listdir)
@@ -555,22 +486,17 @@ class DagsHubFilesystem:
         """
         # FD check
         if isinstance(path, int):
-            return self.__listdir(path)
+            return self.original_listdir(path)
+
+        parsed_path = DagshubPath(self, path)
 
         # listdir needs to return results for bytes path arg also in bytes
-        is_bytes_path_arg = isinstance(path, bytes)
-
         def encode_results(res):
             res = list(res)
-            if is_bytes_path_arg:
+            if parsed_path.is_binary_path_requested:
                 res = [os.fsencode(p) for p in res]
             return res
 
-        if is_bytes_path_arg:
-            str_path = os.fsdecode(path)
-        else:
-            str_path = path
-        parsed_path = DagshubPath(self, str_path)
         if parsed_path.is_in_repo:
             if parsed_path.is_passthrough_path(self):
                 return self.listdir(parsed_path.original_path)
@@ -578,16 +504,17 @@ class DagsHubFilesystem:
                 dircontents: Set[str] = set()
                 error = None
                 try:
-                    dircontents.update(self.__listdir(parsed_path.original_path))
+                    dircontents.update(self.original_listdir(parsed_path.original_path))
                 except FileNotFoundError as e:
                     error = e
                 dircontents.update(
                     special.name
                     for special in self._get_special_paths(
-                        parsed_path, self.project_root_dagshub_path, is_bytes_path_arg
+                        parsed_path, self.project_root_dagshub_path, parsed_path.is_binary_path_requested
                     )
                 )
                 # If we're accessing .dagshub/storage/s3/ we don't need to access the API, return straight away
+                assert parsed_path.relative_path is not None
                 len_parts = len(parsed_path.relative_path.parts)
                 if 0 < len_parts <= 3 and parsed_path.relative_path.parts[0] == ".dagshub":
                     return encode_results(dircontents)
@@ -603,37 +530,33 @@ class DagsHubFilesystem:
                         return encode_results(dircontents)
 
         else:
-            return self.__listdir(path)
+            return self.original_listdir(path)
 
     @cached_property
     def project_root_dagshub_path(self):
         return DagshubPath(self, self.project_root)
 
     @wrapreturn(DagshubScandirIterator)
-    def scandir(self, path="."):
+    def scandir(self, path: PathTypeWithDagshubPath = "."):
         # FD check
         if isinstance(path, int):
-            for direntry in self.__scandir(path):
+            for direntry in self.original_scandir(path):
                 yield direntry
             return
-        # scandir needs to return name and path as bytes, if entry arg is bytes
-        is_bytes_path_arg = isinstance(path, bytes)
-        if is_bytes_path_arg:
-            str_path = os.fsdecode(path)
-        else:
-            str_path = path
-        parsed_path = DagshubPath(self, str_path)
+
+        parsed_path = DagshubPath(self, path)
+
         if parsed_path.is_in_repo and not parsed_path.is_passthrough_path(self):
-            path = Path(str_path)
+            path = Path(parsed_path.original_path)
             local_filenames = set()
             try:
-                for direntry in self.__scandir(path):
+                for direntry in self.original_scandir(path):
                     local_filenames.add(direntry.name)
                     yield direntry
             except FileNotFoundError:
                 pass
             for special_entry in self._get_special_paths(
-                parsed_path, self.project_root_dagshub_path / path, is_bytes_path_arg
+                parsed_path, self.project_root_dagshub_path / path, parsed_path.is_binary_path_requested
             ):
                 if special_entry.path not in local_filenames:
                     yield special_entry
@@ -643,9 +566,11 @@ class DagsHubFilesystem:
                 for f in resp:
                     name = PurePosixPath(f.path).name
                     if name not in local_filenames:
-                        yield DagshubDirEntry(self, parsed_path / name, f.type == "dir", is_binary=is_bytes_path_arg)
+                        yield DagshubDirEntry(
+                            self, parsed_path / name, f.type == "dir", is_binary=parsed_path.is_binary_path_requested
+                        )
         else:
-            for entry in self.__scandir(path):
+            for entry in self.original_scandir(path):
                 yield entry
 
     def _get_special_paths(
@@ -658,6 +583,7 @@ class DagsHubFilesystem:
 
         has_storages = len(self._storages) > 0
         res = set()
+        assert dh_path.relative_path is not None
         str_path = dh_path.relative_path.as_posix()
         if str_path == ".":
             res.add(generate_entry(SPECIAL_FILE, False))
@@ -707,24 +633,6 @@ class DagsHubFilesystem:
                 return cache_val, True
         return None, False
 
-    def _content_url_for_path(self, path: DagshubPath):
-        if not path.is_in_repo:
-            raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
-        str_path = path.relative_path.as_posix()
-        if path.is_storage_path:
-            path_to_access = str_path[len(".dagshub/storage/") :]
-            return self._api.storage_content_api_url(path_to_access)
-        return self._api.content_api_url(str_path, self._current_revision)
-
-    def _raw_url_for_path(self, path: DagshubPath):
-        if not path.is_in_repo:
-            raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
-        str_path = path.relative_path.as_posix()
-        if path.is_storage_path:
-            path_to_access = str_path[len(".dagshub/storage/") :]
-            return self._api.storage_raw_api_url(path_to_access)
-        return self._api.raw_api_url(str_path, self._current_revision)
-
     def _api_download_file_git(self, path: DagshubPath) -> bytes:
         if path.relative_path is None:
             raise RuntimeError(f"Can't access path {path.absolute_path} outside of repo")
@@ -734,229 +642,42 @@ class DagsHubFilesystem:
             return self._api.get_storage_file(str_path)
         return self._api.get_file(str_path, self._current_revision)
 
-    def install_hooks(self):
-        """
-        Install hooks to override default file and directory operations with DagsHub-aware functionality.
-
-        This method patches the standard Python I/O operations such as ``open``,
-        ``stat``, ``listdir``, ``scandir``, and ``chdir`` with DagsHub-aware equivalents.
-        Works inside a notebook and with Pathlib.
-
-        If ``install_hooks()`` have already been called before, this method does nothing.
-
-        Example::
-
-            dagshub_fs = DagsHubFilesystem()
-            dagshub_fs.install_hooks()
-
-            with open("src/file_in_repo.txt") as f:
-                print(f.read())
-
-        Call :func:`~DagsHubFilesystem.uninstall_hooks` to undo the monkey patching.
-        """
-        if not hasattr(self.__class__, f"_{self.__class__.__name__}__unpatched"):
-            # TODO: DRY this dictionary. i.e. __open() links cls.__open
-            #  and io.open even though this dictionary links them
-            #  Cannot use a dict as the source of truth because type hints rely on
-            #  __get_unpatched inferring the right type
-            self.__class__.__unpatched = {
-                "open": builtins.open,
-                "stat": os.stat,
-                "listdir": os.listdir,
-                "scandir": os.scandir,
-                "chdir": os.chdir,
-            }
-            if PRE_PYTHON3_11:
-                self.__class__.__unpatched["pathlib_open"] = _pathlib.open
-
-        # IPython patches io.open to its own override, so we need to overwrite that also
-        # More at _modified_open function in IPython sources:
-        # https://github.com/ipython/ipython/blob/main/IPython/core/interactiveshell.py
-        if is_inside_notebook() and not is_inside_colab():
-            import IPython.core.interactiveshell
-
-            instance = IPython.core.interactiveshell.InteractiveShell._instance  # noqa
-            if instance is not None and hasattr(instance, "user_ns") and "open" in instance.user_ns:
-                self.__class__.__unpatched["notebook_open"] = instance.user_ns["open"]
-                instance.user_ns["open"] = self.open
-
-        io.open = builtins.open = self.open
-        os.stat = self.stat
-        os.listdir = self.listdir
-        os.scandir = self.scandir
-        os.chdir = self.chdir
-        if PRE_PYTHON3_11:
-            if sys.version_info.minor == 10:
-                # Python 3.10 - pathlib uses io.open
-                _pathlib.open = self.open
-            else:
-                # Python <=3.9 - pathlib uses os.open
-                _pathlib.open = self.os_open
-            _pathlib.stat = self.stat
-            _pathlib.listdir = self.listdir
-            _pathlib.scandir = self.scandir
-
-        self._install_framework_hooks()
-
-        DagsHubFilesystem.hooked_instance = self
-
-    _framework_key_prefix = "framework_"
-
-    def _install_framework_hooks(self):
-        """
-        Installs custom hook functions for frameworks
-        """
-        if self.frameworks is None:
-            return
-        for framework in self.frameworks:
-            if framework not in self._framework_override_map:
-                logger.warning(f"Framework {framework} not available for override, skipping")
-                continue
-            funcs = self._framework_override_map[framework]
-            for func in funcs:
-                module_name, func_name = func.rsplit(".", 1)
-                class_name = None
-                patch_class = None
-
-                # Handle static class methods - we'll need to get the class from the module first
-                if "$" in module_name:
-                    module_name, class_name = module_name.split("$")
-                    # Get rid of the . in the module name
-                    module_name = module_name[:-1]
-
-                try:
-                    patch_module = importlib.import_module(module_name)
-                    if class_name is not None:
-                        patch_class = getattr(patch_module, class_name)
-                        orig_fn = getattr(patch_class, func_name)
-                    else:
-                        orig_fn = getattr(patch_module, func_name)
-                except ModuleNotFoundError:
-                    logger.warning(f"Module [{module_name}] not found, so function [{func}] isn't being patched")
-                    continue
-                except AttributeError:
-                    logger.warning(f"Function [{func}] not found, not patching it")
-                    continue
-                self.__class__.__unpatched[f"{self._framework_key_prefix}{func}"] = orig_fn
-                if patch_class is not None:
-                    setattr(patch_class, func_name, self._passthrough_decorator(orig_fn))
-                else:
-                    setattr(patch_module, func_name, self._passthrough_decorator(orig_fn))
-
-    def _passthrough_decorator(self, orig_func, filearg: Union[int, str] = 0) -> Callable:
-        """
-        Decorator function over some other random function that assumes a file exists locally,
-        but isn't using python's open(). These might be C++/Rust functions that use their respective opens.
-        Examples: opencv, anything using pyo3
-
-        Working around the problem by first calling open().close() to get the file.
-
-        :param orig_func: the original function that needs to be called
-        :param filearg: int or string, which arg/kwarg to use to get the filename
-        :return: Wrapped orig_func
-        """
-
-        def passed_through(*args, **kwargs):
-            if type(filearg) is str:
-                filename = kwargs[filearg]
-            else:
-                filename = args[filearg]
-            self.open(filename).close()
-            return orig_func(*args, **kwargs)
-
-        return passed_through
-
-    @classmethod
-    def uninstall_hooks(cls):
-        """
-        Reverses the changes made by :func:`install_hooks`, bringing back the builtin file I/O functions.
-        """
-        if hasattr(cls, f"_{cls.__name__}__unpatched"):
-            io.open = builtins.open = cls.__unpatched["open"]
-            os.stat = cls.__unpatched["stat"]
-            os.listdir = cls.__unpatched["listdir"]
-            os.scandir = cls.__unpatched["scandir"]
-            os.chdir = cls.__unpatched["chdir"]
-            if PRE_PYTHON3_11:
-                _pathlib.open = cls.__unpatched["pathlib_open"]
-                _pathlib.stat = cls.__unpatched["stat"]
-                _pathlib.listdir = cls.__unpatched["listdir"]
-                _pathlib.scandir = cls.__unpatched["scandir"]
-
-            if "notebook_open" in cls.__unpatched:
-                import IPython.core.interactiveshell
-
-                instance = IPython.core.interactiveshell.InteractiveShell._instance  # noqa
-                if instance is not None and hasattr(instance, "user_ns"):
-                    instance.user_ns["open"] = cls.__unpatched["notebook_open"]
-
-            cls._uninstall_framework_hooks()
-
-        if DagsHubFilesystem.hooked_instance is not None:
-            DagsHubFilesystem.hooked_instance.cleanup()
-            DagsHubFilesystem.hooked_instance = None
-
-    @classmethod
-    def _uninstall_framework_hooks(cls):
-        for func in list(filter(lambda key: key.startswith(cls._framework_key_prefix), cls.__unpatched.keys())):
-            orig_fn = cls.__unpatched[func]
-            orig_func_name = func
-
-            func = func[len(cls._framework_key_prefix) :]
-            module_name, func_name = func.rsplit(".", 1)
-            class_name = None
-
-            if "$" in module_name:
-                module_name, class_name = module_name.split("$")
-                # Get rid of the . in the module name
-                module_name = module_name[:-1]
-
-            m = importlib.import_module(module_name)
-            if class_name is not None:
-                patch_class = getattr(m, class_name)
-                setattr(patch_class, func_name, orig_fn)
-            else:
-                setattr(m, func_name, orig_fn)
-
-            del cls.__unpatched[orig_func_name]
-
-    def _mkdirs(self, absolute_path: Path):
+    def mkdirs(self, absolute_path: Path):
         for parent in list(absolute_path.parents)[::-1]:
             try:
-                self.__stat(parent)
+                self.original_stat(parent)
             except (OSError, ValueError):
                 os.mkdir(parent)
         try:
-            self.__stat(absolute_path)
+            self.original_stat(absolute_path)
         except (OSError, ValueError):
             os.mkdir(absolute_path)
 
-    @classmethod
-    def __get_unpatched(cls, key, alt: T) -> T:
-        if hasattr(cls, f"_{cls.__name__}__unpatched"):
-            return cls.__unpatched[key]
-        else:
-            return alt
+    @property
+    def original_open(self):
+        return HookRouter.original_open
 
     @property
-    def __open(self):
-        return self.__get_unpatched("open", builtins.open)
+    def original_stat(self):
+        return HookRouter.original_stat
 
     @property
-    def __stat(self):
-        return self.__get_unpatched("stat", os.stat)
+    def original_listdir(self):
+        return HookRouter.original_listdir
 
     @property
-    def __listdir(self):
-        return self.__get_unpatched("listdir", os.listdir)
+    def original_scandir(self):
+        return HookRouter.original_scandir
 
     @property
-    def __scandir(self):
-        return self.__get_unpatched("scandir", os.scandir)
+    def original_chdir(self):
+        return HookRouter.original_chdir
 
-    @property
-    def __chdir(self):
-        return self.__get_unpatched("chdir", os.chdir)
+    def install_hooks(self):
+        HookRouter.hook_repo(self, frameworks=self.frameworks)
+
+    def uninstall_hooks(self):
+        HookRouter.unhook_repo(self)
 
 
 def install_hooks(
@@ -993,115 +714,14 @@ def install_hooks(
         exclude_globs=exclude_globs,
         frameworks=frameworks,
     )
-    fs.install_hooks()
+    HookRouter.hook_repo(fs, frameworks)
 
 
 def uninstall_hooks():
     """
     Reverses the changes made by :func:`install_hooks`
     """
-    DagsHubFilesystem.uninstall_hooks()
-
-
-class DagshubStatResult:
-    def __init__(self, fs: "DagsHubFilesystem", path: DagshubPath, is_directory: bool, custom_size: int = None):
-        self._fs = fs
-        self._path = path
-        self._is_directory = is_directory
-        self._custom_size = custom_size
-        assert not self._is_directory  # TODO make folder stats lazy?
-
-    def __getattr__(self, name: str):
-        if not name.startswith("st_"):
-            raise AttributeError
-        if hasattr(self, "_true_stat"):
-            return os.stat_result.__getattribute__(self._true_stat, name)
-        if name == "st_uid":
-            return os.getuid()
-        elif name == "st_gid":
-            return os.getgid()
-        elif name == "st_atime" or name == "st_mtime" or name == "st_ctime":
-            return 0
-        elif name == "st_mode":
-            return 0o100644
-        elif name == "st_size":
-            if self._custom_size:
-                return self._custom_size
-            return 1100  # hardcoded size because size requests take a disproportionate amount of time
-        self._fs.open(self._path)
-        self._true_stat = self._fs._DagsHubFilesystem__stat(self._path.absolute_path)
-        return os.stat_result.__getattribute__(self._true_stat, name)
-
-    def __repr__(self):
-        inner = repr(self._true_stat) if hasattr(self, "_true_stat") else "pending..."
-        return f"dagshub_stat_result({inner}, path={self._path})"
-
-
-class DagshubDirEntry:
-    def __init__(self, fs: "DagsHubFilesystem", path: DagshubPath, is_directory: bool = False, is_binary: bool = False):
-        self._fs = fs
-        self._path = path
-        self._is_directory = is_directory
-        self._is_binary = is_binary
-
-    @property
-    def name(self):
-        # TODO: create decorator for delegation
-        if hasattr(self, "_true_direntry"):
-            name = self._true_direntry.name
-        else:
-            name = self._path.name
-        return os.fsencode(name) if self._is_binary else name
-
-    @property
-    def path(self):
-        if hasattr(self, "_true_direntry"):
-            path = self._true_direntry.path
-        else:
-            path = str(self._path.original_path)
-        return os.fsencode(path) if self._is_binary else path
-
-    def is_dir(self):
-        if hasattr(self, "_true_direntry"):
-            return self._true_direntry.is_dir()
-        else:
-            return self._is_directory
-
-    def is_file(self):
-        if hasattr(self, "_true_direntry"):
-            return self._true_direntry.is_file()
-        else:
-            # TODO: Symlinks should return false
-            return not self._is_directory
-
-    def stat(self):
-        if hasattr(self, "_true_direntry"):
-            return self._true_direntry.stat()
-        else:
-            return self._fs.stat(self._path.original_path)
-
-    def __getattr__(self, name: str):
-        if name == "_true_direntry":
-            raise AttributeError
-        if hasattr(self, "_true_direntry"):
-            return os.DirEntry.__getattribute__(self._true_direntry, name)
-
-        # Either create a dir, or download the file
-        if self._is_directory:
-            self._fs._mkdirs(self._path.absolute_path)
-        else:
-            self._fs.open(self._path.absolute_path)
-
-        for direntry in self._fs._DagsHubFilesystem__scandir(self._path.original_path):
-            if direntry.name == self._path.name:
-                self._true_direntry = direntry
-                return os.DirEntry.__getattribute__(self._true_direntry, name)
-        else:
-            raise FileNotFoundError
-
-    def __repr__(self):
-        cached = " (cached)" if hasattr(self, "_true_direntry") else ""
-        return f"<dagshub_DirEntry '{self.name}'{cached}>"
+    HookRouter.uninstall_monkey_patch()
 
 
 __all__ = [DagsHubFilesystem.__name__, install_hooks.__name__]
