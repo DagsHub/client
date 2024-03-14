@@ -4,7 +4,7 @@ from pathlib import Path, PurePosixPath
 
 import rich.progress
 from httpx import Response
-from tenacity import retry_if_result, stop_after_attempt, wait_exponential, before_sleep_log, retry, retry_if_exception
+from tenacity import stop_after_attempt, wait_exponential, before_sleep_log, retry, retry_if_exception
 
 from dagshub.common.api.responses import (
     RepoAPIResponse,
@@ -237,7 +237,7 @@ class RepoAPI:
         return entries
 
     @retry(
-        retry=retry_if_result(_is_server_error_exception),
+        retry=retry_if_exception(_is_server_error_exception),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
         before_sleep=before_sleep_log(logger, logging.WARNING),
@@ -264,7 +264,7 @@ class RepoAPI:
         return res.content
 
     @retry(
-        retry=retry_if_result(_is_server_error_exception),
+        retry=retry_if_exception(_is_server_error_exception),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
         before_sleep=before_sleep_log(logger, logging.WARNING),
