@@ -5,12 +5,15 @@ import logging
 import os
 import sys
 from os import PathLike
-from typing import Union, Optional, Callable, Dict, List, TYPE_CHECKING
+from typing import Union, Optional, Callable, Dict, List, TYPE_CHECKING, Set
 
 from dagshub.common import is_inside_notebook, is_inside_colab
 from dagshub.streaming.dataclasses import DagshubPath, PathType
+from dagshub.streaming.errors import FilesystemAlreadyMountedError
 from dagshub.streaming.filesystem import DagshubScandirIterator
 from dagshub.streaming.util import wrapreturn
+
+from pathlib import Path
 
 if TYPE_CHECKING:
     from dagshub.streaming.filesystem import DagsHubFilesystem
@@ -20,7 +23,6 @@ if TYPE_CHECKING:
 PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
 if PRE_PYTHON3_11:
     from pathlib import _NormalAccessor as _pathlib  # noqa
-
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ class HookRouter:
 
     is_monkey_patching = False
 
-    active_filesystems: List["DagsHubFilesystem"] = []
+    active_filesystems: Set["DagsHubFilesystem"] = set()
 
     # Framework-specific override functions.
     # These functions will be patched with a function that calls fs.open() before calling the original function
@@ -48,7 +50,7 @@ class HookRouter:
     @classmethod
     def open(
         cls,
-        file: Union[str, int, bytes, PathLike, DagshubPath],
+        file: PathType,
         mode="r",
         buffering=-1,
         encoding=None,
@@ -302,17 +304,43 @@ class HookRouter:
         return None
 
     @classmethod
+    def get_fs_by_path(cls, path: Union[str, PathLike]) -> Optional["DagsHubFilesystem"]:
+        fs: Optional["DagsHubFilesystem"] = None
+        path = Path(os.path.abspath(path))
+        for active_fs in cls.active_filesystems:
+            if active_fs.project_root == path:
+                fs = active_fs
+                break
+        return fs
+
+    @classmethod
     def hook_repo(cls, fs: "DagsHubFilesystem", frameworks: Optional[List[str]]):
         if not cls.is_monkey_patching:
             cls.init_monkey_patch(frameworks)
-        cls.active_filesystems.append(fs)
+
+        existing_fs = cls.get_fs_by_path(fs.project_root)
+        if existing_fs is not None:
+            raise FilesystemAlreadyMountedError(
+                existing_fs.project_root, existing_fs.repo_api.full_name, existing_fs.current_revision
+            )
+
+        cls.active_filesystems.add(fs)
 
     @classmethod
     def unhook_repo(cls, fs: Optional["DagsHubFilesystem"] = None, path: Optional[Union[str, PathLike]] = None):
-        if fs in cls.active_filesystems:
-            cls.active_filesystems.remove(fs)
-        if path is not None:
-            raise NotImplementedError("Unhooking by path is not implemented yet")
+        if fs is None and path is None:
+            raise AttributeError("Only one of `fs` or `path` should be specified at the same time")
 
-        if len(cls.active_filesystems):
+        # Find a filesystem by path
+        if path is not None:
+            fs = cls.get_fs_by_path(path)
+            if fs is None:
+                raise RuntimeError(f"No filesystem mounted at {path}")
+
+        # Unhook the fs
+        if fs is not None and fs in cls.active_filesystems:
+            cls.active_filesystems.remove(fs)
+
+        # If there are no more filesystems anymore, unhook
+        if len(cls.active_filesystems) == 0:
             cls.uninstall_monkey_patch()

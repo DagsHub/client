@@ -75,6 +75,7 @@ class DagsHubFilesystem:
         exclude_globs: Optional[Union[List[str], str]] = None,
         frameworks: Optional[List[str]] = None,
     ):
+        self.project_root: Path
         # Find root directory of Git project
         if not project_root:
             try:
@@ -121,7 +122,7 @@ class DagsHubFilesystem:
 
         self._listdir_cache: Dict[str, Tuple[Optional[List[ContentAPIEntry]], bool]] = {}
 
-        self._api = self._generate_repo_api(self.parsed_repo_url)
+        self.repo_api = self._generate_repo_api(self.parsed_repo_url)
 
         # Check that the repo is accessible by accessing the content root
         response = self._api_listdir(DagshubPath(self, self.project_root))
@@ -129,7 +130,7 @@ class DagsHubFilesystem:
             # TODO: Check .dvc/config{,.local} for credentials
             raise AuthenticationError("DagsHub credentials required, however none provided or discovered")
 
-        self._storages = self._api.get_connected_storages()
+        self._storages = self.repo_api.get_connected_storages()
 
     def _generate_repo_api(self, repo_url: ParseResult) -> RepoAPI:
         host = f"{repo_url.scheme}://{repo_url.netloc}"
@@ -137,7 +138,7 @@ class DagsHubFilesystem:
         return RepoAPI(repo=repo, host=host, auth=self.auth)
 
     @cached_property
-    def _current_revision(self) -> str:
+    def current_revision(self) -> str:
         """
         Gets current revision on repo:
         - If User specified a branch, returns HEAD of that brunch on the remote
@@ -169,22 +170,22 @@ class DagsHubFilesystem:
                     "Couldn't get branch info from local git repository, "
                     + "fetching default branch from the remote..."
                 )
-                branch = self._api.default_branch
+                branch = self.repo_api.default_branch
 
         # check if it is a commit sha, in that case do not load the sha
         sha_regex = re.compile(r"^([a-f0-9]){5,40}$")
         if sha_regex.match(branch):
             try:
-                self._api.get_commit_info(branch)
+                self.repo_api.get_commit_info(branch)
                 return branch
             except CommitNotFoundError:
                 pass
 
-        return self._api.last_commit_sha(branch)
+        return self.repo_api.last_commit_sha(branch)
 
     def is_commit_on_remote(self, sha1):
         try:
-            self._api.get_commit_info(sha1)
+            self.repo_api.get_commit_info(sha1)
             return True
         except CommitNotFoundError:
             return False
@@ -612,9 +613,9 @@ class DagsHubFilesystem:
         try:
             if path.is_storage_path:
                 storage_path = repo_path[len(".dagshub/storage/") :]
-                res = self._api.list_storage_path(storage_path, include_size=include_size)
+                res = self.repo_api.list_storage_path(storage_path, include_size=include_size)
             else:
-                res = self._api.list_path(repo_path, self._current_revision, include_size=include_size)
+                res = self.repo_api.list_path(repo_path, self.current_revision, include_size=include_size)
         except PathNotFoundError:
             self._listdir_cache[repo_path] = (None, True)
             return None
@@ -639,8 +640,8 @@ class DagsHubFilesystem:
         str_path = path.relative_path.as_posix()
         if path.is_storage_path:
             str_path = str_path[len(".dagshub/storage/") :]
-            return self._api.get_storage_file(str_path)
-        return self._api.get_file(str_path, self._current_revision)
+            return self.repo_api.get_storage_file(str_path)
+        return self.repo_api.get_file(str_path, self.current_revision)
 
     def mkdirs(self, absolute_path: Path):
         for parent in list(absolute_path.parents)[::-1]:
@@ -652,6 +653,9 @@ class DagsHubFilesystem:
             self.original_stat(absolute_path)
         except (OSError, ValueError):
             os.mkdir(absolute_path)
+
+    def __del__(self):
+        self.uninstall_hooks()
 
     @property
     def original_open(self):
@@ -677,7 +681,7 @@ class DagsHubFilesystem:
         HookRouter.hook_repo(self, frameworks=self.frameworks)
 
     def uninstall_hooks(self):
-        HookRouter.unhook_repo(self)
+        HookRouter.unhook_repo(fs=self)
 
 
 def install_hooks(
@@ -717,11 +721,34 @@ def install_hooks(
     HookRouter.hook_repo(fs, frameworks)
 
 
-def uninstall_hooks():
+def uninstall_hooks(fs: Optional["DagsHubFilesystem"] = None, path: Optional[Union[str, PathLike]] = None):
     """
     Reverses the changes made by :func:`install_hooks`
+    You can specify a filesystem or a path to unhook just one specific filesystem
+    If nothing is specified, all current hooks will be cancelled
+
+    Args:
+        fs: DagsHubFilesystem
     """
-    HookRouter.uninstall_monkey_patch()
+    if fs is not None or path is not None:
+        HookRouter.unhook_repo(fs=fs, path=path)
+    else:
+        # Uninstall everything
+        HookRouter.uninstall_monkey_patch()
 
 
-__all__ = [DagsHubFilesystem.__name__, install_hooks.__name__]
+def get_mounted_filesystems() -> List[Tuple[Path, "DagsHubFilesystem"]]:
+    """
+    Returns all currently mounted filesystems
+    Returns:
+        List of tuples of (<full mount path>, <fs object>)
+    """
+    return [(fs.project_root, fs) for fs in HookRouter.active_filesystems]
+
+
+__all__ = [
+    DagsHubFilesystem.__name__,
+    install_hooks.__name__,
+    uninstall_hooks.__name__,
+    get_mounted_filesystems.__name__,
+]
