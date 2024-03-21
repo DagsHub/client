@@ -31,6 +31,8 @@ class FieldFilterOperand(enum.Enum):
     LESS_EQUAL_THAN = "LESS_EQUAL_THAN"
     CONTAINS = "CONTAINS"
     IS_NULL = "IS_NULL"
+    STARTS_WITH = "STARTS_WITH"
+    ENDS_WITH = "ENDS_WITH"
 
 
 fieldFilterOperandMap = {
@@ -41,6 +43,8 @@ fieldFilterOperandMap = {
     "le": FieldFilterOperand.LESS_EQUAL_THAN,
     "contains": FieldFilterOperand.CONTAINS,
     "isnull": FieldFilterOperand.IS_NULL,
+    "startswith": FieldFilterOperand.STARTS_WITH,
+    "endswith": FieldFilterOperand.ENDS_WITH,
 }
 
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}

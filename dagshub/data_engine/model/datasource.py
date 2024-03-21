@@ -1108,6 +1108,28 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
+    def startswith(self, item: str):
+        """
+        Check if the filtering field starts with the specified string item.
+
+        :meta private:
+        """
+        if type(item) is not str:
+            return WrongOperatorError(f"Cannot use startswith with non-string value {item}")
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("startswith", item)
+
+    def endswith(self, item: str):
+        """
+        Check if the filtering field ends with the specified string item.
+
+        :meta private:
+        """
+        if type(item) is not str:
+            return WrongOperatorError(f"Cannot use endswith with non-string value {item}")
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("endswith", item)
+
     def is_null(self):
         """
         Check if the filtering field is null.
