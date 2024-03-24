@@ -224,12 +224,6 @@ class ModelLocator:
     def find_model(self) -> ModelLoader:
         model_loader: Optional[ModelLoader]
 
-        def return_if_exists_throw_otherwise():
-            if model_loader is None:
-                raise ModelNotFoundError
-            if model_loader is not None:
-                return model_loader
-
         if self.path is not None:
             # Check that the dir exists and return that
             handled_path, storage_type = self._handle_path(self.path)
@@ -254,7 +248,10 @@ class ModelLocator:
 
         if self.bucket is not None:
             model_loader = self.try_find_model_in_bucket(self.bucket)
-            return return_if_exists_throw_otherwise()
+            if model_loader is None:
+                raise ModelNotFoundError
+            if model_loader is not None:
+                return model_loader
 
         # TODO: add mlflow here
 
