@@ -202,7 +202,7 @@ def sync(
         )
 
 
-def mount(repo: str, cache: bool = False, path: Path = None):
+def mount(repo: str, cache: bool = False, path: Path = None) -> os.PathLike:
     """
     Mounts a DAGsHub repository bucket to a local directory.
 
@@ -271,6 +271,7 @@ def mount(repo: str, cache: bool = False, path: Path = None):
         log_message(
             f'To unmount, run `dagshub.storage.unmount(repo="{repo}", path="{mount_dir}")`.'
         )
+        return mount_dir
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to mount DagsHub Storage in '{repo_name}': {e}")
 
