@@ -1,5 +1,3 @@
-from .rclone import mount_bucket as mount
-from .rclone import unmount_bucket as unmount
-from .rclone import sync
+from .rclone import mount, unmount, sync
 
-__all__ = ['mount', 'unmount', 'sync']
+__all__ = [mount.__name__, unmount.__name__, sync.__name__]
