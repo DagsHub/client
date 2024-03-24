@@ -60,7 +60,8 @@ def check_and_provide_install_script(quiet=False):
                         # Non-Linux OS or 'apt' not available
                         log_message("Manual installation required. Please install Rclone and fuse3 for your system.")
                         log_message("Rclone installation instructions: https://rclone.org/install/")
-                        log_message("For fuse3, please consult your operating system's package manager or documentation.")
+                        log_message("For fuse3, please consult your operating system's package manager or "
+                                    "documentation.")
             else:
                 log_message("Skipping installation of missing packages.")
         else:
@@ -221,7 +222,7 @@ def mount_bucket(repo: str, cache: bool = False, path: Path = None):
         # Execute the mount command
         subprocess.run(mount_command, check=True)
         log_message(f"Successfully mounted DagsHub Storage in '{repo_name}' to '{mount_dir}'.")
-        log_message(f"To unmount, run `dagshub.storage.unmount({repo})`.")
+        log_message(f"To unmount, run `dagshub.storage.unmount(repo={repo}, path={mount_dir})`.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to mount DagsHub Storage in '{repo_name}': {e}")
 
