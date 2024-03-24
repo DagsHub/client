@@ -1,17 +1,25 @@
+import platform
+import shutil
 import subprocess
 import configparser
+import logging
 import os
 from pathlib import Path
+from typing import Tuple
 
+from ..common.helpers import log_message, prompt_user
 from ..auth import get_token
+import dagshub.common.config
+
+logger = logging.getLogger(__name__)
 
 
-def check_and_provide_install_script(verbose=True):
+def check_and_provide_install_script(quiet=False):
     """
     Checks whether Rclone and fuse3 are installed on the system. If not, it provides the necessary
     installation commands.
 
-    :param verbose: Optional. A boolean flag that controls the output of the function. If True, the function will
+    :param quiet: Optional. A boolean flag that controls the output of the function. If False, the function will
     print messages about its operation.
     No parameters are required for this function.
     """
@@ -36,26 +44,37 @@ def check_and_provide_install_script(verbose=True):
     if missing_packages:
         # Format a string listing all missing packages
         missing_packages_list = ', '.join([pkg for pkg, _ in missing_packages])
-        if verbose:
-            print(f"The following packages are not installed: {missing_packages_list}.")
-        response = input("Do you want to install all missing packages? (yes/no): ").strip().lower()
+        if not quiet:
+            log_message(f"The following packages are not installed: {missing_packages_list}.")
+        if platform.system().lower() == 'linux' and not shutil.which('apt') is None:
+            response = prompt_user("Do you want to install all missing packages?")
 
-        if response in ["yes", "y"]:
-            for package, cmd in missing_packages:
-                print(f"Installing {package}...")
-                try:
-                    subprocess.run(cmd, shell=True, check=True)
-                    print(f"{package} installed successfully.")
-                except subprocess.CalledProcessError as e:
-                    print(f"Failed to install {package}: {e}")
+            if response:
+                for package, cmd in missing_packages:
+                    log_message(f"Installing {package}...")
+                    try:
+                        subprocess.run(cmd, shell=True, check=True)
+                        log_message(f"{package} installed successfully.")
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Failed to install {package}: {e}")
+                        # Non-Linux OS or 'apt' not available
+                        log_message("Manual installation required. Please install Rclone and fuse3 for your system.")
+                        log_message("Rclone installation instructions: https://rclone.org/install/")
+                        log_message("For fuse3, please consult your operating system's package manager or documentation.")
+            else:
+                log_message("Skipping installation of missing packages.")
         else:
-            print("Skipping installation of missing packages.")
+            # Non-Linux OS or 'apt' not available
+            log_message("Manual installation required. Please install Rclone and fuse3 for your system.")
+            log_message("Rclone installation instructions: https://rclone.org/install/")
+            log_message("For fuse3, please consult your operating system's package manager or documentation.")
+            return
     else:
-        if verbose:
-            print("All packages are installed.")
+        if not quiet:
+            log_message("All packages are installed.")
 
 
-def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=True) -> Tuple[str, Path]:
+def rclone_init(repo_owner: str, conf_path: Path = None, update=False, quiet=False) -> Tuple[str, Path]:
     """
     Initializes or updates the Rclone configuration for a DAGsHub repository.
 
@@ -63,12 +82,12 @@ def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=T
     :param conf_path: Optional. The path to the Rclone configuration file. If not provided, the default path is used.
     :param update: Optional. A boolean flag indicating whether to update the configuration if it already exists.
     Defaults to False.
-    :param verbose: Optional. A boolean flag that controls the output of the function. If True, the function will
+    :param quiet: Optional. A boolean flag that controls the output of the function. If False, the function will
     print messages about its operation.
     :return: Name of the remote for rclone + The absolute path to the Rclone configuration file.
     """
     # Make sure RClone and fuse3 are properly installed
-    check_and_provide_install_script(verbose=False)
+    check_and_provide_install_script(quiet=True)
 
     if conf_path is None:
         root_path = Path.home() / ".config/rclone/"
@@ -101,11 +120,11 @@ def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=T
     with conf_path.open("w") as f:
         config.write(f)
 
-    if verbose:
+    if not quiet:
         # Inform the user about the remote name
-        print(f"Configuration complete. The remote '{remote_name}' has been created/updated in '{conf_path}'.")
-        print(f"Example usage with rclone: `rclone ls {remote_name}:<your-bucket-name>` to list the contents of "
-              f"'your-bucket-name'.")
+        log_message(f"Configuration complete. The remote '{remote_name}' has been created/updated in '{conf_path}'.")
+        log_message(f"Example usage with rclone: `rclone ls {remote_name}:<your-bucket-name>` to list the contents of "
+                    f"'your-bucket-name'.")
 
     return remote_name, conf_path.absolute()
 
@@ -124,10 +143,7 @@ def sync(local_path, remote_path, repo: str):
     repo_owner, repo_name = repo.split('/')
 
     # Ensure the repository is configured in Rclone
-    remote_name, conf_path = rclone_init(repo_owner=repo_owner, verbose=False)
-    if not conf_path or not conf_path.exists():
-        print("Failed to configure rclone.")
-        return
+    remote_name, conf_path = rclone_init(repo_owner=repo_owner, quiet=True)
 
     # Convert local_path to a string, in case it's a Path object
     local_path_str = str(local_path)
@@ -143,11 +159,11 @@ def sync(local_path, remote_path, repo: str):
         with subprocess.Popen(sync_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1,
                               universal_newlines=True) as p:
             for line in p.stdout:
-                print(line, end='')
+                log_message(line)
 
-        print(f"Successfully synchronized {local_path_str} to DagsHub Storage {remote_path}.")
+        log_message(f"Successfully synchronized {local_path_str} to DagsHub Storage {remote_path}.")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to synchronize {local_path_str} to DagsHub Storage {remote_path}: {e}")
+        log_message(f"Failed to synchronize {local_path_str} to DagsHub Storage {remote_path}: {e}")
 
 
 def mount_bucket(repo: str, cache: bool = False, path: Path = None):
@@ -160,7 +176,7 @@ def mount_bucket(repo: str, cache: bool = False, path: Path = None):
     :param repo: The repository in the format "<repo_owner>/<repo_name>". This is used to determine the remote name and
     mount point.
     :param cache: Optional. A boolean flag that enables or disables the cache feature. If True, caching is enabled with
-    specific settings.
+    specific settings `--vfs-cache-max-age 24h`.
     :param path: Optional. A Path object specifying the custom mount path. If not provided, the mount directory is
     determined based on the current working directory and the repository name.
     """
@@ -178,16 +194,17 @@ def mount_bucket(repo: str, cache: bool = False, path: Path = None):
             mount_dir = Path(repo_name) / "dagshub_storage"
 
     # 2. Configure the rclone conf
-    remote_name, conf_path = rclone_init(repo_owner=repo_owner, verbose=False)
-    if not conf_path or not conf_path.exists():
-        print("Failed to configure rclone.")
-        return
+    remote_name, conf_path = rclone_init(repo_owner=repo_owner, quiet=True)
 
     # 3. Prepare and execute the mount command
     try:
         mount_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
-        print("Encountered OSError, attempting to remount...")
+        # In Colab, when a cell fails to run, all mounts become broken, and os level actions like mkdir fail,
+        # with an OSError: Transport Endpoint Disconnected. To fix this you must unmount the bucket and remount it,
+        # so here we are attempting to handle this on behalf of the user. If it's a different error,
+        # it will fail the second time.
+        logger.error("Encountered OSError, attempting to remount...")
         unmount_bucket(repo)
         mount_dir.mkdir(parents=True, exist_ok=True)
 
@@ -203,9 +220,10 @@ def mount_bucket(repo: str, cache: bool = False, path: Path = None):
     try:
         # Execute the mount command
         subprocess.run(mount_command, check=True)
-        print(f"Successfully mounted DagsHub Storage in '{repo_name}' to '{mount_dir}'.")
+        log_message(f"Successfully mounted DagsHub Storage in '{repo_name}' to '{mount_dir}'.")
+        log_message(f"To unmount, run `dagshub.storage.unmount({repo})`.")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to mount DagsHub Storage in '{repo_name}': {e}")
+        logger.error(f"Failed to mount DagsHub Storage in '{repo_name}': {e}")
 
 
 def unmount_bucket(repo, path=None):
@@ -233,6 +251,6 @@ def unmount_bucket(repo, path=None):
 
     try:
         subprocess.run(['fusermount', '-u', str(mount_point)], check=True)
-        print(f"Successfully unmounted '{mount_point}'.")
+        log_message(f"Successfully unmounted '{mount_point}'.")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to unmount '{mount_point}': {e}")
+        logger.error(f"Failed to unmount '{mount_point}': {e}")
