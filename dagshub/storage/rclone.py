@@ -5,7 +5,7 @@ import configparser
 import logging
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
 from ..common.helpers import log_message, prompt_user
 from ..auth import get_token
@@ -90,7 +90,7 @@ def check_and_provide_install_script(quiet=False):
 
 
 def rclone_init(
-    repo_owner: str, conf_path: Path | None = None, update=False, quiet=False
+    repo_owner: str, conf_path: Optional[Path] = None, update=False, quiet=False
 ) -> Tuple[str, Path]:
     """
     Initializes or updates the Rclone configuration for a DAGsHub repository.
