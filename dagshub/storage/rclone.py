@@ -5,7 +5,7 @@ import configparser
 import logging
 import os
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 
 from ..common.helpers import log_message, prompt_user
 from ..auth import get_token
@@ -150,7 +150,9 @@ def rclone_init(
     return remote_name, conf_path.absolute()
 
 
-def sync(repo: str, local_path: str | os.PathLike, remote_path: str | os.PathLike):
+def sync(
+    repo: str, local_path: Union[str, os.PathLike], remote_path: Union[str, os.PathLike]
+):
     """
     Synchronizes the contents of a local directory with a specified remote directory in a DAGsHub repository using
     Rclone.
