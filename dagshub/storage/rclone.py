@@ -55,7 +55,7 @@ def check_and_provide_install_script(verbose=True):
             print("All packages are installed.")
 
 
-def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=True) -> tuple[str, Path]:
+def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=True) -> Tuple[str, Path]:
     """
     Initializes or updates the Rclone configuration for a DAGsHub repository.
 
@@ -65,7 +65,7 @@ def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=T
     Defaults to False.
     :param verbose: Optional. A boolean flag that controls the output of the function. If True, the function will
     print messages about its operation.
-    :return: The absolute path to the Rclone configuration file.
+    :return: Name of the remote for rclone + The absolute path to the Rclone configuration file.
     """
     # Make sure RClone and fuse3 are properly installed
     check_and_provide_install_script(verbose=False)
@@ -95,7 +95,7 @@ def rclone_init(repo_owner: str, conf_path: Path = None, update=False, verbose=T
         "provider": "Other",
         "access_key_id": token,
         "secret_access_key": token,
-        "endpoint": f"https://dagshub.com/api/v1/repo-buckets/s3/{repo_owner}",
+        "endpoint": f"{dagshub.common.config.host}/api/v1/repo-buckets/s3/{repo_owner}",
     }
 
     with conf_path.open("w") as f:
