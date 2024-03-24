@@ -78,22 +78,6 @@ class RepoModelLoader(ModelLoader):
         return Path(self.path)
 
 
-class DagsHubStorageModelLoader(ModelLoader):
-    def __init__(self, repo_api: RepoAPI, path: PurePosixPath):
-        super().__init__(repo_api)
-        self.path = path
-
-    def _eager_load(self, download_dest: Path) -> Path:
-        remote_path = PurePosixPath(f"s3:/{self.repo_api.repo_name}") / self.path
-        local_path = download_dest / self.model_path
-        self.repo_api.download(remote_path, local_path=local_path)
-        return local_path
-
-    @property
-    def model_path(self) -> Path:
-        return Path(".dagshub") / "storage" / "s3" / self.repo_api.repo_name / self.path
-
-
 class BucketModelLoader(ModelLoader):
     def __init__(self, repo_api: RepoAPI, path: PurePosixPath):
         super().__init__(repo_api)
@@ -109,6 +93,12 @@ class BucketModelLoader(ModelLoader):
     @property
     def model_path(self) -> Path:
         return Path(".dagshub") / "storage" / self.path
+
+
+class DagsHubStorageModelLoader(BucketModelLoader):
+    def __init__(self, repo_api: RepoAPI, path: PurePosixPath):
+        bucket_path = PurePosixPath("s3") / repo_api.repo_name / path
+        super().__init__(repo_api, bucket_path)
 
 
 class MLflowArtifactModelLoader(ModelLoader):
