@@ -11,7 +11,12 @@ class ModelLoader:
     def __init__(self, repo_api: RepoAPI):
         self.repo_api = repo_api
 
-    def load_model(self, mode: Literal["eager", "lazy"], download_dest: Path, revision: Optional[str] = None) -> Path:
+    def load_model(
+        self,
+        mode: Literal["eager", "lazy"],
+        download_dest: Path,
+        revision: Optional[str] = None,
+    ) -> Path:
         if mode == "eager":
             return self._eager_load(download_dest)
         elif mode == "lazy":
@@ -21,15 +26,14 @@ class ModelLoader:
         raise RuntimeError(f"Unknown model load mode [{mode}]")
 
     @abstractmethod
-    def _eager_load(self, download_dest: Path) -> Path:
-        ...
+    def _eager_load(self, download_dest: Path) -> Path: ...
 
     def _lazy_load(self, download_dest: Path, revision: str) -> Path:
         fs = DagsHubFilesystem(
             project_root=download_dest,
             repo_url=self.repo_api.repo_url,
             branch=revision,
-            frameworks=["transformers"]
+            frameworks=["transformers"],
         )
         res_path = download_dest / self.model_path
         log_message(
@@ -41,8 +45,7 @@ class ModelLoader:
 
     @property
     @abstractmethod
-    def model_path(self) -> Path:
-        ...
+    def model_path(self) -> Path: ...
 
 
 class RepoModelLoader(ModelLoader):
@@ -51,10 +54,23 @@ class RepoModelLoader(ModelLoader):
         self.revision = revision
         self.path = path
 
+    def load_model(
+        self,
+        mode: Literal["eager", "lazy"],
+        download_dest: Path,
+        revision: Optional[str] = None,
+    ) -> Path:
+        """Overrides the original to change the revision used. If it's not set, use the revision from the class"""
+        if revision is None:
+            revision = self.revision
+        return super().load_model(mode, download_dest, revision)
+
     def _eager_load(self, download_dest: Path) -> Path:
         remote_path = self.path
         local_path = download_dest / self.model_path
-        self.repo_api.download(remote_path, local_path=local_path)
+        self.repo_api.download(
+            remote_path, local_path=local_path, revision=self.revision
+        )
         return local_path
 
     @property
