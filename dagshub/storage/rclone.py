@@ -222,7 +222,7 @@ def mount_bucket(repo: str, cache: bool = False, path: Path = None):
         # Execute the mount command
         subprocess.run(mount_command, check=True)
         log_message(f"Successfully mounted DagsHub Storage in '{repo_name}' to '{mount_dir}'.")
-        log_message(f"To unmount, run `dagshub.storage.unmount(repo={repo}, path={mount_dir})`.")
+        log_message(f"To unmount, run `dagshub.storage.unmount(repo=\"{repo}\", path=\"{mount_dir}\")`.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to mount DagsHub Storage in '{repo_name}': {e}")
 
