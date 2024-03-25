@@ -68,9 +68,17 @@ def setup(ctx):
 
 @setup.command("dvc")
 @click.option("--repo_name", help="The repository name to set up")
-@click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
-@click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
-@click.option("--host", default=config.DEFAULT_HOST, help="DagsHub instance to which you want to login")
+@click.option(
+    "--repo_owner", help="Owner of the repository in use (user or organization)"
+)
+@click.option(
+    "--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner"
+)
+@click.option(
+    "--host",
+    default=config.DEFAULT_HOST,
+    help="DagsHub instance to which you want to login",
+)
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
@@ -79,7 +87,15 @@ def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
     """
     host = host or ctx.obj["host"]
     config.quiet = quiet or ctx.obj["quiet"]
-    init(repo_name=repo_name, repo_owner=repo_owner, url=url, root=None, host=host, mlflow=False, dvc=True)
+    init(
+        repo_name=repo_name,
+        repo_owner=repo_owner,
+        url=url,
+        root=None,
+        host=host,
+        mlflow=False,
+        dvc=True,
+    )
 
 
 @cli.command()
@@ -106,7 +122,9 @@ def login(ctx, token, host, quiet):
 def validate_repo(ctx, param, value):
     parts = value.split("/")
     if len(parts) != 2:
-        raise click.BadParameter("repo needs to be in the format <repo-owner>/<repo-name>")
+        raise click.BadParameter(
+            "repo needs to be in the format <repo-owner>/<repo-name>"
+        )
     return tuple(parts)
 
 
@@ -131,11 +149,18 @@ if False: will download to "<local_path>/test/file.txt"
 @click.argument("remote_path")
 @click.argument("local_path", required=False, type=click.Path())
 @click.option(
-    "-b", "--branch", help="Branch or revision to download from. " "If left unspecified, use the default branch."
+    "-b",
+    "--branch",
+    help="Branch or revision to download from. "
+    "If left unspecified, use the default branch.",
 )
 @click.option("--keep-prefix", is_flag=True, default=False, help=KEEP_PREFIX_HELP)
 @click.option("--not-recursive", is_flag=True, help="Don't download nested folders")
-@click.option("--redownload", is_flag=True, help="Redownload files, even if they already exist locally")
+@click.option(
+    "--redownload",
+    is_flag=True,
+    help="Redownload files, even if they already exist locally",
+)
 @click.option(
     "--download-storages",
     is_flag=True,
@@ -145,6 +170,12 @@ if False: will download to "<local_path>/test/file.txt"
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
+@click.option(
+    "--bucket",
+    is_flag=True,
+    help="Download the file(s) to the repo's DagsHub Storage bucket. "
+    "Makes it so remote path is relative to the root of the storage bucket",
+)
 @click.pass_context
 def download(
     ctx,
@@ -159,6 +190,7 @@ def download(
     host,
     redownload,
     download_storages,
+    bucket,
 ):
     """
     Download REMOTE_PATH from REPO to LOCAL_PATH
@@ -177,6 +209,10 @@ def download(
     logger.setLevel(to_log_level(verbose))
 
     repoApi = RepoAPI(f"{repo[0]}/{repo[1]}", host=host)
+
+    if bucket:
+        remote_path = f"s3:/{repoApi.repo_name}/{remote_path.lstrip('/')}"
+
     repoApi.download(
         remote_path,
         local_path,
@@ -199,13 +235,31 @@ def download(
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.option("--host", help="DagsHub instance to which you want to login")
 @click.option(
-    "--versioning", help="Versioning system to be used to upload the file(s)", type=click.Choice(["git", "dvc", "auto"])
+    "--versioning",
+    help="Versioning system to be used to upload the file(s)",
+    type=click.Choice(["git", "dvc", "auto"]),
 )
 @click.option(
-    "--bucket", is_flag=True, help="Upload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)"
+    "--bucket",
+    is_flag=True,
+    help="Upload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)",
 )
 @click.pass_context
-def upload(ctx, filename, target, repo, message, branch, verbose, update, quiet, host, versioning, bucket, **kwargs):
+def upload(
+    ctx,
+    filename,
+    target,
+    repo,
+    message,
+    branch,
+    verbose,
+    update,
+    quiet,
+    host,
+    versioning,
+    bucket,
+    **kwargs,
+):
     """
     Upload FILENAME to REPO at location TARGET.
 
@@ -260,7 +314,9 @@ def repo():
 
 @repo.command()
 @click.argument("repo_name")
-@click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
+@click.option(
+    "-u", "--upload-data", help="Upload data from specified url to new repository"
+)
 @click.option("-c", "--clone", is_flag=True, help="Clone repository locally")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
@@ -293,7 +349,9 @@ def create(ctx, repo_name, upload_data, clone, verbose, quiet):
             # get the data
             res = http_request("GET", upload_data)
             if res.status_code != HTTPStatus.OK:
-                raise RuntimeError(f"Could not get file from source (response: {res.status_code}), repo created")
+                raise RuntimeError(
+                    f"Could not get file from source (response: {res.status_code}), repo created"
+                )
 
             downloaded_file_name = os.path.basename(urlparse(upload_data).path)
 
@@ -326,7 +384,9 @@ def create(ctx, repo_name, upload_data, clone, verbose, quiet):
             # now the local repo resembles the remote but with copy of data
             if upload_data:
                 shutil.move(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
-                log_message(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger)
+                log_message(
+                    f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger
+                )
 
     # clean tmp file/dir if exists
     if upload_data and os.path.exists(downloaded_file_name):
