@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Tuple, Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING
+from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
@@ -226,12 +226,6 @@ class Datapoint:
 
     def blob_url(self, sha):
         return self.datasource.source.blob_path(sha)
-
-    def _extract_blob_url_and_path(self, col: str) -> Tuple[Optional[str], Optional[PathLike]]:
-        sha = self.metadata.get(col)
-        if sha is None or type(sha) is not str:
-            return None, None
-        return self.blob_url(sha), self.blob_cache_location / sha
 
 
 def _get_blob(
