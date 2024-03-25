@@ -8,6 +8,7 @@ from os import PathLike
 from typing import Union, Optional, Callable, Dict, List, TYPE_CHECKING, Set
 
 from dagshub.common import is_inside_notebook, is_inside_colab
+from dagshub.common.helpers import log_message
 from dagshub.streaming.dataclasses import DagshubPath, PathType
 from dagshub.streaming.errors import FilesystemAlreadyMountedError
 from dagshub.streaming.filesystem import DagshubScandirIterator
@@ -323,6 +324,13 @@ class HookRouter:
             raise FilesystemAlreadyMountedError(
                 existing_fs.project_root, existing_fs.repo_api.full_name, existing_fs.current_revision
             )
+
+        msg = (
+            f'Repository "{fs.repo_api.full_name}" is now hooked at path "{fs.project_root}".\n'
+            f"Any calls to Python file access function like open() and listdir() inside "
+            f"of this directory will include results from the repository."
+        )
+        log_message(msg, logger)
 
         cls.active_filesystems.add(fs)
 

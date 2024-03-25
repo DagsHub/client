@@ -97,7 +97,7 @@ def prompt_user(prompt, default=False) -> bool:
     return prompt_response == "y"
 
 
-def log_message(msg, logger=None):
+def log_message(msg: str, logger=None):
     """
     Logs message to the info of the logger + prints, unless the printing was suppressed
     """
