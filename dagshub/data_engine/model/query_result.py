@@ -291,7 +291,7 @@ class QueryResult:
                 download_task = (dp, fld, dp.blob_url(field_value), dp.blob_cache_location / field_value)
                 to_download.append(download_task)
 
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn(), transient=False)
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         task = progress.add_task("Downloading blobs...", total=len(to_download))
 
         auth = self.datasource.source.repoApi.auth
