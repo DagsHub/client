@@ -55,5 +55,5 @@ jobs:
       - name: Invalidate CDN Cache
         env:
           LOAD_BALANCER: ${{ secrets.LOAD_BALANCER_NAME }}
-        run: gcloud compute url-maps invalidate-cdn-cache $LOAD_BALANCER --path "/docs/client/*"
+        run: gcloud compute url-maps invalidate-cdn-cache $LOAD_BALANCER --async --path "/docs/client/*"
 

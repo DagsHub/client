@@ -4,7 +4,7 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
 
 import rich.progress
 
@@ -502,12 +502,14 @@ class QueryResult:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
-    def visualize(self, **kwargs):
+    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "fiftyone", **kwargs) -> Union[str, "fo.Session"]:
         """
-        Visualize this QueryResult with Voxel51.
+        Visualize this QueryResult either on DagsHub or with Voxel51.
 
-        This function calls :func:`to_voxel51_dataset`, passing to it the keyword arguments,
-        and launches a fiftyone session showing the dataset.
+        If ``visualizer`` is ``dagshub``, a webpage is opened on DagsHub with the query applied.
+
+        If ``visualizer`` is ``fiftyone``, this function calls :func:`to_voxel51_dataset`,
+        passing to it the keyword arguments, and launches a fiftyone session showing the dataset.
 
         Additionally, this function adds a DagsHub plugin into Voxel51 that you can use for additional interactions
         with the datasource from within the voxel environment.
@@ -518,17 +520,20 @@ class QueryResult:
             session = ds.all().visualize()
             session.wait(-1)
         """
-        set_voxel_envvars()
+        if visualizer == "dagshub":
+            return self.datasource.visualize(visualizer, **kwargs)
+        if visualizer == "fiftyone":
+            set_voxel_envvars()
 
-        send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
+            send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
 
-        ds = self.to_voxel51_dataset(**kwargs)
+            ds = self.to_voxel51_dataset(**kwargs)
 
-        sess = fo.launch_app(ds)
-        # Launch the server for plugin interaction
-        plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
+            sess = fo.launch_app(ds)
+            # Launch the server for plugin interaction
+            plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
 
-        return sess
+            return sess
 
     def annotate(
         self, open_project=True, ignore_warning=True, fields_to_embed=None, fields_to_exclude=None
