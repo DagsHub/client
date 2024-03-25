@@ -235,7 +235,7 @@ class Datapoint:
 
 
 def _get_blob(
-    url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk, return_blob
+    url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk: bool, return_blob: bool
 ) -> Optional[Union[Path, str, bytes]]:
     """
     Args:
