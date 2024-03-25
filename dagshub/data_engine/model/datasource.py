@@ -828,7 +828,7 @@ class Datasource:
             sanitize_filepath(os.path.join(Path.home(), "dagshub", "datasets", self.source.repo, str(self.source.id)))
         )
 
-    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "dagshub", **kwargs) -> Union[str, "fo.Session"]:
+    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "fiftyone", **kwargs) -> Union[str, "fo.Session"]:
         """
         Visualize the whole datasource using
         :func:`QueryResult.visualize() <dagshub.data_engine.model.query_result.QueryResult.visualize>`.
