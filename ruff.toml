@@ -2,4 +2,11 @@ line-length=120
 
 [lint]
 select = ["E", "F"]
-ignore = ["E111", "E203", "E114", "E117", "E701"]
+# Ignore some of the rules that are conflicting with the formatter
+ignore = [
+    "E111",   # Indentation is not a multiple of four
+    "E203",   # Whitespace before ':'
+    "E114",   # Indentation is not a multiple of four (comment)
+    "E117",   # Over-indented
+    "E701",   # Multiple statements on one line (colon)
+]
