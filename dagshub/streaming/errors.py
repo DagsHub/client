@@ -11,5 +11,5 @@ class FilesystemAlreadyMountedError(Exception):
         return (
             f"There is already a filesystem mounted at path {self.path.absolute()} "
             f"({self.repo} revision {self.revision})"
-            f"\nrun uninstall_hooks({self.path.absolute()}) to remove the existing hook"
+            f"\nrun dagshub.streaming.uninstall_hooks({self.path.absolute()}) to remove the existing hook"
         )
