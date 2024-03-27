@@ -8,8 +8,7 @@ from dagshub.common.api.repo import PathNotFoundError
 from dagshub.common.api.responses import StorageAPIEntry, ContentAPIEntry, CommitAPIResponse
 
 
-class MockError(Exception):
-    ...
+class MockError(Exception): ...
 
 
 class MockRepoAPI(RepoAPI):
@@ -118,6 +117,8 @@ class MockRepoAPI(RepoAPI):
         return self.storages
 
     def get_file(self, path: str, revision: Optional[str] = None) -> bytes:
+        if path == ".":
+            path = ""
         if revision is None:
             revision = self.default_branch
         content = self.repo_files.get(revision, {}).get(path)
@@ -126,12 +127,16 @@ class MockRepoAPI(RepoAPI):
         return content
 
     def get_storage_file(self, path: str) -> bytes:
+        if path == ".":
+            path = ""
         content = self.storage_files.get(path)
         if content is None:
             raise PathNotFoundError
         return content
 
     def list_path(self, path: str, revision: Optional[str] = None, include_size: bool = False) -> List[ContentAPIEntry]:
+        if path == ".":
+            path = ""
         if revision is None:
             revision = self.default_branch
         content = self.repo_contents.get(revision, {}).get(path)
@@ -140,6 +145,8 @@ class MockRepoAPI(RepoAPI):
         return content
 
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
+        if path == ".":
+            path = ""
         content = self.storage_contents.get(path)
         if content is None:
             raise PathNotFoundError
@@ -147,7 +154,7 @@ class MockRepoAPI(RepoAPI):
 
     def last_commit(self, branch: Optional[str] = None) -> CommitAPIResponse:
         return CommitAPIResponse(
-            id="deadbeef",
+            id=branch if branch is not None else "main",
             message="random-commit",
             url="http://local.invalid/commit",
             author=None,

@@ -5,7 +5,7 @@ from dagshub.streaming import DagsHubFilesystem, uninstall_hooks, install_hooks
 
 def test_sets_current_revision(mock_api):
     fs = DagsHubFilesystem()
-    assert fs._current_revision == mock_api.current_revision
+    assert fs.current_revision == mock_api.current_revision
     assert mock_api["branch"].called
 
 
