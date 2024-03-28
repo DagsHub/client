@@ -2,7 +2,6 @@ from dagshub.auth import add_oauth_token, get_token
 from dagshub.auth.tokens import get_user_of_token
 from dagshub.common.api import RepoAPI
 from dagshub.common.api.repo import RepoNotFoundError
-from dagshub.common.helpers import log_message
 from dagshub.upload import create_repo
 
 COLAB_REPO_NAME = "dagshub-drive"
@@ -28,6 +27,6 @@ def login() -> str:
         colab_repo.get_repo_info()
     except RepoNotFoundError:
         create_repo(COLAB_REPO_NAME)
-    log_message(f"Repository {colab_repo.full_name} is ready for use with Colab. Link to the repository:")
+    print(f"Repository {colab_repo.full_name} is ready for use with Colab. Link to the repository:")
     print(colab_repo.repo_url)
     return colab_repo.full_name
