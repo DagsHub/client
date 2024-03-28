@@ -16,11 +16,11 @@ def login() -> str:
     Returns the name of the repository that can be used with colab-related functionality (``<user>/dagshub-drive``)
     """
     try:
-        get_token(fail_if_no_token=True)
+        token = get_token(fail_if_no_token=True)
     except RuntimeError:
         add_oauth_token(referrer="colab")
+        token = get_token()
 
-    token = get_token()
     username = get_user_of_token(token)
 
     colab_repo = RepoAPI(f"{username}/{COLAB_REPO_NAME}")
