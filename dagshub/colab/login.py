@@ -8,10 +8,12 @@ from dagshub.upload import create_repo
 COLAB_REPO_NAME = "dagshub-drive"
 
 
-def login():
+def login() -> str:
     """
-    Run custom colab-specific flow, which helps users with setting up a repository,
-    storage of which will be used as an alternative to Google Drive
+    Run custom colab-specific flow, which helps with setting up a repository,
+    storage of which will be used as an alternative to Google Drive.
+
+    Returns the name of the repository that can be used with colab-related functionality (``<user>/dagshub-drive``)
     """
     try:
         get_token(fail_if_no_token=True)
@@ -28,3 +30,4 @@ def login():
         create_repo(COLAB_REPO_NAME)
     log_message(f"Repository {colab_repo.full_name} is ready for use with Colab. Link to the repository:")
     print(colab_repo.repo_url)
+    return colab_repo.full_name
