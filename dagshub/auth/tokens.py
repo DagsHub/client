@@ -387,7 +387,7 @@ def add_app_token(token: str, host: Optional[str] = None, **kwargs):
     _get_token_storage(**kwargs).add_token(token_obj, host)
 
 
-def add_oauth_token(host: Optional[str] = None, **kwargs):
+def add_oauth_token(host: Optional[str] = None, referrer: Optional[str] = None, **kwargs):
     """
     Launches the OAuth flow that generates a short-lived token.
 
@@ -397,6 +397,7 @@ def add_oauth_token(host: Optional[str] = None, **kwargs):
 
     Args:
         host: URL of the hosted DagsHub instance. Leave empty to use the default ``https://dagshub.com``.
+        referrer: For custom referral flows
 
     Keyword Args:
         cache_location: Path to an alternative cache location.
@@ -404,5 +405,23 @@ def add_oauth_token(host: Optional[str] = None, **kwargs):
             ``DAGSHUB_CLIENT_TOKENS_CACHE`` environment variable.
     """
     host = host or config.host
-    token = oauth.oauth_flow(host)
+    token = oauth.oauth_flow(host, referrer=referrer)
     _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)
+
+
+def get_user_of_token(token: Union[str, DagshubTokenABC], host: Optional[str] = None) -> str:
+    """
+    Returns the username of the user with the token
+    """
+    host = host or config.host
+    check_url = multi_urljoin(host, "api/v1/user")
+    if type(token) is str:
+        auth = HTTPBearerAuth(token)
+    else:
+        auth = token
+    resp = http_request("GET", check_url, auth=auth)
+
+    if resp.status_code == 200:
+        return resp.json()["login"]
+    else:
+        raise RuntimeError(f"Got HTTP status {resp.status_code} while trying to get user: {resp.content}")
