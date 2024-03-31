@@ -21,6 +21,8 @@ from dagshub.common.helpers import http_request, log_message
 from dagshub.upload.errors import UpdateNotAllowedError
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 
+_dagshub_bucket_doc_link = "https://dagshub.com/docs/feature_guide/dagshub_storage/"
+
 
 @click.group()
 @click.option("--host", default=config.host, help="Hostname of DagsHub instance")
@@ -68,12 +70,8 @@ def setup(ctx):
 
 @setup.command("dvc")
 @click.option("--repo_name", help="The repository name to set up")
-@click.option(
-    "--repo_owner", help="Owner of the repository in use (user or organization)"
-)
-@click.option(
-    "--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner"
-)
+@click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
+@click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
 @click.option(
     "--host",
     default=config.DEFAULT_HOST,
@@ -122,9 +120,7 @@ def login(ctx, token, host, quiet):
 def validate_repo(ctx, param, value):
     parts = value.split("/")
     if len(parts) != 2:
-        raise click.BadParameter(
-            "repo needs to be in the format <repo-owner>/<repo-name>"
-        )
+        raise click.BadParameter("repo needs to be in the format <repo-owner>/<repo-name>")
     return tuple(parts)
 
 
@@ -151,8 +147,7 @@ if False: will download to "<local_path>/test/file.txt"
 @click.option(
     "-b",
     "--branch",
-    help="Branch or revision to download from. "
-    "If left unspecified, use the default branch.",
+    help="Branch or revision to download from. " "If left unspecified, use the default branch.",
 )
 @click.option("--keep-prefix", is_flag=True, default=False, help=KEEP_PREFIX_HELP)
 @click.option("--not-recursive", is_flag=True, help="Don't download nested folders")
@@ -173,8 +168,9 @@ if False: will download to "<local_path>/test/file.txt"
 @click.option(
     "--bucket",
     is_flag=True,
-    help="Download the file(s) to the repo's DagsHub Storage bucket. "
-    "Makes it so remote path is relative to the root of the storage bucket",
+    help="\b\nDownload the file(s) from the repo's DagsHub Storage bucket."
+    "\nMakes it so remote path is relative to the root of the storage bucket"
+    f"\nLearn more about the repo bucket here: {_dagshub_bucket_doc_link}",
 )
 @click.pass_context
 def download(
@@ -242,7 +238,8 @@ def download(
 @click.option(
     "--bucket",
     is_flag=True,
-    help="Upload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)",
+    help="\b\nUpload the file(s) to the repo's DagsHub Storage bucket (s3-compatible)"
+    f"\nLearn more about the repo bucket here: {_dagshub_bucket_doc_link}",
 )
 @click.pass_context
 def upload(
@@ -314,9 +311,7 @@ def repo():
 
 @repo.command()
 @click.argument("repo_name")
-@click.option(
-    "-u", "--upload-data", help="Upload data from specified url to new repository"
-)
+@click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
 @click.option("-c", "--clone", is_flag=True, help="Clone repository locally")
 @click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
@@ -349,9 +344,7 @@ def create(ctx, repo_name, upload_data, clone, verbose, quiet):
             # get the data
             res = http_request("GET", upload_data)
             if res.status_code != HTTPStatus.OK:
-                raise RuntimeError(
-                    f"Could not get file from source (response: {res.status_code}), repo created"
-                )
+                raise RuntimeError(f"Could not get file from source (response: {res.status_code}), repo created")
 
             downloaded_file_name = os.path.basename(urlparse(upload_data).path)
 
@@ -384,9 +377,7 @@ def create(ctx, repo_name, upload_data, clone, verbose, quiet):
             # now the local repo resembles the remote but with copy of data
             if upload_data:
                 shutil.move(tmp_dir, f"{repo.name}/{DEFAULT_DATA_DIR_NAME}")
-                log_message(
-                    f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger
-                )
+                log_message(f"files moved to {repo.name}/{DEFAULT_DATA_DIR_NAME}", logger)
 
     # clean tmp file/dir if exists
     if upload_data and os.path.exists(downloaded_file_name):
