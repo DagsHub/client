@@ -62,7 +62,7 @@ class MockApi(MockRouter):
             "repo": rf"{self.repoapipath}/?$",
             "branch": rf"{self.repoapipath}/branches/(main|master)$",
             "branches": rf"{self.repoapipath}/branches/?$",
-            "list_root": rf"{self.repoapipath}/content/{self.current_revision}/$",
+            "list_root": rf"{self.repoapipath}/content/{self.current_revision}/(\?include_size=(false|true))?$",
             "storages": rf"{self.repoapipath}/storage/?$",
         }
 
@@ -250,7 +250,7 @@ class MockApi(MockRouter):
         Add a directory to the storage api
         Storage has a different response schema
         """
-        url = f"{self.api_storage_list_path}/{path}?paging=true"
+        url = f"{self.api_storage_list_path}/{path}?include_size=false&paging=true"
         if from_token is not None:
             url += f"&from_token={from_token}"
         route = self.route(url=url)

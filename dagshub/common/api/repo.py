@@ -1,8 +1,11 @@
 import logging
+from functools import partial
 from os import PathLike
 from pathlib import Path, PurePosixPath
 
 import rich.progress
+from httpx import Response
+from tenacity import before_sleep_log, retry, retry_if_exception, wait_exponential_jitter, stop_after_delay
 
 from dagshub.common.api.responses import (
     RepoAPIResponse,
@@ -15,7 +18,6 @@ from dagshub.common.api.responses import (
 from dagshub.common.download import download_files
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
-from functools import partial
 
 try:
     from functools import cached_property
@@ -54,6 +56,31 @@ class PathNotFoundError(Exception):
     pass
 
 
+class DagsHubHTTPError(Exception):
+    def __init__(self, msg: str, response: Response):
+        super().__init__()
+        self.msg = msg
+        self.response = response
+
+    def __str__(self):
+        return self.msg
+
+
+def _is_server_error_exception(exception: BaseException) -> bool:
+    if not isinstance(exception, DagsHubHTTPError):
+        return False
+    return 500 <= exception.response.status_code < 600
+
+
+def request_retry(func):
+    return retry(
+        retry=retry_if_exception(_is_server_error_exception),
+        stop=stop_after_delay(5 * 60),
+        wait=wait_exponential_jitter(max=60, jitter=2),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    )(func)
+
+
 class RepoAPI:
     def __init__(self, repo: str, host: Optional[str] = None, auth: Optional[Any] = None):
         """
@@ -89,7 +116,7 @@ class RepoAPI:
             error_msg = f"Got status code {res.status_code} when getting repository info."
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
         return dacite.from_dict(RepoAPIResponse, res.json())
 
     def get_branch_info(self, branch: str) -> BranchAPIResponse:
@@ -107,7 +134,7 @@ class RepoAPI:
             error_msg = f"Got status code {res.status_code} when getting branch."
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
 
         return dacite.from_dict(BranchAPIResponse, res.json())
 
@@ -126,7 +153,7 @@ class RepoAPI:
             error_msg = f"Got status code {res.status_code} when getting commit."
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
 
         return dacite.from_dict(CommitAPIResponse, res.json()["commit"])
 
@@ -142,7 +169,7 @@ class RepoAPI:
             error_msg = f"Got status code {res.status_code} when getting repository info."
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
 
         return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in res.json()]
 
@@ -164,7 +191,7 @@ class RepoAPI:
             error_msg = f"Got status code {res.status_code} when listing path {path}"
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
 
         content = res.json()
         if type(content) is dict:
@@ -194,7 +221,7 @@ class RepoAPI:
                 error_msg = f"Got status code {res.status_code} when listing path {path}"
                 logger.error(error_msg)
                 logger.debug(res.content)
-                raise RuntimeError(error_msg)
+                raise DagsHubHTTPError(error_msg, res)
 
             content = res.json()
             if "entries" not in content:
@@ -218,6 +245,7 @@ class RepoAPI:
 
         return entries
 
+    @request_retry
     def get_file(self, path: str, revision: Optional[str] = None) -> bytes:
         """
         Download file from repo.
@@ -229,16 +257,17 @@ class RepoAPI:
         Returns:
             bytes: The content of the file.
         """
-        res = self._http_request("GET", self.raw_api_url(path, revision))
+        res = self._http_request("GET", self.raw_api_url(path, revision), timeout=None)
         if res.status_code == 404:
             raise PathNotFoundError(f"Path {path} not found")
         elif res.status_code >= 400:
             error_msg = f"Got status code {res.status_code} when getting file {path}"
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
         return res.content
 
+    @request_retry
     def get_storage_file(self, path: str) -> bytes:
         """
         Download file from a connected storage bucket.
@@ -258,7 +287,7 @@ class RepoAPI:
             error_msg = f"Got status code {res.status_code} when getting file {path}"
             logger.error(error_msg)
             logger.debug(res.content)
-            raise RuntimeError(error_msg)
+            raise DagsHubHTTPError(error_msg, res)
         return res.content
 
     def _get_files_in_path(

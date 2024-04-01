@@ -111,7 +111,6 @@ def token_cleanup_test(token_cache, token):
             if token.token_text in line:
                 failed = True
                 break
-    print(token_cache.cache_location)
     assert not failed
 
 

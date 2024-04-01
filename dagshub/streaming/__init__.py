@@ -1,4 +1,4 @@
-from .filesystem import DagsHubFilesystem, install_hooks, uninstall_hooks
+from .filesystem import DagsHubFilesystem, install_hooks, uninstall_hooks, get_mounted_filesystems
 
 try:
     from .mount import mount
@@ -15,4 +15,10 @@ except OSError as e:
         print(error)
 
 
-__all__ = [DagsHubFilesystem.__name__, install_hooks.__name__, mount.__name__, uninstall_hooks.__name__]
+__all__ = [
+    DagsHubFilesystem.__name__,
+    install_hooks.__name__,
+    mount.__name__,
+    uninstall_hooks.__name__,
+    get_mounted_filesystems.__name__,
+]
