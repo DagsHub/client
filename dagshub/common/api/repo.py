@@ -1,10 +1,11 @@
 import logging
+from functools import partial
 from os import PathLike
 from pathlib import Path, PurePosixPath
 
 import rich.progress
 from httpx import Response
-from tenacity import stop_after_attempt, wait_exponential, before_sleep_log, retry, retry_if_exception
+from tenacity import before_sleep_log, retry, retry_if_exception, wait_exponential_jitter, stop_after_delay
 
 from dagshub.common.api.responses import (
     RepoAPIResponse,
@@ -17,7 +18,6 @@ from dagshub.common.api.responses import (
 from dagshub.common.download import download_files
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
-from functools import partial
 
 try:
     from functools import cached_property
@@ -70,6 +70,15 @@ def _is_server_error_exception(exception: BaseException) -> bool:
     if not isinstance(exception, DagsHubHTTPError):
         return False
     return 500 <= exception.response.status_code < 600
+
+
+def request_retry(func):
+    return retry(
+        retry=retry_if_exception(_is_server_error_exception),
+        stop=stop_after_delay(5 * 60),
+        wait=wait_exponential_jitter(max=60, jitter=2),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    )(func)
 
 
 class RepoAPI:
@@ -236,12 +245,7 @@ class RepoAPI:
 
         return entries
 
-    @retry(
-        retry=retry_if_exception(_is_server_error_exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
+    @request_retry
     def get_file(self, path: str, revision: Optional[str] = None) -> bytes:
         """
         Download file from repo.
@@ -263,12 +267,7 @@ class RepoAPI:
             raise DagsHubHTTPError(error_msg, res)
         return res.content
 
-    @retry(
-        retry=retry_if_exception(_is_server_error_exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
+    @request_retry
     def get_storage_file(self, path: str) -> bytes:
         """
         Download file from a connected storage bucket.
