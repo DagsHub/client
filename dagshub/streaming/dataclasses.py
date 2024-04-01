@@ -35,16 +35,18 @@ class DagshubPath:
         self.is_binary_path_requested = isinstance(file_path, bytes)
         self.absolute_path, self.relative_path, self.original_path = self.parse_path(file_path)
 
-    def parse_path(self, file_path: Union[str, bytes, PathLike, "DagshubPath"]) -> Tuple[Path, Optional[Path], Path]:
+    def parse_path(
+        self, file_path: Union[str, bytes, PathLike, "DagshubPath"]
+    ) -> Tuple[Path, Optional[Path], Union[str, bytes, PathLike]]:
         if isinstance(file_path, DagshubPath):
             self.is_binary_path_requested = file_path.is_binary_path_requested
             if file_path.fs != self.fs:
                 relativized = DagshubPath(self.fs, file_path.absolute_path)
                 return relativized.absolute_path, relativized.relative_path, relativized.original_path
             return file_path.absolute_path, file_path.relative_path, file_path.original_path
+        orig_path = file_path
         if isinstance(file_path, bytes):
             file_path = os.fsdecode(file_path)
-        orig_path = Path(file_path)
         abspath = Path(os.path.abspath(file_path))
         try:
             relpath = abspath.relative_to(os.path.abspath(self.fs.project_root))
@@ -105,7 +107,7 @@ class DagshubPath:
     def __truediv__(self, other):
         new = DagshubPath(
             self.fs,
-            self.original_path / other,
+            Path(self.original_path) / other,
         )
         new.is_binary_path_requested = self.is_binary_path_requested
         return new
