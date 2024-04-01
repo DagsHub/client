@@ -69,7 +69,7 @@ class DagsHubHTTPError(Exception):
 def _is_server_error_exception(exception: BaseException) -> bool:
     if not isinstance(exception, DagsHubHTTPError):
         return False
-    return exception.response.status_code >= 500
+    return 500 <= exception.response.status_code < 600
 
 
 class RepoAPI:
