@@ -1,11 +1,10 @@
 import inspect
 import logging
-import multiprocessing.pool
+from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
-from itertools import repeat
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
 
 import rich.progress
 
@@ -268,31 +267,49 @@ class QueryResult:
 
         # If no fields are specified, include all blob fields from self.datasource.fields
         if not fields:
-            fields = [field.name for field in self.datasource.fields if field.valueType == MetadataFieldType.BLOB]
-
-        for fld in fields:
-            logger.info(f"Downloading metadata for field {fld} with {num_proc} processes")
-            cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
-
-            if cache_on_disk:
-                cache_location.mkdir(parents=True, exist_ok=True)
-
-            blob_urls = list(map(lambda dp: dp._extract_blob_url_and_path(fld), self.entries))
-            auth = self.datasource.source.repoApi.auth
-            func_args = zip(
-                map(lambda bu: bu[0], blob_urls),
-                map(lambda bu: bu[1], blob_urls),
-                repeat(auth),
-                repeat(cache_on_disk),
-                repeat(load_into_memory),
+            fields = tuple(
+                [field.name for field in self.datasource.fields if field.valueType == MetadataFieldType.BLOB]
             )
-            with multiprocessing.pool.ThreadPool(num_proc) as pool:
-                res = pool.starmap(_get_blob, func_args)
 
-            for dp, binary_val_or_path in zip(self.entries, res):
-                if binary_val_or_path is None:
+        if len(fields) == 0:
+            logger.warning("No blob fields loaded")
+            return self
+
+        cache_location = self.datasource.default_dataset_location / ".metadata_blobs"
+
+        if cache_on_disk:
+            cache_location.mkdir(parents=True, exist_ok=True)
+
+        # Create a list of things to download: (datapoint, field, url, path_location)
+        to_download: List[Tuple[Datapoint, str, str, Path]] = []
+        for dp in self.entries:
+            for fld in fields:
+                field_value = dp.metadata.get(fld)
+                # If field_value is a blob or a path, then ignore, means it's already been downloaded
+                if not isinstance(field_value, str):
                     continue
-                dp.metadata[fld] = binary_val_or_path
+                download_task = (dp, fld, dp.blob_url(field_value), dp.blob_cache_location / field_value)
+                to_download.append(download_task)
+
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Downloading blobs...", total=len(to_download))
+
+        auth = self.datasource.source.repoApi.auth
+
+        def _get_blob_fn(dp: Datapoint, field: str, url: str, blob_path: Path):
+            blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory)
+            if isinstance(blob_or_path, str):
+                logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}:{blob_or_path}")
+            dp.metadata[field] = blob_or_path
+
+        with progress:
+            with ThreadPoolExecutor(max_workers=num_proc) as tp:
+                futures = [tp.submit(_get_blob_fn, *args) for args in to_download]
+                for f in as_completed(futures):
+                    exc = f.exception()
+                    if exc is not None:
+                        logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
+                    progress.update(task, advance=1)
 
         return self
 
@@ -485,12 +502,14 @@ class QueryResult:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
-    def visualize(self, **kwargs):
+    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "fiftyone", **kwargs) -> Union[str, "fo.Session"]:
         """
-        Visualize this QueryResult with Voxel51.
+        Visualize this QueryResult either on DagsHub or with Voxel51.
 
-        This function calls :func:`to_voxel51_dataset`, passing to it the keyword arguments,
-        and launches a fiftyone session showing the dataset.
+        If ``visualizer`` is ``dagshub``, a webpage is opened on DagsHub with the query applied.
+
+        If ``visualizer`` is ``fiftyone``, this function calls :func:`to_voxel51_dataset`,
+        passing to it the keyword arguments, and launches a fiftyone session showing the dataset.
 
         Additionally, this function adds a DagsHub plugin into Voxel51 that you can use for additional interactions
         with the datasource from within the voxel environment.
@@ -501,17 +520,20 @@ class QueryResult:
             session = ds.all().visualize()
             session.wait(-1)
         """
-        set_voxel_envvars()
+        if visualizer == "dagshub":
+            return self.datasource.visualize(visualizer, **kwargs)
+        if visualizer == "fiftyone":
+            set_voxel_envvars()
 
-        send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
+            send_analytics_event("Client_DataEngine_VizualizeResults", repo=self.datasource.source.repoApi)
 
-        ds = self.to_voxel51_dataset(**kwargs)
+            ds = self.to_voxel51_dataset(**kwargs)
 
-        sess = fo.launch_app(ds)
-        # Launch the server for plugin interaction
-        plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
+            sess = fo.launch_app(ds)
+            # Launch the server for plugin interaction
+            plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
 
-        return sess
+            return sess
 
     def annotate(
         self, open_project=True, ignore_warning=True, fields_to_embed=None, fields_to_exclude=None

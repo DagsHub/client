@@ -47,11 +47,13 @@ def repo_with_yaml_dh_storage_model(repo_mock) -> Tuple[MockRepoAPI, PurePosixPa
 
     repo_mock.add_dagshub_storage_contents("", dirs=[model_dir])
     repo_mock.add_dagshub_storage_file(f"{model_dir}/model.pt", b"blablabla")
-    return repo_mock, PurePosixPath(model_dir)
+    return repo_mock, PurePosixPath("s3") / repo_mock.repo_name / model_dir
 
 
 @pytest.fixture
-def repo_with_yaml_bucket_model(repo_mock, bucket_name, protocol) -> Tuple[MockRepoAPI, PurePosixPath]:
+def repo_with_yaml_bucket_model(
+    repo_mock, bucket_name, protocol
+) -> Tuple[MockRepoAPI, PurePosixPath]:
     repo_mock.add_storage(protocol, bucket_name)
 
     full_bucket_name = f"{protocol}/{bucket_name}"
@@ -66,10 +68,12 @@ def repo_with_yaml_bucket_model(repo_mock, bucket_name, protocol) -> Tuple[MockR
 
 
 @pytest.fixture
-def repo_with_dh_storage_model(repo_mock, dir_path) -> Tuple[MockRepoAPI, PurePosixPath]:
+def repo_with_dh_storage_model(
+    repo_mock, dir_path
+) -> Tuple[MockRepoAPI, PurePosixPath]:
     repo_mock.add_dagshub_storage_contents("", dirs=[dir_path])
     repo_mock.add_dagshub_storage_file(f"{dir_path}/model.pt", b"blablabla")
-    return repo_mock, PurePosixPath(f"{dir_path}")
+    return repo_mock, PurePosixPath(f"s3/{repo_mock.repo_name}/{dir_path}")
 
 
 @pytest.fixture
@@ -95,7 +99,9 @@ def protocol(request):
 
 
 @pytest.fixture
-def repo_with_bucket_model(repo_mock, dir_path, protocol, bucket_name) -> Tuple[MockRepoAPI, PurePosixPath]:
+def repo_with_bucket_model(
+    repo_mock, dir_path, protocol, bucket_name
+) -> Tuple[MockRepoAPI, PurePosixPath]:
     repo_mock.add_storage(protocol, bucket_name)
     full_bucket_name = f"{protocol}/{bucket_name}"
     repo_mock.add_storage_contents(full_bucket_name, dirs=[dir_path])

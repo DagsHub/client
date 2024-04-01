@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
 
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
@@ -828,14 +828,49 @@ class Datasource:
             sanitize_filepath(os.path.join(Path.home(), "dagshub", "datasets", self.source.repo, str(self.source.id)))
         )
 
-    def visualize(self, **kwargs) -> "fo.Session":
+    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "fiftyone", **kwargs) -> Union[str, "fo.Session"]:
         """
         Visualize the whole datasource using
         :func:`QueryResult.visualize() <dagshub.data_engine.model.query_result.QueryResult.visualize>`.
 
         Read the function docs for kwarg documentation.
         """
-        return self.all().visualize(**kwargs)
+        if visualizer == "dagshub":
+            link = self._generate_visualize_url()
+
+            print("The visualization is available at the following link:")
+            print(link)
+
+            webbrowser.open(link)
+
+            return link
+
+        elif visualizer == "fiftyone":
+            return self.all().visualize(**kwargs)
+
+    def _generate_visualize_url(self) -> str:
+        url: str
+        if self.assigned_dataset is not None:
+            url = multi_urljoin(
+                self.source.repoApi.repo_url, f"datasets/dataset/{self.assigned_dataset.dataset_id}/gallery"
+            )
+        else:
+            url = self.source.url
+
+        full_url = url
+        query = self._encode_query_for_frontend()
+        if query is not None:
+            full_url += f"?{query}"
+        return full_url
+
+    def _encode_query_for_frontend(self) -> str:
+        """
+        Returns a query that is parseable by the frontend.
+        It has to be a JSON of the GraphQL query, encoded into b64
+        """
+        params = self._query.to_json()
+        params_encoded = base64.urlsafe_b64encode(params.encode("utf-8")).decode("utf-8")
+        return f"query={params_encoded}"
 
     @property
     def fields(self) -> List[MetadataFieldSchema]:
@@ -1107,6 +1142,26 @@ class Datasource:
             return WrongOperatorError(f"Cannot use contains with non-string value {item}")
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
+
+    def startswith(self, item: str):
+        """
+        Check if the filtering field starts with the specified string item.
+
+        :meta private:
+        """
+        if type(item) is not str:
+            return WrongOperatorError(f"Cannot use startswith with non-string value {item}")
+        return self.add_query_op("startswith", item)
+
+    def endswith(self, item: str):
+        """
+        Check if the filtering field ends with the specified string item.
+
+        :meta private:
+        """
+        if type(item) is not str:
+            return WrongOperatorError(f"Cannot use endswith with non-string value {item}")
+        return self.add_query_op("endswith", item)
 
     def is_null(self):
         """

@@ -16,17 +16,12 @@ from dagshub.common.api.repo import PathNotFoundError
 from dagshub.common.api.responses import StorageAPIEntry
 from dagshub.common.determine_repo import determine_repo
 from dagshub.common.helpers import log_message
-from dagshub.models.model_loaders import ModelLoader, RepoModelLoader, BucketModelLoader, DagsHubStorageModelLoader
-
-# TODO:
-"""
-Ways to get model:
-- automatic - with the cascade
-- from path
-- from bucket
-- from mlflow model
-- from mlflow artifact
-"""
+from dagshub.models.model_loaders import (
+    ModelLoader,
+    RepoModelLoader,
+    BucketModelLoader,
+    DagsHubStorageModelLoader,
+)
 
 # TODO: don't forget to separate dvc downloads by the hash of the dir
 
@@ -91,7 +86,11 @@ class ModelLocator:
     def download_destination(self) -> Path:
         if self._download_dest is not None:
             return Path(self._download_dest)
-        return Path(sanitize_filepath(os.path.join(Path.home(), "dagshub", "models", self.repo_api.full_name)))
+        return Path(
+            sanitize_filepath(
+                os.path.join(Path.home(), "dagshub", "models", self.repo_api.full_name)
+            )
+        )
 
     @cached_property
     def repo_storages(self) -> List[StorageAPIEntry]:
@@ -112,7 +111,7 @@ class ModelLocator:
             return path, StorageType.Repo
 
         if str_path.startswith("dagshub_storage/"):
-            return str_path[len("dagshub_storage/"):], StorageType.DagshubStorage
+            return str_path[len("dagshub_storage/") :], StorageType.DagshubStorage
         for storage in self.repo_storages:
             if str_path.startswith(f"{storage.name}/"):
                 bucketPath = f"{storage.protocol}/{str_path}"
@@ -133,15 +132,24 @@ class ModelLocator:
         log_message(f"Loading the model from yaml file {yaml_path}", logger=logger)
         if storage_type == StorageType.DagshubStorage:
             try:
-                self.repo_api.list_storage_path(f"s3/{self.repo_api.repo_name}/{model_path}")
-                log_message(f"Loading the model from DagsHub Storage {model_path}", logger=logger)
-                return DagsHubStorageModelLoader(self.repo_api, PurePosixPath(model_path))
+                self.repo_api.list_storage_path(
+                    f"s3/{self.repo_api.repo_name}/{model_path}"
+                )
+                log_message(
+                    f"Loading the model from DagsHub Storage {model_path}",
+                    logger=logger,
+                )
+                return DagsHubStorageModelLoader(
+                    self.repo_api, PurePosixPath(model_path)
+                )
             except PathNotFoundError:
                 raise ModelNotFoundError
         elif storage_type == StorageType.Bucket:
             try:
                 self.repo_api.list_storage_path(model_path)
-                log_message(f"Loading the model from bucket {model_path}", logger=logger)
+                log_message(
+                    f"Loading the model from bucket {model_path}", logger=logger
+                )
                 return BucketModelLoader(self.repo_api, PurePosixPath(model_path))
             except PathNotFoundError:
                 raise ModelNotFoundError
@@ -149,7 +157,9 @@ class ModelLocator:
             try:
                 self.repo_api.list_path(model_path, revision=self.git_ref)
                 log_message(f"Loading the model from repo {model_path}", logger=logger)
-                return RepoModelLoader(self.repo_api, self.git_ref, PurePosixPath(model_path))
+                return RepoModelLoader(
+                    self.repo_api, self.git_ref, PurePosixPath(model_path)
+                )
             except PathNotFoundError:
                 raise ModelNotFoundError
 
@@ -160,8 +170,12 @@ class ModelLocator:
             modelPath = PurePosixPath(lookup_dir)
             try:
                 self.repo_api.list_path(str(modelPath), revision=self.git_ref)
-                log_message(f"Loading the model from repo directory {modelPath}", logger=logger)
-                return RepoModelLoader(repo_api=self.repo_api, revision=self.git_ref, path=modelPath)
+                log_message(
+                    f"Loading the model from repo directory {modelPath}", logger=logger
+                )
+                return RepoModelLoader(
+                    repo_api=self.repo_api, revision=self.git_ref, path=modelPath
+                )
             except PathNotFoundError:
                 continue
         return None
@@ -180,7 +194,10 @@ class ModelLocator:
             modelPath = bucketPath / lookup_dir
             try:
                 self.repo_api.list_storage_path(str(modelPath))
-                log_message(f"Loading the model from bucket directory {modelPath}", logger=logger)
+                log_message(
+                    f"Loading the model from bucket directory {modelPath}",
+                    logger=logger,
+                )
                 return BucketModelLoader(repo_api=self.repo_api, path=modelPath)
             except PathNotFoundError:
                 continue
@@ -192,8 +209,13 @@ class ModelLocator:
         for modelPath in self.lookup_dirs:
             try:
                 self.repo_api.list_storage_path(str(bucketPath / modelPath))
-                log_message(f"Loading the model from DagsHub Storage directory {modelPath}", logger=logger)
-                return DagsHubStorageModelLoader(repo_api=self.repo_api, path=PurePosixPath(modelPath))
+                log_message(
+                    f"Loading the model from DagsHub Storage directory {modelPath}",
+                    logger=logger,
+                )
+                return DagsHubStorageModelLoader(
+                    repo_api=self.repo_api, path=PurePosixPath(modelPath)
+                )
             except PathNotFoundError:
                 continue
 
@@ -201,12 +223,6 @@ class ModelLocator:
 
     def find_model(self) -> ModelLoader:
         model_loader: Optional[ModelLoader]
-
-        def return_if_exists_throw_otherwise():
-            if model_loader is None:
-                raise ModelNotFoundError
-            if model_loader is not None:
-                return model_loader
 
         if self.path is not None:
             # Check that the dir exists and return that
@@ -216,17 +232,26 @@ class ModelLocator:
                     self.repo_api.list_storage_path(handled_path)
                     return BucketModelLoader(self.repo_api, PurePosixPath(handled_path))
                 elif storage_type == storage_type.DagshubStorage:
-                    self.repo_api.list_storage_path(PurePosixPath("s3") / self.repo_api.repo_name / handled_path)
-                    return DagsHubStorageModelLoader(self.repo_api, PurePosixPath(handled_path))
+                    self.repo_api.list_storage_path(
+                        PurePosixPath("s3") / self.repo_api.repo_name / handled_path
+                    )
+                    return DagsHubStorageModelLoader(
+                        self.repo_api, PurePosixPath(handled_path)
+                    )
                 else:
                     self.repo_api.list_path(handled_path, self.git_ref)
-                    return RepoModelLoader(self.repo_api, self.git_ref, PurePosixPath(handled_path))
+                    return RepoModelLoader(
+                        self.repo_api, self.git_ref, PurePosixPath(handled_path)
+                    )
             except PathNotFoundError:
                 raise ModelNotFoundError
 
         if self.bucket is not None:
             model_loader = self.try_find_model_in_bucket(self.bucket)
-            return return_if_exists_throw_otherwise()
+            if model_loader is None:
+                raise ModelNotFoundError
+            if model_loader is not None:
+                return model_loader
 
         # TODO: add mlflow here
 
@@ -247,7 +272,9 @@ class ModelLocator:
     def get_model_path(self) -> Path:
         send_analytics_event("Client_Models_GetModelPath")
         model_loader = self.find_model()
-        return model_loader.load_model(self.download_type, self.download_destination, self.git_ref)
+        return model_loader.load_model(
+            self.download_type, self.download_destination, self.git_ref
+        )
 
 
 def get_model_path(

@@ -12,7 +12,7 @@ from dagshub.common import config, rich_console
 logger = logging.getLogger(__name__)
 
 
-def oauth_flow(host: str, client_id: Optional[str] = None) -> OAuthDagshubToken:
+def oauth_flow(host: str, client_id: Optional[str] = None, referrer: Optional[str] = None) -> OAuthDagshubToken:
     """
     Initiate the OAuth 2.0 flow for obtaining an access token.
 
@@ -20,6 +20,7 @@ def oauth_flow(host: str, client_id: Optional[str] = None) -> OAuthDagshubToken:
         host (str): The URL of the OAuth provider.
         client_id (Optional[str], optional): The client ID used for authentication.
             If not provided, it will use the default client ID from the configuration.
+        referrer (Optional[str], optional): For custom referral
 
     Returns:
         Dict: A dictionary containing the obtained access token.
@@ -31,8 +32,10 @@ def oauth_flow(host: str, client_id: Optional[str] = None) -> OAuthDagshubToken:
     state = uuid.uuid4()
     middle_man_request_id = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
     auth_link = (
-        f"{dagshub_url}/authorize?state={state}&client_id={client_id}" f"&middleman_request_id={middle_man_request_id}"
+        f"{dagshub_url}/authorize?state={state}&client_id={client_id}&middleman_request_id={middle_man_request_id}"
     )
+    if referrer is not None:
+        auth_link += f"&referrer={referrer}"
 
     webbrowser.open(auth_link)
 

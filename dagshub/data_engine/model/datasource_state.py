@@ -9,6 +9,7 @@ from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, MetadataFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
+from dagshub.common.util import multi_urljoin
 
 try:
     from functools import cached_property
@@ -62,6 +63,10 @@ class DatasourceState:
             logger.warning("Revision wasn't set, assuming default repo branch")
             self.revision = self.repoApi.default_branch
         return self._revision
+
+    @property
+    def url(self) -> str:
+        return multi_urljoin(self.repoApi.repo_url, f"datasets/datasource/{self.id}/gallery")
 
     @revision.setter
     def revision(self, val: str):
