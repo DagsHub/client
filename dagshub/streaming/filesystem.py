@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 from configparser import ConfigParser
-from functools import wraps
+from functools import wraps, cached_property
 from multiprocessing import AuthenticationError
 from os import PathLike
 from pathlib import Path, PurePosixPath
@@ -31,7 +31,6 @@ PRE_PYTHON3_11 = sys.version_info.major == 3 and sys.version_info.minor < 11
 if PRE_PYTHON3_11:
     from pathlib import _NormalAccessor as _pathlib  # noqa: E402
 
-from functools import cached_property
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
