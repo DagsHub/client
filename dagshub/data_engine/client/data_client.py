@@ -28,10 +28,7 @@ from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
-try:
-    from functools import cached_property
-except ImportError:
-    from cached_property import cached_property
+from functools import cached_property
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState

@@ -17,10 +17,7 @@ from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
 from functools import partial
 
-try:
-    from functools import cached_property
-except ImportError:
-    from cached_property import cached_property
+from functools import cached_property
 
 from typing import Optional, Tuple, Any, List, Union
 

@@ -2,10 +2,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Optional, Dict, List
 
-try:
-    from functools import cached_property
-except ImportError:
-    from cached_property import cached_property
+from functools import cached_property
 
 
 @dataclass
