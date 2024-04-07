@@ -200,6 +200,10 @@ class Datasource:
         """Return all fields that have the annotation meta tag set"""
         return [f.name for f in self.fields if f.is_annotation()]
 
+    @property
+    def document_fields(self) -> List[str]:
+        return [f.name for f in self.fields if f.is_document()]
+
     def serialize_gql_query_input(self) -> Dict:
         """
         Serialize the query of this Datasource for use in GraphQL querying (e.g. getting datapoints)
