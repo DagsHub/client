@@ -1,8 +1,13 @@
+from unittest.mock import MagicMock
+
 import pandas as pd
 import pytest
 
-from dagshub.data_engine.dtypes import MetadataFieldType
+from dagshub.data_engine.client.models import MetadataFieldSchema
+from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, MetadataContextManager
+from dagshub.data_engine.model.metadata import wrap_bytes, MultipleDataTypesUploadedError, StringFieldValueTooLongError
+from tests.data_engine.util import add_string_fields
 
 
 @pytest.fixture
@@ -69,8 +74,44 @@ def test_fails_nonexistent_field(ds, metadata_df):
 def test_binary_metadata(ds):
     ctx = MetadataContextManager(ds)
     data = "aaa".encode()
-    encoded_data = MetadataContextManager.wrap_bytes(data)
+    encoded_data = wrap_bytes(data)
     ctx.update_metadata("test.txt", {"binary_value": data})
 
     expected = DatapointMetadataUpdateEntry("test.txt", "binary_value", encoded_data, MetadataFieldType.BLOB)
     assert ctx.get_metadata_entries() == [expected]
+
+
+def test_validation_cant_upload_multi_type(ds):
+    with pytest.raises(MultipleDataTypesUploadedError):
+        with ds.metadata_context() as ctx:
+            ctx.update_metadata("a.txt", {"field": "value"})
+            ctx.update_metadata("b.txt", {"field": 1})
+
+
+def test_validation_upload_long_string(ds):
+    add_string_fields(ds, "field")
+    with pytest.raises(StringFieldValueTooLongError):
+        with ds.metadata_context() as ctx:
+            ctx.update_metadata("a.txt", {"field": "a" * 100_000})
+
+
+def test_uploading_new_big_file_turns_it_to_document(ds):
+    data = "a" * 100_000
+    with ds.metadata_context() as ctx:
+        ctx.update_metadata("a.txt", {"field": data})
+    client_mock: MagicMock = ds.source.client
+
+    expected_field_update = [
+        MetadataFieldSchema(
+            "field", valueType=MetadataFieldType.BLOB, multiple=False, tags={ReservedTags.DOCUMENT.value}
+        )
+    ]
+
+    client_mock.update_metadata_fields.assert_called_with(ds, expected_field_update)
+
+    expected_data_upload = [
+        DatapointMetadataUpdateEntry(
+            url="a.txt", key="field", value=wrap_bytes(data.encode("utf-8")), valueType=MetadataFieldType.BLOB
+        )
+    ]
+    client_mock.update_metadata.assert_called_with(ds, expected_data_upload)

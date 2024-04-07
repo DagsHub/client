@@ -1,6 +1,5 @@
 import base64
 import datetime
-import gzip
 import json
 import logging
 import math
@@ -39,6 +38,12 @@ from dagshub.data_engine.model.errors import (
     FieldNotFoundError,
     DatasetNotFoundError,
 )
+from dagshub.data_engine.model.metadata import (
+    validate_uploading_metadata,
+    run_preupload_transforms,
+    precalculate_metadata_info,
+)
+from dagshub.data_engine.model.metadata import wrap_bytes
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
 from dagshub.data_engine.model.query import QueryFilterTree
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
@@ -543,7 +548,7 @@ class Datasource:
                         if value_type == MetadataFieldType.INTEGER:
                             sub_val = int(sub_val)
                         if type(sub_val) is bytes:
-                            sub_val = MetadataContextManager.wrap_bytes(sub_val)
+                            sub_val = wrap_bytes(sub_val)
                         res.append(
                             DatapointMetadataUpdateEntry(
                                 url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
@@ -619,6 +624,10 @@ class Datasource:
         self.source.client.scan_datasource(self, options=options)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
+        precalculated_info = precalculate_metadata_info(self, metadata_entries)
+        validate_uploading_metadata(precalculated_info)
+        run_preupload_transforms(self, metadata_entries, precalculated_info)
+
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
         upload_batch_size = dagshub.common.config.dataengine_metadata_upload_batch_size
@@ -1304,7 +1313,7 @@ class MetadataContextManager:
                             continue
 
                         if type(v) is bytes:
-                            sub_val = self.wrap_bytes(sub_val)
+                            sub_val = wrap_bytes(sub_val)
                         self._metadata_entries.append(
                             DatapointMetadataUpdateEntry(
                                 url=dp,
@@ -1326,7 +1335,7 @@ class MetadataContextManager:
                         continue
 
                     if type(v) is bytes:
-                        v = self.wrap_bytes(v)
+                        v = wrap_bytes(v)
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(
@@ -1338,17 +1347,6 @@ class MetadataContextManager:
                             allowMultiple=k in self._multivalue_fields,
                         )
                     )
-
-    @staticmethod
-    def wrap_bytes(val: bytes) -> str:
-        """
-        Handles bytes values for uploading metadata
-        The process is gzip -> base64
-
-        :meta private:
-        """
-        compressed = gzip.compress(val)
-        return base64.b64encode(compressed).decode("utf-8")
 
     def get_metadata_entries(self):
         return self._metadata_entries
