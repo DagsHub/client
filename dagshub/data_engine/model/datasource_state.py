@@ -11,10 +11,7 @@ from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 from dagshub.common.util import multi_urljoin
 
-try:
-    from functools import cached_property
-except ImportError:
-    from cached_property import cached_property
+from functools import cached_property
 
 logger = logging.getLogger(__name__)
 

@@ -10,10 +10,7 @@ from httpx import Auth
 
 from dagshub.common import config
 
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
+from typing import Literal
 
 import re
 import rich.progress

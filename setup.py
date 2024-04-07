@@ -1,4 +1,3 @@
-import sys
 import setuptools
 import os.path
 
@@ -49,13 +48,6 @@ extras_require = {
     "jupyter": ["rich[jupyter]~=13.1.0"],
     "fuse": ["fusepy>=3"],
 }
-
-# Polyfills for Python 3.7
-if sys.version_info.major == 3 and sys.version_info.minor == 7:
-    install_requires += [
-        "cached-property==1.5.2",
-        "typing_extensions",
-    ]
 
 packages = setuptools.find_packages(exclude=["tests", "tests.*"])
 
