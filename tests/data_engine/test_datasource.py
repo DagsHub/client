@@ -7,7 +7,7 @@ from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, MetadataContextManager
 from dagshub.data_engine.model.metadata import wrap_bytes, MultipleDataTypesUploadedError, StringFieldValueTooLongError
-from tests.data_engine.util import add_string_fields
+from tests.data_engine.util import add_string_fields, add_document_fields
 
 
 @pytest.fixture
@@ -112,6 +112,22 @@ def test_uploading_new_big_file_turns_it_to_document(ds):
     expected_data_upload = [
         DatapointMetadataUpdateEntry(
             url="a.txt", key="field", value=wrap_bytes(data.encode("utf-8")), valueType=MetadataFieldType.BLOB
+        )
+    ]
+    client_mock.update_metadata.assert_called_with(ds, expected_data_upload)
+
+
+def test_uploading_to_document_turns_into_blob(ds):
+    data = "aaa"
+    field = "field"
+    add_document_fields(ds, field)
+    with ds.metadata_context() as ctx:
+        ctx.update_metadata("a.txt", {field: data})
+
+    client_mock: MagicMock = ds.source.client
+    expected_data_upload = [
+        DatapointMetadataUpdateEntry(
+            url="a.txt", key=field, value=wrap_bytes(data.encode("utf-8")), valueType=MetadataFieldType.BLOB
         )
     ]
     client_mock.update_metadata.assert_called_with(ds, expected_data_upload)
