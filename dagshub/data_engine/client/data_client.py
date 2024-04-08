@@ -11,7 +11,6 @@ import dagshub.auth
 import dagshub.common.config
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
-from dagshub.common.helpers import log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.gql_introspections import GqlIntrospections, TypesIntrospection
 from dagshub.data_engine.client.models import (
@@ -163,11 +162,6 @@ class DataClient:
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
                 progress.update(total_task, advance=len(new_entries.entries), refresh=True)
-
-        # Auto download document fields
-        if len(datasource.document_fields) > 0:
-            log_message("Downloading document fields")
-            res.download_binary_columns(*datasource.document_fields)
 
         return res
 

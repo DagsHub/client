@@ -103,9 +103,13 @@ class Voxel51Annotation(DagshubDataType):
     backing_field_type = MetadataFieldType.BLOB
     custom_tags = {ReservedTags.ANNOTATION.value}
 
+
 class Document(DagshubDataType):
     """
-    Field with large text values that is stored as a blob
+    Field with large text values that is stored as a blob.
+    Document fields can't be filtered on,
+    but allow you to store arbitrarily large text longer than allowed 512 characters
     """
+
     backing_field_type = MetadataFieldType.BLOB
     custom_tags = {ReservedTags.DOCUMENT.value}

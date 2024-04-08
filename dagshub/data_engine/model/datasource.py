@@ -257,10 +257,12 @@ class Datasource:
         if change_query:
             self._query = dataset_state.query
 
-    def sample(self, start: Optional[int] = None, end: Optional[int] = None):
+    def sample(self, start: Optional[int] = None, end: Optional[int] = None) -> "QueryResult":
         if start is not None:
             logger.warning("Starting slices is not implemented for now")
-        return self._source.client.sample(self, end, include_metadata=True)
+        res = self._source.client.sample(self, end, include_metadata=True)
+        self._download_document_fields(res)
+        return res
 
     def head(self, size=100) -> "QueryResult":
         """
@@ -271,14 +273,29 @@ class Datasource:
         """
         self._check_preprocess()
         send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
-        return self._source.client.head(self, size)
+        res = self._source.client.head(self, size)
+        self._download_document_fields(res)
+        return res
 
     def all(self) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
         """
         self._check_preprocess()
-        return self._source.client.get_datapoints(self)
+        res = self._source.client.get_datapoints(self)
+        self._download_document_fields(res)
+
+        return res
+
+    def _download_document_fields(self, qr: "QueryResult"):
+        if len(self.document_fields) > 0:
+            log_message(f"Downloading document fields {self.document_fields}...")
+            qr.download_binary_columns(*self.document_fields)
+            # Convert them to strings
+            for dp in qr:
+                for f in self.document_fields:
+                    if f in dp.metadata:
+                        dp.metadata[f] = dp.metadata[f].decode("utf-8")
 
     def select(self, *selected: Union[str, Field]) -> "Datasource":
         """
