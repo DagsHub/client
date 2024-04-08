@@ -19,7 +19,7 @@ from dagshub.data_engine.annotation.voxel_conversion import (
     add_ls_annotations,
 )
 from dagshub.data_engine.client.models import DatasourceType
-from dagshub.data_engine.model.datapoint import Datapoint, _get_blob
+from dagshub.data_engine.model.datapoint import Datapoint, _get_blob, _generated_fields
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from dagshub.data_engine.dtypes import MetadataFieldType
@@ -28,10 +28,12 @@ if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
     import fiftyone as fo
     import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
+    import datasets as hf_ds
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     tf = lazy_load("tensorflow")
+    hf_ds = lazy_load("datasets")
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +229,34 @@ class QueryResult:
         else:
             raise ValueError("supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>")
 
+    def as_hf_dataset(self, download_datapoints=True, download_blobs=True):
+        """
+        Loads this QueryResult as a HuggingFace dataset.
+        """
+        if download_blobs:
+            # Download blobs as paths, so later a user can apply ds.cast_column on the blobs
+            self.get_blob_fields(load_into_memory=False, path_format="str")
+
+        df = self.dataframe
+
+        if download_datapoints:
+            # Do the same for the actual datapoint files, changing the path
+            new_paths = []
+            self.download_files()
+            for dp in df["path"]:
+                new_paths.append(
+                    str(self.datasource.default_dataset_location / self.datasource.source.source_prefix / dp)
+                )
+            df["path"] = new_paths
+
+        # Drop the generated fields
+        for f in _generated_fields.keys():
+            if f == "path":
+                continue
+            df.drop(f, axis=1, inplace=True)
+
+        return hf_ds.Dataset.from_pandas(df)
+
     def __getitem__(self, item: Union[str, int, slice]):
         """
         Gets datapoint by its path (string) or by its index in the result (or slice)
@@ -244,7 +274,12 @@ class QueryResult:
             )
 
     def get_blob_fields(
-        self, *fields: str, load_into_memory=False, cache_on_disk=True, num_proc: int = config.download_threads
+        self,
+        *fields: str,
+        load_into_memory=False,
+        cache_on_disk=True,
+        num_proc: int = config.download_threads,
+        path_format: Literal["str", "path"] = "path",
     ) -> "QueryResult":
         """
         Downloads data from blob fields
@@ -260,6 +295,8 @@ class QueryResult:
             cache_on_disk: Whether to cache the blobs on disk or not (valid only if load_into_memory is set to True)
                 Cache location is ``~/dagshub/datasets/<repo>/<datasource_id>/.metadata_blobs/``
             num_proc: number of download threads
+            path_format: What way the paths to the file should be represented.
+                ``path`` returns a Path object, and ``str`` returns a string of this path.
         """
         send_analytics_event("Client_DataEngine_downloadBlobs", repo=self.datasource.source.repoApi)
         if not load_into_memory:
@@ -297,8 +334,8 @@ class QueryResult:
         auth = self.datasource.source.repoApi.auth
 
         def _get_blob_fn(dp: Datapoint, field: str, url: str, blob_path: Path):
-            blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory)
-            if isinstance(blob_or_path, str):
+            blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory, path_format)
+            if isinstance(blob_or_path, str) and path_format != "str":
                 logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}:{blob_or_path}")
             dp.metadata[field] = blob_or_path
 
@@ -314,7 +351,11 @@ class QueryResult:
         return self
 
     def download_binary_columns(
-        self, *columns: str, load_into_memory=True, cache_on_disk=True, num_proc: int = 32
+        self,
+        *columns: str,
+        load_into_memory=True,
+        cache_on_disk=True,
+        num_proc: int = 32,
     ) -> "QueryResult":
         """
         deprecated: Use get_blob_fields instead.
@@ -322,7 +363,10 @@ class QueryResult:
         :meta private:
         """
         return self.get_blob_fields(
-            *columns, load_into_memory=load_into_memory, cache_on_disk=cache_on_disk, num_proc=num_proc
+            *columns,
+            load_into_memory=load_into_memory,
+            cache_on_disk=cache_on_disk,
+            num_proc=num_proc,
         )
 
     def download_files(

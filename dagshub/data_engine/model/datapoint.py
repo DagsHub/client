@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING
+from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING, Literal
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
@@ -229,7 +229,12 @@ class Datapoint:
 
 
 def _get_blob(
-    url: Optional[str], cache_path: Optional[Path], auth, cache_on_disk: bool, return_blob: bool
+    url: Optional[str],
+    cache_path: Optional[Path],
+    auth,
+    cache_on_disk: bool,
+    return_blob: bool,
+    path_format: Literal["str", "path"] = "path",
 ) -> Optional[Union[Path, str, bytes]]:
     """
     Args:
@@ -248,6 +253,8 @@ def _get_blob(
             with cache_path.open("rb") as f:
                 return f.read()
         else:
+            if path_format == "str":
+                cache_path = str(cache_path)
             return cache_path
 
     try:
@@ -266,4 +273,6 @@ def _get_blob(
     if return_blob:
         return content
     else:
+        if path_format == "str":
+            cache_path = str(cache_path)
         return cache_path
