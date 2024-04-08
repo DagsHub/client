@@ -232,6 +232,15 @@ class QueryResult:
     def as_hf_dataset(self, download_datapoints=True, download_blobs=True):
         """
         Loads this QueryResult as a HuggingFace dataset.
+
+        The paths of the downloads are set to the local paths in the filesystem, so they can be used with
+        a ``cast_column()`` function later.
+
+        Args:
+            download_datapoints: If set to ``True`` (default), downloads the datapoint files and sets the path column\
+                to the path of the datapoint in the filesystem
+            download_blobs: If set to ``True`` (default), downloads all blob fields and sets the respective column\
+                to the path of the file in the filesystem.
         """
         if download_blobs:
             # Download blobs as paths, so later a user can apply ds.cast_column on the blobs
