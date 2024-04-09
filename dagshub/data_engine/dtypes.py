@@ -7,7 +7,7 @@ class ReservedTags(enum.Enum):
     """:meta private:"""
 
     ANNOTATION = "annotation"
-    DOCUMENT = "document"
+    DOCUMENT = "text_document"
 
 
 # These are the base primitives that the data engine database is capable of storing
