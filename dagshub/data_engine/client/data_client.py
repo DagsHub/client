@@ -162,6 +162,7 @@ class DataClient:
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
                 progress.update(total_task, advance=len(new_entries.entries), refresh=True)
+
         return res
 
     def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

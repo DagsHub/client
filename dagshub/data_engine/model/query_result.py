@@ -268,7 +268,11 @@ class QueryResult:
         # If no fields are specified, include all blob fields from self.datasource.fields
         if not fields:
             fields = tuple(
-                [field.name for field in self.datasource.fields if field.valueType == MetadataFieldType.BLOB]
+                [
+                    field.name
+                    for field in self.datasource.fields
+                    if field.valueType == MetadataFieldType.BLOB and field.name not in self.datasource.document_fields
+                ]
             )
 
         if len(fields) == 0:

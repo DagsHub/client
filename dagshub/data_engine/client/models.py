@@ -70,6 +70,9 @@ class MetadataFieldSchema(DataClassJsonMixin):
     def is_annotation(self):
         return ReservedTags.ANNOTATION.value in self.tags if self.tags else False
 
+    def is_document(self):
+        return ReservedTags.DOCUMENT.value in self.tags if self.tags else False
+
 
 @dataclass
 class DatasourceResult:

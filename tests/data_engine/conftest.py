@@ -8,10 +8,13 @@ from tests.data_engine.util import add_string_fields
 
 
 @pytest.fixture
-def ds() -> Datasource:
+def ds(mocker) -> Datasource:
     ds_state = datasources.DatasourceState(id=1, name="test-dataset", repo="kirill/repo")
     ds_state.path = "repo://kirill/repo/data/"
-    yield Datasource(ds_state)
+    mocker.patch.object(ds_state, "client")
+    # Stub out get_from_dagshub, because it doesn't need to be done in tests
+    mocker.patch.object(ds_state, "get_from_dagshub")
+    return Datasource(ds_state)
 
 
 @pytest.fixture
@@ -25,13 +28,13 @@ def dataset_state(ds) -> DatasetState:
         datasource_id=ds.source.id,
         dataset_query=queried.serialize_gql_query_input(),
     )
-    yield state
+    return state
 
 
 @pytest.fixture
 def ds_with_dataset(ds, dataset_state) -> Datasource:
     ds.load_from_dataset_state(dataset_state)
-    yield ds
+    return ds
 
 
 @pytest.fixture

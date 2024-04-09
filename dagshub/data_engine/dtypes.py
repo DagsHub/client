@@ -7,6 +7,7 @@ class ReservedTags(enum.Enum):
     """:meta private:"""
 
     ANNOTATION = "annotation"
+    DOCUMENT = "text_document"
 
 
 # These are the base primitives that the data engine database is capable of storing
@@ -38,8 +39,8 @@ class DagshubDataType(metaclass=ABCMeta):
         custom_tags: additional tags applied to this type
     """
 
-    backing_field_type: MetadataFieldType = None
-    custom_tags: Set[str] = None
+    backing_field_type: MetadataFieldType
+    custom_tags: Set[str]
 
 
 class Int(DagshubDataType):
@@ -101,3 +102,14 @@ class Voxel51Annotation(DagshubDataType):
 
     backing_field_type = MetadataFieldType.BLOB
     custom_tags = {ReservedTags.ANNOTATION.value}
+
+
+class Document(DagshubDataType):
+    """
+    Field with large text values that is stored as a blob.
+    Document fields can't be filtered on,
+    but allow you to store arbitrarily large text longer than allowed 512 characters
+    """
+
+    backing_field_type = MetadataFieldType.BLOB
+    custom_tags = {ReservedTags.DOCUMENT.value}

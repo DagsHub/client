@@ -1,6 +1,5 @@
 import base64
 import datetime
-import gzip
 import json
 import logging
 import math
@@ -39,6 +38,12 @@ from dagshub.data_engine.model.errors import (
     FieldNotFoundError,
     DatasetNotFoundError,
 )
+from dagshub.data_engine.model.metadata import (
+    validate_uploading_metadata,
+    run_preupload_transforms,
+    precalculate_metadata_info,
+)
+from dagshub.data_engine.model.metadata import wrap_bytes
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
 from dagshub.data_engine.model.query import QueryFilterTree
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
@@ -195,6 +200,10 @@ class Datasource:
         """Return all fields that have the annotation meta tag set"""
         return [f.name for f in self.fields if f.is_annotation()]
 
+    @property
+    def document_fields(self) -> List[str]:
+        return [f.name for f in self.fields if f.is_document()]
+
     def serialize_gql_query_input(self) -> Dict:
         """
         Serialize the query of this Datasource for use in GraphQL querying (e.g. getting datapoints)
@@ -248,10 +257,12 @@ class Datasource:
         if change_query:
             self._query = dataset_state.query
 
-    def sample(self, start: Optional[int] = None, end: Optional[int] = None):
+    def sample(self, start: Optional[int] = None, end: Optional[int] = None) -> "QueryResult":
         if start is not None:
             logger.warning("Starting slices is not implemented for now")
-        return self._source.client.sample(self, end, include_metadata=True)
+        res = self._source.client.sample(self, end, include_metadata=True)
+        self._download_document_fields(res)
+        return res
 
     def head(self, size=100) -> "QueryResult":
         """
@@ -262,14 +273,29 @@ class Datasource:
         """
         self._check_preprocess()
         send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
-        return self._source.client.head(self, size)
+        res = self._source.client.head(self, size)
+        self._download_document_fields(res)
+        return res
 
     def all(self) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
         """
         self._check_preprocess()
-        return self._source.client.get_datapoints(self)
+        res = self._source.client.get_datapoints(self)
+        self._download_document_fields(res)
+
+        return res
+
+    def _download_document_fields(self, qr: "QueryResult"):
+        if len(self.document_fields) > 0:
+            log_message(f"Downloading document fields {self.document_fields}...")
+            qr.download_binary_columns(*self.document_fields)
+            # Convert them to strings
+            for dp in qr:
+                for f in self.document_fields:
+                    if f in dp.metadata:
+                        dp.metadata[f] = dp.metadata[f].decode("utf-8")
 
     def select(self, *selected: Union[str, Field]) -> "Datasource":
         """
@@ -499,10 +525,10 @@ class Datasource:
         res: List[DatapointMetadataUpdateEntry] = []
         if path_column is None:
             path_column = df.columns[0]
-        elif type(path_column) is str:
+        elif isinstance(path_column, str):
             if path_column not in df.columns:
                 raise RuntimeError(f"Column {path_column} does not exist in the dataframe")
-        elif type(path_column) is int:
+        elif isinstance(path_column, int):
             path_column = df.columns[path_column]
 
         # objects are actually mixed and not guaranteed to be string, but this should cover most use cases
@@ -510,6 +536,7 @@ class Datasource:
             raise RuntimeError(f"Column {path_column} doesn't have strings")
 
         field_value_types = {f.name: f.valueType for f in self.fields}
+        document_fields = set(self.document_fields)
 
         for _, row in df.iterrows():
             datapoint = row[path_column]
@@ -522,9 +549,9 @@ class Datasource:
                 if val is None:
                     continue
                 # ONLY FOR PANDAS: since pandas doesn't distinguish between None and NaN, don't upload it
-                if type(val) is float and math.isnan(val):
+                if isinstance(val, float) and math.isnan(val):
                     continue
-                if type(val) is list:
+                if isinstance(val, list):
                     if key not in multivalue_fields:
                         multivalue_fields.add(key)
                         # Promote all the existing uploading metadata to multivalue
@@ -537,13 +564,16 @@ class Datasource:
                             value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[key] = value_type
                         # Don't override bytes if they're not bytes - probably just undownloaded values
-                        if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
-                            continue
+                        if value_type == MetadataFieldType.BLOB and not isinstance(sub_val, bytes):
+                            if key not in document_fields:
+                                continue
                         # Pandas quirk - integers are floats on the backend
                         if value_type == MetadataFieldType.INTEGER:
                             sub_val = int(sub_val)
-                        if type(sub_val) is bytes:
-                            sub_val = MetadataContextManager.wrap_bytes(sub_val)
+                        if isinstance(sub_val, str) and key in document_fields:
+                            sub_val = sub_val.encode("utf-8")
+                        if isinstance(sub_val, bytes):
+                            sub_val = wrap_bytes(sub_val)
                         res.append(
                             DatapointMetadataUpdateEntry(
                                 url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
@@ -555,13 +585,16 @@ class Datasource:
                         value_type = metadataTypeLookup[type(val)]
                         field_value_types[key] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
-                    if value_type == MetadataFieldType.BLOB and type(val) is not bytes:
-                        continue
+                    if value_type == MetadataFieldType.BLOB and not isinstance(val, bytes):
+                        if key not in document_fields:
+                            continue
                     # Pandas quirk - integers are floats on the backend
                     if value_type == MetadataFieldType.INTEGER:
                         val = int(val)
-                    if type(val) is bytes:
-                        val = MetadataContextManager.wrap_bytes(val)
+                    if isinstance(val, str) and key in document_fields:
+                        val = val.encode("utf-8")
+                    if isinstance(val, bytes):
+                        val = wrap_bytes(val)
                     res.append(
                         DatapointMetadataUpdateEntry(
                             url=datapoint,
@@ -619,6 +652,10 @@ class Datasource:
         self.source.client.scan_datasource(self, options=options)
 
     def _upload_metadata(self, metadata_entries: List[DatapointMetadataUpdateEntry]):
+        precalculated_info = precalculate_metadata_info(self, metadata_entries)
+        validate_uploading_metadata(precalculated_info)
+        run_preupload_transforms(self, metadata_entries, precalculated_info)
+
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
         upload_batch_size = dagshub.common.config.dataengine_metadata_upload_batch_size
@@ -1279,6 +1316,7 @@ class MetadataContextManager:
             datapoints = [datapoints]
 
         field_value_types = {f.name: f.valueType for f in self._datasource.fields}
+        document_fields = set(self._datasource.document_fields)
 
         for dp in datapoints:
             for k, v in metadata.items():
@@ -1287,7 +1325,7 @@ class MetadataContextManager:
                 if k in autogenerated_columns:
                     continue
 
-                if type(v) is list:
+                if isinstance(v, list):
                     if k not in self._multivalue_fields:
                         self._multivalue_fields.add(k)
                         # Promote all existing ones to multivalue
@@ -1299,12 +1337,15 @@ class MetadataContextManager:
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[k] = value_type
-                        # Don't override bytes if they're not bytes - probably just undownloaded values
-                        if value_type == MetadataFieldType.BLOB and type(sub_val) is not bytes:
-                            continue
-
-                        if type(v) is bytes:
-                            sub_val = self.wrap_bytes(sub_val)
+                        # Don't override bytes if they're not bytes and not documents
+                        # - probably just undownloaded values
+                        if value_type == MetadataFieldType.BLOB and not isinstance(sub_val, bytes):
+                            if k not in document_fields:
+                                continue
+                        if isinstance(v, str) and k in document_fields:
+                            v = v.encode("utf-8")
+                        if isinstance(v, bytes):
+                            sub_val = wrap_bytes(sub_val)
                         self._metadata_entries.append(
                             DatapointMetadataUpdateEntry(
                                 url=dp,
@@ -1322,11 +1363,14 @@ class MetadataContextManager:
                         value_type = metadataTypeLookup[type(v)]
                         field_value_types[k] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
-                    if value_type == MetadataFieldType.BLOB and type(v) is not bytes:
-                        continue
+                    if value_type == MetadataFieldType.BLOB and not isinstance(v, bytes):
+                        if k not in document_fields:
+                            continue
 
-                    if type(v) is bytes:
-                        v = self.wrap_bytes(v)
+                    if isinstance(v, str) and k in document_fields:
+                        v = v.encode("utf-8")
+                    if isinstance(v, bytes):
+                        v = wrap_bytes(v)
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(
@@ -1338,17 +1382,6 @@ class MetadataContextManager:
                             allowMultiple=k in self._multivalue_fields,
                         )
                     )
-
-    @staticmethod
-    def wrap_bytes(val: bytes) -> str:
-        """
-        Handles bytes values for uploading metadata
-        The process is gzip -> base64
-
-        :meta private:
-        """
-        compressed = gzip.compress(val)
-        return base64.b64encode(compressed).decode("utf-8")
 
     def get_metadata_entries(self):
         return self._metadata_entries
