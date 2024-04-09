@@ -229,7 +229,9 @@ class QueryResult:
         else:
             raise ValueError("supported flavors are torch|tensorflow|<torch.utils.data.Dataset>|<tf.data.Dataset>")
 
-    def as_hf_dataset(self, download_datapoints=True, download_blobs=True):
+    def as_hf_dataset(
+        self, target_dir: Optional[Union[str, PathLike]] = None, download_datapoints=True, download_blobs=True
+    ):
         """
         Loads this QueryResult as a HuggingFace dataset.
 
@@ -237,6 +239,7 @@ class QueryResult:
         a ``cast_column()`` function later.
 
         Args:
+            target_dir: Where to download the datapoints. The metadata is still downloaded into the global cache.
             download_datapoints: If set to ``True`` (default), downloads the datapoint files and sets the path column\
                 to the path of the datapoint in the filesystem
             download_blobs: If set to ``True`` (default), downloads all blob fields and sets the respective column\
@@ -250,12 +253,15 @@ class QueryResult:
 
         if download_datapoints:
             # Do the same for the actual datapoint files, changing the path
+
+            if target_dir is None:
+                target_dir = self.datasource.default_dataset_location
+            elif isinstance(target_dir, str):
+                target_dir = Path(target_dir).absolute()
             new_paths = []
-            self.download_files()
+            self.download_files(target_dir=target_dir)
             for dp in df["path"]:
-                new_paths.append(
-                    str(self.datasource.default_dataset_location / self.datasource.source.source_prefix / dp)
-                )
+                new_paths.append(str(target_dir / self.datasource.source.source_prefix / dp))
             df["path"] = new_paths
 
         # Drop the generated fields
