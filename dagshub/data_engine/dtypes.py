@@ -1,6 +1,6 @@
 import enum
 from abc import ABCMeta
-from typing import Set
+from typing import Set, Optional
 
 
 class ReservedTags(enum.Enum):
@@ -39,8 +39,8 @@ class DagshubDataType(metaclass=ABCMeta):
         custom_tags: additional tags applied to this type
     """
 
-    backing_field_type: MetadataFieldType
-    custom_tags: Set[str]
+    backing_field_type: Optional[MetadataFieldType] = None
+    custom_tags: Optional[Set[str]] = None
 
 
 class Int(DagshubDataType):
