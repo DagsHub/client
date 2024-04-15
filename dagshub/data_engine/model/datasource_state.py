@@ -92,15 +92,15 @@ class DatasourceState:
         """
         Returns the url for the content path of a specified path
         """
-        path = self._extract_path(path).strip("/")
-        return self.root_content_path + "/" + path
+        path = self._extract_path(path)
+        return multi_urljoin(self.root_content_path, path)
 
     def raw_path(self, path: Union[str, Datapoint, Mapping[str, Any]]) -> str:
         """
         Returns the url for the download path of a specified path
         """
-        path = self._extract_path(path).strip("/")
-        return self.root_raw_path + "/" + path
+        path = self._extract_path(path)
+        return multi_urljoin(self.root_raw_path, path)
 
     @property
     def source_prefix(self) -> PurePosixPath:
