@@ -5,6 +5,7 @@ from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource import Datasource, DatasetState
 from dagshub.data_engine.model.query_result import QueryResult
 from tests.data_engine.util import add_string_fields
+from tests.mocks.repo_api import MockRepoAPI
 
 
 @pytest.fixture
@@ -14,6 +15,7 @@ def ds(mocker) -> Datasource:
     mocker.patch.object(ds_state, "client")
     # Stub out get_from_dagshub, because it doesn't need to be done in tests
     mocker.patch.object(ds_state, "get_from_dagshub")
+    ds_state.repoApi = MockRepoAPI("kirill/repo")
     return Datasource(ds_state)
 
 
