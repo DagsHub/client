@@ -114,20 +114,19 @@ class MetadataFieldBuilder:
 
     def _set_or_unset_thumbnails(self, type_tag, is_thumbnail):
         # Remove previous thumbnail type tags
-        thumbnail_type_tags = {ReservedTags.VIDEO_THUMBNAIL_VIZ.value,
-                               ReservedTags.AUDIO_THUMBNAIL_VIZ.value,
-                               ReservedTags.IMAGE_THUMBNAIL_VIZ.value,
-                               ReservedTags.PDF_THUMBNAIL_VIZ.value,
-                               ReservedTags.TEXT_THUMBNAIL_VIZ.value,
-                               ReservedTags.CSV_THUMBNAIL_VIZ.value}
-
         if self.schema.tags is not None:
+            thumbnail_type_tags = {ReservedTags.VIDEO_THUMBNAIL_VIZ.value,
+                                   ReservedTags.AUDIO_THUMBNAIL_VIZ.value,
+                                   ReservedTags.IMAGE_THUMBNAIL_VIZ.value,
+                                   ReservedTags.PDF_THUMBNAIL_VIZ.value,
+                                   ReservedTags.TEXT_THUMBNAIL_VIZ.value,
+                                   ReservedTags.CSV_THUMBNAIL_VIZ.value}
+
             for tag in thumbnail_type_tags:
                 if tag in self.schema.tags:
                     self._remove_tag(tag)
 
         if is_thumbnail:
-            # Add the new thumbnail tag
             self._add_tags({type_tag.value, ReservedTags.THUMBNAIL_VIZ.value})
         else:
             self._remove_tags({ReservedTags.THUMBNAIL_VIZ.value})
