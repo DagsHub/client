@@ -38,6 +38,8 @@ class MetadataFieldType(enum.Enum):
 class ThumbnailType(enum.Enum):
     """
     Thumbnail types for visualization
+
+    :meta private:
     """
 
     VIDEO = "video"

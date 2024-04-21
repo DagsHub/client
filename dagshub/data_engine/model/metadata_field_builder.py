@@ -138,7 +138,7 @@ class MetadataFieldBuilder:
         if is_thumbnail:
             self._add_tags({type_tag.value, ReservedTags.THUMBNAIL_VIZ.value})
         else:
-            self._remove_tags({ReservedTags.THUMBNAIL_VIZ.value})
+            self._remove_tags(ReservedTags.THUMBNAIL_VIZ.value)
 
     def _set_or_unset(self, tag, is_set):
         if is_set:
@@ -160,7 +160,7 @@ class MetadataFieldBuilder:
         except ValueError:
             logger.warning(f"Tag {tag} doesn't exist on the field, nothing to delete")
 
-    def _remove_tags(self, tags: Set[str]):
+    def _remove_tags(self, *tags: str):
         if self.schema.tags is None:
             return
         for t in tags:
