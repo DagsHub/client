@@ -1,6 +1,6 @@
 import dataclasses
 import logging
-from typing import TYPE_CHECKING, Type, Union, Set
+from typing import TYPE_CHECKING, Type, Union, Set, Optional, Literal
 
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags, ThumbnailType
@@ -80,7 +80,7 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
-    def set_thumbnail(self, thumbnail_type: Union[ThumbnailType, str, None] = None,
+    def set_thumbnail(self, thumbnail_type: Optional[Literal["video", "audio", "image", "pdf", "text", "csv"]] = None,
                       is_thumbnail: bool = True) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as thumbnail field, with the specified thumbnail type
@@ -96,11 +96,10 @@ class MetadataFieldBuilder:
             raise ValueError("Thumbnail type must be specified")
 
         valid_types = ", ".join([t.value for t in ThumbnailType])
-        if isinstance(thumbnail_type, str):
-            try:
-                thumbnail_type = ThumbnailType(thumbnail_type)
-            except ValueError:
-                raise ValueError(f"'{thumbnail_type}' is not a valid thumbnail type. Valid types are: {valid_types}")
+        try:
+            thumbnail_type = ThumbnailType(thumbnail_type)
+        except ValueError:
+            raise ValueError(f"'{thumbnail_type}' is not a valid thumbnail type. Valid types are: {valid_types}")
 
         tag: ReservedTags
 
