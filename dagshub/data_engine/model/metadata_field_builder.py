@@ -80,10 +80,13 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
-    def set_thumbnail(self, thumbnail_type: ThumbnailType, is_thumbnail: bool = True) -> "MetadataFieldBuilder":
+    def set_thumbnail(self, thumbnail_type: Union[ThumbnailType, None] = None, is_thumbnail: bool = True) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as thumbnail field, with the specified thumbnail type
         """
+        if not is_thumbnail:
+            self._set_or_unset(ReservedTags.THUMBNAIL_VIZ.value, False)
+            return self
 
         if thumbnail_type is None:
             raise ValueError("Thumbnail type must be specified")
@@ -105,22 +108,27 @@ class MetadataFieldBuilder:
         else:
             raise ValueError("Invalid thumbnail type")
 
-        self._set_or_unset_thumbnails(tag.value, is_thumbnail)
+        self._set_or_unset_thumbnails(tag, True)
         return self
 
     def _set_or_unset_thumbnails(self, type_tag, is_thumbnail):
-        if is_thumbnail:
-            # Remove all other thumbnail tags
-            self._remove_tags({ReservedTags.VIDEO_THUMBNAIL_VIZ.value,
+        # Remove previous thumbnail type tags
+        thumbnail_type_tags = {ReservedTags.VIDEO_THUMBNAIL_VIZ.value,
                                ReservedTags.AUDIO_THUMBNAIL_VIZ.value,
                                ReservedTags.IMAGE_THUMBNAIL_VIZ.value,
                                ReservedTags.PDF_THUMBNAIL_VIZ.value,
                                ReservedTags.TEXT_THUMBNAIL_VIZ.value,
-                               ReservedTags.CSV_THUMBNAIL_VIZ.value})
+                               ReservedTags.CSV_THUMBNAIL_VIZ.value}
+
+        for tag in thumbnail_type_tags:
+            if tag in self.schema.tags:
+                self._remove_tag(tag)
+
+        if is_thumbnail:
             # Add the new thumbnail tag
             self._add_tags({type_tag, ReservedTags.THUMBNAIL_VIZ.value})
         else:
-            self._remove_tags({type_tag, ReservedTags.THUMBNAIL_VIZ.value})
+            self._remove_tags({ReservedTags.THUMBNAIL_VIZ.value})
 
     def _set_or_unset(self, tag, is_set):
         if is_set:
