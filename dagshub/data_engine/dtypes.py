@@ -8,6 +8,13 @@ class ReservedTags(enum.Enum):
 
     ANNOTATION = "annotation"
     DOCUMENT = "text_document"
+    THUMBNAIL_VIZ = "thumbnail_viz"
+    VIDEO_THUMBNAIL_VIZ = "video_thumbnail_viz"
+    AUDIO_THUMBNAIL_VIZ = "audio_thumbnail_viz"
+    IMAGE_THUMBNAIL_VIZ = "image_thumbnail_viz"
+    PDF_THUMBNAIL_VIZ = "pdf_thumbnail_viz"
+    TEXT_THUMBNAIL_VIZ = "text_thumbnail_viz"
+    CSV_THUMBNAIL_VIZ = "csv_thumbnail_viz"
 
 
 # These are the base primitives that the data engine database is capable of storing
@@ -26,6 +33,21 @@ class MetadataFieldType(enum.Enum):
     """Python's ``str``"""
     BLOB = "BLOB"
     """Python's ``bytes``"""
+
+
+class ThumbnailType(enum.Enum):
+    """
+    Thumbnail types for visualization
+
+    :meta private:
+    """
+
+    VIDEO = "video"
+    AUDIO = "audio"
+    IMAGE = "image"
+    PDF = "pdf"
+    TEXT = "text"
+    CSV = "csv"
 
 
 class DagshubDataType(metaclass=ABCMeta):
