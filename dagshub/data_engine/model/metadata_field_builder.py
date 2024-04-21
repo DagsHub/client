@@ -3,7 +3,7 @@ import logging
 from typing import TYPE_CHECKING, Type, Union, Set
 
 from dagshub.data_engine.client.models import MetadataFieldSchema
-from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags
+from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags, ThumbnailType
 from dagshub.data_engine.model.schema_util import metadataTypeLookup
 
 if TYPE_CHECKING:
@@ -80,6 +80,46 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
+    def set_thumbnail(self, thumbnail_type: ThumbnailType, is_thumbnail: bool = True) -> "MetadataFieldBuilder":
+        """
+        Mark or unmark the field as thumbnail field, with the specified thumbnail type
+        """
+
+        if thumbnail_type is None:
+            raise ValueError("Thumbnail type must be specified")
+
+        tag: ReservedTags
+
+        if thumbnail_type == ThumbnailType.VIDEO:
+            tag = ReservedTags.VIDEO_THUMBNAIL_VIZ
+        elif thumbnail_type == ThumbnailType.AUDIO:
+            tag = ReservedTags.AUDIO_THUMBNAIL_VIZ
+        elif thumbnail_type == ThumbnailType.IMAGE:
+            tag = ReservedTags.IMAGE_THUMBNAIL_VIZ
+        elif thumbnail_type == ThumbnailType.PDF:
+            tag = ReservedTags.PDF_THUMBNAIL_VIZ
+        elif thumbnail_type == ThumbnailType.TEXT:
+            tag = ReservedTags.TEXT_THUMBNAIL_VIZ
+        elif thumbnail_type == ThumbnailType.CSV:
+            tag = ReservedTags.CSV_THUMBNAIL_VIZ
+        else:
+            raise ValueError("Invalid thumbnail type")
+
+        self._set_or_unset_thumbnails(tag.value, is_thumbnail)
+        return self
+
+    def _set_or_unset_thumbnails(self, tag, is_thumbnail):
+        if is_thumbnail:
+            self._remove_tags({ReservedTags.VIDEO_THUMBNAIL_VIZ.value,
+                               ReservedTags.AUDIO_THUMBNAIL_VIZ.value,
+                               ReservedTags.IMAGE_THUMBNAIL_VIZ.value,
+                               ReservedTags.PDF_THUMBNAIL_VIZ.value,
+                               ReservedTags.TEXT_THUMBNAIL_VIZ.value,
+                               ReservedTags.CSV_THUMBNAIL_VIZ.value})
+            self._add_tags({tag})
+        else:
+            self._remove_tag(tag)
+
     def _set_or_unset(self, tag, is_set):
         if is_set:
             self._add_tags({tag})
@@ -99,6 +139,12 @@ class MetadataFieldBuilder:
             self.schema.tags.remove(tag)
         except ValueError:
             logger.warning(f"Tag {tag} doesn't exist on the field, nothing to delete")
+
+    def _remove_tags(self, tags: Set[str]):
+        if self.schema.tags is None:
+            return
+        for t in tags:
+            self._remove_tag(t)
 
     @staticmethod
     def _get_backing_type(t: Union[Type, DagshubDataType]) -> MetadataFieldType:
