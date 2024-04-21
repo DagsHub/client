@@ -80,17 +80,27 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
-    def set_thumbnail(self, thumbnail_type: Union[ThumbnailType, None] = None,
+    def set_thumbnail(self, thumbnail_type: Union[ThumbnailType, str, None] = None,
                       is_thumbnail: bool = True) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as thumbnail field, with the specified thumbnail type
         """
+
+        # Remove thumbnail tag
         if not is_thumbnail:
-            self._set_or_unset(ReservedTags.THUMBNAIL_VIZ.value, False)
+            self._set_or_unset(ReservedTags.THUMBNAIL_VIZ.value, is_thumbnail)
             return self
 
+        # Set thumbnail tag
         if thumbnail_type is None:
             raise ValueError("Thumbnail type must be specified")
+
+        valid_types = ", ".join([t.value for t in ThumbnailType])
+        if isinstance(thumbnail_type, str):
+            try:
+                thumbnail_type = ThumbnailType(thumbnail_type)
+            except ValueError:
+                raise ValueError(f"'{thumbnail_type}' is not a valid thumbnail type. Valid types are: {valid_types}")
 
         tag: ReservedTags
 
@@ -107,9 +117,9 @@ class MetadataFieldBuilder:
         elif thumbnail_type == ThumbnailType.CSV:
             tag = ReservedTags.CSV_THUMBNAIL_VIZ
         else:
-            raise ValueError("Invalid thumbnail type")
+            raise ValueError(f"'{thumbnail_type}' is not a valid thumbnail type. Valid types are: {valid_types}")
 
-        self._set_or_unset_thumbnails(tag, True)
+        self._set_or_unset_thumbnails(tag, is_thumbnail)
         return self
 
     def _set_or_unset_thumbnails(self, type_tag, is_thumbnail):
