@@ -80,7 +80,8 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
-    def set_thumbnail(self, thumbnail_type: Union[ThumbnailType, None] = None, is_thumbnail: bool = True) -> "MetadataFieldBuilder":
+    def set_thumbnail(self, thumbnail_type: Union[ThumbnailType, None] = None,
+                      is_thumbnail: bool = True) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as thumbnail field, with the specified thumbnail type
         """
