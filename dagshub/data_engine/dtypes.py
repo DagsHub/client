@@ -8,6 +8,7 @@ class ReservedTags(enum.Enum):
 
     ANNOTATION = "annotation"
     DOCUMENT = "text_document"
+    THUMBNAIL_VIZ = "thumbnail_viz"
     VIDEO_THUMBNAIL_VIZ = "video_thumbnail_viz"
     AUDIO_THUMBNAIL_VIZ = "audio_thumbnail_viz"
     IMAGE_THUMBNAIL_VIZ = "image_thumbnail_viz"
