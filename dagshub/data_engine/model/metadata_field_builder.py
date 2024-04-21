@@ -121,13 +121,14 @@ class MetadataFieldBuilder:
                                ReservedTags.TEXT_THUMBNAIL_VIZ.value,
                                ReservedTags.CSV_THUMBNAIL_VIZ.value}
 
-        for tag in thumbnail_type_tags:
-            if tag in self.schema.tags:
-                self._remove_tag(tag)
+        if self.schema.tags is not None:
+            for tag in thumbnail_type_tags:
+                if tag in self.schema.tags:
+                    self._remove_tag(tag)
 
         if is_thumbnail:
             # Add the new thumbnail tag
-            self._add_tags({type_tag, ReservedTags.THUMBNAIL_VIZ.value})
+            self._add_tags({type_tag.value, ReservedTags.THUMBNAIL_VIZ.value})
         else:
             self._remove_tags({ReservedTags.THUMBNAIL_VIZ.value})
 
