@@ -88,7 +88,7 @@ class MetadataFieldBuilder:
 
         # Remove thumbnail tag
         if not is_thumbnail:
-            self._set_or_unset(ReservedTags.THUMBNAIL_VIZ.value, is_thumbnail)
+            self._set_or_unset_thumbnails(ReservedTags.THUMBNAIL_VIZ.value, is_thumbnail)
             return self
 
         # Set thumbnail tag
