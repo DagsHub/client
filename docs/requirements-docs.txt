@@ -1,4 +1,4 @@
-sphinx==7.2.6
+sphinx==7.3.7
 furo==2024.1.29
 sphinx-autobuild==2024.2.4
 sphinx-copybutton==0.5.2
