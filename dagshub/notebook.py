@@ -47,7 +47,7 @@ def _default_notebook_name():
     return f"notebook-{datetime.datetime.utcnow().strftime('%Y-%m-%d')}.ipynb"
 
 
-def save_notebook(repo, path="", branch=None, commit_message=None, versioning="git") -> None:
+def save_notebook(repo, path="", branch=None, commit_message=None, versioning="git", colab_timeout=40) -> None:
     """
     Save the notebook to DagsHub.
 
@@ -59,6 +59,8 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning="g
         branch: The branch under which to save the notebook. Uses the repo default if not specified.
         commit_message: Message of the commit with the notebook upload. Default is ``"Uploaded notebook {name}"``
         versioning: Either ``"git"`` or ``"dvc"``.
+        colab_timeout: For Colab environments sets the timeout for getting the notebook (in seconds).
+            Raise this if you have a large notebook and encountering timeouts while saving it.
 
 
     .. note::
@@ -95,7 +97,7 @@ def save_notebook(repo, path="", branch=None, commit_message=None, versioning="g
         if _inside_colab():
             from google.colab import _message  # If inside colab, this import is guaranteed
 
-            notebook_ipynb = _message.blocking_request("get_ipynb", timeout_sec=20)
+            notebook_ipynb = _message.blocking_request("get_ipynb", timeout_sec=colab_timeout)
             if notebook_ipynb is None or "ipynb" not in notebook_ipynb:
                 raise RuntimeError("Couldn't get notebook data from colab.")
             with open(out_path, "w") as file:
