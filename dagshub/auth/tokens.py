@@ -407,21 +407,3 @@ def add_oauth_token(host: Optional[str] = None, referrer: Optional[str] = None, 
     host = host or config.host
     token = oauth.oauth_flow(host, referrer=referrer)
     _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)
-
-
-def get_user_of_token(token: Union[str, DagshubTokenABC], host: Optional[str] = None) -> str:
-    """
-    Returns the username of the user with the token
-    """
-    host = host or config.host
-    check_url = multi_urljoin(host, "api/v1/user")
-    if type(token) is str:
-        auth = HTTPBearerAuth(token)
-    else:
-        auth = token
-    resp = http_request("GET", check_url, auth=auth)
-
-    if resp.status_code == 200:
-        return resp.json()["login"]
-    else:
-        raise RuntimeError(f"Got HTTP status {resp.status_code} while trying to get user: {resp.content}")

@@ -1,6 +1,5 @@
 from dagshub.auth import add_oauth_token, get_token
-from dagshub.auth.tokens import get_user_of_token
-from dagshub.common.api import RepoAPI
+from dagshub.common.api import RepoAPI, UserAPI
 from dagshub.common.api.repo import RepoNotFoundError
 from dagshub.upload import create_repo
 
@@ -20,7 +19,7 @@ def login() -> str:
         add_oauth_token(referrer="colab")
         token = get_token()
 
-    username = get_user_of_token(token)
+    username = UserAPI.get_user_from_token(token).username
 
     colab_repo = RepoAPI(f"{username}/{COLAB_REPO_NAME}")
     try:
