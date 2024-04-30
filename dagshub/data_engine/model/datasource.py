@@ -820,6 +820,7 @@ class Datasource:
             query=self._query,
             timestamp=datetime.datetime.now().timestamp(),
             modified=self.is_query_different_from_dataset,
+            link=self._generate_visualize_url(),
         )
         if self.assigned_dataset is not None:
             res.dataset_id = self.assigned_dataset.dataset_id
