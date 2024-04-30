@@ -481,7 +481,7 @@ class Datasource:
         :func:`~MetadataContextManager.update_metadata()` function.
         Once the context is exited, all metadata is uploaded in one batch::
 
-            with df.metadata_context() as ctx:
+            with ds.metadata_context() as ctx:
                 ctx.update_metadata("file1", {"key1": True, "key2": "value"})
 
         """
