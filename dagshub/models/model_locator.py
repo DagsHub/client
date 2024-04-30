@@ -288,7 +288,16 @@ def get_model_path(
     download_type: Literal["lazy", "eager"] = "eager",
 ) -> Path:
     """
-    Load a model from a DagsHub repository.
+    Load a model path from a DagsHub repository in way that is compatible with the Hugging Face Transformers library.
+
+    Example usage:
+
+    .. code-block:: python
+
+       from transformers import AutoModel
+       from dagshub.models import get_model_path
+
+       model = AutoModel.from_pretrained(get_model_path("<user_name>/<repo_name>"))
 
     The function looks for the model in following places in the repository, in this order:
 
