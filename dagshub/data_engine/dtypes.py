@@ -9,12 +9,12 @@ class ReservedTags(enum.Enum):
     ANNOTATION = "annotation"
     DOCUMENT = "text_document"
     THUMBNAIL_VIZ = "thumbnail_viz"
-    VIDEO_THUMBNAIL_VIZ = "video"
-    AUDIO_THUMBNAIL_VIZ = "audio"
-    IMAGE_THUMBNAIL_VIZ = "image"
-    PDF_THUMBNAIL_VIZ = "pdf"
-    TEXT_THUMBNAIL_VIZ = "text"
-    CSV_THUMBNAIL_VIZ = "csv"
+    VIDEO = "video"
+    AUDIO = "audio"
+    IMAGE = "image"
+    PDF = "pdf"
+    TEXT = "text"
+    CSV = "csv"
 
 
 # These are the base primitives that the data engine database is capable of storing

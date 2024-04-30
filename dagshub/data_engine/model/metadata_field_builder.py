@@ -104,17 +104,17 @@ class MetadataFieldBuilder:
         tag: ReservedTags
 
         if thumbnail_type == ThumbnailType.VIDEO:
-            tag = ReservedTags.VIDEO_THUMBNAIL_VIZ
+            tag = ReservedTags.VIDEO
         elif thumbnail_type == ThumbnailType.AUDIO:
-            tag = ReservedTags.AUDIO_THUMBNAIL_VIZ
+            tag = ReservedTags.AUDIO
         elif thumbnail_type == ThumbnailType.IMAGE:
-            tag = ReservedTags.IMAGE_THUMBNAIL_VIZ
+            tag = ReservedTags.IMAGE
         elif thumbnail_type == ThumbnailType.PDF:
-            tag = ReservedTags.PDF_THUMBNAIL_VIZ
+            tag = ReservedTags.PDF
         elif thumbnail_type == ThumbnailType.TEXT:
-            tag = ReservedTags.TEXT_THUMBNAIL_VIZ
+            tag = ReservedTags.TEXT
         elif thumbnail_type == ThumbnailType.CSV:
-            tag = ReservedTags.CSV_THUMBNAIL_VIZ
+            tag = ReservedTags.CSV
         else:
             raise ValueError(f"'{thumbnail_type}' is not a valid thumbnail type. Valid types are: {valid_types}")
 
@@ -124,12 +124,12 @@ class MetadataFieldBuilder:
     def _set_or_unset_thumbnails(self, type_tag, is_thumbnail):
         # Remove previous thumbnail type tags
         if self.schema.tags is not None:
-            thumbnail_type_tags = {ReservedTags.VIDEO_THUMBNAIL_VIZ.value,
-                                   ReservedTags.AUDIO_THUMBNAIL_VIZ.value,
-                                   ReservedTags.IMAGE_THUMBNAIL_VIZ.value,
-                                   ReservedTags.PDF_THUMBNAIL_VIZ.value,
-                                   ReservedTags.TEXT_THUMBNAIL_VIZ.value,
-                                   ReservedTags.CSV_THUMBNAIL_VIZ.value}
+            thumbnail_type_tags = {ReservedTags.VIDEO.value,
+                                   ReservedTags.AUDIO.value,
+                                   ReservedTags.IMAGE.value,
+                                   ReservedTags.PDF.value,
+                                   ReservedTags.TEXT.value,
+                                   ReservedTags.CSV.value}
 
             for tag in thumbnail_type_tags:
                 if tag in self.schema.tags:
