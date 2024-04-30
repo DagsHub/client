@@ -4,8 +4,10 @@ import json
 import logging
 import math
 import os.path
+import threading
 import time
 import webbrowser
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
@@ -19,6 +21,7 @@ from pathvalidate import sanitize_filepath
 import dagshub.common.config
 from dagshub.common import rich_console
 from dagshub.common.analytics import send_analytics_event
+from dagshub.common.environment import is_mlflow_installed
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none
@@ -63,6 +66,9 @@ else:
 logger = logging.getLogger(__name__)
 
 DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
+
+_autolog_counters: Dict[str, int] = defaultdict(int)
+_autolog_counter_lock = threading.Lock()
 
 
 @dataclass
@@ -282,6 +288,7 @@ class Datasource:
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
         """
         self._check_preprocess()
+        self._autolog_mlflow()
         res = self._source.client.get_datapoints(self)
         self._download_document_fields(res)
 
@@ -741,6 +748,19 @@ class Datasource:
         copy_with_ds_assigned = self.__deepcopy__()
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
+
+    def _autolog_mlflow(self):
+        if not is_mlflow_installed:
+            return
+        # Run ONLY if there's an active run going on
+        if mlflow.active_run() is None:
+            return
+        source_name = self.source.name
+        with _autolog_counter_lock:
+            counter_value = _autolog_counters[source_name]
+            _autolog_counters[source_name] += 1
+        artifact_name = f"autolog_{source_name}_{counter_value}.dagshub.json"
+        threading.Thread(target=self.log_to_mlflow, kwargs={"artifact_name": artifact_name}).start()
 
     def log_to_mlflow(
         self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional["mlflow.entities.Run"] = None
