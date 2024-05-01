@@ -750,7 +750,8 @@ class Datasource:
         if not is_mlflow_installed:
             return
         # Run ONLY if there's an active run going on
-        if mlflow.active_run() is None:
+        active_run = mlflow.active_run()
+        if active_run is None:
             return
         source_name = self.source.name
 
@@ -758,9 +759,7 @@ class Datasource:
         uuid_chunk = str(uuid.uuid4())[-4:]
 
         artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
-        threading.Thread(
-            target=self.log_to_mlflow, kwargs={"artifact_name": artifact_name, "run": mlflow.active_run()}
-        ).start()
+        threading.Thread(target=self.log_to_mlflow, kwargs={"artifact_name": artifact_name, "run": active_run}).start()
 
     def log_to_mlflow(
         self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional["mlflow.entities.Run"] = None
