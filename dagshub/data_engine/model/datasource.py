@@ -6,8 +6,8 @@ import math
 import os.path
 import threading
 import time
+import uuid
 import webbrowser
-from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
@@ -66,9 +66,6 @@ else:
 logger = logging.getLogger(__name__)
 
 DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
-
-_autolog_counters: Dict[str, int] = defaultdict(int)
-_autolog_counter_lock = threading.Lock()
 
 
 @dataclass
@@ -756,11 +753,14 @@ class Datasource:
         if mlflow.active_run() is None:
             return
         source_name = self.source.name
-        with _autolog_counter_lock:
-            counter_value = _autolog_counters[source_name]
-            _autolog_counters[source_name] += 1
-        artifact_name = f"autolog_{source_name}_{counter_value}.dagshub.json"
-        threading.Thread(target=self.log_to_mlflow, kwargs={"artifact_name": artifact_name}).start()
+
+        now_time = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
+        uuid_chunk = str(uuid.uuid4())[-4:]
+
+        artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
+        threading.Thread(
+            target=self.log_to_mlflow, kwargs={"artifact_name": artifact_name, "run": mlflow.active_run()}
+        ).start()
 
     def log_to_mlflow(
         self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional["mlflow.entities.Run"] = None
