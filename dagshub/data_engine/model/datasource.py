@@ -4,7 +4,9 @@ import json
 import logging
 import math
 import os.path
+import threading
 import time
+import uuid
 import webbrowser
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -19,6 +21,7 @@ from pathvalidate import sanitize_filepath
 import dagshub.common.config
 from dagshub.common import rich_console
 from dagshub.common.analytics import send_analytics_event
+from dagshub.common.environment import is_mlflow_installed
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none
@@ -282,6 +285,7 @@ class Datasource:
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
         """
         self._check_preprocess()
+        self._autolog_mlflow()
         res = self._source.client.get_datapoints(self)
         self._download_document_fields(res)
 
@@ -474,7 +478,7 @@ class Datasource:
         :func:`~MetadataContextManager.update_metadata()` function.
         Once the context is exited, all metadata is uploaded in one batch::
 
-            with df.metadata_context() as ctx:
+            with ds.metadata_context() as ctx:
                 ctx.update_metadata("file1", {"key1": True, "key2": "value"})
 
         """
@@ -742,6 +746,21 @@ class Datasource:
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
 
+    def _autolog_mlflow(self):
+        if not is_mlflow_installed:
+            return
+        # Run ONLY if there's an active run going on
+        active_run = mlflow.active_run()
+        if active_run is None:
+            return
+        source_name = self.source.name
+
+        now_time = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
+        uuid_chunk = str(uuid.uuid4())[-4:]
+
+        artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
+        threading.Thread(target=self.log_to_mlflow, kwargs={"artifact_name": artifact_name, "run": active_run}).start()
+
     def log_to_mlflow(
         self, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME, run: Optional["mlflow.entities.Run"] = None
     ) -> "mlflow.Entities.Run":
@@ -800,6 +819,7 @@ class Datasource:
             query=self._query,
             timestamp=datetime.datetime.now().timestamp(),
             modified=self.is_query_different_from_dataset,
+            link=self._generate_visualize_url(),
         )
         if self.assigned_dataset is not None:
             res.dataset_id = self.assigned_dataset.dataset_id
