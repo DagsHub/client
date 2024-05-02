@@ -14,7 +14,6 @@ class ReservedTags(enum.Enum):
     IMAGE = "image"
     PDF = "pdf"
     TEXT = "text"
-    CSV = "csv"
 
 
 # These are the base primitives that the data engine database is capable of storing
@@ -47,7 +46,6 @@ class ThumbnailType(enum.Enum):
     IMAGE = "image"
     PDF = "pdf"
     TEXT = "text"
-    CSV = "csv"
 
 
 class DagshubDataType(metaclass=ABCMeta):

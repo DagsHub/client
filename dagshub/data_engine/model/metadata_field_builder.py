@@ -80,7 +80,7 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
-    def set_thumbnail(self, thumbnail_type: Optional[Literal["video", "audio", "image", "pdf", "text", "csv"]] = None,
+    def set_thumbnail(self, thumbnail_type: Optional[Literal["video", "audio", "image", "pdf", "text"]] = None,
                       is_thumbnail: bool = True) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as thumbnail field, with the specified thumbnail type
@@ -113,8 +113,6 @@ class MetadataFieldBuilder:
             tag = ReservedTags.PDF
         elif thumbnail_type == ThumbnailType.TEXT:
             tag = ReservedTags.TEXT
-        elif thumbnail_type == ThumbnailType.CSV:
-            tag = ReservedTags.CSV
         else:
             raise ValueError(f"'{thumbnail_type}' is not a valid thumbnail type. Valid types are: {valid_types}")
 
@@ -128,8 +126,7 @@ class MetadataFieldBuilder:
                                    ReservedTags.AUDIO.value,
                                    ReservedTags.IMAGE.value,
                                    ReservedTags.PDF.value,
-                                   ReservedTags.TEXT.value,
-                                   ReservedTags.CSV.value}
+                                   ReservedTags.TEXT.value}
 
             for tag in thumbnail_type_tags:
                 if tag in self.schema.tags:
