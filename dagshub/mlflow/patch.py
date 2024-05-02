@@ -157,7 +157,7 @@ def patch_mlflow():
 
     if _global_mlflow_patch is not None:
         logger.warning("MLflow is already patched")
-        return _global_mlflow_patch
+        return
 
     logger.warning(
         "Patching MLflow to prevent any MLflow exceptions from being raised. "
