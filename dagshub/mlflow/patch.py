@@ -50,7 +50,8 @@ class MlflowMonkeyPatch:
     def __init__(self, funcs_to_patch: List[str], guaranteed_raises: List[str]):
         self.funcs_to_patch = set(funcs_to_patch)
         # Functions that guarantee to raise an exception if they are in the stack
-        # Example: all mlflow.<framework>.log_model functions underneath use log_artifact, but we might want to raise them
+        # Example: all mlflow.<framework>.log_model functions underneath use log_artifact,
+        # but we might want to raise exceptions, so logging models doesn't get swallowed
         self.functions_with_guaranteed_raises = set(guaranteed_raises)
 
         self.original_func_lookup: Dict[str, Callable] = {}
