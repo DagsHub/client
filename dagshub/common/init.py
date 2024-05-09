@@ -98,8 +98,8 @@ def init(
 
         log_message(f'Initialized MLflow to track repo "{repo_owner}/{repo_name}"')
 
-        if patch_mlflow:
-            _patch_mlflow()
+    if patch_mlflow:
+        _patch_mlflow()
 
     # Configure DVC
     if dvc:
