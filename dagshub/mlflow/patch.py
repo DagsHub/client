@@ -1,20 +1,60 @@
 import inspect
 import logging
 import sys
+import threading
 import traceback
 from types import ModuleType, FunctionType
-from typing import Callable, Optional, Dict, Set
+from typing import Callable, Optional, Dict, Set, List, Tuple
 
 from tenacity import Retrying, stop_after_delay
 
 logger = logging.getLogger(__name__)
 
+_top_level_functions = [
+    "mlflow.log_artifact",
+    "mlflow.log_artifacts",
+    "mlflow.log_dict",
+    "mlflow.log_figure",
+    "mlflow.log_image",
+    "mlflow.log_input",
+    "mlflow.log_metric",
+    "mlflow.log_metrics",
+    "mlflow.log_param",
+    "mlflow.log_params",
+    "mlflow.log_table",
+    "mlflow.log_text",
+]
+
+_mlflow_client_functions = [
+    "mlflow.tracking.client.MlflowClient.log_artifact",
+    "mlflow.tracking.client.MlflowClient.log_artifacts",
+    "mlflow.tracking.client.MlflowClient.log_batch",
+    "mlflow.tracking.client.MlflowClient.log_dict",
+    "mlflow.tracking.client.MlflowClient.log_figure",
+    "mlflow.tracking.client.MlflowClient.log_image",
+    "mlflow.tracking.client.MlflowClient.log_inputs",
+    "mlflow.tracking.client.MlflowClient.log_metric",
+    "mlflow.tracking.client.MlflowClient.log_param",
+    "mlflow.tracking.client.MlflowClient.log_table",
+    "mlflow.tracking.client.MlflowClient.log_text",
+]
+
+_default_patch_functions = _top_level_functions + _mlflow_client_functions
+
+_default_patch_classes = ["mlflow.tracking.client.MlflowClient"]
+
+_default_guaranteed_raises = ["log_model"]
+
 
 class MlflowMonkeyPatch:
     context_manager_functions = ["start_run"]
-    classes_to_patch = ["mlflow.tracking.client.MlflowClient"]
+    # Functions that guarantee to raise an exception if they are in the stack
+    # Example: all mlflow.<framework>.log_model functions underneath use log_artifact, but we might want to raise them
 
-    def __init__(self):
+    def __init__(self, funcs_to_patch: List[str], classes_to_patch: List[str], guaranteed_raises: List[str]):
+        self.funcs_to_patch = set(funcs_to_patch)
+        self.classes_to_patch = set(classes_to_patch)
+        self.functions_with_guaranteed_raises = set(guaranteed_raises)
         self.original_func_lookup: Dict[str, Callable] = {}
         self.patched_modules: Set[str] = set()
 
@@ -24,15 +64,18 @@ class MlflowMonkeyPatch:
         def is_top_level_mlflow_call() -> bool:
             tb = traceback.extract_stack()
 
-            # Count the times `wrap_fn` function shows up in the stack trace,
-            # if it's only once - means it's the top level mlflow call
+            # Count the times `wrap_fn` functions show up in the stack trace,
+            # if it's only once - means it's the top-most level wrapped mlflow call
 
             wrap_fn_met = False
             for stack_line in tb:
-                is_wrap_func = stack_line.filename == __file__ and stack_line.name in [
+                # If there is a guaranteed raise in the stack - return False
+                if stack_line.name in self.functions_with_guaranteed_raises:
+                    return False
+                is_wrap_func = stack_line.filename == __file__ and stack_line.name in {
                     "wrap_fn",
                     "context_manager_wrap_fn",
-                ]
+                }
                 if not is_wrap_func:
                     continue
                 elif wrap_fn_met:
@@ -89,6 +132,8 @@ class MlflowMonkeyPatch:
             is_class = inspect.isclass(attr)
 
             if is_function:
+                if full_attr_name not in self.funcs_to_patch:
+                    continue
                 if self.is_function_already_patched(full_attr_name):
                     continue
                 self.original_func_lookup[full_attr_name] = attr
@@ -101,8 +146,10 @@ class MlflowMonkeyPatch:
                         continue
                     class_attr = getattr(attr, class_attr_name)
                     full_class_attr_name = f"{full_attr_name}.{class_attr_name}"
-                    if isinstance(class_attr, FunctionType) and not self.is_function_already_patched(
-                        full_class_attr_name
+                    if (
+                        isinstance(class_attr, FunctionType)
+                        and not self.is_function_already_patched(full_class_attr_name)
+                        and full_class_attr_name in self.funcs_to_patch
                     ):
                         self.original_func_lookup[full_class_attr_name] = class_attr
                         setattr(attr, class_attr_name, self._wrap_func(class_attr))
@@ -129,7 +176,6 @@ class MlflowMonkeyPatch:
 
     def unpatch(self):
         logger.warning("Unpatching MLflow to raise exceptions again")
-        global _global_mlflow_patch
 
         for unpatched_key, unpatched_func in self.original_func_lookup.items():
             attrs = unpatched_key.split(".")
@@ -144,33 +190,139 @@ class MlflowMonkeyPatch:
 
         self.patched_modules.clear()
         self.original_func_lookup.clear()
-        _global_mlflow_patch = None
 
 
 _global_mlflow_patch: Optional[MlflowMonkeyPatch] = None
+_patch_mutex = threading.Lock()
 
 
-def patch_mlflow():
+def _patch_mlflow(funcs_to_patch: List[str], classes_to_patch: List[str], guaranteed_raises: List[str]):
     import mlflow
 
     global _global_mlflow_patch
 
-    if _global_mlflow_patch is not None:
-        logger.warning("MLflow is already patched")
-        return
+    with _patch_mutex:
+        if _global_mlflow_patch is not None:
+            logger.warning("MLflow is already patched")
+            return
 
-    logger.warning(
-        "Patching MLflow to prevent any MLflow exceptions from being raised. "
-        "Call dagshub.mlflow.unpatch_mlflow() to undo"
+        logger.warning(
+            "Patching MLflow to prevent any MLflow exceptions from being raised. "
+            "Call dagshub.mlflow.unpatch_mlflow() to undo"
+        )
+
+        patch = MlflowMonkeyPatch(funcs_to_patch, classes_to_patch, guaranteed_raises)
+        patch.monkey_patch_module(mlflow)
+        _global_mlflow_patch = patch
+
+
+def _resolve_patches(
+    include: Optional[List[str]],
+    exclude: Optional[List[str]],
+    include_classes: Optional[List[str]],
+    patch_top_level: bool,
+    patch_mlflow_client: bool,
+    raise_on_log_model: bool,
+) -> Tuple[List[str], List[str], List[str]]:
+    """
+    Resolve the arguments for patch_mlflow
+
+    Returns:
+        Tuple of:
+        - List of functions that need to be patched
+        - List of classes that need to be patched
+        - List of functions that should raise exceptions if they are in the stack
+    """
+    funcs_to_patch = _default_patch_functions.copy()
+    classes_to_patch = _default_patch_classes.copy()
+    guaranteed_raises = _default_guaranteed_raises.copy()
+
+    if not patch_top_level:
+        for f in _top_level_functions:
+            if f in funcs_to_patch:
+                funcs_to_patch.remove(f)
+
+    if not patch_mlflow_client:
+        for f in _mlflow_client_functions:
+            if f in funcs_to_patch:
+                funcs_to_patch.remove(f)
+        classes_to_patch.remove("mlflow.tracking.client.MlflowClient")
+
+    if include is not None:
+        funcs_to_patch = funcs_to_patch + include
+
+    if include_classes is not None:
+        classes_to_patch = classes_to_patch + include_classes
+
+    if exclude is not None:
+        for f in exclude:
+            if f in funcs_to_patch:
+                funcs_to_patch.remove(f)
+
+    if not raise_on_log_model:
+        if "log_model" in guaranteed_raises:
+            guaranteed_raises.remove("log_model")
+
+    return funcs_to_patch, classes_to_patch, guaranteed_raises
+
+
+def patch_mlflow(
+    include: Optional[List[str]] = None,
+    exclude: Optional[List[str]] = None,
+    include_classes: Optional[List[str]] = None,
+    raise_on_log_model=True,
+    patch_top_level=True,
+    patch_mlflow_client=False,
+):
+    """
+    Patch MLflow functions, making some of them stop raising exceptions, instead logging them to console.
+    This is useful for long runs that have MLflow failing occasionally,
+    so you don't have to restart the run if logging failed.
+
+    By default, all top-level ``mlflow.log_...`` and ``MlflowClient.log_...`` functions are patched.
+
+    Args:
+        include: List of full names of functions you want to patch additionally to the default ones.
+        exclude: List of functions you DON'T want to patch.\
+            Use this if you need to make sure, for example, all ``log_artifact``
+            functions raise an exception on failure:
+
+            .. code-block:: python
+
+                patch_mlflow(exclude=["mlflow.log_artifact", "mlflow.log_artifacts"])
+
+        include_classes: If ``include`` has classes other than the MlflowClient,
+            you need to list the class here, otherwise it won't be patched
+        raise_on_log_model: If true, patched log calls still raise an exception
+            if they are called from a ``log_model`` function.
+        patch_top_level: Whether to patch the top level ``mlflow`` functions.
+        patch_mlflow_client: Whether to patch the ``MlflowClient`` class.
+    """
+    funcs_to_patch, classes_to_patch, guaranteed_raises = _resolve_patches(
+        include=include,
+        exclude=exclude,
+        include_classes=include_classes,
+        patch_top_level=patch_top_level,
+        patch_mlflow_client=patch_mlflow_client,
+        raise_on_log_model=raise_on_log_model,
     )
 
-    patch = MlflowMonkeyPatch()
-    patch.monkey_patch_module(mlflow)
-    _global_mlflow_patch = patch
+    _patch_mlflow(funcs_to_patch, classes_to_patch, guaranteed_raises)
 
 
 def unpatch_mlflow():
-    if _global_mlflow_patch is None:
-        logger.warning("MLflow should be unpatched already")
-        return
-    _global_mlflow_patch.unpatch()
+    """
+    Removes the failsafe MLflow patching, returning all MLflow functions to their original state
+    """
+    global _global_mlflow_patch
+
+    with _patch_mutex:
+        if _global_mlflow_patch is None:
+            logger.warning("MLflow should be unpatched already")
+            return
+        _global_mlflow_patch.unpatch()
+        _global_mlflow_patch = None
+
+
+# TODO: add a "with_unpatch" (name subject to change) context manager, that disables the patching
+# Implementation: set a THREAD LOCAL flag that disables the wrapping behaviour inside of the functions
