@@ -281,8 +281,12 @@ def patch_mlflow(
 
                 patch_mlflow(exclude=["mlflow.log_artifact", "mlflow.log_artifacts"])
 
-        raise_on_log_model: If true, patched log calls still raise an exception
+        raise_on_log_model: If ``True``, patched log calls still raise an exception
             if they are called from a ``log_model`` function.
+
+            This ensures that even if you want to ignore failed calls to ``log_artifact`` or ``log_figure`` etc.,
+            failed calls to ``log_model`` in particular will still raise errors.
+            This should work for all supported ML frameworks, as long as the function is named ``log_model``.
         patch_top_level: Whether to patch the top level ``mlflow`` functions.
         patch_mlflow_client: Whether to patch the ``MlflowClient`` class.
     """
