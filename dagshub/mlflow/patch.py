@@ -41,17 +41,14 @@ _mlflow_client_functions = [
 
 _default_patch_functions = _top_level_functions + _mlflow_client_functions
 
-_default_patch_classes = ["mlflow.tracking.client.MlflowClient"]
-
 _default_guaranteed_raises = ["log_model"]
 
 
 class MlflowMonkeyPatch:
     context_manager_functions = ["start_run"]
 
-    def __init__(self, funcs_to_patch: List[str], classes_to_patch: List[str], guaranteed_raises: List[str]):
+    def __init__(self, funcs_to_patch: List[str], guaranteed_raises: List[str]):
         self.funcs_to_patch = set(funcs_to_patch)
-        self.classes_to_patch = set(classes_to_patch)
         # Functions that guarantee to raise an exception if they are in the stack
         # Example: all mlflow.<framework>.log_model functions underneath use log_artifact, but we might want to raise them
         self.functions_with_guaranteed_raises = set(guaranteed_raises)
@@ -141,7 +138,7 @@ class MlflowMonkeyPatch:
                 setattr(module, attr_name, self._wrap_func(attr))
                 continue
 
-            if is_class and full_attr_name in self.classes_to_patch:
+            if is_class:
                 for class_attr_name in dir(attr):
                     if class_attr_name.startswith("_"):
                         continue
@@ -197,7 +194,7 @@ _global_mlflow_patch: Optional[MlflowMonkeyPatch] = None
 _patch_mutex = threading.Lock()
 
 
-def _patch_mlflow(funcs_to_patch: List[str], classes_to_patch: List[str], guaranteed_raises: List[str]):
+def _patch_mlflow(funcs_to_patch: List[str], guaranteed_raises: List[str]):
     import mlflow
 
     global _global_mlflow_patch
@@ -212,7 +209,7 @@ def _patch_mlflow(funcs_to_patch: List[str], classes_to_patch: List[str], guaran
             "Call dagshub.mlflow.unpatch_mlflow() to undo"
         )
 
-        patch = MlflowMonkeyPatch(funcs_to_patch, classes_to_patch, guaranteed_raises)
+        patch = MlflowMonkeyPatch(funcs_to_patch, guaranteed_raises)
         patch.monkey_patch_module(mlflow)
         _global_mlflow_patch = patch
 
@@ -220,22 +217,19 @@ def _patch_mlflow(funcs_to_patch: List[str], classes_to_patch: List[str], guaran
 def _resolve_patches(
     include: Optional[List[str]],
     exclude: Optional[List[str]],
-    include_classes: Optional[List[str]],
     patch_top_level: bool,
     patch_mlflow_client: bool,
     raise_on_log_model: bool,
-) -> Tuple[List[str], List[str], List[str]]:
+) -> Tuple[List[str], List[str]]:
     """
     Resolve the arguments for patch_mlflow
 
     Returns:
         Tuple of:
         - List of functions that need to be patched
-        - List of classes that need to be patched
         - List of functions that should raise exceptions if they are in the stack
     """
     funcs_to_patch = _default_patch_functions.copy()
-    classes_to_patch = _default_patch_classes.copy()
     guaranteed_raises = _default_guaranteed_raises.copy()
 
     if not patch_top_level:
@@ -247,13 +241,9 @@ def _resolve_patches(
         for f in _mlflow_client_functions:
             if f in funcs_to_patch:
                 funcs_to_patch.remove(f)
-        classes_to_patch.remove("mlflow.tracking.client.MlflowClient")
 
     if include is not None:
         funcs_to_patch = funcs_to_patch + include
-
-    if include_classes is not None:
-        classes_to_patch = classes_to_patch + include_classes
 
     if exclude is not None:
         for f in exclude:
@@ -264,16 +254,15 @@ def _resolve_patches(
         if "log_model" in guaranteed_raises:
             guaranteed_raises.remove("log_model")
 
-    return funcs_to_patch, classes_to_patch, guaranteed_raises
+    return funcs_to_patch, guaranteed_raises
 
 
 def patch_mlflow(
     include: Optional[List[str]] = None,
     exclude: Optional[List[str]] = None,
-    include_classes: Optional[List[str]] = None,
     raise_on_log_model=True,
     patch_top_level=True,
-    patch_mlflow_client=False,
+    patch_mlflow_client=True,
 ):
     """
     Patch MLflow functions, making some of them stop raising exceptions, instead logging them to console.
@@ -292,23 +281,20 @@ def patch_mlflow(
 
                 patch_mlflow(exclude=["mlflow.log_artifact", "mlflow.log_artifacts"])
 
-        include_classes: If ``include`` has classes other than the MlflowClient,
-            you need to list the class here, otherwise it won't be patched
         raise_on_log_model: If true, patched log calls still raise an exception
             if they are called from a ``log_model`` function.
         patch_top_level: Whether to patch the top level ``mlflow`` functions.
         patch_mlflow_client: Whether to patch the ``MlflowClient`` class.
     """
-    funcs_to_patch, classes_to_patch, guaranteed_raises = _resolve_patches(
+    funcs_to_patch, guaranteed_raises = _resolve_patches(
         include=include,
         exclude=exclude,
-        include_classes=include_classes,
         patch_top_level=patch_top_level,
         patch_mlflow_client=patch_mlflow_client,
         raise_on_log_model=raise_on_log_model,
     )
 
-    _patch_mlflow(funcs_to_patch, classes_to_patch, guaranteed_raises)
+    _patch_mlflow(funcs_to_patch, guaranteed_raises)
 
 
 def unpatch_mlflow():
