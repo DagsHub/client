@@ -13,6 +13,7 @@ from dagshub.common.api.repo import RepoNotFoundError
 from dagshub.common.determine_repo import determine_repo
 from dagshub.common.helpers import log_message
 from dagshub.upload import create_repo
+from dagshub.mlflow import patch_mlflow as _patch_mlflow
 
 from dagshub.common.util import lazy_load
 
@@ -27,6 +28,7 @@ def init(
     host: Optional[str] = None,
     mlflow: bool = True,
     dvc: bool = False,
+    patch_mlflow: bool = False,
 ):
     """
     Initialize a DagsHub repository or DagsHub-related functionality.
@@ -47,6 +49,7 @@ def init(
         host: Address of the DagsHub instance with the repository.
         mlflow: Configure MLflow to log experiments to DagsHub.
         dvc: Configure a dvc remote in the repository.
+        patch_mlflow: Run :func:`dagshub.mlflow.patch_mlflow` so errors while logging with MLflow don't stop execution
     """
     if host is None:
         host = config.host
@@ -94,6 +97,9 @@ def init(
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
         log_message(f'Initialized MLflow to track repo "{repo_owner}/{repo_name}"')
+
+        if patch_mlflow:
+            _patch_mlflow()
 
     # Configure DVC
     if dvc:
