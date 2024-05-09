@@ -48,13 +48,14 @@ _default_guaranteed_raises = ["log_model"]
 
 class MlflowMonkeyPatch:
     context_manager_functions = ["start_run"]
-    # Functions that guarantee to raise an exception if they are in the stack
-    # Example: all mlflow.<framework>.log_model functions underneath use log_artifact, but we might want to raise them
 
     def __init__(self, funcs_to_patch: List[str], classes_to_patch: List[str], guaranteed_raises: List[str]):
         self.funcs_to_patch = set(funcs_to_patch)
         self.classes_to_patch = set(classes_to_patch)
+        # Functions that guarantee to raise an exception if they are in the stack
+        # Example: all mlflow.<framework>.log_model functions underneath use log_artifact, but we might want to raise them
         self.functions_with_guaranteed_raises = set(guaranteed_raises)
+
         self.original_func_lookup: Dict[str, Callable] = {}
         self.patched_modules: Set[str] = set()
 
@@ -64,7 +65,7 @@ class MlflowMonkeyPatch:
         def is_top_level_mlflow_call() -> bool:
             tb = traceback.extract_stack()
 
-            # Count the times `wrap_fn` functions show up in the stack trace,
+            # Count the times `dh_mlflow_wrap_fn` functions show up in the stack trace,
             # if it's only once - means it's the top-most level wrapped mlflow call
 
             wrap_fn_met = False
@@ -73,8 +74,8 @@ class MlflowMonkeyPatch:
                 if stack_line.name in self.functions_with_guaranteed_raises:
                     return False
                 is_wrap_func = stack_line.filename == __file__ and stack_line.name in {
-                    "wrap_fn",
-                    "context_manager_wrap_fn",
+                    "dh_mlflow_wrap_fn",
+                    "dh_mlflow_context_manager_wrap_fn",
                 }
                 if not is_wrap_func:
                     continue
@@ -85,7 +86,7 @@ class MlflowMonkeyPatch:
 
             return True
 
-        def wrap_fn(*args, **kwargs):
+        def dh_mlflow_wrap_fn(*args, **kwargs):
             try:
                 return fn(*args, **kwargs)
             except MlflowException:
@@ -97,7 +98,7 @@ class MlflowMonkeyPatch:
                     f"but was suppressed due to running dagshub.mlflow.patch_mlflow:"
                 )
 
-        def context_manager_wrap_fn(*args, **kwargs):
+        def dh_mlflow_context_manager_wrap_fn(*args, **kwargs):
             # Context managers (start_run), always return a value, so those we retry for a long amount of time instead
             # Swallowing this function's exception would break any call after that
             # Alternative might be returning a mock object that no-ops any calls to it
@@ -106,9 +107,9 @@ class MlflowMonkeyPatch:
                     return fn(*args, **kwargs)
 
         if fn.__name__ in self.context_manager_functions:
-            return context_manager_wrap_fn
+            return dh_mlflow_context_manager_wrap_fn
         else:
-            return wrap_fn
+            return dh_mlflow_wrap_fn
 
     def is_function_already_patched(self, func_name: str) -> bool:
         return func_name in self.original_func_lookup
