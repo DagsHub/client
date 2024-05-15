@@ -388,6 +388,17 @@ class QueryResult:
             num_proc=num_proc,
         )
 
+    def get_annotations(self, **kwargs) -> "QueryResult":
+        """
+        Loads all annotation fields using :func:`get_blob_fields`.
+
+        All keyword arguments are passed to :func:`get_blob_fields`.
+        """
+        if len(self.datasource.annotation_fields) == 0:
+            logger.warning("No annotation fields in this datasource")
+            return self
+        return self.get_blob_fields(*self.datasource.annotation_fields, **kwargs)
+
     def download_files(
         self,
         target_dir: Optional[Union[str, PathLike]] = None,
