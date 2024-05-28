@@ -576,7 +576,7 @@ class QueryResult:
             logger.warning("Not every datapoint has a size field, size calculations might be wrong")
         return sum_size
 
-    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "fiftyone", **kwargs) -> Union[str, "fo.Session"]:
+    def visualize(self, visualizer: Literal["dagshub", "fiftyone"] = "dagshub", **kwargs) -> Union[str, "fo.Session"]:
         """
         Visualize this QueryResult either on DagsHub or with Voxel51.
 
