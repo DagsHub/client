@@ -26,6 +26,8 @@ class MetadataFieldType(enum.Enum):
     """Python's ``bool``"""
     INTEGER = "INTEGER"
     """Python's ``int``"""
+    DATETIME = "DATETIME"
+    """Python's ``datetime.datetime``"""
     FLOAT = "FLOAT"
     """Python's ``float``"""
     STRING = "STRING"
@@ -67,6 +69,12 @@ class Int(DagshubDataType):
     """Basic python ``int``"""
 
     backing_field_type = MetadataFieldType.INTEGER
+
+
+class DateTime(DagshubDataType):
+    """Basic python ``datetime.datetime``"""
+
+    backing_field_type = MetadataFieldType.DATETIME
 
 
 class String(DagshubDataType):

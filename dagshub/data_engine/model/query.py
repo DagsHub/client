@@ -1,3 +1,4 @@
+import datetime
 import enum
 import logging
 from typing import Optional, Union, Dict
@@ -83,7 +84,7 @@ class QueryFilterTree:
             return None
         return filter_node.data["field"]
 
-    def compose(self, op: str, other: Optional[Union[str, int, float, "QueryFilterTree"]]):
+    def compose(self, op: str, other: Optional[Union[str, int, float, "QueryFilterTree", datetime.datetime]]):
         """
         Compose the current query with another query or a value using the specified operator.
 
@@ -187,7 +188,11 @@ class QueryFilterTree:
                 # TODO: this will need to probably be changed when we allow actual binary field comparisons
                 value = value.decode("utf-8")
             else:
-                value = str(value)
+                if isinstance(value, datetime.datetime):
+                    value = int(value.timestamp())
+                else:
+                    value = str(value)
+
             if value_type is None:
                 raise RuntimeError(
                     f"Value type {value_type} is not supported for querying.\r\n"
