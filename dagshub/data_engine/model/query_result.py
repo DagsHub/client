@@ -236,7 +236,9 @@ class QueryResult:
         Loads this QueryResult as a HuggingFace dataset.
 
         The paths of the downloads are set to the local paths in the filesystem, so they can be used with
-        a ``cast_column()`` function later.
+        a `cast_column() \
+        <https://huggingface.co/docs/datasets/main/en/package_reference/main_classes#datasets.Dataset.cast_column>`_\
+        function later.
 
         Args:
             target_dir: Where to download the datapoints. The metadata is still downloaded into the global cache.
