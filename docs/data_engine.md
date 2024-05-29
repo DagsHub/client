@@ -114,6 +114,7 @@ Metadata dictionary is keyed by strings, currently acceptable value types are:
 - Boolean
 - String
 - Blobs (need to be of type `bytes`)
+- Datetime
 - ** Please let us know about other metadata types you'd like to use and why **
 
 We automatically infer the metadata types and create the schema when we first encounter a new metadata field name being

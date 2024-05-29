@@ -72,8 +72,20 @@ class Int(DagshubDataType):
 
 
 class DateTime(DagshubDataType):
-    """Basic python ``datetime.datetime``"""
+    """Basic python ``datetime.datetime``
 
+    .. note::
+        dagshub backend can receive only an integer timestamp (utc timestamp).
+        in the below example the dagshub client sends int(t.timestamp()) to the backend
+        if you want to save your own timestamp it must be rounded like this.
+
+    Example::
+
+        datapoints = datasource.all()
+        t = dateutil.parser.parse("2022-04-05T15:30:00.99999+05:30")
+        datapoints[path][name] = t
+        datapoints[path].save()
+    """
     backing_field_type = MetadataFieldType.DATETIME
 
 
