@@ -16,6 +16,11 @@ class ReservedTags(enum.Enum):
     TEXT = "text"
 
 
+class MetadataFieldComparisonType(enum.Enum):
+    INTRANGE  = "INTRANGE"
+    JSONRANGE = "JSONRANGE"
+
+
 # These are the base primitives that the data engine database is capable of storing
 class MetadataFieldType(enum.Enum):
     """

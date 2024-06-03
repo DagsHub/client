@@ -1200,6 +1200,19 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
+    def year(self, item: List[int]):
+        """
+        Check if the filtering field contains the specified string item.
+
+        :meta private:
+        """
+        # yuvald TODO add validation
+        # if type(item) is not str:
+        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
+
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("year", item)
+
     def startswith(self, item: str):
         """
         Check if the filtering field starts with the specified string item.
@@ -1392,7 +1405,7 @@ class MetadataContextManager:
                     if isinstance(v, bytes):
                         v = wrap_bytes(v)
                     if isinstance(v, datetime.datetime):
-                        v = int(v.timestamp())
+                        v = int(v.timestamp()*1000)
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(

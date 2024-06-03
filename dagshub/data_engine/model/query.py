@@ -5,6 +5,7 @@ from typing import Optional, Union, Dict
 
 from treelib import Tree, Node
 
+from dagshub.data_engine.dtypes import MetadataFieldComparisonType
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
@@ -34,6 +35,8 @@ class FieldFilterOperand(enum.Enum):
     IS_NULL = "IS_NULL"
     STARTS_WITH = "STARTS_WITH"
     ENDS_WITH = "ENDS_WITH"
+    YEAR = "YEAR"
+
 
 
 fieldFilterOperandMap = {
@@ -46,6 +49,7 @@ fieldFilterOperandMap = {
     "isnull": FieldFilterOperand.IS_NULL,
     "startswith": FieldFilterOperand.STARTS_WITH,
     "endswith": FieldFilterOperand.ENDS_WITH,
+    "year": FieldFilterOperand.YEAR
 }
 
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
@@ -177,6 +181,25 @@ class QueryFilterTree:
             return serialized
         else:
             query_op = fieldFilterOperandMap.get(operand)
+
+
+            if query_op is FieldFilterOperand.YEAR:
+                key = node.data["field"]
+                value = node.data["value"]
+                #as_of = node.data.get("as_of")
+                res = {
+                    "filter": {
+                        "key": key,
+                        "value": 3,
+                        "valueRange": {"range": value},
+                        "valueType": MetadataFieldComparisonType.INTRANGE.value,
+                        "comparator": query_op.value,
+                    }
+                }
+
+                return res
+
+
             if query_op is None:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
@@ -189,7 +212,7 @@ class QueryFilterTree:
                 value = value.decode("utf-8")
             else:
                 if isinstance(value, datetime.datetime):
-                    value = int(value.timestamp())
+                    value = int(value.timestamp()*1000)
                 else:
                     value = str(value)
 
@@ -208,6 +231,10 @@ class QueryFilterTree:
             }
             if as_of:
                 res["filter"]["asOf"] = as_of
+
+            # if query_op is FieldFilterOperand.IN_PERIOD:
+            #     res["filter"]["period_values"] = value
+
             return res
 
     @staticmethod
