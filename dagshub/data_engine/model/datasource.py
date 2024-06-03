@@ -1145,25 +1145,25 @@ class Datasource:
 
     def __gt__(self, other: object):
         self._test_not_comparing_other_ds(other)
-        if not isinstance(other, (int, float, str)):
+        if not isinstance(other, (int, float, str, datetime.datetime)):
             raise NotImplementedError
         return self.add_query_op("gt", other)
 
     def __ge__(self, other: object):
         self._test_not_comparing_other_ds(other)
-        if not isinstance(other, (int, float, str)):
+        if not isinstance(other, (int, float, str, datetime.datetime)):
             raise NotImplementedError
         return self.add_query_op("ge", other)
 
     def __le__(self, other: object):
         self._test_not_comparing_other_ds(other)
-        if not isinstance(other, (int, float, str)):
+        if not isinstance(other, (int, float, str, datetime.datetime)):
             raise NotImplementedError
         return self.add_query_op("le", other)
 
     def __lt__(self, other: object):
         self._test_not_comparing_other_ds(other)
-        if not isinstance(other, (int, float, str)):
+        if not isinstance(other, (int, float, str, datetime.datetime)):
             raise NotImplementedError
         return self.add_query_op("lt", other)
 
@@ -1171,7 +1171,7 @@ class Datasource:
         self._test_not_comparing_other_ds(other)
         if other is None:
             return self.is_null()
-        if not isinstance(other, (int, float, str)):
+        if not isinstance(other, (int, float, str, datetime.datetime)):
             raise NotImplementedError
         return self.add_query_op("eq", other)
 
@@ -1179,7 +1179,7 @@ class Datasource:
         self._test_not_comparing_other_ds(other)
         if other is None:
             return self.is_not_null()
-        if not isinstance(other, (int, float, str)):
+        if not isinstance(other, (int, float, str, datetime.datetime)):
             raise NotImplementedError
         return self.add_query_op("eq", other).add_query_op("not")
 
@@ -1391,6 +1391,8 @@ class MetadataContextManager:
                         v = v.encode("utf-8")
                     if isinstance(v, bytes):
                         v = wrap_bytes(v)
+                    if isinstance(v, datetime.datetime):
+                        v = int(v.timestamp())
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(
