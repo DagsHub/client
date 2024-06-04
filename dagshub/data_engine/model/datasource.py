@@ -277,7 +277,7 @@ class Datasource:
         self._check_preprocess()
         send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
         res = self._source.client.head(self, size)
-        self._download_document_fields(res)
+        res._load_autoload_fields()
         return res
 
     def all(self) -> "QueryResult":
@@ -287,19 +287,9 @@ class Datasource:
         self._check_preprocess()
         self._autolog_mlflow()
         res = self._source.client.get_datapoints(self)
-        self._download_document_fields(res)
+        res._load_autoload_fields()
 
         return res
-
-    def _download_document_fields(self, qr: "QueryResult"):
-        if len(self.document_fields) > 0:
-            log_message(f"Downloading document fields {self.document_fields}...")
-            qr.download_binary_columns(*self.document_fields)
-            # Convert them to strings
-            for dp in qr:
-                for f in self.document_fields:
-                    if f in dp.metadata:
-                        dp.metadata[f] = dp.metadata[f].decode("utf-8")
 
     def select(self, *selected: Union[str, Field]) -> "Datasource":
         """

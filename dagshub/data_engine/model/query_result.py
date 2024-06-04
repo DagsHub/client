@@ -12,7 +12,7 @@ import rich.progress
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
-from dagshub.common.helpers import sizeof_fmt, prompt_user
+from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.annotation.voxel_conversion import (
@@ -113,7 +113,7 @@ class QueryResult:
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
-        raw_fields = query_resp.get("select_fields", [])
+        raw_fields = query_resp.get("selectFields", [])
         if raw_fields is None:
             raw_fields = []
         fields = [dacite.from_dict(MetadataSelectFieldSchema, f, dacite_config) for f in raw_fields]
@@ -332,13 +332,13 @@ class QueryResult:
         if not load_into_memory:
             assert cache_on_disk
 
-        # If no fields are specified, include all blob fields from self.datasource.fields
+        # If no fields are specified, include all blob fields from self..fields
         if not fields:
             fields = tuple(
                 [
                     f.name
                     for f in self.fields
-                    if f.valueType == MetadataFieldType.BLOB and f.name not in self.datasource.document_fields
+                    if f.valueType == MetadataFieldType.BLOB and f.name not in self.document_fields
                 ]
             )
 
@@ -648,3 +648,22 @@ class QueryResult:
             fields_to_exclude=fields_to_exclude,
             fields_to_embed=fields_to_embed,
         )
+
+    @property
+    def document_fields(self) -> List[str]:
+        return [f.name for f in self.fields if f.is_document()]
+
+    def _load_autoload_fields(self):
+        """
+        Loads fields that are supposed to be load automatically upon querying.
+        This includes:
+            - All document fields
+        """
+        if len(self.document_fields) > 0:
+            log_message(f"Downloading document fields {self.document_fields}...")
+            self.get_blob_fields(*self.document_fields, load_into_memory=True)
+            # Convert them to strings
+            for dp in self:
+                for f in self.document_fields:
+                    if f in dp.metadata:
+                        dp.metadata[f] = dp.metadata[f].decode("utf-8")
