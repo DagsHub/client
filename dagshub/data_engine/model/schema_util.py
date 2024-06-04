@@ -1,3 +1,4 @@
+import datetime
 from typing import Type, Dict, Set
 
 import dacite
@@ -11,6 +12,7 @@ metadataTypeLookup = {
     float: MetadataFieldType.FLOAT,
     str: MetadataFieldType.STRING,
     bytes: MetadataFieldType.BLOB,
+    datetime.datetime: MetadataFieldType.DATETIME,
 }
 
 metadataTypeLookupReverse: Dict[str, Type] = {}

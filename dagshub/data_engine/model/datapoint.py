@@ -1,3 +1,5 @@
+import datetime
+import pytz
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -118,12 +120,16 @@ class Datapoint:
         )
 
         float_fields = {f.name for f in fields if f.valueType == MetadataFieldType.FLOAT}
+        date_fields = {f.name for f in fields if f.valueType == MetadataFieldType.DATETIME}
 
         for meta_dict in edge["node"]["metadata"]:
             key = meta_dict["key"]
             value = meta_dict["value"]
             if key in float_fields:
                 value = float(value)
+            else:
+                if key in date_fields:
+                    value = datetime.datetime.fromtimestamp(value).astimezone(pytz.utc)
             res.metadata[key] = value
         return res
 
