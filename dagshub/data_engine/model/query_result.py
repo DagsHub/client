@@ -409,10 +409,10 @@ class QueryResult:
 
         All keyword arguments are passed to :func:`get_blob_fields`.
         """
-        if len(self.datasource.annotation_fields) == 0:
-            logger.warning("No annotation fields in this datasource")
+        if len(self.annotation_fields) == 0:
+            logger.warning("No annotation fields in this query result")
             return self
-        return self.get_blob_fields(*self.datasource.annotation_fields, **kwargs)
+        return self.get_blob_fields(*self.annotation_fields, **kwargs)
 
     def download_files(
         self,
@@ -652,6 +652,10 @@ class QueryResult:
     @property
     def document_fields(self) -> List[str]:
         return [f.name for f in self.fields if f.is_document()]
+
+    @property
+    def annotation_fields(self) -> List[str]:
+        return [f.name for f in self.fields if f.is_annotation()]
 
     def _load_autoload_fields(self):
         """
