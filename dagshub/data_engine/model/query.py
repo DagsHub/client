@@ -36,6 +36,8 @@ class FieldFilterOperand(enum.Enum):
     STARTS_WITH = "STARTS_WITH"
     ENDS_WITH = "ENDS_WITH"
     YEAR = "YEAR"
+    MONTH = "MONTH"
+    DAY = "DAY"
 
 
 
@@ -49,7 +51,9 @@ fieldFilterOperandMap = {
     "isnull": FieldFilterOperand.IS_NULL,
     "startswith": FieldFilterOperand.STARTS_WITH,
     "endswith": FieldFilterOperand.ENDS_WITH,
-    "year": FieldFilterOperand.YEAR
+    "year": FieldFilterOperand.YEAR,
+    "month": FieldFilterOperand.MONTH,
+    "day": FieldFilterOperand.DAY
 }
 
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
@@ -183,7 +187,7 @@ class QueryFilterTree:
             query_op = fieldFilterOperandMap.get(operand)
 
 
-            if query_op is FieldFilterOperand.YEAR:
+            if query_op in [FieldFilterOperand.YEAR, FieldFilterOperand.MONTH, FieldFilterOperand.DAY]:
                 key = node.data["field"]
                 value = node.data["value"]
                 #as_of = node.data.get("as_of")

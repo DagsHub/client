@@ -1200,7 +1200,21 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
+    # yuvald TODO maybe rename, maybe one api func?
     def year(self, item: List[int]):
+        """
+        Check if the filtering field contains the specified string item.
+
+        :meta private:
+        """
+        # yuvald TODO add validation, that key is date
+        # if type(item) is not str:
+        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
+
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("year", item)
+
+    def month(self, item: List[int]):
         """
         Check if the filtering field contains the specified string item.
 
@@ -1211,7 +1225,20 @@ class Datasource:
         #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
 
         self._test_not_comparing_other_ds(item)
-        return self.add_query_op("year", item)
+        return self.add_query_op("month", item)
+
+    def day(self, item: List[int]):
+        """
+        Check if the filtering field contains the specified string item.
+
+        :meta private:
+        """
+        # yuvald TODO add validation
+        # if type(item) is not str:
+        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
+
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("day", item)
 
     def startswith(self, item: str):
         """
@@ -1279,7 +1306,7 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree"]] = None
+        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[int]]] = None
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
