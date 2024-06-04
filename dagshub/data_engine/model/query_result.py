@@ -6,6 +6,7 @@ from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
 
+import dacite
 import rich.progress
 
 from dagshub.common import config
@@ -18,9 +19,10 @@ from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
     add_ls_annotations,
 )
-from dagshub.data_engine.client.models import DatasourceType
+from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint, _get_blob, _generated_fields
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
+from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from dagshub.data_engine.dtypes import MetadataFieldType
 
@@ -59,6 +61,7 @@ class QueryResult:
 
     _entries: List[Datapoint]
     datasource: "Datasource"
+    fields: List[MetadataSelectFieldSchema]
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
 
     def __post_init__(self):
@@ -110,13 +113,23 @@ class QueryResult:
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
-        if "edges" not in query_resp:
-            return QueryResult([], datasource)
-        if query_resp["edges"] is None:
-            return QueryResult([], datasource)
+        raw_fields = query_resp.get("select_fields", [])
+        if raw_fields is None:
+            raw_fields = []
+        fields = [dacite.from_dict(MetadataSelectFieldSchema, f, dacite_config) for f in raw_fields]
+        # If no fields - get the default datasource ones
+        if len(fields) == 0:
+            fields = [MetadataSelectFieldSchema.from_metadata_field_schema(mfs) for mfs in datasource.fields]
+
+        edges = query_resp.get("edges", [])
+        if edges is None:
+            edges = []
+        datapoints = [Datapoint.from_gql_edge(edge, datasource, fields) for edge in edges]
+
         return QueryResult(
-            [Datapoint.from_gql_edge(edge, datasource) for edge in query_resp["edges"]],
+            datapoints,
             datasource,
+            fields,
         )
 
     def as_ml_dataset(self, flavor: str, **kwargs):
@@ -278,12 +291,12 @@ class QueryResult:
         """
         Gets datapoint by its path (string) or by its index in the result (or slice)
         """
-        if type(item) is str:
+        if isinstance(item, str):
             return self._datapoint_path_lookup[item]
-        elif type(item) is int:
+        elif isinstance(item, int):
             return self.entries[item]
         elif type(item) is slice:
-            return QueryResult(_entries=self.entries[item], datasource=self.datasource)
+            return QueryResult(_entries=self.entries[item], datasource=self.datasource, fields=self.fields)
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
@@ -323,9 +336,9 @@ class QueryResult:
         if not fields:
             fields = tuple(
                 [
-                    field.name
-                    for field in self.datasource.fields
-                    if field.valueType == MetadataFieldType.BLOB and field.name not in self.datasource.document_fields
+                    f.name
+                    for f in self.fields
+                    if f.valueType == MetadataFieldType.BLOB and f.name not in self.datasource.document_fields
                 ]
             )
 
@@ -512,7 +525,7 @@ class QueryResult:
             annotation_fields = kwargs["voxel_annotations"]
             label_func = add_voxel_annotations
         else:
-            annotation_fields = self.datasource.annotation_fields
+            annotation_fields = [f for f in self.fields if f.is_annotation()]
             label_func = add_ls_annotations
 
         # Load the annotation fields

@@ -7,8 +7,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from dagshub.common.analytics import send_analytics_event
-from dagshub.data_engine.client.data_client import dacite_config
 from dagshub.data_engine.client.models import MetadataFieldSchema
+from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.routes.util import error_handler
 from dagshub.data_engine.voxel_plugin_server.utils import get_plugin_state
 
