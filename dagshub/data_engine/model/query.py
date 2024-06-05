@@ -5,7 +5,6 @@ from typing import Optional, Union, Dict
 
 from treelib import Tree, Node
 
-from dagshub.data_engine.dtypes import MetadataFieldComparisonType
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
@@ -38,6 +37,7 @@ class FieldFilterOperand(enum.Enum):
     YEAR = "YEAR"
     MONTH = "MONTH"
     DAY = "DAY"
+    TIMEOFDAY= "TIMEOFDAY"
 
 
 
@@ -53,7 +53,8 @@ fieldFilterOperandMap = {
     "endswith": FieldFilterOperand.ENDS_WITH,
     "year": FieldFilterOperand.YEAR,
     "month": FieldFilterOperand.MONTH,
-    "day": FieldFilterOperand.DAY
+    "day": FieldFilterOperand.DAY,
+    "timeofday": FieldFilterOperand.TIMEOFDAY
 }
 
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
@@ -186,58 +187,53 @@ class QueryFilterTree:
         else:
             query_op = fieldFilterOperandMap.get(operand)
 
-
-            if query_op in [FieldFilterOperand.YEAR, FieldFilterOperand.MONTH, FieldFilterOperand.DAY]:
+            if query_op in [FieldFilterOperand.YEAR, FieldFilterOperand.MONTH, FieldFilterOperand.DAY, FieldFilterOperand.TIMEOFDAY]:
                 key = node.data["field"]
                 value = node.data["value"]
-                #as_of = node.data.get("as_of")
                 res = {
                     "filter": {
                         "key": key,
-                        "value": 3,
-                        "valueRange": {"range": value},
-                        "valueType": MetadataFieldComparisonType.INTRANGE.value,
+                        "value": value if query_op is FieldFilterOperand.TIMEOFDAY else 0,
+                        "valueRange": 0 if query_op is FieldFilterOperand.TIMEOFDAY else value,
+                        "valueType": "DATETIME_RANGE",
                         "comparator": query_op.value,
                     }
                 }
 
                 return res
-
-
-            if query_op is None:
-                raise WrongOperatorError(f"Operator {operand} is not supported")
-            key = node.data["field"]
-            value = node.data["value"]
-            as_of = node.data.get("as_of")
-
-            value_type = metadataTypeLookup[type(value)].value
-            if type(value) is bytes:
-                # TODO: this will need to probably be changed when we allow actual binary field comparisons
-                value = value.decode("utf-8")
             else:
-                if isinstance(value, datetime.datetime):
-                    value = int(value.timestamp()*1000)
-                else:
-                    value = str(value)
+                if query_op is None:
+                    raise WrongOperatorError(f"Operator {operand} is not supported")
+                key = node.data["field"]
+                value = node.data["value"]
+                as_of = node.data.get("as_of")
 
-            if value_type is None:
-                raise RuntimeError(
-                    f"Value type {value_type} is not supported for querying.\r\n"
-                    f"Supported types: {list(metadataTypeLookup.keys())}"
-                )
-            res = {
-                "filter": {
-                    "key": key,
-                    "value": str(value),
-                    "valueType": value_type,
-                    "comparator": query_op.value,
+                value_type = metadataTypeLookup[type(value)].value
+                if type(value) is bytes:
+                    # TODO: this will need to probably be changed when we allow actual binary field comparisons
+                    value = value.decode("utf-8")
+                else:
+                    if isinstance(value, datetime.datetime):
+                        value = int(value.timestamp()*1000)
+                    else:
+                        value = str(value)
+
+                if value_type is None:
+                    raise RuntimeError(
+                        f"Value type {value_type} is not supported for querying.\r\n"
+                        f"Supported types: {list(metadataTypeLookup.keys())}"
+                    )
+                res = {
+                    "filter": {
+                        "key": key,
+                        "value": str(value),
+                        "valueType": value_type,
+                        "comparator": query_op.value,
+                    }
                 }
-            }
+
             if as_of:
                 res["filter"]["asOf"] = as_of
-
-            # if query_op is FieldFilterOperand.IN_PERIOD:
-            #     res["filter"]["period_values"] = value
 
             return res
 
