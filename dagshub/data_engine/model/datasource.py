@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
+from dateutil import tz
+
 
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
@@ -373,6 +375,15 @@ class Datasource:
         new_ds = self.__deepcopy__()
 
         new_ds._query.as_of = to_timestamp(time)
+        return new_ds
+
+    def time_zone(self, time: str) -> "Datasource":
+        """
+        yuvald TODO
+        """
+        new_ds = self.__deepcopy__()
+
+        new_ds._query.timezone = time
         return new_ds
 
     def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
@@ -1200,8 +1211,7 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
-    # yuvald TODO maybe rename, maybe one api func?
-    def year(self, item: List[str]):
+    def _periodic_filter(self, item: List[str], periodtype):
         """
         Check if the filtering field contains the specified string item.
 
@@ -1212,46 +1222,20 @@ class Datasource:
         #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
 
         self._test_not_comparing_other_ds(item)
-        return self.add_query_op("year", item)
+        return self.add_query_op(periodtype, item)
+
+    # yuvald TODO document all these
+    def year(self, item: List[str]):
+        return self._periodic_filter(item, "year")
 
     def month(self, item: List[str]):
-        """
-        Check if the filtering field contains the specified string item.
-
-        :meta private:
-        """
-        # yuvald TODO add validation
-        # if type(item) is not str:
-        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
-
-        self._test_not_comparing_other_ds(item)
-        return self.add_query_op("month", item)
+        return self._periodic_filter(item, "month")
 
     def day(self, item: List[str]):
-        """
-        Check if the filtering field contains the specified string item.
-
-        :meta private:
-        """
-        # yuvald TODO add validation
-        # if type(item) is not str:
-        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
-
-        self._test_not_comparing_other_ds(item)
-        return self.add_query_op("day", item)
+        return self._periodic_filter(item, "day")
 
     def timeofday(self, item: List[str]):
-        """
-        Check if the filtering field contains the specified string item.
-
-        :meta private:
-        """
-        # yuvald TODO add validation
-        # if type(item) is not str:
-        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
-
-        self._test_not_comparing_other_ds(item)
-        return self.add_query_op("timeofday", item)
+        return self._periodic_filter(item, "timeofday")
 
     def startswith(self, item: str):
         """
@@ -1462,9 +1446,17 @@ class MetadataContextManager:
         return self._metadata_entries
 
 
+def _get_local_timezone():
+    now_utc = datetime.datetime.utcnow()
+    local_timezone = tz.tzlocal()
+    return now_utc.astimezone(local_timezone).strftime('%z')[:-2] + ':' + now_utc.astimezone(
+        local_timezone).strftime('%z')[-2:]
+
+
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    timezone: Optional[str] = field(default=_get_local_timezone(), metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
@@ -1477,6 +1469,7 @@ class DatasourceQuery(DataClassJsonMixin):
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
             as_of=self.as_of,
+            timezone=self.timezone,
             filter=self.filter.__deepcopy__(),
         )
         if self.select is not None:
@@ -1504,6 +1497,8 @@ class DatasourceQuery(DataClassJsonMixin):
                 self.select = other_query.select
             if other_query.as_of is not None:
                 self.as_of = other_query.as_of
+            if other_query.timezone is not None:
+                self.timezone = other_query.timezone
             if other_query.order_by is not None:
                 self.order_by = other_query.order_by
 
