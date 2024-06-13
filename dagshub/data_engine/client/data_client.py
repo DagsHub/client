@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Set
+from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
 
 import dacite
 import gql
@@ -15,13 +15,9 @@ from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.gql_introspections import GqlIntrospections, TypesIntrospection
 from dagshub.data_engine.client.models import (
     DatasourceResult,
-    DatasourceType,
-    IntegrationStatus,
-    PreprocessingStatus,
     DatasetResult,
     MetadataFieldSchema,
 )
-from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
@@ -29,6 +25,8 @@ from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
 from functools import cached_property
+
+from dagshub.data_engine.model.schema_util import dacite_config
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
@@ -40,8 +38,6 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
-
-dacite_config = dacite.Config(cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType, Set])
 
 
 class DataClient:
@@ -122,7 +118,7 @@ class DataClient:
 
         has_next_page = True
         after = None
-        res = QueryResult([], datasource)
+        res = QueryResult([], datasource, [])
         left = n
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
@@ -136,6 +132,7 @@ class DataClient:
                 after = resp["pageInfo"]["endCursor"]
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
+                res.fields = new_entries.fields
                 left -= take
                 progress.update(total_task, advance=len(res.entries), refresh=True)
         return res
@@ -146,7 +143,7 @@ class DataClient:
     def _get_all(self, datasource: "Datasource", include_metadata: bool) -> QueryResult:
         has_next_page = True
         after = None
-        res = QueryResult([], datasource)
+        res = QueryResult([], datasource, [])
         # TODO: smarter batch sizing. Query a constant size at first
         #       On next queries adjust depending on the amount of metadata columns
 
@@ -161,6 +158,7 @@ class DataClient:
 
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
+                res.fields = new_entries.fields
                 progress.update(total_task, advance=len(new_entries.entries), refresh=True)
 
         return res

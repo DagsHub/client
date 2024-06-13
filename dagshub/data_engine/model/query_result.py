@@ -6,21 +6,23 @@ from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
 
+import dacite
 import rich.progress
 
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
-from dagshub.common.helpers import sizeof_fmt, prompt_user
+from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
     add_ls_annotations,
 )
-from dagshub.data_engine.client.models import DatasourceType
+from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint, _get_blob, _generated_fields
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
+from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from dagshub.data_engine.dtypes import MetadataFieldType
 
@@ -59,6 +61,7 @@ class QueryResult:
 
     _entries: List[Datapoint]
     datasource: "Datasource"
+    fields: List[MetadataSelectFieldSchema]
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
 
     def __post_init__(self):
@@ -110,13 +113,21 @@ class QueryResult:
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
-        if "edges" not in query_resp:
-            return QueryResult([], datasource)
-        if query_resp["edges"] is None:
-            return QueryResult([], datasource)
+        raw_fields = query_resp.get("selectFields") or []
+        fields = [dacite.from_dict(MetadataSelectFieldSchema, f, dacite_config) for f in raw_fields]
+        # If no fields - get the default datasource ones
+        if len(fields) == 0:
+            fields = [MetadataSelectFieldSchema.from_metadata_field_schema(mfs) for mfs in datasource.fields]
+
+        edges = query_resp.get("edges", [])
+        if edges is None:
+            edges = []
+        datapoints = [Datapoint.from_gql_edge(edge, datasource, fields) for edge in edges]
+
         return QueryResult(
-            [Datapoint.from_gql_edge(edge, datasource) for edge in query_resp["edges"]],
+            datapoints,
             datasource,
+            fields,
         )
 
     def as_ml_dataset(self, flavor: str, **kwargs):
@@ -278,12 +289,12 @@ class QueryResult:
         """
         Gets datapoint by its path (string) or by its index in the result (or slice)
         """
-        if type(item) is str:
+        if isinstance(item, str):
             return self._datapoint_path_lookup[item]
-        elif type(item) is int:
+        elif isinstance(item, int):
             return self.entries[item]
         elif type(item) is slice:
-            return QueryResult(_entries=self.entries[item], datasource=self.datasource)
+            return QueryResult(_entries=self.entries[item], datasource=self.datasource, fields=self.fields)
         else:
             raise ValueError(
                 f"Can't lookup datapoint using value {item} of type {type(item)}, "
@@ -319,13 +330,13 @@ class QueryResult:
         if not load_into_memory:
             assert cache_on_disk
 
-        # If no fields are specified, include all blob fields from self.datasource.fields
+        # If no fields are specified, include all blob fields from self..fields
         if not fields:
             fields = tuple(
                 [
-                    field.name
-                    for field in self.datasource.fields
-                    if field.valueType == MetadataFieldType.BLOB and field.name not in self.datasource.document_fields
+                    f.name
+                    for f in self.fields
+                    if f.valueType == MetadataFieldType.BLOB and f.name not in self.document_fields
                 ]
             )
 
@@ -396,10 +407,10 @@ class QueryResult:
 
         All keyword arguments are passed to :func:`get_blob_fields`.
         """
-        if len(self.datasource.annotation_fields) == 0:
-            logger.warning("No annotation fields in this datasource")
+        if len(self.annotation_fields) == 0:
+            logger.warning("No annotation fields in this query result")
             return self
-        return self.get_blob_fields(*self.datasource.annotation_fields, **kwargs)
+        return self.get_blob_fields(*self.annotation_fields, **kwargs)
 
     def download_files(
         self,
@@ -512,7 +523,7 @@ class QueryResult:
             annotation_fields = kwargs["voxel_annotations"]
             label_func = add_voxel_annotations
         else:
-            annotation_fields = self.datasource.annotation_fields
+            annotation_fields = [f for f in self.fields if f.is_annotation()]
             label_func = add_ls_annotations
 
         # Load the annotation fields
@@ -635,3 +646,26 @@ class QueryResult:
             fields_to_exclude=fields_to_exclude,
             fields_to_embed=fields_to_embed,
         )
+
+    @property
+    def document_fields(self) -> List[str]:
+        return [f.name for f in self.fields if f.is_document()]
+
+    @property
+    def annotation_fields(self) -> List[str]:
+        return [f.name for f in self.fields if f.is_annotation()]
+
+    def _load_autoload_fields(self):
+        """
+        Loads fields that are supposed to be load automatically upon querying.
+        This includes:
+            - All document fields
+        """
+        if len(self.document_fields) > 0:
+            log_message(f"Downloading document fields {self.document_fields}...")
+            self.get_blob_fields(*self.document_fields, load_into_memory=True)
+            # Convert them to strings
+            for dp in self:
+                for f in self.document_fields:
+                    if f in dp.metadata:
+                        dp.metadata[f] = dp.metadata[f].decode("utf-8")

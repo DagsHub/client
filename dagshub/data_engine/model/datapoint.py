@@ -7,6 +7,7 @@ from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING, Li
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
+from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
@@ -110,7 +111,7 @@ class Datapoint:
         return self.datasource.source.file_path(self)
 
     @staticmethod
-    def from_gql_edge(edge: Dict, datasource: "Datasource") -> "Datapoint":
+    def from_gql_edge(edge: Dict, datasource: "Datasource", fields: List[MetadataSelectFieldSchema]) -> "Datapoint":
         res = Datapoint(
             datapoint_id=int(edge["node"]["id"]),
             path=edge["node"]["path"],
@@ -118,8 +119,8 @@ class Datapoint:
             datasource=datasource,
         )
 
-        float_fields = {f.name for f in datasource.fields if f.valueType == MetadataFieldType.FLOAT}
-        date_fields = {f.name for f in datasource.fields if f.valueType == MetadataFieldType.DATETIME}
+        float_fields = {f.name for f in fields if f.valueType == MetadataFieldType.FLOAT}
+        date_fields = {f.name for f in fields if f.valueType == MetadataFieldType.DATETIME}
 
         for meta_dict in edge["node"]["metadata"]:
             key = meta_dict["key"]
