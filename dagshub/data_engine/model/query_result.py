@@ -113,9 +113,7 @@ class QueryResult:
 
     @staticmethod
     def from_gql_query(query_resp: Dict[str, Any], datasource: "Datasource") -> "QueryResult":
-        raw_fields = query_resp.get("selectFields", [])
-        if raw_fields is None:
-            raw_fields = []
+        raw_fields = query_resp.get("selectFields") or []
         fields = [dacite.from_dict(MetadataSelectFieldSchema, f, dacite_config) for f in raw_fields]
         # If no fields - get the default datasource ones
         if len(fields) == 0:
