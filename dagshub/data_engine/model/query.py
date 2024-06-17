@@ -37,8 +37,7 @@ class FieldFilterOperand(enum.Enum):
     YEAR = "YEAR"
     MONTH = "MONTH"
     DAY = "DAY"
-    TIMEOFDAY= "TIMEOFDAY"
-
+    TIMEOFDAY = "TIMEOFDAY"
 
 
 fieldFilterOperandMap = {
@@ -187,7 +186,10 @@ class QueryFilterTree:
         else:
             query_op = fieldFilterOperandMap.get(operand)
 
-            if query_op in [FieldFilterOperand.YEAR, FieldFilterOperand.MONTH, FieldFilterOperand.DAY, FieldFilterOperand.TIMEOFDAY]:
+            if query_op in [FieldFilterOperand.YEAR,
+                            FieldFilterOperand.MONTH,
+                            FieldFilterOperand.DAY,
+                            FieldFilterOperand.TIMEOFDAY]:
                 key = node.data["field"]
                 value = node.data["value"]
                 res = {
@@ -214,7 +216,7 @@ class QueryFilterTree:
                     value = value.decode("utf-8")
                 else:
                     if isinstance(value, datetime.datetime):
-                        value = int(value.timestamp()*1000)
+                        value = int(value.timestamp() * 1000)
                     else:
                         value = str(value)
 
