@@ -377,13 +377,13 @@ class Datasource:
         new_ds._query.as_of = to_timestamp(time)
         return new_ds
 
-    def time_zone(self, time: str) -> "Datasource":
+    def time_zone(self, tz_val: str) -> "Datasource":
         """
-        yuvald TODO
+        A time zone offset string in the form of "+HH:mm" or "-HH:mm"
         """
         new_ds = self.__deepcopy__()
 
-        new_ds._query.timezone = time
+        new_ds._query.timezone = tz_val
         return new_ds
 
     def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
@@ -1212,29 +1212,69 @@ class Datasource:
         return self.add_query_op("contains", item)
 
     def _periodic_filter(self, item: List[str], periodtype):
-        """
-        Check if the filtering field contains the specified string item.
-
-        :meta private:
-        """
-        # yuvald TODO add validation, that key is date
-        # if type(item) is not str:
-        #     return WrongOperatorError(f"Cannot use contains with non-string value {item}")
-
         self._test_not_comparing_other_ds(item)
         return self.add_query_op(periodtype, item)
 
-    # yuvald TODO document all these
     def year(self, item: List[str]):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given years list.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            List of years.
+
+        Examples::
+
+            datasource[(datasource["y"].year(["1979", "2003"])
+
+        """
+
         return self._periodic_filter(item, "year")
 
     def month(self, item: List[str]):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given months list.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            List of months.
+
+        Examples::
+
+            datasource[(datasource["y"].month(["12", "2"])
+
+        """
         return self._periodic_filter(item, "month")
 
     def day(self, item: List[str]):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given days list.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            List of days.
+
+        Examples::
+
+            datasource[(datasource["y"].day(["25", "2"])
+
+        """
         return self._periodic_filter(item, "day")
 
-    def timeofday(self, item: List[str]):
+    def timeofday(self, item: str):
+        """
+        Checks if a metadata field (which is of datetime type) is in given minute range inside the day (any day).
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            Time range string.
+
+        Examples::
+
+            datasource[(datasource["y"].timeofday("11:30-12:30")
+
+        """
+
         return self._periodic_filter(item, "timeofday")
 
     def startswith(self, item: str):
@@ -1429,7 +1469,7 @@ class MetadataContextManager:
                     if isinstance(v, bytes):
                         v = wrap_bytes(v)
                     if isinstance(v, datetime.datetime):
-                        v = int(v.timestamp()*1000)
+                        v = int(v.timestamp() * 1000)
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(
@@ -1456,7 +1496,8 @@ def _get_local_timezone():
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
-    timezone: Optional[str] = field(default=_get_local_timezone(), metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    timezone: Optional[str] = field(default=_get_local_timezone(),
+                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),

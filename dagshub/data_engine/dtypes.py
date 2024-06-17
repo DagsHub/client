@@ -16,7 +16,6 @@ class ReservedTags(enum.Enum):
     TEXT = "text"
 
 
-
 # These are the base primitives that the data engine database is capable of storing
 class MetadataFieldType(enum.Enum):
     """
