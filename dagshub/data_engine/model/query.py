@@ -204,8 +204,6 @@ class QueryFilterTree:
                         "comparator": query_op.value,
                     }
                 }
-
-                return res
             else:
                 value_type = metadataTypeLookup[type(value)].value
                 if type(value) is bytes:
