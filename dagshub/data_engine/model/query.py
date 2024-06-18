@@ -5,6 +5,7 @@ from typing import Optional, Union, Dict
 
 from treelib import Tree, Node
 
+from dagshub.data_engine.dtypes import DATETIME_RANGE
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 
@@ -38,6 +39,12 @@ class FieldFilterOperand(enum.Enum):
     MONTH = "MONTH"
     DAY = "DAY"
     TIMEOFDAY = "TIMEOFDAY"
+
+
+dt_range_ops = [FieldFilterOperand.YEAR,
+                FieldFilterOperand.MONTH,
+                FieldFilterOperand.DAY,
+                FieldFilterOperand.TIMEOFDAY]
 
 
 fieldFilterOperandMap = {
@@ -191,11 +198,6 @@ class QueryFilterTree:
             value = node.data["value"]
             as_of = node.data.get("as_of")
 
-            dt_range_ops = [FieldFilterOperand.YEAR,
-                            FieldFilterOperand.MONTH,
-                            FieldFilterOperand.DAY,
-                            FieldFilterOperand.TIMEOFDAY]
-
             value_type = metadataTypeLookup[type(value)].value if type(value) in metadataTypeLookup else None
 
             # if one of basic value types:
@@ -228,7 +230,7 @@ class QueryFilterTree:
 
             if query_op in dt_range_ops:
                 res["filter"]["value"] = value if query_op is FieldFilterOperand.TIMEOFDAY else 0
-                res["filter"]["valueType"] = "DATETIME_RANGE"
+                res["filter"]["valueType"] = DATETIME_RANGE
                 res["filter"]["valueRange"] = 0 if query_op is FieldFilterOperand.TIMEOFDAY else value
 
             return res
@@ -258,9 +260,13 @@ class QueryFilterTree:
         if op_type == "filter":
             comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
             key = val["key"]
-            value_type = metadataTypeLookupReverse[val["valueType"]]
-            converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
-            value = converter(val["value"])
+            if comparator.upper() in [d.value for d in dt_range_ops]:
+                value_type = DATETIME_RANGE
+                value = val["value"]
+            else:
+                value_type = metadataTypeLookupReverse[val["valueType"]]
+                converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
+                value = converter(val["value"])
             as_of = val.get("asOf")
             node = Node(tag=comparator, data={"field": key, "value": value, "as_of": as_of})
             tree.add_node(node, parent_node)
