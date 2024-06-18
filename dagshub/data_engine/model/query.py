@@ -196,15 +196,18 @@ class QueryFilterTree:
                             FieldFilterOperand.DAY,
                             FieldFilterOperand.TIMEOFDAY]
 
-            value_type = metadataTypeLookup[type(value)].value
-            if type(value) is bytes:
-                # TODO: this will need to probably be changed when we allow actual binary field comparisons
-                value = value.decode("utf-8")
-            else:
-                if isinstance(value, datetime.datetime):
-                    value = int(value.timestamp() * 1000)
+            value_type = metadataTypeLookup[type(value)].value if type(value) in metadataTypeLookup else None
+
+            # if one of basic value types:
+            if value_type:
+                if type(value) is bytes:
+                    # TODO: this will need to probably be changed when we allow actual binary field comparisons
+                    value = value.decode("utf-8")
                 else:
-                    value = str(value)
+                    if isinstance(value, datetime.datetime):
+                        value = int(value.timestamp() * 1000)
+                    else:
+                        value = str(value)
 
             if value_type is None and query_op not in dt_range_ops:
                 raise RuntimeError(
@@ -224,9 +227,9 @@ class QueryFilterTree:
                 res["filter"]["asOf"] = as_of
 
             if query_op in dt_range_ops:
-                res["value"] = value if query_op is FieldFilterOperand.TIMEOFDAY else 0
-                res["valueType"] = "DATETIME_RANGE"
-                res["valueRange"] = 0 if query_op is FieldFilterOperand.TIMEOFDAY else value
+                res["filter"]["value"] = value if query_op is FieldFilterOperand.TIMEOFDAY else 0
+                res["filter"]["valueType"] = "DATETIME_RANGE"
+                res["filter"]["valueRange"] = 0 if query_op is FieldFilterOperand.TIMEOFDAY else value
 
             return res
 

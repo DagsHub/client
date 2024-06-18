@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
-from dateutil import tz
 
 
 import rich.progress
@@ -1492,10 +1491,9 @@ class MetadataContextManager:
 
 
 def _get_local_timezone():
-    #
-    # return a timezone offset in the form of "+03:00" or "-03:00"
-    #
-
+    """
+    return a timezone offset in the form of "+03:00" or "-03:00"
+    """
     # get the offset
     now = datetime.datetime.now()
     local_tz = now.astimezone().tzinfo
