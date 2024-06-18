@@ -377,7 +377,7 @@ class Datasource:
         new_ds._query.as_of = to_timestamp(time)
         return new_ds
 
-    def time_zone(self, tz_val: str) -> "Datasource":
+    def with_time_zone(self, tz_val: str) -> "Datasource":
         """
         A time zone offset string in the form of "+HH:mm" or "-HH:mm"
         """
@@ -1211,12 +1211,15 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
-    def _periodic_filter(self, item: Union[str, List[str]], periodtype):
-        self._test_not_comparing_other_ds(item)
-        self._query.timezone = _get_local_timezone()
-        return self.add_query_op(periodtype, item)
+    def _periodic_filter(self, periodtype, items):
+        periods = [str(s) for s in items]
 
-    def year(self, item: List[str]):
+        if not self._query.timezone:
+            self._query.timezone = _get_local_timezone()
+
+        return self.add_query_op(periodtype, periods)
+
+    def date_field_in_years(self, *item: int):
         """
         Checks if a metadata field (which is of datetime type) is in one of given years list.
         local timezone assumed unless time_zone() requests anything else.
@@ -1226,13 +1229,13 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].year(["1979", "2003"])
+            datasource[(datasource["y"].date_field_in_years(["1979", "2003"])
 
         """
 
-        return self._periodic_filter(item, "year")
+        return self._periodic_filter("year", item)
 
-    def month(self, item: List[str]):
+    def date_field_in_months(self, *item: int):
         """
         Checks if a metadata field (which is of datetime type) is in one of given months list.
         local timezone assumed unless time_zone() requests anything else.
@@ -1242,12 +1245,12 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].month(["12", "2"])
+            datasource[(datasource["y"].date_field_in_months(["12", "2"])
 
         """
-        return self._periodic_filter(item, "month")
+        return self._periodic_filter("month", item)
 
-    def day(self, item: List[str]):
+    def date_field_in_days(self, *item: int):
         """
         Checks if a metadata field (which is of datetime type) is in one of given days list.
         local timezone assumed unless time_zone() requests anything else.
@@ -1257,10 +1260,10 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].day(["25", "2"])
+            datasource[(datasource["y"].date_field_in_days(["25", "2"])
 
         """
-        return self._periodic_filter(item, "day")
+        return self._periodic_filter("day", item)
 
     def timeofday(self, item: str):
         """
@@ -1275,8 +1278,9 @@ class Datasource:
             datasource[(datasource["y"].timeofday("11:30-12:30")
 
         """
-
-        return self._periodic_filter(item, "timeofday")
+        self._test_not_comparing_other_ds(item)
+        self._query.timezone = _get_local_timezone()
+        return self.add_query_op("timeofday", item)
 
     def startswith(self, item: str):
         """
@@ -1488,10 +1492,20 @@ class MetadataContextManager:
 
 
 def _get_local_timezone():
-    now_utc = datetime.datetime.utcnow()
-    local_timezone = tz.tzlocal()
-    return now_utc.astimezone(local_timezone).strftime('%z')[:-2] + ':' + now_utc.astimezone(
-        local_timezone).strftime('%z')[-2:]
+    #
+    # return a timezone offset in the form of "+03:00" or "-03:00"
+    #
+
+    # get the offset
+    now = datetime.datetime.now()
+    local_tz = now.astimezone().tzinfo
+    local_offset = local_tz.utcoffset(now)
+
+    # Format the offset as a string
+    offset_hours = int(local_offset.total_seconds() // 3600)
+    offset_minutes = int((local_offset.total_seconds() % 3600) // 60)
+    offset_str = f"{offset_hours:+03d}:{offset_minutes:02d}"
+    return offset_str
 
 
 @dataclass
