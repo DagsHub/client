@@ -185,13 +185,16 @@ class QueryFilterTree:
             return serialized
         else:
             query_op = fieldFilterOperandMap.get(operand)
+            if query_op is None:
+                raise WrongOperatorError(f"Operator {operand} is not supported")
+            key = node.data["field"]
+            value = node.data["value"]
+            as_of = node.data.get("as_of")
 
             if query_op in [FieldFilterOperand.YEAR,
                             FieldFilterOperand.MONTH,
                             FieldFilterOperand.DAY,
                             FieldFilterOperand.TIMEOFDAY]:
-                key = node.data["field"]
-                value = node.data["value"]
                 res = {
                     "filter": {
                         "key": key,
@@ -204,12 +207,6 @@ class QueryFilterTree:
 
                 return res
             else:
-                if query_op is None:
-                    raise WrongOperatorError(f"Operator {operand} is not supported")
-                key = node.data["field"]
-                value = node.data["value"]
-                as_of = node.data.get("as_of")
-
                 value_type = metadataTypeLookup[type(value)].value
                 if type(value) is bytes:
                     # TODO: this will need to probably be changed when we allow actual binary field comparisons
