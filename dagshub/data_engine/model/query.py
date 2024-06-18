@@ -191,46 +191,42 @@ class QueryFilterTree:
             value = node.data["value"]
             as_of = node.data.get("as_of")
 
-            if query_op in [FieldFilterOperand.YEAR,
+            dt_range_ops = [FieldFilterOperand.YEAR,
                             FieldFilterOperand.MONTH,
                             FieldFilterOperand.DAY,
-                            FieldFilterOperand.TIMEOFDAY]:
-                res = {
-                    "filter": {
-                        "key": key,
-                        "value": value if query_op is FieldFilterOperand.TIMEOFDAY else 0,
-                        "valueRange": 0 if query_op is FieldFilterOperand.TIMEOFDAY else value,
-                        "valueType": "DATETIME_RANGE",
-                        "comparator": query_op.value,
-                    }
-                }
-            else:
-                value_type = metadataTypeLookup[type(value)].value
-                if type(value) is bytes:
-                    # TODO: this will need to probably be changed when we allow actual binary field comparisons
-                    value = value.decode("utf-8")
-                else:
-                    if isinstance(value, datetime.datetime):
-                        value = int(value.timestamp() * 1000)
-                    else:
-                        value = str(value)
+                            FieldFilterOperand.TIMEOFDAY]
 
-                if value_type is None:
-                    raise RuntimeError(
-                        f"Value type {value_type} is not supported for querying.\r\n"
-                        f"Supported types: {list(metadataTypeLookup.keys())}"
-                    )
-                res = {
-                    "filter": {
-                        "key": key,
-                        "value": str(value),
-                        "valueType": value_type,
-                        "comparator": query_op.value,
-                    }
+            value_type = metadataTypeLookup[type(value)].value
+            if type(value) is bytes:
+                # TODO: this will need to probably be changed when we allow actual binary field comparisons
+                value = value.decode("utf-8")
+            else:
+                if isinstance(value, datetime.datetime):
+                    value = int(value.timestamp() * 1000)
+                else:
+                    value = str(value)
+
+            if value_type is None and query_op not in dt_range_ops:
+                raise RuntimeError(
+                    f"Value type {value_type} is not supported for querying.\r\n"
+                    f"Supported types: {list(metadataTypeLookup.keys())}"
+                )
+            res = {
+                "filter": {
+                    "key": key,
+                    "value": str(value),
+                    "valueType": value_type,
+                    "comparator": query_op.value,
                 }
+            }
 
             if as_of:
                 res["filter"]["asOf"] = as_of
+
+            if query_op in dt_range_ops:
+                res["value"] = value if query_op is FieldFilterOperand.TIMEOFDAY else 0
+                res["valueType"] = "DATETIME_RANGE"
+                res["valueRange"] = 0 if query_op is FieldFilterOperand.TIMEOFDAY else value
 
             return res
 
