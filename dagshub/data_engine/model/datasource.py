@@ -1264,7 +1264,7 @@ class Datasource:
         """
         return self._periodic_filter("day", item)
 
-    def timeofday(self, item: str):
+    def date_field_in_timeofday(self, item: str):
         """
         Checks if a metadata field (which is of datetime type) is in given minute range inside the day (any day).
         local timezone assumed unless time_zone() requests anything else.
