@@ -1228,7 +1228,7 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].date_field_in_years(["1979", "2003"])
+            datasource[(datasource["y"].date_field_in_years(1979, 2003)
 
         """
 
@@ -1244,7 +1244,7 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].date_field_in_months(["12", "2"])
+            datasource[(datasource["y"].date_field_in_months(12, 2)
 
         """
         return self._periodic_filter("month", item)
@@ -1259,7 +1259,7 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].date_field_in_days(["25", "2"])
+            datasource[(datasource["y"].date_field_in_days(25, 2)
 
         """
         return self._periodic_filter("day", item)
@@ -1267,6 +1267,8 @@ class Datasource:
     def date_field_in_timeofday(self, item: str):
         """
         Checks if a metadata field (which is of datetime type) is in given minute range inside the day (any day).
+        range is in the format of: "HH:mm-HH:mm" where start hour is on the left. a range that starts at one day and ends at next day,
+        should be expressed as OR of 2 range filter.
         local timezone assumed unless time_zone() requests anything else.
 
         Args:
@@ -1274,7 +1276,7 @@ class Datasource:
 
         Examples::
 
-            datasource[(datasource["y"].timeofday("11:30-12:30")
+            datasource[(datasource["y"].date_field_in_timeofday("11:30-12:30")
 
         """
         self._test_not_comparing_other_ds(item)
