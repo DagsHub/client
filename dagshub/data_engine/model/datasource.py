@@ -1211,8 +1211,9 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
-    def _periodic_filter(self, item: List[str], periodtype):
+    def _periodic_filter(self, item: Union[str, List[str]], periodtype):
         self._test_not_comparing_other_ds(item)
+        self._query.timezone = _get_local_timezone()
         return self.add_query_op(periodtype, item)
 
     def year(self, item: List[str]):
@@ -1496,7 +1497,7 @@ def _get_local_timezone():
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
-    timezone: Optional[str] = field(default=_get_local_timezone(),
+    timezone: Optional[str] = field(default=None,
                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
