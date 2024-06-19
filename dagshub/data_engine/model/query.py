@@ -65,9 +65,9 @@ fieldFilterOperandMap = {
 }
 
 fieldFilterDateTimeFilterMap = {
-    "year":  FieldFilterDateTimeFilter.YEAR,
+    "year": FieldFilterDateTimeFilter.YEAR,
     "month": FieldFilterDateTimeFilter.MONTH,
-    "day":   FieldFilterDateTimeFilter.DAY,
+    "day": FieldFilterDateTimeFilter.DAY,
     "timeofday": FieldFilterDateTimeFilter.TIMEOFDAY
 }
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
@@ -292,7 +292,7 @@ class QueryFilterTree:
                 value = val["value"] if val["timeFilter"] == FieldFilterDateTimeFilter.TIMEOFDAY else val["valueRange"]
 
                 # timeFilter replaced comparator in query, so now the reverse action
-                comparator =  val["timeFilter"].lower()
+                comparator = val["timeFilter"].lower()
             else:
                 value_type = metadataTypeLookupReverse[val["valueType"]]
                 converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
