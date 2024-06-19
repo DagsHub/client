@@ -623,10 +623,21 @@ class QueryResult:
             return sess
 
     def annotate(
-        self, open_project=True, ignore_warning=True, fields_to_embed=None, fields_to_exclude=None
+        self,
+        open_project=True,
+        ignore_warning=True,
+        fields_to_embed=None,
+        fields_to_exclude=None,
+        model_name=None,
+        model_version='latest',
+        model_repo=None,
+        model_pre_hook=lambda x: x,
+        model_post_hook=None,
+        model_batch_size=1,
+        model_metadata_column='annotation'
     ) -> Optional[str]:
         """
-        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
+        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub. Alternatively, uses MLFlow to automatically label datapoints.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
@@ -634,10 +645,28 @@ class QueryResult:
             fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
              if not specified all will be displayed.
             fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
+            model_repo: repository to extract the model from
+            model_name: name of the model in the mlflow registry
+            model_version: (optional, default: 'latest') version of the model in the mlflow registry
+            model_pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
+            model_post_hook: function that converts mlflow model output converts to labelstudio format
+            model_batch_size: function that converts to labelstudio format
         Returns:
             The URL of the created Label Studio workspace
         """
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
+
+        if all([param is not None for param in [model_name, model_version, model_repo, model_fn]]):
+            dagshub.init(*model_repo.split('/')[::-1])
+            model = mlflow.pyfunc.load_model(f'models:/{model_name}/{model_version}')
+
+            with self.datasource.metadata_context() as ctx:
+                for idx, local_paths in enumerate(self.as_ml_dataloader(flavor='torch', batch_size=10, shuffle=False, tensorizers=[lambda x: x])):
+                    for annotation, remote_path in zip(model_post_hook(model.predict(model_pre_hook(datapoint_paths))), [res.path for result in self[idx * model_batch_size, (idx+1) * model_batch_size]]):
+                        ctx.update_metadata(remote_path, {model_metadata_column: annotation})
+            return
+        elif any([param is not None for param in [model_name, model_repo, model_fn, post]]):
+            raise AttributeError('Either all or none of `model_name`, `model_version`, `model_repo`, `model_fn` parameters must be set.')
 
         return self.datasource.send_datapoints_to_annotation(
             self.entries,
