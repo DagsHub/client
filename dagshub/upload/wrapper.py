@@ -301,6 +301,8 @@ class Repo:
 
         The kwargs are the parameters of :func:`upload_files`
         """
+        if commit_message is None:
+            commit_message = DEFAULT_COMMIT_MESSAGE
         local_path = Path(local_path).resolve()
         if local_path.is_dir():
             if remote_path is None:
@@ -583,13 +585,7 @@ class Repo:
             ),
         )
 
-    def upload_files_to_bucket(
-        self,
-        local_path,
-        remote_path,
-        max_workers=config.upload_threads,
-        **kwargs
-    ):
+    def upload_files_to_bucket(self, local_path, remote_path, max_workers=config.upload_threads, **kwargs):
         """
         Upload a file or directory to an S3 bucket, preserving the directory structure.
 
@@ -620,15 +616,18 @@ class Repo:
 
             with progress:
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = [executor.submit(
-                        upload_file_to_s3,
-                        s3_client=s3,
-                        local_path=task[0],
-                        bucket_name=self.name,
-                        remote_path=task[1],
-                        progress=progress,
-                        task=task_id,
-                    ) for task in upload_tasks]
+                    futures = [
+                        executor.submit(
+                            upload_file_to_s3,
+                            s3_client=s3,
+                            local_path=task[0],
+                            bucket_name=self.name,
+                            remote_path=task[1],
+                            progress=progress,
+                            task=task_id,
+                        )
+                        for task in upload_tasks
+                    ]
                     for future in futures:
                         future.result()  # Wait for all futures to complete
 
