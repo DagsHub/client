@@ -5,9 +5,9 @@ from typing import Optional, Union, Dict
 
 from treelib import Tree, Node
 
-from dagshub.data_engine.dtypes import DATETIME_RANGE
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
+from dagshub.data_engine.dtypes import MetadataFieldType
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +35,20 @@ class FieldFilterOperand(enum.Enum):
     IS_NULL = "IS_NULL"
     STARTS_WITH = "STARTS_WITH"
     ENDS_WITH = "ENDS_WITH"
+    DATE_TIME_FILTER = "DATE_TIME_FILTER"
+
+
+class FieldFilterDateTimeFilter(enum.Enum):
     YEAR = "YEAR"
     MONTH = "MONTH"
     DAY = "DAY"
     TIMEOFDAY = "TIMEOFDAY"
 
 
-dt_range_ops = [FieldFilterOperand.YEAR,
-                FieldFilterOperand.MONTH,
-                FieldFilterOperand.DAY,
-                FieldFilterOperand.TIMEOFDAY]
+dt_range_ops = [FieldFilterDateTimeFilter.YEAR,
+                FieldFilterDateTimeFilter.MONTH,
+                FieldFilterDateTimeFilter.DAY,
+                FieldFilterDateTimeFilter.TIMEOFDAY]
 
 
 fieldFilterOperandMap = {
@@ -57,14 +61,21 @@ fieldFilterOperandMap = {
     "isnull": FieldFilterOperand.IS_NULL,
     "startswith": FieldFilterOperand.STARTS_WITH,
     "endswith": FieldFilterOperand.ENDS_WITH,
-    "year": FieldFilterOperand.YEAR,
-    "month": FieldFilterOperand.MONTH,
-    "day": FieldFilterOperand.DAY,
-    "timeofday": FieldFilterOperand.TIMEOFDAY
+    "date_time_filter": FieldFilterOperand.DATE_TIME_FILTER
 }
 
+fieldFilterDateTimeFilterMap = {
+    "year":  FieldFilterDateTimeFilter.YEAR,
+    "month": FieldFilterDateTimeFilter.MONTH,
+    "day":   FieldFilterDateTimeFilter.DAY,
+    "timeofday": FieldFilterDateTimeFilter.TIMEOFDAY
+}
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
+
 for k, v in fieldFilterOperandMap.items():
+    fieldFilterOperandMapReverseMap[v.value] = k
+
+for k, v in fieldFilterDateTimeFilterMap.items():
     fieldFilterOperandMapReverseMap[v.value] = k
 
 UNFILLED_NODE_TAG = "undefined"
@@ -105,7 +116,7 @@ class QueryFilterTree:
 
         Args:
             op (str): The operator to use for composing the query.
-            other (Optional[Union[str, int, float, "DatasourceQuery", "Datasource"]):
+            other (Optional[Union[str, int, float, "QueryFilterTree", datetime.datetime]]):
                 The query or value to compose with.
 
         Raises:
@@ -191,7 +202,8 @@ class QueryFilterTree:
             serialized["not"] = True
             return serialized
         else:
-            query_op = fieldFilterOperandMap.get(operand)
+            # op can be a simple comparator, or a type of timeFilter
+            query_op = fieldFilterOperandMap.get(operand) or fieldFilterDateTimeFilterMap.get(operand)
             if query_op is None:
                 raise WrongOperatorError(f"Operator {operand} is not supported")
             key = node.data["field"]
@@ -229,9 +241,19 @@ class QueryFilterTree:
                 res["filter"]["asOf"] = as_of
 
             if query_op in dt_range_ops:
-                res["filter"]["value"] = value if query_op is FieldFilterOperand.TIMEOFDAY else 0
-                res["filter"]["valueType"] = DATETIME_RANGE
-                res["filter"]["valueRange"] = 0 if query_op is FieldFilterOperand.TIMEOFDAY else value
+                # value is the actual node value in timeofday ("HH:mm-HH:mm"),
+                # else, we use valueRange, so unset value
+                res["filter"]["value"] = value if query_op is FieldFilterDateTimeFilter.TIMEOFDAY else 0
+                # value type from client perspective is string or list,
+                # but we need to tell backend to get datetime from db
+                res["filter"]["valueType"] = MetadataFieldType.DATETIME.value
+                # we use valueRange unless the node op is timeofday,
+                # else, we use value, so unset valueRange
+                res["filter"]["valueRange"] = 0 if query_op is FieldFilterDateTimeFilter.TIMEOFDAY else value
+                # timeFilter replaces comparator
+                res["filter"]["timeFilter"] = query_op.value
+                # comparator indicates that timeFilter replaces comparator
+                res["filter"]["comparator"] = FieldFilterOperand.DATE_TIME_FILTER.value
 
             return res
 
@@ -260,9 +282,17 @@ class QueryFilterTree:
         if op_type == "filter":
             comparator = fieldFilterOperandMapReverseMap[val["comparator"]]
             key = val["key"]
-            if comparator.upper() in [d.value for d in dt_range_ops]:
-                value_type = DATETIME_RANGE
-                value = val["value"]
+            if comparator.upper() == FieldFilterOperand.DATE_TIME_FILTER.value:
+                # if comparator indicates that timeFilter replaced comparator,
+                # we need to rebuild node carefully
+
+                # value type must ignore actual value and be later set to MetadataFieldType.DATETIME
+                value_type = None
+
+                value = val["value"] if val["timeFilter"] == FieldFilterDateTimeFilter.TIMEOFDAY else val["valueRange"]
+
+                # timeFilter replaced comparator in query, so now the reverse action
+                comparator =  val["timeFilter"].lower()
             else:
                 value_type = metadataTypeLookupReverse[val["valueType"]]
                 converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))

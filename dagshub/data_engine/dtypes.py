@@ -36,11 +36,6 @@ class MetadataFieldType(enum.Enum):
     """Python's ``bytes``"""
 
 
-# this extends MetadataFieldType, it appears as data type in schema but only for querying
-# i.e no field is actually of this type
-DATETIME_RANGE = "DATETIME_RANGE"
-
-
 class ThumbnailType(enum.Enum):
     """
     Thumbnail types for visualization
