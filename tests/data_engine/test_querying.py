@@ -602,13 +602,13 @@ def test_periodic_datetime_periods(ds, period):
 
     ds2 = None
     if period == "day":
-        ds2 = (ds[ds["x"]].date_field_in_days(1, 3))
+        ds2 = (ds[ds["x"]].date_field_in_days(1, 3)).with_time_zone("+00:00")
     else:
         if period == "month":
-            ds2 = (ds[ds["x"]].date_field_in_months(1, 3))
+            ds2 = (ds[ds["x"]].date_field_in_months(1, 3)).with_time_zone("+00:00")
         else:
             if period == "year":
-                ds2 = (ds[ds["x"]].date_field_in_years(1, 3))
+                ds2 = (ds[ds["x"]].date_field_in_years(1, 3)).with_time_zone("+00:00")
 
     q = ds2.get_query().filter
 
@@ -629,7 +629,7 @@ def test_periodic_datetime_periods(ds, period):
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'timezone': '+03:00',
+        'timezone': '+00:00',
         'query': {
             'filter': {
                 'key': 'x',
@@ -651,7 +651,7 @@ def test_periodic_datetime_periods(ds, period):
 def test_periodic_datetime_timeofday(ds):
     add_datetime_fields(ds, "x")
 
-    ds2 = (ds[ds["x"]].date_field_in_timeofday("12:00-13:00"))
+    ds2 = (ds[ds["x"]].date_field_in_timeofday("12:00-13:00")).with_time_zone("+00:00")
 
     q = ds2.get_query().filter
 
@@ -669,7 +669,7 @@ def test_periodic_datetime_timeofday(ds):
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'timezone': '+03:00',
+        'timezone': '+00:00',
         'query': {
             'filter': {
                 'key': 'x',
