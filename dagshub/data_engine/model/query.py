@@ -3,6 +3,7 @@ import enum
 import logging
 from typing import Optional, Union, Dict
 
+import pytz
 from treelib import Tree, Node
 
 from dagshub.data_engine.model.errors import WrongOperatorError
@@ -22,6 +23,7 @@ def bytes_deserializer(val: str) -> bytes:
 _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
     bytes: bytes_deserializer,
+    datetime.datetime: lambda x: datetime.datetime.fromtimestamp(int(x) / 1000).astimezone(pytz.utc)
 }
 
 
@@ -289,7 +291,7 @@ class QueryFilterTree:
                 # value type must ignore actual value and be later set to MetadataFieldType.DATETIME
                 value_type = None
 
-                value = val["value"] if val["timeFilter"] == FieldFilterDateTimeFilter.TIMEOFDAY else val["valueRange"]
+                value = val["value"] if val["timeFilter"] == FieldFilterDateTimeFilter.TIMEOFDAY.value else val["valueRange"]
 
                 # timeFilter replaced comparator in query, so now the reverse action
                 comparator = val["timeFilter"].lower()
