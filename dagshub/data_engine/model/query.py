@@ -291,7 +291,10 @@ class QueryFilterTree:
                 # value type must ignore actual value and be later set to MetadataFieldType.DATETIME
                 value_type = None
 
-                value = val["value"] if val["timeFilter"] == FieldFilterDateTimeFilter.TIMEOFDAY.value else val["valueRange"]
+                if val["timeFilter"] == FieldFilterDateTimeFilter.TIMEOFDAY.value:
+                    value = val["value"]
+                else:
+                    value = val["valueRange"]
 
                 # timeFilter replaced comparator in query, so now the reverse action
                 comparator = val["timeFilter"].lower()
