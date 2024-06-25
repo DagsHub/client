@@ -129,7 +129,7 @@ class Datapoint:
                 value = float(value)
             else:
                 if key in date_fields:
-                    value = datetime.datetime.fromtimestamp(value).astimezone(pytz.utc)
+                    value = datetime.datetime.fromtimestamp(value / 1000).astimezone(pytz.utc)
             res.metadata[key] = value
         return res
 

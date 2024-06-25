@@ -14,6 +14,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
 
+
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
@@ -363,6 +364,15 @@ class Datasource:
         new_ds = self.__deepcopy__()
 
         new_ds._query.as_of = to_timestamp(time)
+        return new_ds
+
+    def with_time_zone(self, tz_val: str) -> "Datasource":
+        """
+        A time zone offset string in the form of "+HH:mm" or "-HH:mm"
+        """
+        new_ds = self.__deepcopy__()
+
+        new_ds._query.timezone = tz_val
         return new_ds
 
     def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
@@ -1190,6 +1200,80 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
+    def _periodic_filter(self, periodtype, items):
+        periods = [str(s) for s in items]
+
+        if not self._query.timezone:
+            self._query.timezone = _get_local_timezone()
+
+        return self.add_query_op(periodtype, periods)
+
+    def date_field_in_years(self, *item: int):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given years list.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            List of years.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_years(1979, 2003)
+
+        """
+
+        return self._periodic_filter("year", item)
+
+    def date_field_in_months(self, *item: int):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given months list.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            List of months.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_months(12, 2)
+
+        """
+        return self._periodic_filter("month", item)
+
+    def date_field_in_days(self, *item: int):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given days list.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            List of days.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_days(25, 2)
+
+        """
+        return self._periodic_filter("day", item)
+
+    def date_field_in_timeofday(self, item: str):
+        """
+        Checks if a metadata field (which is of datetime type) is in given minute range inside the day (any day).
+        range is in the format of: "HH:mm-HH:mm" where start hour is on the left.
+        a range that starts at one day and ends at next day,
+        should be expressed as OR of 2 range filter.
+        local timezone assumed unless time_zone() requests anything else.
+
+        Args:
+            Time range string.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_timeofday("11:30-12:30")
+
+        """
+        self._test_not_comparing_other_ds(item)
+        self._query.timezone = _get_local_timezone()
+        return self.add_query_op("timeofday", item)
+
     def startswith(self, item: str):
         """
         Check if the filtering field starts with the specified string item.
@@ -1256,7 +1340,7 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree"]] = None
+        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str]]] = None
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
@@ -1382,7 +1466,7 @@ class MetadataContextManager:
                     if isinstance(v, bytes):
                         v = wrap_bytes(v)
                     if isinstance(v, datetime.datetime):
-                        v = int(v.timestamp())
+                        v = int(v.timestamp() * 1000)
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(
@@ -1399,9 +1483,27 @@ class MetadataContextManager:
         return self._metadata_entries
 
 
+def _get_local_timezone():
+    """
+    return a timezone offset in the form of "+03:00" or "-03:00"
+    """
+    # get the offset
+    now = datetime.datetime.now()
+    local_tz = now.astimezone().tzinfo
+    local_offset = local_tz.utcoffset(now)
+
+    # Format the offset as a string
+    offset_hours = int(local_offset.total_seconds() // 3600)
+    offset_minutes = int((local_offset.total_seconds() % 3600) // 60)
+    offset_str = f"{offset_hours:+03d}:{offset_minutes:02d}"
+    return offset_str
+
+
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    timezone: Optional[str] = field(default=None,
+                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
@@ -1414,6 +1516,7 @@ class DatasourceQuery(DataClassJsonMixin):
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
             as_of=self.as_of,
+            timezone=self.timezone,
             filter=self.filter.__deepcopy__(),
         )
         if self.select is not None:
@@ -1441,6 +1544,8 @@ class DatasourceQuery(DataClassJsonMixin):
                 self.select = other_query.select
             if other_query.as_of is not None:
                 self.as_of = other_query.as_of
+            if other_query.timezone is not None:
+                self.timezone = other_query.timezone
             if other_query.order_by is not None:
                 self.order_by = other_query.order_by
 
