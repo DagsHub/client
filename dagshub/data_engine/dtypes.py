@@ -86,7 +86,6 @@ class DateTime(DagshubDataType):
         datapoints[path][name] = t
         datapoints[path].save()
     """
-
     backing_field_type = MetadataFieldType.DATETIME
 
 

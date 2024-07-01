@@ -68,7 +68,9 @@ class RepoModelLoader(ModelLoader):
     def _eager_load(self, download_dest: Path) -> Path:
         remote_path = self.path
         local_path = download_dest / self.model_path
-        self.repo_api.download(remote_path, local_path=local_path, revision=self.revision)
+        self.repo_api.download(
+            remote_path, local_path=local_path, revision=self.revision
+        )
         return local_path
 
     @property
