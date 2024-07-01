@@ -4,7 +4,6 @@ import os
 import threading
 import traceback
 from typing import Optional, Dict, List, Set, Union
-from multiprocessing import AuthenticationError
 
 import yaml
 from httpx import Auth
@@ -132,7 +131,7 @@ class TokenStorage:
             if user is not None:
                 self._print_accessing_as(user)
             else:
-                raise AuthenticationError("Provided DagsHub token is not valid")
+                raise RuntimeError("Provided DagsHub token is not valid")
             return EnvVarDagshubToken(config.token, host)
 
         with self._token_access_lock:
