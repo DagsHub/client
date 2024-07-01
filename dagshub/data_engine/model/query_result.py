@@ -747,8 +747,8 @@ class QueryResult:
             return True
         elif any([param is not None for param in [model_name, model_repo, model_post_hook]]):
             raise AttributeError(
-                "Either all (for local model-based annotation) or none (for remote manual annotation)
-                of `model_repo`, `model_name`, `model_post_hook` parameters must be set."
+                """Either all (for local model-based annotation) or none (for remote manual annotation)
+                of `model_repo`, `model_name`, `model_post_hook` parameters must be set."""
             )
 
         return self.datasource.send_datapoints_to_annotation(
