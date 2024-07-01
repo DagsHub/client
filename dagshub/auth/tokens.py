@@ -4,6 +4,7 @@ import os
 import threading
 import traceback
 from typing import Optional, Dict, List, Set, Union
+from multiprocessing import AuthenticationError
 
 import yaml
 from httpx import Auth
@@ -130,7 +131,8 @@ class TokenStorage:
             user = TokenStorage.get_username_of_token(config.token, host)
             if user is not None:
                 self._print_accessing_as(user)
-            # todo discuss with Kiril about cases when token is not valid
+            else:
+                raise AuthenticationError("Provided DagsHub token is not valid")
             return EnvVarDagshubToken(config.token, host)
 
         with self._token_access_lock:
@@ -211,9 +213,9 @@ class TokenStorage:
         return is_expired
 
     @staticmethod
-    def get_username_of_token(token: Union[str, Auth, DagshubTokenABC], host: str):
+    def get_username_of_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> Optional[Dict]:
         """
-        Check for token validity and return boolean indicating if the token is valid and the user object
+        Check for token validity and return the dictionary with the info of the user of the token
 
         Args:
             token: token to check validity
@@ -228,13 +230,11 @@ class TokenStorage:
         resp = http_request("GET", check_url, auth=auth)
 
         try:
-            # 500's might be ok since they're server errors, so check only for 400's
-            assert not (400 <= resp.status_code <= 499)
-            if resp.status_code == 200:
-                user = resp.json()
-                assert "login" in user
-                assert "username" in user
-                return user
+            assert resp.status_code == 200
+            user = resp.json()
+            assert "login" in user
+            assert "username" in user
+            return user
         except AssertionError:
             return None
 
@@ -303,7 +303,7 @@ class TokenStorage:
             logger.error(f"Error while storing DagsHub token cache: {traceback.format_exc()}")
             raise
 
-    def _print_accessing_as(self, user):
+    def _print_accessing_as(self, user: Dict):
         """
         This function prints a message to the log that we are accessing as a certain user.
         It does this only once per command, to avoid spamming the logs.
