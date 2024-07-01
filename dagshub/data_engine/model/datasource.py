@@ -1505,7 +1505,7 @@ def _get_datetime_utc_offset(t):
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     time_zone: Optional[str] = field(default=None,
-                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
