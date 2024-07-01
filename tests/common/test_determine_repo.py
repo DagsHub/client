@@ -6,7 +6,6 @@ import respx
 
 import pytest
 import pytest_git
-from httpx import Response
 
 from dagshub.common.determine_repo import determine_repo, parse_dagshub_remote
 import dagshub.common.config
