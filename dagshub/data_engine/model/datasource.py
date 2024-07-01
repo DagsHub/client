@@ -74,9 +74,10 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     url: str
     key: str
     value: str
-    timeZone: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
+    timeZone: Optional[str] = field(default=None,
+                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
 
 
 @dataclass
