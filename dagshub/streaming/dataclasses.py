@@ -35,9 +35,7 @@ class DagshubPath:
             for storage_schema in storage_schemas:
                 if str_path.startswith(f"{storage_schema}:/"):
                     str_path = str_path[len(storage_schema) + 2 :]
-                    self.relative_path = (
-                        Path(".dagshub/storage") / storage_schema / str_path
-                    )
+                    self.relative_path = Path(".dagshub/storage") / storage_schema / str_path
                     self.absolute_path = self.fs.project_root / self.relative_path
 
     @cached_property
