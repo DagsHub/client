@@ -231,9 +231,10 @@ class TokenStorage:
             # 500's might be ok since they're server errors, so check only for 400's
             assert not (400 <= resp.status_code <= 499)
             if resp.status_code == 200:
-                assert "login" in resp.json()
-            user = resp.json()
-            return user
+                user = resp.json()
+                assert "login" in user
+                assert "username" in user
+                return user
         except AssertionError:
             return None
 
