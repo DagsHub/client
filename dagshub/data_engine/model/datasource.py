@@ -76,6 +76,8 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
+    timeZone: Optional[str] = field(default=None,
+                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
 
 
 @dataclass
@@ -372,7 +374,7 @@ class Datasource:
         """
         new_ds = self.__deepcopy__()
 
-        new_ds._query.timezone = tz_val
+        new_ds._query.time_zone = tz_val
         return new_ds
 
     def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
@@ -1202,10 +1204,6 @@ class Datasource:
 
     def _periodic_filter(self, periodtype, items):
         periods = [str(s) for s in items]
-
-        if not self._query.timezone:
-            self._query.timezone = _get_local_timezone()
-
         return self.add_query_op(periodtype, periods)
 
     def date_field_in_years(self, *item: int):
@@ -1271,7 +1269,6 @@ class Datasource:
 
         """
         self._test_not_comparing_other_ds(item)
-        self._query.timezone = _get_local_timezone()
         return self.add_query_op("timeofday", item)
 
     def startswith(self, item: str):
@@ -1461,11 +1458,13 @@ class MetadataContextManager:
                         if k not in document_fields:
                             continue
 
+                    time_zone = None
                     if isinstance(v, str) and k in document_fields:
                         v = v.encode("utf-8")
                     if isinstance(v, bytes):
                         v = wrap_bytes(v)
                     if isinstance(v, datetime.datetime):
+                        time_zone = _get_datetime_utc_offset(v)
                         v = int(v.timestamp() * 1000)
 
                     self._metadata_entries.append(
@@ -1476,6 +1475,7 @@ class MetadataContextManager:
                             valueType=value_type,
                             # todo: preliminary type check
                             allowMultiple=k in self._multivalue_fields,
+                            timeZone=time_zone,
                         )
                     )
 
@@ -1483,18 +1483,21 @@ class MetadataContextManager:
         return self._metadata_entries
 
 
-def _get_local_timezone():
+def _get_datetime_utc_offset(t):
     """
     return a timezone offset in the form of "+03:00" or "-03:00"
     """
-    # get the offset
-    now = datetime.datetime.now()
-    local_tz = now.astimezone().tzinfo
-    local_offset = local_tz.utcoffset(now)
+
+    if t.tzinfo is None:
+        return None
+
+    offset = t.utcoffset()
+    if offset is None:
+        return None
 
     # Format the offset as a string
-    offset_hours = int(local_offset.total_seconds() // 3600)
-    offset_minutes = int((local_offset.total_seconds() % 3600) // 60)
+    offset_hours = int(offset.total_seconds() // 3600)
+    offset_minutes = int((offset.total_seconds() % 3600) // 60)
     offset_str = f"{offset_hours:+03d}:{offset_minutes:02d}"
     return offset_str
 
@@ -1502,8 +1505,8 @@ def _get_local_timezone():
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
-    timezone: Optional[str] = field(default=None,
-                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    time_zone: Optional[str] = field(default=None,
+                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
@@ -1516,7 +1519,7 @@ class DatasourceQuery(DataClassJsonMixin):
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
             as_of=self.as_of,
-            timezone=self.timezone,
+            time_zone=self.time_zone,
             filter=self.filter.__deepcopy__(),
         )
         if self.select is not None:
@@ -1544,8 +1547,8 @@ class DatasourceQuery(DataClassJsonMixin):
                 self.select = other_query.select
             if other_query.as_of is not None:
                 self.as_of = other_query.as_of
-            if other_query.timezone is not None:
-                self.timezone = other_query.timezone
+            if other_query.time_zone is not None:
+                self.time_zone = other_query.time_zone
             if other_query.order_by is not None:
                 self.order_by = other_query.order_by
 
