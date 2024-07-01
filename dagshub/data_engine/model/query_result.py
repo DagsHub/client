@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Liter
 import dacite
 import rich.progress
 
+from dagshub import init
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
@@ -31,11 +32,13 @@ if TYPE_CHECKING:
     import fiftyone as fo
     import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
     import datasets as hf_ds
+    import mlflow
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     tf = lazy_load("tensorflow")
     hf_ds = lazy_load("datasets")
+    mlflow = lazy_load("mlflow")
 
 logger = logging.getLogger(__name__)
 
@@ -401,6 +404,64 @@ class QueryResult:
             num_proc=num_proc,
         )
 
+    def get_predictions(self, repo, name,
+                        version='latest',
+                        pre_hook=lambda x: x,
+                        post_hook=lambda x: x,
+                        batch_size=1,
+                        metadata_column='annotation',
+                        return_predictions=True):
+        """
+        Sends all the datapoints returned in this QueryResult as prediction targets for an MLFlow model registered on DagsHub.
+
+        Args:
+            open_project: Automatically open the Label Studio project in the browser
+            ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
+            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
+             if not specified all will be displayed.
+            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
+            repo: repository to extract the model from
+            name: name of the model in the mlflow registry
+            version: (optional, default: 'latest') version of the model in the mlflow registry
+            pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
+            post_hook: (optional, default: identity function) function that converts mlflow model output converts to labelstudio format
+            batch_size: (optional, default: 1) function that sets batch_size
+            metadata_column: (optional, default: 'prediction') write prediction results to metadata logged in data engine. if None, returns predictions.
+            return_predictions: (optional, default: True) returns predictions logged
+        Returns:
+            The URL of the created Label Studio workspace
+        """
+        if not metadata_column and not return_predictions:
+            raise ValueError('There is nothing to do. Either `metadata_column` or return_predictions` must be set!')
+
+        class TinyDL:
+            def __init__(self, dset, batch_size):
+                self.dset = dset
+                self.batch_size = batch_size
+
+            def __iter__(self):
+                self.curr_idx = 0
+                return self
+
+            def __next__(self):
+                self.curr_idx += self.batch_size
+                return [self.dset[idx] for idx in range(self.curr_idx-self.batch_size, self.curr_idx)]
+
+        init(*repo.split('/')[::-1])
+        model = mlflow.pyfunc.load_model(f'models:/{name}/{version}')
+        dset = DagsHubDataset(self, tensorizers=[lambda x:x])
+
+        predictions = []
+        for idx, local_paths in enumerate(TinyDL(dset, batch_size) if batch_size != 1 else dset):
+            for prediction, remote_path in zip(post_hook(model.predict(pre_hook(local_paths))), [result.path for result in self[idx * batch_size:(idx+1) * batch_size]]):
+                predictions.append({remote_path: prediction})
+
+        if not metadata_column: return predictions
+        with self.datasource.metadata_context() as ctx:
+            for remote_path in predictions:
+                ctx.update_metadata(remote_path, {metadata_column: predictions[remote_path]})
+        return predictions if return_predictions else True
+
     def get_annotations(self, **kwargs) -> "QueryResult":
         """
         Loads all annotation fields using :func:`get_blob_fields`.
@@ -634,7 +695,8 @@ class QueryResult:
         model_pre_hook=lambda x: x,
         model_post_hook=None,
         model_batch_size=1,
-        model_metadata_column='annotation'
+        model_metadata_column='annotation',
+        use_remote_backend=False
     ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub. Alternatively, uses MLFlow to automatically label datapoints.
@@ -657,16 +719,14 @@ class QueryResult:
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
 
         if all([param is not None for param in [model_name, model_version, model_repo, model_fn]]):
-            dagshub.init(*model_repo.split('/')[::-1])
-            model = mlflow.pyfunc.load_model(f'models:/{model_name}/{model_version}')
+            if use_remote_backend:
+                # send to dagshub backend
+                raise NotImplementedError('Coming soon!')
 
-            with self.datasource.metadata_context() as ctx:
-                for idx, local_paths in enumerate(self.as_ml_dataloader(flavor='torch', batch_size=10, shuffle=False, tensorizers=[lambda x: x])):
-                    for annotation, remote_path in zip(model_post_hook(model.predict(model_pre_hook(datapoint_paths))), [res.path for result in self[idx * model_batch_size, (idx+1) * model_batch_size]]):
-                        ctx.update_metadata(remote_path, {model_metadata_column: annotation})
-            return
+            get_predictions(model_repo, model_name, model_version, model_pre_hook, model_post_hook, model_batch_size, model_metadata_column, return_predictions=False)
+            return True
         elif any([param is not None for param in [model_name, model_repo, model_fn, post]]):
-            raise AttributeError('Either all or none of `model_name`, `model_version`, `model_repo`, `model_fn` parameters must be set.')
+            raise AttributeError('Either all (for local model-based annotation) or none (for remote manual annotation) of `model_repo`, `model_name`, `model_post_hook` parameters must be set.')
 
         return self.datasource.send_datapoints_to_annotation(
             self.entries,
