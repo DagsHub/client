@@ -18,7 +18,7 @@ from dagshub.auth.token_auth import (
     DagshubAuthenticator,
 )
 from dagshub.common import config
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, log_message
 from dagshub.common.util import multi_urljoin
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,7 @@ class TokenStorage:
         self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = {}
 
         self.__token_access_lock = threading.RLock()
+        self._accessing_as_was_printed = False
 
     @property
     def _token_cache(self):
@@ -126,6 +127,7 @@ class TokenStorage:
 
         host = host or config.host
         if host == config.host and config.token is not None:
+            self._print_accessing_as(config.token, host)
             return EnvVarDagshubToken(config.token, host)
 
         with self._token_access_lock:
@@ -173,6 +175,7 @@ class TokenStorage:
                     self._token_cache[host] = tokens
                     self._store_cache_file()
 
+            self._print_accessing_as(good_token, host)
             return good_token
 
     def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
@@ -202,6 +205,16 @@ class TokenStorage:
         return is_expired
 
     @staticmethod
+    def api_get_user_request(token: Union[str, Auth, DagshubTokenABC], host: str):
+        host = host or config.host
+        check_url = multi_urljoin(host, "api/v1/user")
+        if type(token) is str:
+            auth = HTTPBearerAuth(token)
+        else:
+            auth = token
+        return http_request("GET", check_url, auth=auth)
+
+    @staticmethod
     def is_valid_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> bool:
         """
         Check for token validity
@@ -210,13 +223,7 @@ class TokenStorage:
             token: token to check validity
             host: which host to connect against
         """
-        host = host or config.host
-        check_url = multi_urljoin(host, "api/v1/user")
-        if type(token) is str:
-            auth = HTTPBearerAuth(token)
-        else:
-            auth = token
-        resp = http_request("GET", check_url, auth=auth)
+        resp = TokenStorage.api_get_user_request(token, host)
 
         try:
             # 500's might be ok since they're server errors, so check only for 400's
@@ -280,6 +287,26 @@ class TokenStorage:
         except Exception:
             logger.error(f"Error while storing DagsHub token cache: {traceback.format_exc()}")
             raise
+
+    def _print_accessing_as(self, token: Union[str, Auth, DagshubTokenABC], host: str):
+        """
+        This function prints a message to the log that we are accessing as a certain user.
+        It does this only once per command, to avoid spamming the logs.
+        It called after successful token validation.
+
+        """
+        if self._accessing_as_was_printed:
+            return
+
+        resp = TokenStorage.api_get_user_request(token, host)
+        user = resp.json()
+        username = user.get("username")
+        if username is None:
+            # todo handle error ? it should be defined
+            return
+
+        log_message(f"Accessing as {username}")
+        self._accessing_as_was_printed = True
 
     def __getstate__(self):
         d = self.__dict__
