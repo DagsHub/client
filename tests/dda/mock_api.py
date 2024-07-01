@@ -2,7 +2,7 @@ import os.path
 
 from httpx import Response
 from respx import MockRouter, Route
-from tests.dda.test_tokens import valid_token_side_effect
+from tests.util import valid_token_side_effect
 
 
 class MockApi(MockRouter):

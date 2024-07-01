@@ -313,10 +313,7 @@ class TokenStorage:
         if self._accessing_as_was_printed:
             return
 
-        username = user.get("username")
-        if username is None:
-            # todo handle error ? it should be defined
-            return
+        username = user["username"]
 
         log_message(f"Accessing as {username}")
         self._accessing_as_was_printed = True

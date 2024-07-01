@@ -10,8 +10,7 @@ import pytest_git
 from dagshub.common.determine_repo import determine_repo, parse_dagshub_remote
 import dagshub.common.config
 from dagshub.common.errors import DagsHubRepoNotFoundError
-from tests.dda.test_tokens import valid_token_side_effect
-from tests.util import remember_cwd
+from tests.util import remember_cwd, valid_token_side_effect
 
 T = TypeVar("T")
 
