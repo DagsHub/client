@@ -34,8 +34,6 @@ def token_api(mock_api):
     old_token_val = dagshub.common.config.token
     dagshub.common.config.token = None
 
-    mock_api.get("https://dagshub.com/api/v1/user").mock(side_effect=valid_token_side_effect)
-
     mock_api.post("https://dagshub.com/api/v1/middleman").mock(httpx.Response(200, json="code"))
 
     a_day_away = datetime.datetime.utcnow() + datetime.timedelta(days=1)

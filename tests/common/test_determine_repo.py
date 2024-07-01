@@ -2,13 +2,16 @@ import os
 import urllib.parse
 import uuid
 from typing import Generator, TypeVar
+import respx
 
 import pytest
 import pytest_git
+from httpx import Response
 
 from dagshub.common.determine_repo import determine_repo, parse_dagshub_remote
 import dagshub.common.config
 from dagshub.common.errors import DagsHubRepoNotFoundError
+from tests.dda.test_tokens import valid_token_side_effect
 from tests.util import remember_cwd
 
 T = TypeVar("T")
@@ -92,9 +95,11 @@ def test_in_folder(dagshub_host, dagshub_repo, repo_name):
 
 
 def _test_determine_repo(dagshub_host: str, dagshub_repo: pytest_git.GitRepo, repo_name: str):
-    res, branch = determine_repo()
-    assert res.full_name == repo_name
-    assert res.host == dagshub_host
+    with respx.mock(base_url=dagshub_host) as mock_router:
+        mock_router.get("api/v1/user").mock(side_effect=valid_token_side_effect)
+        res, branch = determine_repo()
+        assert res.full_name == repo_name
+        assert res.host == dagshub_host
 
 
 def test_cant_find_repo(dagshub_host, repo_with_no_dagshub_remote):

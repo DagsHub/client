@@ -2,6 +2,7 @@ import os.path
 
 from httpx import Response
 from respx import MockRouter, Route
+from tests.dda.test_tokens import valid_token_side_effect
 
 
 class MockApi(MockRouter):
@@ -17,15 +18,24 @@ class MockApi(MockRouter):
         route_dict = {k: (self._endpoints[k], self._responses[k]) for k in self._endpoints}
         for route_name in route_dict:
             endpoint_regex, return_value = route_dict[route_name]
-            self.route(name=route_name, url__regex=endpoint_regex).mock(return_value)
+
+            # if return value is a response, mock it directly; otherwise, mock the side effect
+            if isinstance(return_value, Response):
+                self.route(name=route_name, url__regex=endpoint_regex).mock(return_value)
+            else:
+                self.route(name=route_name, url__regex=endpoint_regex).mock(side_effect=return_value)
 
     @property
     def repourlpath(self):
         return f"{self.user}/{self.reponame}"
 
     @property
+    def api_prefix(self):
+        return "/api/v1"
+
+    @property
     def repoapipath(self):
-        return f"/api/v1/repos/{self.repourlpath}"
+        return f"{self.api_prefix}/repos/{self.repourlpath}"
 
     @property
     def repophysicalpath(self):
@@ -64,6 +74,7 @@ class MockApi(MockRouter):
             "branches": rf"{self.repoapipath}/branches/?$",
             "list_root": rf"{self.repoapipath}/content/{self.current_revision}/$",
             "storages": rf"{self.repoapipath}/storage/?$",
+            "user": rf"{self.api_prefix}/user",
         }
 
         responses = {
@@ -213,6 +224,7 @@ class MockApi(MockRouter):
                     }
                 ],
             ),
+            "user": valid_token_side_effect,
         }
 
         return endpoints, responses
