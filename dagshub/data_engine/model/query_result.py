@@ -416,7 +416,8 @@ class QueryResult:
         return_predictions=True,
     ):
         """
-        Sends all the datapoints returned in this QueryResult as prediction targets for an MLFlow model registered on DagsHub.
+        Sends all the datapoints returned in this QueryResult as prediction targets for an MLFlow model
+        registered on DagsHub.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
@@ -428,9 +429,11 @@ class QueryResult:
             name: name of the model in the mlflow registry
             version: (optional, default: 'latest') version of the model in the mlflow registry
             pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
-            post_hook: (optional, default: identity function) function that converts mlflow model output converts to labelstudio format
+            post_hook: (optional, default: identity function) function that converts mlflow model output
+            to the desired format
             batch_size: (optional, default: 1) function that sets batch_size
-            metadata_column: (optional, default: 'prediction') write prediction results to metadata logged in data engine. if None, returns predictions.
+            metadata_column: (optional, default: 'prediction') write prediction results to metadata
+            logged in data engine. if None, returns predictions.
             return_predictions: (optional, default: True) returns predictions logged
         Returns:
             The URL of the created Label Studio workspace
@@ -707,7 +710,8 @@ class QueryResult:
         use_remote_backend=False,
     ) -> Optional[str]:
         """
-        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub. Alternatively, uses MLFlow to automatically label datapoints.
+        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
+        Alternatively, uses MLFlow to automatically label datapoints.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
@@ -718,7 +722,8 @@ class QueryResult:
             model_repo: repository to extract the model from
             model_name: name of the model in the mlflow registry
             model_version: (optional, default: 'latest') version of the model in the mlflow registry
-            model_pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
+            model_pre_hook: (optional, default: identity function) function that runs before datapoint
+            is sent to the model
             model_post_hook: function that converts mlflow model output converts to labelstudio format
             model_batch_size: function that converts to labelstudio format
         Returns:
@@ -744,7 +749,8 @@ class QueryResult:
             return True
         elif any([param is not None for param in [model_name, model_repo, model_post_hook]]):
             raise AttributeError(
-                "Either all (for local model-based annotation) or none (for remote manual annotation) of `model_repo`, `model_name`, `model_post_hook` parameters must be set."
+                """Either all (for local model-based annotation) or none (for remote manual annotation) of
+                `model_repo`, `model_name`, `model_post_hook` parameters must be set."""
             )
 
         return self.datasource.send_datapoints_to_annotation(
