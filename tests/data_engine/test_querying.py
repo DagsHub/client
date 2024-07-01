@@ -627,7 +627,7 @@ def test_periodic_datetime_periods(ds, period):
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'time_zone': '+03:00',
+        'timeZone': '+03:00',
         'query': {
             'filter': {
                 'key': 'x',
@@ -667,7 +667,7 @@ def test_periodic_datetime_timeofday(ds):
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'time_zone': '+03:00',
+        'timeZone': '+03:00',
         'query': {
             'filter': {
                 'key': 'x',
