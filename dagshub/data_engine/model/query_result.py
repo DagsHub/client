@@ -416,7 +416,8 @@ class QueryResult:
         return_predictions=True,
     ):
         """
-        Sends all the datapoints returned in this QueryResult as prediction targets for an MLFlow model registered on DagsHub.
+        Sends all the datapoints returned in this QueryResult as prediction targets for
+        an MLFlow model registered on DagsHub.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
@@ -431,7 +432,8 @@ class QueryResult:
             post_hook: (optional, default: identity function) function that converts mlflow model output
             to the desired format
             batch_size: (optional, default: 1) function that sets batch_size
-            metadata_column: (optional, default: 'prediction') write prediction results to metadatalogged in data engine.
+            metadata_column: (optional, default: 'prediction') write prediction results to metadata
+            logged in data engine.
             If None, returns predictions.
             return_predictions: (optional, default: True) returns predictions logged
         Returns:
@@ -721,7 +723,8 @@ class QueryResult:
             model_repo: repository to extract the model from
             model_name: name of the model in the mlflow registry
             model_version: (optional, default: 'latest') version of the model in the mlflow registry
-            model_pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
+            model_pre_hook: (optional, default: identity function) function that runs
+            before the datapoint is sent to the model
             model_post_hook: function that converts mlflow model output converts to labelstudio format
             model_batch_size: function that converts to labelstudio format
         Returns:
