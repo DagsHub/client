@@ -370,7 +370,16 @@ class Datasource:
 
     def with_time_zone(self, tz_val: str) -> "Datasource":
         """
-        A time zone offset string in the form of "+HH:mm" or "-HH:mm"
+        A time zone offset string in the form of "+HH:mm" or "-HH:mm".
+
+        A metadata of type datetime is always stored in DB as a UTC time, when a query is done on this field
+        there are 3 options:
+
+        - Metadata was saved with a timezone, in which case it will be used.
+
+        - Metadata was saved without a timezone, in which case UTC will be used.
+
+        - with_time_zone specified a time zone and it will override whatever is in the database.
         """
         new_ds = self.__deepcopy__()
 
@@ -1209,7 +1218,6 @@ class Datasource:
     def date_field_in_years(self, *item: int):
         """
         Checks if a metadata field (which is of datetime type) is in one of given years list.
-        local timezone assumed unless time_zone() requests anything else.
 
         Args:
             List of years.
@@ -1225,7 +1233,6 @@ class Datasource:
     def date_field_in_months(self, *item: int):
         """
         Checks if a metadata field (which is of datetime type) is in one of given months list.
-        local timezone assumed unless time_zone() requests anything else.
 
         Args:
             List of months.
@@ -1240,7 +1247,6 @@ class Datasource:
     def date_field_in_days(self, *item: int):
         """
         Checks if a metadata field (which is of datetime type) is in one of given days list.
-        local timezone assumed unless time_zone() requests anything else.
 
         Args:
             List of days.
@@ -1255,10 +1261,9 @@ class Datasource:
     def date_field_in_timeofday(self, item: str):
         """
         Checks if a metadata field (which is of datetime type) is in given minute range inside the day (any day).
-        range is in the format of: "HH:mm-HH:mm" where start hour is on the left.
+        range is in the format of: "HH:mm-HH:mm" (or "HH:mm:ss-HH:mm:ss") where start hour is on the left.
         a range that starts at one day and ends at next day,
         should be expressed as OR of 2 range filter.
-        local timezone assumed unless time_zone() requests anything else.
 
         Args:
             Time range string.
