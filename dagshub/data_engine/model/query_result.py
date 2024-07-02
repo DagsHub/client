@@ -440,7 +440,7 @@ class QueryResult:
             The URL of the created Label Studio workspace
         """
         if not metadata_column and not return_predictions:
-            raise ValueError("There is nothing to do. Either `metadata_column` or return_predictions` must be set!")
+            raise ValueError("Either `metadata_column` or `return_predictions` must be set.")
 
         class TinyDL:
             def __init__(self, dset, batch_size):
