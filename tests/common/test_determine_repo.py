@@ -17,6 +17,14 @@ YieldFixture = Generator[T, None, None]
 
 
 @pytest.fixture
+def mock_get_username_of_token(mocker):
+    return mocker.patch(
+        "dagshub.auth.tokens.TokenStorage.get_username_of_token",
+        return_value={"username": "testuser", "login": "testlogin"},
+    )
+
+
+@pytest.fixture
 def repo_name() -> str:
     return f"user/repo-{uuid.uuid4()}"
 
@@ -29,7 +37,7 @@ def repo_name() -> str:
         "https://somewhere.else:8080/prefix",
     ]
 )
-def dagshub_host(request) -> YieldFixture[str]:
+def dagshub_host(request, mock_get_username_of_token) -> YieldFixture[str]:
     host = request.param
     old_value = dagshub.common.config.host
     dagshub.common.config.host = host

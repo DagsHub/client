@@ -12,29 +12,11 @@ from dagshub.auth.tokens import (
 )
 
 
-def valid_token_side_effect(request: httpx.Request) -> httpx.Response:
-    if request.headers["Authorization"] == "Bearer good-token":
-        return httpx.Response(
-            200,
-            json={
-                "id": 1,
-                "login": "user",
-                "full_name": "user",
-                "avatar_url": "random_url",
-                "username": "user",
-            },
-        )
-    else:
-        return httpx.Response(401)
-
-
 @pytest.fixture
 def token_api(mock_api):
     # Disable the env var token for these tests explicitly
     old_token_val = dagshub.common.config.token
     dagshub.common.config.token = None
-
-    mock_api.get("https://dagshub.com/api/v1/user").mock(side_effect=valid_token_side_effect)
 
     mock_api.post("https://dagshub.com/api/v1/middleman").mock(httpx.Response(200, json="code"))
 

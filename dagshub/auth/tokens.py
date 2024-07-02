@@ -18,7 +18,7 @@ from dagshub.auth.token_auth import (
     DagshubAuthenticator,
 )
 from dagshub.common import config
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, log_message
 from dagshub.common.util import multi_urljoin
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,7 @@ class TokenStorage:
         self._known_good_tokens: Dict[str, Set[DagshubTokenABC]] = {}
 
         self.__token_access_lock = threading.RLock()
+        self._accessing_as_was_printed = False
 
     @property
     def _token_cache(self):
@@ -126,6 +127,11 @@ class TokenStorage:
 
         host = host or config.host
         if host == config.host and config.token is not None:
+            user = TokenStorage.get_username_of_token(config.token, host)
+            if user is not None:
+                self._print_accessing_as(user)
+            else:
+                raise RuntimeError("Provided DagsHub token is not valid")
             return EnvVarDagshubToken(config.token, host)
 
         with self._token_access_lock:
@@ -135,6 +141,7 @@ class TokenStorage:
                 self._known_good_tokens[host] = set()
             good_token_set = self._known_good_tokens[host]
             good_token = None
+            good_user = None
             token_queue = list(sorted(tokens, key=lambda t: t.priority))
 
             for token in token_queue:
@@ -146,9 +153,11 @@ class TokenStorage:
                     good_token = token
                     break
                 # Check token validity
-                elif self.is_valid_token(token, host):
+                user = TokenStorage.get_username_of_token(token, host)
+                if user is not None:
                     good_token = token
                     good_token_set.add(token)
+                    good_user = user
                 # Remove invalid token from the cache
                 else:
                     self.invalidate_token(token, host)
@@ -173,6 +182,7 @@ class TokenStorage:
                     self._token_cache[host] = tokens
                     self._store_cache_file()
 
+            self._print_accessing_as(good_user)
             return good_token
 
     def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
@@ -202,9 +212,9 @@ class TokenStorage:
         return is_expired
 
     @staticmethod
-    def is_valid_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> bool:
+    def get_username_of_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> Optional[Dict]:
         """
-        Check for token validity
+        Check for token validity and return the dictionary with the info of the user of the token
 
         Args:
             token: token to check validity
@@ -219,13 +229,24 @@ class TokenStorage:
         resp = http_request("GET", check_url, auth=auth)
 
         try:
-            # 500's might be ok since they're server errors, so check only for 400's
-            assert not (400 <= resp.status_code <= 499)
-            if resp.status_code == 200:
-                assert "login" in resp.json()
-            return True
+            assert resp.status_code == 200
+            user = resp.json()
+            assert "login" in user
+            assert "username" in user
+            return user
         except AssertionError:
-            return False
+            return None
+
+    @staticmethod
+    def is_valid_token(token: Union[str, Auth, DagshubTokenABC], host: str) -> bool:
+        """
+        Check for token validity
+
+        Args:
+            token: token to check validity
+            host: which host to connect against
+        """
+        return TokenStorage.get_username_of_token(token, host) is not None
 
     def _load_cache_file(self) -> Dict[str, List[DagshubTokenABC]]:
         logger.debug(f"Loading token cache from {self.cache_location}")
@@ -280,6 +301,21 @@ class TokenStorage:
         except Exception:
             logger.error(f"Error while storing DagsHub token cache: {traceback.format_exc()}")
             raise
+
+    def _print_accessing_as(self, user: Dict):
+        """
+        This function prints a message to the log that we are accessing as a certain user.
+        It does this only once per command, to avoid spamming the logs.
+        It called after successful token validation.
+
+        """
+        if self._accessing_as_was_printed:
+            return
+
+        username = user["username"]
+
+        log_message(f"Accessing as {username}")
+        self._accessing_as_was_printed = True
 
     def __getstate__(self):
         d = self.__dict__

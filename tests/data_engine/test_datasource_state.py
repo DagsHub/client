@@ -22,7 +22,7 @@ import pytest
         ("repo://user/repo/branch/with/slashes:/", "user", "repo", "branch/with/slashes", "/"),
     ],
 )
-def test_repo_regex(in_str, user, repo, revision, prefix):
+def test_repo_regex(in_str, user, repo, revision, prefix, mock_get_username_of_token):
     ds = DatasourceState(repo="user/repo")
     ds.path = in_str
     ds.source_type = DatasourceType.REPOSITORY
@@ -40,7 +40,7 @@ def test_repo_regex(in_str, user, repo, revision, prefix):
 @pytest.mark.parametrize(
     "in_str", ["s3://user/repo/prefix", "user/repo/", "repo://user/", "repo://" "repo://user/repo/wrong\\branch:"]
 )
-def test_repo_regex_incorrect(in_str):
+def test_repo_regex_incorrect(in_str, mock_get_username_of_token):
     ds = DatasourceState(repo="user/repo")
     ds.path = in_str
     ds.source_type = DatasourceType.REPOSITORY
@@ -60,7 +60,7 @@ def test_repo_regex_incorrect(in_str):
         ("s3://bucket_with.weird-chars/longer/prefix", "s3", "bucket_with.weird-chars", "/longer/prefix"),
     ],
 )
-def test_bucket_regex(in_str, schema, bucket, prefix):
+def test_bucket_regex(in_str, schema, bucket, prefix, mock_get_username_of_token):
     ds = DatasourceState(repo="user/repo")
     ds.path = in_str
     ds.source_type = DatasourceType.BUCKET
@@ -78,7 +78,7 @@ def test_bucket_regex(in_str, schema, bucket, prefix):
         "s3://bucket.www.com/prefix",
     ],
 )
-def test_bucket_regex_incorrect(in_str):
+def test_bucket_regex_incorrect(in_str, mock_get_username_of_token):
     ds = DatasourceState(repo="user/repo")
     ds.path = in_str
     ds.source_type = DatasourceType.REPOSITORY

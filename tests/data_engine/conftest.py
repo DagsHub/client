@@ -13,7 +13,7 @@ from tests.mocks.repo_api import MockRepoAPI
 
 
 @pytest.fixture
-def ds(mocker) -> Datasource:
+def ds(mocker, mock_get_username_of_token) -> Datasource:
     ds_state = datasources.DatasourceState(id=1, name="test-dataset", repo="kirill/repo")
     ds_state.path = "repo://kirill/repo/data/"
     mocker.patch.object(ds_state, "client")
@@ -77,3 +77,11 @@ def query_result(ds, some_datapoints):
         fields.append(f)
     qr = QueryResult(datasource=ds, _entries=some_datapoints, fields=fields)
     return qr
+
+
+@pytest.fixture
+def mock_get_username_of_token(mocker):
+    mocker.patch(
+        "dagshub.auth.tokens.TokenStorage.get_username_of_token",
+        return_value={"username": "testuser", "login": "testlogin"},
+    )
