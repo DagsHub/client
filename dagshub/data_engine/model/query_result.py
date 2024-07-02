@@ -4,12 +4,12 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
+import os
 
 import dacite
 import rich.progress
 
-from dagshub import init
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
@@ -404,27 +404,22 @@ class QueryResult:
             num_proc=num_proc,
         )
 
-    def get_predictions(
+    def predict_with_mlflow_model(
         self,
-        repo,
-        name,
-        version="latest",
-        pre_hook=lambda x: x,
-        post_hook=lambda x: x,
-        batch_size=1,
-        metadata_column="annotation",
-        return_predictions=True,
-    ):
+        repo: str,
+        name: str,
+        version: str = "latest",
+        pre_hook: Callable = lambda x: x,
+        post_hook: Callable = lambda x: x,
+        batch_size: int = 1,
+        log_to_field: str = None,
+        return_predictions: bool = True,
+    ) -> Optional[list]:
         """
         Sends all the datapoints returned in this QueryResult as prediction targets for
         an MLFlow model registered on DagsHub.
 
         Args:
-            open_project: Automatically open the Label Studio project in the browser
-            ignore_warning: Suppress the prompt-warning if you try to annotate too many datapoints at once.
-            fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
-             if not specified all will be displayed.
-            fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
             repo: repository to extract the model from
             name: name of the model in the mlflow registry
             version: (optional, default: 'latest') version of the model in the mlflow registry
@@ -432,17 +427,16 @@ class QueryResult:
             post_hook: (optional, default: identity function) function that converts mlflow model output
             to the desired format
             batch_size: (optional, default: 1) function that sets batch_size
-            metadata_column: (optional, default: 'prediction') write prediction results to metadata
-            logged in data engine.
-            If None, returns predictions.
-            return_predictions: (optional, default: True) returns predictions logged
-        Returns:
-            The URL of the created Label Studio workspace
+            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
+            If None, just returns predictions.
+            return_predictions: (optional, default: True) returns prediction result
+            (in addition to logging to a field, iff that parameter is set)
         """
-        if not metadata_column and not return_predictions:
-            raise ValueError("Either `metadata_column` or `return_predictions` must be set.")
+        if not log_to_field and not return_predictions:
+            raise ValueError("Either `log_to_field` or `return_predictions` must be set.")
 
-        class TinyDL:
+        # to support depedency-free dataloading, `Batcher` is a barebones dataloader that sets up batched inference
+        class Batcher:
             def __init__(self, dset, batch_size):
                 self.dset = dset
                 self.batch_size = batch_size
@@ -455,23 +449,38 @@ class QueryResult:
                 self.curr_idx += self.batch_size
                 return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
 
-        init(*repo.split("/")[::-1])
+        # we know the user is authenticated to dagshub since they are using the data engine
+        registry_uri = mlflow.get_registry_uri()
+        mlflow.set_registry_uri(f'https://dagshub.com/{repo}.mlflow')
+        environ_uri = os.getenv("MLFLOW_TRACKING_URI")
+        os.environ["MLFLOW_TRACKING_URI"] = f'https://dagshub.com/{repo}.mlflow'
+
         model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
+
+        mlflow.set_registry_uri(registry_uri)
+        os.environ["MLFLOW_TRACKING_URI"] = environ_uri
+
         dset = DagsHubDataset(self, tensorizers=[lambda x: x])
 
         predictions = []
-        for idx, local_paths in enumerate(TinyDL(dset, batch_size) if batch_size != 1 else dset):
-            for prediction, remote_path in zip(
-                post_hook(model.predict(pre_hook(local_paths))),
-                [result.path for result in self[idx * batch_size: (idx + 1) * batch_size]],
-            ):
-                predictions.append({remote_path: prediction})
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Running inference...", total=len(dset))
+        with progress:
+            for idx, local_paths in enumerate(
+                Batcher(dset, batch_size) if batch_size != 1 else dset
+            ):  # encapsulates dataset with batcher if necessary and iterates over it
+                for prediction, remote_path in zip(
+                    post_hook(model.predict(pre_hook(local_paths))),
+                    [result.path for result in self[idx * batch_size: (idx + 1) * batch_size]],
+                ):
+                    predictions.append({remote_path: prediction})
+                progress.update(task, advance=batch_size, refresh=True)
 
-        if not metadata_column:
+        if not log_to_field:
             return predictions
         with self.datasource.metadata_context() as ctx:
             for remote_path in predictions:
-                ctx.update_metadata(remote_path, {metadata_column: predictions[remote_path]})
+                ctx.update_metadata(remote_path, {log_to_field: predictions[remote_path]})
         return predictions if return_predictions else True
 
     def get_annotations(self, **kwargs) -> "QueryResult":
@@ -695,20 +704,40 @@ class QueryResult:
 
             return sess
 
+    def annotate_with_mlflow_model(
+        self,
+        repo: str,
+        name: str,
+        post_hook: Callable,
+        version: str = "latest",
+        pre_hook: Callable = lambda x: x,
+        batch_size: int = 1,
+        log_to_field: str = "annotation",
+        return_predictions: bool = True,
+    ) -> Optional[str]:
+        """
+        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
+        Alternatively, uses MLFlow to automatically label datapoints.
+
+        Args:
+            repo: repository to extract the model from
+            name: name of the model in the mlflow registry
+            version: (optional, default: 'latest') version of the model in the mlflow registry
+            pre_hook: (optional, default: identity function) function that runs
+            before the datapoint is sent to the model
+            post_hook: function that converts mlflow model output converts to labelstudio format
+            batch_size: function that converts to labelstudio format
+        """
+        self.predict_with_mlflow_model(
+            repo, name, version, pre_hook, post_hook, batch_size, log_to_field, return_predictions=False
+        )
+
     def annotate(
         self,
-        open_project=True,
-        ignore_warning=True,
-        fields_to_embed=None,
-        fields_to_exclude=None,
-        model_name=None,
-        model_version="latest",
-        model_repo=None,
-        model_pre_hook=lambda x: x,
-        model_post_hook=None,
-        model_batch_size=1,
-        model_metadata_column="annotation",
-        use_remote_backend=False,
+        open_project: bool = True,
+        ignore_warning: bool = True,
+        fields_to_embed: Optional[List[str]] = None,
+        fields_to_exclude: Optional[List[str]] = None,
     ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
@@ -720,39 +749,10 @@ class QueryResult:
             fields_to_embed: list of meta-data columns that will show up in Label Studio UI.
              if not specified all will be displayed.
             fields_to_exclude: list of meta-data columns that will not show up in Label Studio UI
-            model_repo: repository to extract the model from
-            model_name: name of the model in the mlflow registry
-            model_version: (optional, default: 'latest') version of the model in the mlflow registry
-            model_pre_hook: (optional, default: identity function) function that runs
-            before the datapoint is sent to the model
-            model_post_hook: function that converts mlflow model output converts to labelstudio format
-            model_batch_size: function that converts to labelstudio format
         Returns:
             The URL of the created Label Studio workspace
         """
         send_analytics_event("Client_DataEngine_SentToAnnotation", repo=self.datasource.source.repoApi)
-
-        if all([param is not None for param in [model_name, model_version, model_repo, model_post_hook]]):
-            if use_remote_backend:
-                # send to dagshub backend
-                raise NotImplementedError("Coming soon!")
-
-            self.get_predictions(
-                model_repo,
-                model_name,
-                model_version,
-                model_pre_hook,
-                model_post_hook,
-                model_batch_size,
-                model_metadata_column,
-                return_predictions=False,
-            )
-            return True
-        elif any([param is not None for param in [model_name, model_repo, model_post_hook]]):
-            raise AttributeError(
-                """Either all (for local model-based annotation) or none (for remote manual annotation)
-                of `model_repo`, `model_name`, `model_post_hook` parameters must be set."""
-            )
 
         return self.datasource.send_datapoints_to_annotation(
             self.entries,
