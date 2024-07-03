@@ -412,7 +412,7 @@ class QueryResult:
         pre_hook: Callable[[Any], Any] = lambda x: x,
         post_hook: Callable[[Any], Any] = lambda x: x,
         batch_size: int = 1,
-        log_to_field: str = None,
+        log_to_field: Optional[str] = None,
         return_predictions: bool = True,
     ) -> Optional[list]:
         """
