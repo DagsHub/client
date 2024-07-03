@@ -5,11 +5,11 @@ from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
-import os
 
 import dacite
 import rich.progress
 
+from dagshub import init
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
@@ -449,16 +449,9 @@ class QueryResult:
                 self.curr_idx += self.batch_size
                 return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
 
-        # we know the user is authenticated to dagshub since they are using the data engine
-        registry_uri = mlflow.get_registry_uri()
-        mlflow.set_registry_uri(f'https://dagshub.com/{repo}.mlflow')
-        environ_uri = os.getenv("MLFLOW_TRACKING_URI")
-        os.environ["MLFLOW_TRACKING_URI"] = f'https://dagshub.com/{repo}.mlflow'
-
+        init(*repo.split("/")[::-1])
         model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
-
-        mlflow.set_registry_uri(registry_uri)
-        os.environ["MLFLOW_TRACKING_URI"] = environ_uri
+        init(*self.datasource.repo.split("/")[::-1])
 
         dset = DagsHubDataset(self, tensorizers=[lambda x: x])
 
