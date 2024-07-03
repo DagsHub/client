@@ -5,11 +5,12 @@ from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
+import os
 
 import dacite
 import rich.progress
 
-from dagshub import init
+from dagshub.auth import get_token
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
@@ -413,7 +414,6 @@ class QueryResult:
         post_hook: Callable[[Any], Any] = lambda x: x,
         batch_size: int = 1,
         log_to_field: Optional[str] = None,
-        return_predictions: bool = True,
     ) -> Optional[list]:
         """
         Sends all the datapoints returned in this QueryResult as prediction targets for
@@ -429,11 +429,8 @@ class QueryResult:
             batch_size: (optional, default: 1) function that sets batch_size
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
             If None, just returns predictions.
-            return_predictions: (optional, default: True) returns prediction result
             (in addition to logging to a field, iff that parameter is set)
         """
-        if not log_to_field and not return_predictions:
-            raise ValueError("Either `log_to_field` or `return_predictions` must be set.")
 
         # to support depedency-free dataloading, `Batcher` is a barebones dataloader that sets up batched inference
         class Batcher:
@@ -449,9 +446,14 @@ class QueryResult:
                 self.curr_idx += self.batch_size
                 return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
 
-        init(*repo.split("/")[::-1])
-        model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
-        init(*self.datasource.repo.split("/")[::-1])
+        prev_uri = os.getenv("MLFLOW_TRACKING_URI", "")
+        os.environ["MLFLOW_TRACKING_URI"] = f"https://dagshub.com/{repo}.mlflow"
+        os.environ["MLFLOW_TRACKING_USERNAME"] = get_token()
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = get_token()
+        try:
+            model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
+        finally:
+            os.environ["MLFLOW_TRACKING_URI"] = prev_uri
 
         dset = DagsHubDataset(self, tensorizers=[lambda x: x])
 
@@ -469,12 +471,11 @@ class QueryResult:
                     predictions.append({remote_path: prediction})
                 progress.update(task, advance=batch_size, refresh=True)
 
-        if not log_to_field:
-            return predictions
-        with self.datasource.metadata_context() as ctx:
-            for remote_path in predictions:
-                ctx.update_metadata(remote_path, {log_to_field: predictions[remote_path]})
-        return predictions if return_predictions else True
+        if log_to_field:
+            with self.datasource.metadata_context() as ctx:
+                for remote_path in predictions:
+                    ctx.update_metadata(remote_path, {log_to_field: predictions[remote_path]})
+        return predictions
 
     def get_annotations(self, **kwargs) -> "QueryResult":
         """
@@ -706,11 +707,9 @@ class QueryResult:
         pre_hook: Callable = lambda x: x,
         batch_size: int = 1,
         log_to_field: str = "annotation",
-        return_predictions: bool = True,
     ) -> Optional[str]:
         """
-        Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
-        Alternatively, uses MLFlow to automatically label datapoints.
+        Sends all the datapoints returned in this QueryResult to an MLFlow model which automatically labels datapoints.
 
         Args:
             repo: repository to extract the model from
@@ -721,9 +720,7 @@ class QueryResult:
             post_hook: function that converts mlflow model output converts to labelstudio format
             batch_size: function that converts to labelstudio format
         """
-        self.predict_with_mlflow_model(
-            repo, name, version, pre_hook, post_hook, batch_size, log_to_field, return_predictions=False
-        )
+        self.predict_with_mlflow_model(repo, name, version, pre_hook, post_hook, batch_size, log_to_field)
 
     def annotate(
         self,
