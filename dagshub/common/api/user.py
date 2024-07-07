@@ -1,4 +1,4 @@
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Optional, Any, Union
 
 import dacite
@@ -48,6 +48,7 @@ class UserAPI:
         return UserAPI(user=user_info, host=host, auth=auth)
 
     @staticmethod
+    @lru_cache
     def get_current_user(host: Optional[str] = None) -> "UserAPI":
         return UserAPI.get_user_from_token(get_token(host=host), host=host)
 

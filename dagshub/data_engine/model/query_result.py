@@ -15,6 +15,7 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
+from dagshub.data_engine.annotation.container import Annotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
     add_ls_annotations,
@@ -26,11 +27,13 @@ from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from dagshub.data_engine.dtypes import MetadataFieldType
 
+
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
     import fiftyone as fo
     import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
     import datasets as hf_ds
+    import tensorflow as tf
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
@@ -94,11 +97,11 @@ class QueryResult:
         """
         import pandas as pd
 
-        metadata_keys = set()
+        metadata_key_set = set()
         for e in self.entries:
-            metadata_keys.update(e.metadata.keys())
+            metadata_key_set.update(e.metadata.keys())
 
-        metadata_keys = list(sorted(metadata_keys))
+        metadata_keys = list(sorted(metadata_key_set))
         return pd.DataFrame.from_records([dp.to_dict(metadata_keys) for dp in self.entries])
 
     def __len__(self):
@@ -408,9 +411,21 @@ class QueryResult:
         All keyword arguments are passed to :func:`get_blob_fields`.
         """
         if len(self.annotation_fields) == 0:
-            logger.warning("No annotation fields in this query result")
             return self
-        return self.get_blob_fields(*self.annotation_fields, **kwargs)
+
+        log_message(f"Downloading annotation fields {self.annotation_fields}...")
+        if "load_into_memory" in kwargs:
+            del kwargs["load_into_memory"]
+        self.get_blob_fields(*self.annotation_fields, load_into_memory=True, **kwargs)
+
+        # Convert them
+        for dp in self:
+            for f in self.annotation_fields:
+                if f in dp.metadata:
+                    dp.metadata[f] = Annotations.from_ls_task(datapoint=dp, ls_task=dp.metadata[f])
+                else:
+                    dp.metadata[f] = Annotations(datapoint=dp)
+        return self
 
     def download_files(
         self,
@@ -660,6 +675,7 @@ class QueryResult:
         Loads fields that are supposed to be load automatically upon querying.
         This includes:
             - All document fields
+            - All annotation fields
         """
         if len(self.document_fields) > 0:
             log_message(f"Downloading document fields {self.document_fields}...")
@@ -669,3 +685,5 @@ class QueryResult:
                 for f in self.document_fields:
                     if f in dp.metadata:
                         dp.metadata[f] = dp.metadata[f].decode("utf-8")
+
+        self.get_annotations()
