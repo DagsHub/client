@@ -16,7 +16,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.common.util import lazy_load
+from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
     add_ls_annotations,
@@ -409,6 +409,7 @@ class QueryResult:
         self,
         repo: str,
         name: str,
+        host: Optional[str] = None,
         version: str = "latest",
         pre_hook: Callable[[Any], Any] = lambda x: x,
         post_hook: Callable[[Any], Any] = lambda x: x,
@@ -446,8 +447,10 @@ class QueryResult:
                 self.curr_idx += self.batch_size
                 return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
 
-        prev_uri = os.getenv("MLFLOW_TRACKING_URI", "")
-        os.environ["MLFLOW_TRACKING_URI"] = f"https://dagshub.com/{repo}.mlflow"
+        if not host:
+            host = self.datasource.source.repoApi.host
+        prev_uri = mlflow.get_tracking_uri()
+        os.environ["MLFLOW_TRACKING_URI"] = multi_urljoin(host, f"{repo}.mlflow")
         os.environ["MLFLOW_TRACKING_USERNAME"] = get_token()
         os.environ["MLFLOW_TRACKING_PASSWORD"] = get_token()
         try:
@@ -457,7 +460,7 @@ class QueryResult:
 
         dset = DagsHubDataset(self, tensorizers=[lambda x: x])
 
-        predictions = []
+        predictions = {}
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         task = progress.add_task("Running inference...", total=len(dset))
         with progress:
@@ -468,7 +471,7 @@ class QueryResult:
                     post_hook(model.predict(pre_hook(local_paths))),
                     [result.path for result in self[idx * batch_size: (idx + 1) * batch_size]],
                 ):
-                    predictions.append({remote_path: prediction})
+                    predictions[remote_path] = prediction
                 progress.update(task, advance=batch_size, refresh=True)
 
         if log_to_field:
@@ -703,8 +706,9 @@ class QueryResult:
         repo: str,
         name: str,
         post_hook: Callable,
-        version: str = "latest",
         pre_hook: Callable = lambda x: x,
+        host: Optional[str] = None,
+        version: str = "latest",
         batch_size: int = 1,
         log_to_field: str = "annotation",
     ) -> Optional[str]:
@@ -720,7 +724,16 @@ class QueryResult:
             post_hook: function that converts mlflow model output converts to labelstudio format
             batch_size: function that converts to labelstudio format
         """
-        self.predict_with_mlflow_model(repo, name, version, pre_hook, post_hook, batch_size, log_to_field)
+        self.predict_with_mlflow_model(
+            repo,
+            name,
+            host=host,
+            version=version,
+            pre_hook=pre_hook,
+            post_hook=post_hook,
+            batch_size=batch_size,
+            log_to_field=log_to_field,
+        )
 
     def annotate(
         self,
