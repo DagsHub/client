@@ -5,6 +5,7 @@ from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
+import json
 import os
 
 import dacite
@@ -477,7 +478,7 @@ class QueryResult:
         if log_to_field:
             with self.datasource.metadata_context() as ctx:
                 for remote_path in predictions:
-                    ctx.update_metadata(remote_path, {log_to_field: predictions[remote_path]})
+                    ctx.update_metadata(remote_path, {log_to_field: json.dumps(predictions[remote_path]).encode('utf-8')})
         return predictions
 
     def get_annotations(self, **kwargs) -> "QueryResult":
