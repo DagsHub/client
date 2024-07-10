@@ -1,8 +1,7 @@
 from typing import TYPE_CHECKING, Optional, Sequence, Tuple, Union, Literal
 
-import ultralytics.engine.results
 from dagshub_annotation_converter.formats.label_studio.task import parse_ls_task, LabelStudioTask
-from dagshub_annotation_converter.formats.yolo import YoloContext
+from dagshub_annotation_converter.formats.yolo import YoloContext, import_lookup, import_yolo_result
 from dagshub_annotation_converter.ir.image import (
     IRBBoxImageAnnotation,
     CoordinateStyle,
@@ -10,24 +9,26 @@ from dagshub_annotation_converter.ir.image import (
     IRSegmentationPoint,
     IRPoseImageAnnotation,
     IRPosePoint,
-    IRImageAnnotationBase,
 )
+from dagshub_annotation_converter.ir.image.annotations.base import IRAnnotationBase, IRImageAnnotationBase
 
 from dagshub.common.api import UserAPI
+from dagshub.common.helpers import log_message
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datapoint import Datapoint
+    import ultralytics.engine.results
 
 
 class Annotations:
     def __init__(
         self,
         datapoint: "Datapoint",
-        annotations: Optional[Sequence["IRImageAnnotationBase"]] = None,
+        annotations: Optional[Sequence["IRAnnotationBase"]] = None,
         original_ls_task: Optional["LabelStudioTask"] = None,
     ):
         self.datapoint = datapoint
-        self.annotations: list["IRImageAnnotationBase"]
+        self.annotations: list["IRAnnotationBase"]
         self.original_ls_task = original_ls_task
         if annotations is None:
             annotations = []
@@ -45,6 +46,7 @@ class Annotations:
             user_id=UserAPI.get_current_user(self.datapoint.datasource.source.repoApi.host).user_id,
         )
         task.data["image"] = self.datapoint.download_url
+        # TODO: need to filter out non-image annotations here maybe?
         task.add_ir_annotations(self.annotations)
         return task.model_dump_json().encode("utf-8")
 
@@ -68,8 +70,9 @@ class Annotations:
         if image_width is not None and image_height is not None:
             return image_width, image_height
 
-        if len(self.annotations) > 0:
-            return self.annotations[0].image_width, self.annotations[0].image_height
+        for ann in self.annotations:
+            if isinstance(ann, IRImageAnnotationBase):
+                return ann.image_width, ann.image_height
 
         if "width" not in self.datapoint.metadata:
             raise ValueError('Image width not provided, and a "width" field was not found in the datapoint')
@@ -197,5 +200,23 @@ class Annotations:
         annotation_type: Literal["bbox", "segmentation", "pose"],
         annotation: Union[str, "ultralytics.engine.results.Results"],
         yolo_context: Optional["YoloContext"] = None,
+        image_width: Optional[int] = None,
+        image_height: Optional[int] = None,
     ):
-        raise NotImplementedError
+        annotations: list[IRAnnotationBase] = []
+        if isinstance(annotation, str):
+            if yolo_context is None:
+                raise ValueError("YoloContext is required when importing annotations from a string")
+            image_width, image_height = self.get_image_dimensions(image_width, image_height)
+            parse_fn = import_lookup[annotation_type]
+            for ann in annotation.split("\n"):
+                new_ann = parse_fn(ann, yolo_context, image_width, image_height, None)
+                new_ann.filename = self.datapoint.path
+                annotations.append(new_ann)
+        else:
+            new_anns = import_yolo_result(annotation_type, annotation)
+            for new_ann in new_anns:
+                new_ann.filename = self.datapoint.path
+            annotations.extend(new_anns)
+        self.annotations.extend(annotations)
+        log_message(f"Added {len(annotations)} YOLO annotation(s) to datapoint {self.datapoint.path}")
