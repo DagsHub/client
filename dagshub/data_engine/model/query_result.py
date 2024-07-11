@@ -472,13 +472,18 @@ class QueryResult:
                     post_hook(model.predict(pre_hook(local_paths))),
                     [result.path for result in self[idx * batch_size: (idx + 1) * batch_size]],
                 ):
-                    predictions[remote_path] = prediction
+                    predictions[remote_path] = {
+                        "data": {"image": multi_urljoin(self.datasource.source.root_raw_path, remote_path)},
+                        "annotations": [prediction],
+                    }
                 progress.update(task, advance=batch_size, refresh=True)
 
         if log_to_field:
             with self.datasource.metadata_context() as ctx:
                 for remote_path in predictions:
-                    ctx.update_metadata(remote_path, {log_to_field: json.dumps(predictions[remote_path]).encode('utf-8')})
+                    ctx.update_metadata(
+                        remote_path, {log_to_field: json.dumps(predictions[remote_path]).encode("utf-8")}
+                    )
         return predictions
 
     def get_annotations(self, **kwargs) -> "QueryResult":
