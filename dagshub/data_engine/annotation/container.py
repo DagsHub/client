@@ -114,7 +114,7 @@ class Annotations:
                 height=height,
                 image_width=image_width,
                 image_height=image_height,
-                state=CoordinateStyle.NORMALIZED,
+                coordinate_style=CoordinateStyle.NORMALIZED,
             )
         )
 
@@ -145,7 +145,7 @@ class Annotations:
                 points=[IRSegmentationPoint(x=x, y=y) for x, y in points],
                 image_width=image_width,
                 image_height=image_height,
-                state=CoordinateStyle.NORMALIZED,
+                coordinate_style=CoordinateStyle.NORMALIZED,
             )
         )
 
@@ -184,7 +184,7 @@ class Annotations:
             points=pose_points,
             image_width=image_width,
             image_height=image_height,
-            state=CoordinateStyle.NORMALIZED,
+            coordinate_style=CoordinateStyle.NORMALIZED,
         )
 
         if bbox_left is not None and bbox_top is not None and bbox_width is not None and bbox_height is not None:

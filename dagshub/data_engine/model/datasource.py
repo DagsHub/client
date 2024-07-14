@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
 
 
 import rich.progress
@@ -26,6 +26,7 @@ from dagshub.common.environment import is_mlflow_installed
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none
+from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationType, AnnotationLocation
 from dagshub.data_engine.client.models import (
     PreprocessingStatus,
     MetadataFieldSchema,
@@ -76,8 +77,9 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
-    timeZone: Optional[str] = field(default=None,
-                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    timeZone: Optional[str] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
 
 
 @dataclass
@@ -1133,7 +1135,7 @@ class Datasource:
         # Otherwise we're doing querying
         new_ds = self.__deepcopy__()
         if isinstance(other, (str, Field)):
-            query_field: Field = Field(other) if type(other) is str else other
+            query_field: Field = Field(other) if isinstance(other, str) else other
             other_query = QueryFilterTree(
                 query_field.field_name,
                 query_field.as_of_timestamp,
@@ -1342,7 +1344,9 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str]]] = None
+        self,
+        op: str,
+        other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str], datetime.datetime]] = None,
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
@@ -1367,6 +1371,64 @@ class Datasource:
     def _test_not_comparing_other_ds(other):
         if type(other) is Datasource:
             raise DatasetFieldComparisonError()
+
+    def import_annotations_from_files(
+        self,
+        annotation_type: AnnotationType,
+        annotations_path: Union[str, Path],
+        annotations_field: str = "imported_annotation",
+        load_from: Optional[AnnotationLocation] = None,
+        remapping_function: Optional[Callable[[str], str]] = None,
+        **kwargs,
+    ):
+        """
+        Imports annotations into the datasource from files
+
+        # TODO: ADD BETTER DOCS HERE
+
+        Args:
+            annotation_type: Type of annotations to import. Possible values are ``yolo`` and ``cvat``
+            annotations_path: If YOLO - path to the .yaml file, if CVAT - path to the .zip file. \
+                Can be either on disk or in repository
+            annotations_field: Which field to upload the annotations into
+            load_from: Force specify where to get the files from. \
+                By default, we're trying to load files from the disk first, and then repository
+            remapping_function: Function that maps from a path of the annotation to the path of the datapoint. \
+                If None, we try to make a best guess based on the first imported annotation. \
+                This might fail, if there is no matching datapoint in the datasource.
+        """
+
+        # Make sure the annotation field exists, is a blob field + has the annotation tag
+        existing_fields = [f for f in self.fields if f.name == annotations_field]
+        if len(existing_fields) != 0:
+            f = existing_fields[0]
+            if f.valueType != MetadataFieldType.BLOB:
+                raise RuntimeError(
+                    f"Field {f.name} is not a blob field. "
+                    f"Choose a new field or an existing blob field to upload annotations to."
+                )
+        self.metadata_field(annotations_field).set_type(bytes).set_annotation().apply()
+
+        # Run import
+        importer = AnnotationImporter(
+            ds=self,
+            annotations_type=annotation_type,
+            annotations_file=annotations_path,
+            load_from=load_from,
+            **kwargs,
+        )
+        annotation_dict = importer.import_annotations()
+
+        annotation_dict = importer.remap_annotations(annotation_dict, remap_func=remapping_function)
+
+        with rich_console.status("Converting annotations to tasks..."):
+            tasks = importer.convert_to_ls_tasks(annotation_dict)
+
+        with self.metadata_context() as ctx:
+            for dp, task in tasks.items():
+                ctx.update_metadata(dp, {annotations_field: task})
+
+        log_message(f'Done! Uploaded annotations for {len(tasks)} datapoints to field "{annotations_field}"')
 
 
 class MetadataContextManager:
@@ -1510,8 +1572,9 @@ def _get_datetime_utc_offset(t):
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
-    time_zone: Optional[str] = field(default=None,
-                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    time_zone: Optional[str] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
