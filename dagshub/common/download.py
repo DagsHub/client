@@ -6,7 +6,8 @@ from functools import partial
 from pathlib import Path
 from typing import Tuple, Callable, Optional, List, Union, Dict
 
-from httpx import Auth
+from httpx import Auth, Response
+from tenacity import stop_after_attempt, wait_exponential, before_sleep_log, retry, retry_if_exception
 
 from dagshub.common import config
 
@@ -16,7 +17,7 @@ import re
 import rich.progress
 
 from dagshub.auth import get_authenticator
-from dagshub.common.helpers import http_request
+from dagshub.common.helpers import http_request, is_server_error
 from dagshub.common.rich_util import get_rich_progress
 
 logger = logging.getLogger(__name__)
@@ -126,16 +127,29 @@ def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
     return groups["proto"], groups["bucket"], groups["path"]
 
 
+class DownloadError(Exception):
+    def __init__(self, response: Response):
+        self.response = response
+        super().__init__("Download failed with status code {response.status_code}")
+
+
+def is_download_server_error(error: BaseException) -> bool:
+    if not isinstance(error, DownloadError):
+        return False
+    return is_server_error(error.response)
+
+
+@retry(
+    retry=retry_if_exception(is_download_server_error),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+)
 def _dagshub_download(url: str, auth: Auth) -> bytes:
     resp = http_request("GET", url, auth=auth, timeout=600)
-    try:
-        assert resp.status_code == 200
-    # TODO: retry
-    except AssertionError:
-        raise RuntimeError(
-            f"Couldn't download file at URL {url}. Response code {resp.status_code} (Body: {resp.content})"
-        )
-    return resp.content
+    if resp.status_code == 200:
+        return resp.content
+    raise DownloadError(resp)
 
 
 BucketDownloaderFuncType = Callable[[str, str], bytes]
