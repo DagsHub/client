@@ -42,7 +42,7 @@ class GqlQueries:
     @staticmethod
     @functools.lru_cache()
     def datasource_query(include_metadata: bool, introspection: "TypesIntrospection") -> GqlQuery:
-        metadata_fields = "metadata { key value }" if include_metadata else ""
+        metadata_fields = "metadata { key value timeZone}" if include_metadata else ""
         q = (
             GqlQuery()
             .operation(
