@@ -4,7 +4,7 @@ import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
-from typing import Tuple, Callable, Optional, List, Union, Dict
+from typing import Tuple, Callable, Optional, Union, Dict, List
 
 from httpx import Auth, Response
 from tenacity import stop_after_attempt, wait_exponential, before_sleep_log, retry, retry_if_exception
@@ -141,7 +141,7 @@ def is_download_server_error(error: BaseException) -> bool:
 
 @retry(
     retry=retry_if_exception(is_download_server_error),
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=4, max=10),
     before_sleep=before_sleep_log(logger, logging.WARNING),
 )
@@ -233,7 +233,7 @@ def download_files(
 
     # Convert string paths to Path objects
     for i, file_tuple in enumerate(files):
-        if type(file_tuple[1]) is str:
+        if isinstance(file_tuple[1], str):
             files[i] = (file_tuple[0], Path(file_tuple[1]))
 
     if download_fn is None:
