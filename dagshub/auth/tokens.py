@@ -3,7 +3,7 @@ import logging
 import os
 import threading
 import traceback
-from typing import Optional, Dict, List, Set, Union
+from typing import Optional, Dict, List, Set, Union, cast
 
 import yaml
 from httpx import Auth
@@ -32,7 +32,7 @@ class InvalidTokenError(Exception):
 
 
 class TokenStorage:
-    def __init__(self, cache_location: str = None, **kwargs):
+    def __init__(self, cache_location: Optional[str] = None, **kwargs):
         cache_location = cache_location or config.cache_location
         self.cache_location = cache_location
         self.schema_version = config.TOKENS_CACHE_SCHEMA_VERSION
@@ -71,11 +71,13 @@ class TokenStorage:
             logger.info("Removed expired tokens from the token cache")
             self._store_cache_file()
 
-    def add_token(self, token: Union[str, DagshubTokenABC], host: str = None, skip_validation=False):
+    def add_token(self, token: Union[str, DagshubTokenABC], host: Optional[str] = None, skip_validation=False):
         host = host or config.host
 
-        if type(token) is str:
+        if isinstance(token, str):
             token = AppDagshubToken(token)
+
+        token = cast(DagshubTokenABC, token)
 
         if self._token_already_exists(token.token_text, host):
             logger.warning("The added token already exists in the token cache, skipping")
@@ -90,7 +92,7 @@ class TokenStorage:
         self._token_cache[host].append(token)
         self._store_cache_file()
 
-    def invalidate_token(self, token: DagshubTokenABC, host: str = None):
+    def invalidate_token(self, token: DagshubTokenABC, host: Optional[str] = None):
         host = host or config.host
 
         try:
@@ -107,7 +109,9 @@ class TokenStorage:
         except ValueError:
             logger.warning(f"Token {token} does not exist in the storage")
 
-    def get_authenticator(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubAuthenticator:
+    def get_authenticator(
+        self, host: Optional[str] = None, fail_if_no_token: bool = False, **kwargs
+    ) -> DagshubAuthenticator:
         """
         Returns the authenticator object, that can renegotiate tokens in case of failure
         """
@@ -115,7 +119,7 @@ class TokenStorage:
         token = self.get_token_object(host, fail_if_no_token, **kwargs)
         return DagshubAuthenticator(token, token_storage=self, host=host)
 
-    def get_token_object(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
+    def get_token_object(self, host: Optional[str] = None, fail_if_no_token: bool = False, **kwargs) -> DagshubTokenABC:
         """
         This function does following:
         - Iterates over all tokens in the cache for the provided host
@@ -178,6 +182,7 @@ class TokenStorage:
                     good_token = oauth.oauth_flow(host, **kwargs)
                     tokens.append(good_token)
                     good_token_set.add(good_token)
+                    good_user = TokenStorage.get_username_of_token(good_token, host)
                     # Save the cache
                     self._token_cache[host] = tokens
                     self._store_cache_file()
@@ -185,7 +190,7 @@ class TokenStorage:
             self._print_accessing_as(good_user)
             return good_token
 
-    def get_token(self, host: str = None, fail_if_no_token: bool = False, **kwargs) -> str:
+    def get_token(self, host: Optional[str] = None, fail_if_no_token: bool = False, **kwargs) -> str:
         """
         Return the raw token string
         This is a lower level method that cannot do renegotiations, we only return the token itself here.
