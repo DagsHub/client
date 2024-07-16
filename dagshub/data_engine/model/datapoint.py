@@ -1,5 +1,4 @@
 import datetime
-import pytz
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
