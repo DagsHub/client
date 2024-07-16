@@ -1375,8 +1375,8 @@ class Datasource:
     def import_annotations_from_files(
         self,
         annotation_type: AnnotationType,
-        annotations_path: Union[str, Path],
-        annotations_field: str = "imported_annotation",
+        path: Union[str, Path],
+        field: str = "imported_annotation",
         load_from: Optional[AnnotationLocation] = None,
         remapping_function: Optional[Callable[[str], str]] = None,
         **kwargs,
@@ -1384,22 +1384,50 @@ class Datasource:
         """
         Imports annotations into the datasource from files
 
-        # TODO: ADD BETTER DOCS HERE
+        The annotations will be downloaded and converted into Label Studio tasks,
+        that are then uploaded into the specified fields.
+
+        If the annotations are stored in a repo and not locally, they are downloaded to a temporary directory.
+
+        Caveats:
+            - YOLO:
+                - Images need to also be downloaded to get their dimensions.
+                - The .YAML file needs to have the ``path`` argument set to the relative path to the data. \
+                    We're using that to download the files
+                - You have to specify the ``yolo_type`` kwarg with the type of annotation to import
 
         Args:
             annotation_type: Type of annotations to import. Possible values are ``yolo`` and ``cvat``
-            annotations_path: If YOLO - path to the .yaml file, if CVAT - path to the .zip file. \
+            path: If YOLO - path to the .yaml file, if CVAT - path to the .zip file. \
                 Can be either on disk or in repository
-            annotations_field: Which field to upload the annotations into
+            field: Which field to upload the annotations into. \
+                If it's an existing field, it has to be a blob field, \
+                and it will have the annotations flag set afterwards.
             load_from: Force specify where to get the files from. \
-                By default, we're trying to load files from the disk first, and then repository
+                By default, we're trying to load files from the disk first, and then repository.
+                If this is specified, then that check is being skipped and \
+                we'll try to download from the specified location.
             remapping_function: Function that maps from a path of the annotation to the path of the datapoint. \
                 If None, we try to make a best guess based on the first imported annotation. \
-                This might fail, if there is no matching datapoint in the datasource.
+                This might fail, if there is no matching datapoint in the datasource for some annotations \
+                or if the paths are wildly different.
+
+        Keyword Args:
+            yolo_type: Type of YOLO annotations to import. Either ``bbox``, ``segmentation`` or ``pose``.
+
+        Example to import segmentation annotations into an ``imported_annotations`` field,
+        using YOLO information from an ``annotations.yaml`` file (can be local, or in the repo)::
+
+            ds.import_annotations_from_files(
+                annotation_type="yolo",
+                annotations_path="annotations.yaml",
+                annotations_field="imported_annotations",
+                yolo_type="segmentation"
+            )
         """
 
         # Make sure the annotation field exists, is a blob field + has the annotation tag
-        existing_fields = [f for f in self.fields if f.name == annotations_field]
+        existing_fields = [f for f in self.fields if f.name == field]
         if len(existing_fields) != 0:
             f = existing_fields[0]
             if f.valueType != MetadataFieldType.BLOB:
@@ -1407,13 +1435,13 @@ class Datasource:
                     f"Field {f.name} is not a blob field. "
                     f"Choose a new field or an existing blob field to upload annotations to."
                 )
-        self.metadata_field(annotations_field).set_type(bytes).set_annotation().apply()
+        self.metadata_field(field).set_type(bytes).set_annotation().apply()
 
         # Run import
         importer = AnnotationImporter(
             ds=self,
             annotations_type=annotation_type,
-            annotations_file=annotations_path,
+            annotations_file=path,
             load_from=load_from,
             **kwargs,
         )
@@ -1426,9 +1454,9 @@ class Datasource:
 
         with self.metadata_context() as ctx:
             for dp, task in tasks.items():
-                ctx.update_metadata(dp, {annotations_field: task})
+                ctx.update_metadata(dp, {field: task})
 
-        log_message(f'Done! Uploaded annotations for {len(tasks)} datapoints to field "{annotations_field}"')
+        log_message(f'Done! Uploaded annotations for {len(tasks)} datapoints to field "{field}"')
 
 
 class MetadataContextManager:
