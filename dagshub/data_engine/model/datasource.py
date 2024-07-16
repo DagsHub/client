@@ -7,13 +7,16 @@ import os.path
 import threading
 import time
 import uuid
+import requests
 import webbrowser
+import cloudpickle
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
 
+import ngrok
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
@@ -65,6 +68,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
+LS_ORCHESTRATOR_URL = 'http://127.0.0.1'
 DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
 
 
@@ -922,6 +926,71 @@ class Datasource:
     @property
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
+
+    def add_annotation_model(
+        self,
+        repo: str,
+        name: str,
+        post_hook: Callable[[Any], Any],
+        version: str = "latest",
+        pre_hook: Callable[[Any], Any] = lambda x: x,
+        port: int = 9090,
+        project_name: Optional[str] = None,
+        ngrok_authtoken: Optional[str] = None
+    ) -> Optional[list]:
+        """
+        Initialize a LS backend for ML annotation.
+
+        Args:
+            repo: repository to extract the model from
+            name: name of the model in the mlflow registry
+            version: (optional, default: 'latest') version of the model in the mlflow registry
+            pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
+            post_hook: (optional, default: identity function) function that converts mlflow model output
+            to the desired format
+            port: (optional, default: 9090) port on which orchestrator is hosted
+            project_name: (optional, default: None) automatically adds backend to project
+            ngrok_authtoken: (optional, default: None) uses ngrok to forward local connection
+        """
+        def fn_encoder(fn):
+            return base64.b64encode(cloudpickle.dumps(fn)).decode("utf-8")
+
+        with get_rich_progress() as progress:
+            task = progress.add_task("Initializing LS Model...", start=False)
+            resp = requests.post(f'{LS_ORCHESTRATOR_URL}:{port}/configure',
+                                 headers = {'Content-Type': 'application/json'},
+                                 json=json.dumps({'host': self.source.repoApi.host,
+                                                  'username': self.source.repoApi.owner,
+                                                  'repo': repo,
+                                                  'model': name,
+                                                  'version': version,
+                                                  'datasource_repo': self.source.repo,
+                                                  'datasource_name': self.source.name,
+                                                  'pre_hook': fn_encoder(pre_hook),
+                                                  'post_hook': fn_encoder(post_hook)}))
+        if ngrok_authtoken:
+            endpoint = ngrok.forward(port, authtoken=ngrok_authtoken).url()
+        else: endpoint = f'{LS_ORCHESTRATOR_URL}:{port}/'
+
+        if project_name:
+            if not ngrok_authtoken):
+                raise ValueError(f'Ngrok authtoken is not defined, endpoint has to be forwarded manually.')
+            ls_api_endpoint = multi_urljoin(self.source.repoApi.host, self.source.repo, 'annotations/de/api')
+            res = requests.get(multi_urljoin(ls_api_endpoint, 'projects'),
+                                    headers={'Authorization': f'Bearer {dagshub.auth.get_token()}'})
+            projects = {project['title']: str(project['id']) for project in res.json()['results']}
+
+            if project_name not in projects:
+                raise ValueError(f'{project_name} not in projects. Available project names: {list(projects.keys())}')
+
+            res = requests.post(multi_urljoin(ls_api_endpoint, 'ml'),
+                                headers={'Authorization': f'Bearer {dagshub.auth.get_token()}',
+                                         'Content-Type': 'application/json'},
+                                data=json.dumps({'url': endpoint,
+                                                 'project': projects[project_name]}))
+            if res.status_code == 201: print('Backend added successfully!')
+            else: raise ValueError(f'Adding backend failed! Response: {res.text}')
+        else: print(f'Connection Established! Add LS endpoint: {endpoint} to your project.')
 
     def annotate(self, fields_to_embed=None, fields_to_exclude=None) -> Optional[str]:
         """
