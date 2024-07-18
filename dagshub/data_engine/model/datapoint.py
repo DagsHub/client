@@ -6,6 +6,7 @@ from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING, Li
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
+from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType
 
@@ -45,6 +46,8 @@ class Datapoint:
         return self.metadata[item]
 
     def __setitem__(self, key, value):
+        if isinstance(value, MetadataAnnotations):
+            value = value.to_ls_task()
         self.datasource.implicit_update_context.update_metadata(self.path, {key: value})
 
     def delete_metadata(self, *fields: str):

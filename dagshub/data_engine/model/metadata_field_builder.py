@@ -80,8 +80,11 @@ class MetadataFieldBuilder:
         self._set_or_unset(ReservedTags.ANNOTATION.value, is_annotation)
         return self
 
-    def set_thumbnail(self, thumbnail_type: Optional[Literal["video", "audio", "image", "pdf", "text"]] = None,
-                      is_thumbnail: bool = True) -> "MetadataFieldBuilder":
+    def set_thumbnail(
+        self,
+        thumbnail_type: Optional[Literal["video", "audio", "image", "pdf", "text"]] = None,
+        is_thumbnail: bool = True,
+    ) -> "MetadataFieldBuilder":
         """
         Mark or unmark the field as thumbnail field, with the specified thumbnail type
         """
@@ -122,11 +125,13 @@ class MetadataFieldBuilder:
     def _set_or_unset_thumbnails(self, type_tag, is_thumbnail):
         # Remove previous thumbnail type tags
         if self.schema.tags is not None:
-            thumbnail_type_tags = {ReservedTags.VIDEO.value,
-                                   ReservedTags.AUDIO.value,
-                                   ReservedTags.IMAGE.value,
-                                   ReservedTags.PDF.value,
-                                   ReservedTags.TEXT.value}
+            thumbnail_type_tags = {
+                ReservedTags.VIDEO.value,
+                ReservedTags.AUDIO.value,
+                ReservedTags.IMAGE.value,
+                ReservedTags.PDF.value,
+                ReservedTags.TEXT.value,
+            }
 
             for tag in thumbnail_type_tags:
                 if tag in self.schema.tags:
@@ -177,9 +182,9 @@ class MetadataFieldBuilder:
 
     def apply(self):
         """
-        Apply the outgoing changes to this builder's metadata field.
+        Apply the outgoing changes to this metadata field.
 
-        If you need to apply multiple changes at once, use
+        If you need to apply changes to multiple fields at once, use
         :func:`Datasource.apply_field_changes <dagshub.data_engine.model.datasource.Datasource.apply_field_changes>`
         instead.
         """

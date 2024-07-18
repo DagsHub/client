@@ -22,7 +22,7 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
-from dagshub.data_engine.annotation.container import Annotations
+from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
     add_ls_annotations,
@@ -429,9 +429,9 @@ class QueryResult:
         for dp in self:
             for f in self.annotation_fields:
                 if f in dp.metadata:
-                    dp.metadata[f] = Annotations.from_ls_task(datapoint=dp, ls_task=dp.metadata[f])
+                    dp.metadata[f] = MetadataAnnotations.from_ls_task(datapoint=dp, field=f, ls_task=dp.metadata[f])
                 else:
-                    dp.metadata[f] = Annotations(datapoint=dp)
+                    dp.metadata[f] = MetadataAnnotations(datapoint=dp, field=f)
         return self
 
     def download_files(
