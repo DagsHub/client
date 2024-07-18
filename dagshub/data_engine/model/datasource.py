@@ -272,27 +272,33 @@ class Datasource:
         self._download_document_fields(res)
         return res
 
-    def head(self, size=100) -> "QueryResult":
+    def head(self, size=100, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing first ``size`` datapoints
 
         Args:
             size: how many datapoints to get. Default is 100
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
         """
         self._check_preprocess()
         send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
         res = self._source.client.head(self, size)
-        res._load_autoload_fields()
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
         return res
 
-    def all(self) -> "QueryResult":
+    def all(self, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
+
+        Args:
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
         """
         self._check_preprocess()
         self._autolog_mlflow()
         res = self._source.client.get_datapoints(self)
-        res._load_autoload_fields()
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
 
         return res
 

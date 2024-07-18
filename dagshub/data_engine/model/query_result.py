@@ -403,6 +403,14 @@ class QueryResult:
                     else:
                         dp.metadata[field] = MetadataAnnotations(datapoint=dp, field=field)
 
+        # Convert any downloaded document fields
+        document_fields = [f for f in fields if f in self.document_fields]
+        if document_fields:
+            for dp in self:
+                for field in document_fields:
+                    if field in dp.metadata:
+                        dp.metadata[field] = dp.metadata[field].decode("utf-8")
+
         return self
 
     def download_binary_columns(
@@ -758,20 +766,16 @@ class QueryResult:
     def annotation_fields(self) -> List[str]:
         return [f.name for f in self.fields if f.is_annotation()]
 
-    def _load_autoload_fields(self):
+    def _load_autoload_fields(self, documents=True, annotations=True):
         """
         Loads fields that are supposed to be load automatically upon querying.
         This includes:
             - All document fields
             - All annotation fields
         """
-        if len(self.document_fields) > 0:
-            log_message(f"Downloading document fields {self.document_fields}...")
-            self.get_blob_fields(*self.document_fields, load_into_memory=True)
-            # Convert them to strings
-            for dp in self:
-                for f in self.document_fields:
-                    if f in dp.metadata:
-                        dp.metadata[f] = dp.metadata[f].decode("utf-8")
+        if documents:
+            if len(self.document_fields) > 0:
+                self.get_blob_fields(*self.document_fields, load_into_memory=True)
 
-        self.get_annotations()
+        if annotations:
+            self.get_annotations()
