@@ -1,13 +1,20 @@
 import inspect
 import logging
+from collections import Counter
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
+import os.path
 
 import dacite
+import dagshub_annotation_converter.converters.yolo
 import rich.progress
+from dagshub_annotation_converter.formats.yolo import YoloContext
+from dagshub_annotation_converter.formats.yolo.categories import Categories
+from dagshub_annotation_converter.formats.yolo.common import ir_mapping
+from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
 
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
@@ -481,6 +488,81 @@ class QueryResult:
 
         download_files(download_args, skip_if_exists=not redownload)
         return target_path
+
+    def _get_all_annotations(self, annotation_field: str) -> list[IRImageAnnotationBase]:
+        annotations = []
+        for dp in self.entries:
+            if annotation_field in dp.metadata:
+                annotations.extend(dp.metadata[annotation_field].annotations)
+        return annotations
+
+    def export_as_yolo(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        annotation_type: Optional[Literal["bbox", "segmentation", "pose"]] = None,
+    ) -> Path:
+        """
+        Downloads the files and annotations in a way that can be used to train with YOLO immediately.
+
+        Args:
+            download_dir: Where to download the files. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            annotation_type: Type of YOLO annotations to export.
+                Possible values: "bbox", "segmentation", "pose".
+                If None, returns based on the most common annotation type.
+
+        Returns:
+            The path to the YAML file with the metadata. Pass this path to ``YOLO.train()`` to train a model.
+        """
+        if annotation_field is None:
+            annotation_field = sorted([f.name for f in self.fields if f.is_annotation()])[0]
+            log_message(f"Using annotations from field {annotation_field}")
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir) / "data"
+
+        annotations = self._get_all_annotations(annotation_field)
+
+        categories = Categories()
+        ann_types: dict[type, int] = {}
+
+        for ann in annotations:
+            if annotation_type is None:
+                ann_type = type(ann)
+                ann_types[ann_type] = ann_types.get(ann_type, 0) + 1
+            for cat in ann.categories.keys():
+                categories.get_or_create(cat)
+
+        if annotation_type is None:
+            annotation_types = [type(ann) for ann in annotations]
+            counter = Counter(annotation_types)
+            most_common = counter.most_common(1)
+            annotation_type = ir_mapping[most_common[0][0]]
+            log_message(f"Importing annotations of type {annotation_type} (most common type of annotation).")
+
+        image_download_path = Path(download_dir)
+
+        # Add the source prefix to all annotations
+        for ann in annotations:
+            ann.filename = os.path.join(self.datasource.source.source_prefix, ann.filename)
+
+        # If there's no folder "images" in the datasource, prepend it to the path
+        if not any("images/" in ann.filename for ann in annotations):
+            for ann in annotations:
+                ann.filename = os.path.join("images", ann.filename)
+            image_download_path = Path(download_dir) / "images"
+
+        context = YoloContext(annotation_type=annotation_type, categories=categories)
+        context.path = image_download_path
+
+        log_message("Downloading image files...")
+        self.download_files(image_download_path)
+        log_message("Exporting annotations...")
+        yaml_path = dagshub_annotation_converter.converters.yolo.export_to_fs(context, annotations)
+        log_message(f"Done! Saved YOLO Dataset, YAML file is at {yaml_path.absolute()}")
+        return yaml_path
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
