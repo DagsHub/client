@@ -136,6 +136,8 @@ class MockRepoAPI(RepoAPI):
             revision = self.default_branch
         content = self.repo_contents.get(revision, {}).get(path)
         if content is None:
+            if self.get_file(path, revision) is not None:
+                return [self.generate_content_api_entry(path)]
             raise PathNotFoundError
         return content
 
