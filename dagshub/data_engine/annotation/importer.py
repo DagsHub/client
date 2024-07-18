@@ -1,7 +1,7 @@
 from difflib import SequenceMatcher
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Literal, Optional, Union, Sequence, Mapping, Callable
+from typing import TYPE_CHECKING, Literal, Optional, Union, Sequence, Mapping, Callable, List
 
 from dagshub_annotation_converter.converters.cvat import load_cvat_from_zip
 from dagshub_annotation_converter.converters.yolo import load_yolo_from_fs
@@ -161,7 +161,7 @@ class AnnotationImporter:
 
     @staticmethod
     def guess_annotation_filename_remapping(
-        annotation_path: str, datapoint_paths: list[str]
+        annotation_path: str, datapoint_paths: List[str]
     ) -> Callable[[str], Optional[str]]:
         """
         Guesses the remapping function from the annotations to the data points.
@@ -242,7 +242,7 @@ class AnnotationImporter:
             return remove_prefix
 
     @staticmethod
-    def get_best_fit_datapoint_path(ann_path: str, datapoint_paths: list[str]) -> str:
+    def get_best_fit_datapoint_path(ann_path: str, datapoint_paths: List[str]) -> str:
         """
         Get the datapoint path that is the closest to the annotation path.
 
