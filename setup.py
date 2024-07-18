@@ -42,7 +42,7 @@ install_requires = [
     "python-dateutil",
     "tenacity~=8.2.3",
     "boto3",
-    "dagshub-annotations-converter~=0.0.11",
+    "dagshub-annotation-converter @ git+https://github.com/DagsHub/dagshub-annotation-converter@refactor/static-annotations#egg=dagshub-annotation-converter",
 ]
 
 extras_require = {
