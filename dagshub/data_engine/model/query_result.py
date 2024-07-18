@@ -390,6 +390,19 @@ class QueryResult:
                         logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
                     progress.update(task, advance=1)
 
+        # Convert any downloaded annotation column
+        annotation_fields = [f for f in fields if f in self.annotation_fields]
+        if annotation_fields:
+            # Convert them
+            for dp in self:
+                for field in annotation_fields:
+                    if field in dp.metadata:
+                        dp.metadata[field] = MetadataAnnotations.from_ls_task(
+                            datapoint=dp, field=field, ls_task=dp.metadata[field]
+                        )
+                    else:
+                        dp.metadata[field] = MetadataAnnotations(datapoint=dp, field=field)
+
         return self
 
     def download_binary_columns(
@@ -425,13 +438,6 @@ class QueryResult:
             del kwargs["load_into_memory"]
         self.get_blob_fields(*self.annotation_fields, load_into_memory=True, **kwargs)
 
-        # Convert them
-        for dp in self:
-            for f in self.annotation_fields:
-                if f in dp.metadata:
-                    dp.metadata[f] = MetadataAnnotations.from_ls_task(datapoint=dp, field=f, ls_task=dp.metadata[f])
-                else:
-                    dp.metadata[f] = MetadataAnnotations(datapoint=dp, field=f)
         return self
 
     def download_files(
@@ -511,7 +517,7 @@ class QueryResult:
                 annotations.extend(dp.metadata[annotation_field].annotations)
         return annotations
 
-    def download_as_yolo(
+    def export_as_yolo(
         self,
         download_dir: Optional[Union[str, Path]] = None,
         annotation_field: Optional[str] = None,
