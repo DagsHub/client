@@ -4,6 +4,7 @@ from os.path import ismount
 from pathlib import Path
 
 import httpx
+from httpx import Response
 
 from dagshub.common import config, rich_console
 
@@ -35,6 +36,10 @@ def get_default_branch(owner, reponame, auth, host=config.host):
         auth=auth,
     )
     return res.json().get("default_branch")
+
+
+def is_server_error(resp: Response):
+    return resp.status_code >= 500
 
 
 def http_request(method, url, **kwargs):

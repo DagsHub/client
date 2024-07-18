@@ -1,13 +1,20 @@
 import inspect
 import logging
+from collections import Counter
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
+import os.path
 
 import dacite
+import dagshub_annotation_converter.converters.yolo
 import rich.progress
+from dagshub_annotation_converter.formats.yolo import YoloContext
+from dagshub_annotation_converter.formats.yolo.categories import Categories
+from dagshub_annotation_converter.formats.yolo.common import ir_mapping
+from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
 
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
@@ -15,6 +22,7 @@ from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load
+from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
     add_ls_annotations,
@@ -26,11 +34,13 @@ from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 from dagshub.data_engine.dtypes import MetadataFieldType
 
+
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
     import fiftyone as fo
     import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
     import datasets as hf_ds
+    import tensorflow as tf
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
@@ -94,11 +104,11 @@ class QueryResult:
         """
         import pandas as pd
 
-        metadata_keys = set()
+        metadata_key_set = set()
         for e in self.entries:
-            metadata_keys.update(e.metadata.keys())
+            metadata_key_set.update(e.metadata.keys())
 
-        metadata_keys = list(sorted(metadata_keys))
+        metadata_keys = list(sorted(metadata_key_set))
         return pd.DataFrame.from_records([dp.to_dict(metadata_keys) for dp in self.entries])
 
     def __len__(self):
@@ -380,6 +390,27 @@ class QueryResult:
                         logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
                     progress.update(task, advance=1)
 
+        # Convert any downloaded annotation column
+        annotation_fields = [f for f in fields if f in self.annotation_fields]
+        if annotation_fields:
+            # Convert them
+            for dp in self:
+                for fld in annotation_fields:
+                    if fld in dp.metadata:
+                        dp.metadata[fld] = MetadataAnnotations.from_ls_task(
+                            datapoint=dp, field=fld, ls_task=dp.metadata[fld]
+                        )
+                    else:
+                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+
+        # Convert any downloaded document fields
+        document_fields = [f for f in fields if f in self.document_fields]
+        if document_fields:
+            for dp in self:
+                for fld in document_fields:
+                    if fld in dp.metadata:
+                        dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
+
         return self
 
     def download_binary_columns(
@@ -408,9 +439,14 @@ class QueryResult:
         All keyword arguments are passed to :func:`get_blob_fields`.
         """
         if len(self.annotation_fields) == 0:
-            logger.warning("No annotation fields in this query result")
             return self
-        return self.get_blob_fields(*self.annotation_fields, **kwargs)
+
+        log_message(f"Downloading annotation fields {self.annotation_fields}...")
+        if "load_into_memory" in kwargs:
+            del kwargs["load_into_memory"]
+        self.get_blob_fields(*self.annotation_fields, load_into_memory=True, **kwargs)
+
+        return self
 
     def download_files(
         self,
@@ -481,6 +517,81 @@ class QueryResult:
 
         download_files(download_args, skip_if_exists=not redownload)
         return target_path
+
+    def _get_all_annotations(self, annotation_field: str) -> list[IRImageAnnotationBase]:
+        annotations = []
+        for dp in self.entries:
+            if annotation_field in dp.metadata:
+                annotations.extend(dp.metadata[annotation_field].annotations)
+        return annotations
+
+    def export_as_yolo(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        annotation_type: Optional[Literal["bbox", "segmentation", "pose"]] = None,
+    ) -> Path:
+        """
+        Downloads the files and annotations in a way that can be used to train with YOLO immediately.
+
+        Args:
+            download_dir: Where to download the files. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            annotation_type: Type of YOLO annotations to export.
+                Possible values: "bbox", "segmentation", "pose".
+                If None, returns based on the most common annotation type.
+
+        Returns:
+            The path to the YAML file with the metadata. Pass this path to ``YOLO.train()`` to train a model.
+        """
+        if annotation_field is None:
+            annotation_field = sorted([f.name for f in self.fields if f.is_annotation()])[0]
+            log_message(f"Using annotations from field {annotation_field}")
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir) / "data"
+
+        annotations = self._get_all_annotations(annotation_field)
+
+        categories = Categories()
+        ann_types: dict[type, int] = {}
+
+        for ann in annotations:
+            if annotation_type is None:
+                ann_type = type(ann)
+                ann_types[ann_type] = ann_types.get(ann_type, 0) + 1
+            for cat in ann.categories.keys():
+                categories.get_or_create(cat)
+
+        if annotation_type is None:
+            annotation_types = [type(ann) for ann in annotations]
+            counter = Counter(annotation_types)
+            most_common = counter.most_common(1)
+            annotation_type = ir_mapping[most_common[0][0]]
+            log_message(f"Importing annotations of type {annotation_type} (most common type of annotation).")
+
+        image_download_path = Path(download_dir)
+
+        # Add the source prefix to all annotations
+        for ann in annotations:
+            ann.filename = os.path.join(self.datasource.source.source_prefix, ann.filename)
+
+        # If there's no folder "images" in the datasource, prepend it to the path
+        if not any("images/" in ann.filename for ann in annotations):
+            for ann in annotations:
+                ann.filename = os.path.join("images", ann.filename)
+            image_download_path = Path(download_dir) / "images"
+
+        context = YoloContext(annotation_type=annotation_type, categories=categories)
+        context.path = image_download_path
+
+        log_message("Downloading image files...")
+        self.download_files(image_download_path)
+        log_message("Exporting annotations...")
+        yaml_path = dagshub_annotation_converter.converters.yolo.export_to_fs(context, annotations)
+        log_message(f"Done! Saved YOLO Dataset, YAML file is at {yaml_path.absolute()}")
+        return yaml_path
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
@@ -655,17 +766,16 @@ class QueryResult:
     def annotation_fields(self) -> List[str]:
         return [f.name for f in self.fields if f.is_annotation()]
 
-    def _load_autoload_fields(self):
+    def _load_autoload_fields(self, documents=True, annotations=True):
         """
         Loads fields that are supposed to be load automatically upon querying.
         This includes:
             - All document fields
+            - All annotation fields
         """
-        if len(self.document_fields) > 0:
-            log_message(f"Downloading document fields {self.document_fields}...")
-            self.get_blob_fields(*self.document_fields, load_into_memory=True)
-            # Convert them to strings
-            for dp in self:
-                for f in self.document_fields:
-                    if f in dp.metadata:
-                        dp.metadata[f] = dp.metadata[f].decode("utf-8")
+        if documents:
+            if len(self.document_fields) > 0:
+                self.get_blob_fields(*self.document_fields, load_into_memory=True)
+
+        if annotations:
+            self.get_annotations()
