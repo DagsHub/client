@@ -395,21 +395,21 @@ class QueryResult:
         if annotation_fields:
             # Convert them
             for dp in self:
-                for field in annotation_fields:
-                    if field in dp.metadata:
-                        dp.metadata[field] = MetadataAnnotations.from_ls_task(
-                            datapoint=dp, field=field, ls_task=dp.metadata[field]
+                for fld in annotation_fields:
+                    if fld in dp.metadata:
+                        dp.metadata[fld] = MetadataAnnotations.from_ls_task(
+                            datapoint=dp, field=fld, ls_task=dp.metadata[fld]
                         )
                     else:
-                        dp.metadata[field] = MetadataAnnotations(datapoint=dp, field=field)
+                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
 
         # Convert any downloaded document fields
         document_fields = [f for f in fields if f in self.document_fields]
         if document_fields:
             for dp in self:
-                for field in document_fields:
-                    if field in dp.metadata:
-                        dp.metadata[field] = dp.metadata[field].decode("utf-8")
+                for fld in document_fields:
+                    if fld in dp.metadata:
+                        dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
 
         return self
 
