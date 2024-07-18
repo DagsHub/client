@@ -99,6 +99,7 @@ class DateTime(DagshubDataType):
         # send only a millisecond timestamp, without timezone (will be saved as utc)
         datapoints[path][name] = int(dateutil.parser.parse("2022-04-05T15:30:00.99999+05:30").timestamp() * 1000)
     """
+
     backing_field_type = MetadataFieldType.DATETIME
 
 
@@ -141,6 +142,10 @@ class LabelStudioAnnotation(DagshubDataType):
     """
     LabelStudio annotation. Backing type is blob.
     Has the annotation tag set.
+
+    Annotations of this type get automatically converted in the metadata into
+    :class:`MetadataAnnotations <dagshub.data_engine.annotation.metadata.MetadataAnnotations>`
+    objects that simplify adding and saving annotations.
     """
 
     backing_field_type = MetadataFieldType.BLOB
