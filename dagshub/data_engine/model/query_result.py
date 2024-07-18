@@ -489,7 +489,7 @@ class QueryResult:
         download_files(download_args, skip_if_exists=not redownload)
         return target_path
 
-    def _get_all_annotations(self, annotation_field: str) -> list[IRImageAnnotationBase]:
+    def _get_all_annotations(self, annotation_field: str) -> List[IRImageAnnotationBase]:
         annotations = []
         for dp in self.entries:
             if annotation_field in dp.metadata:
