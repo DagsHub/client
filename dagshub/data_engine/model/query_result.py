@@ -470,7 +470,7 @@ class QueryResult:
             ):  # encapsulates dataset with batcher if necessary and iterates over it
                 for prediction, remote_path in zip(
                     post_hook(model.predict(pre_hook(local_paths))),
-                    [result.path for result in self[idx * batch_size: (idx + 1) * batch_size]],
+                    [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
                 ):
                     predictions[remote_path] = {
                         "data": {"image": multi_urljoin(self.datasource.source.root_raw_path, remote_path)},
@@ -711,7 +711,7 @@ class QueryResult:
         self,
         repo: str,
         name: str,
-        post_hook: Callable,
+        post_hook: Callable = lambda x: x,
         pre_hook: Callable = lambda x: x,
         host: Optional[str] = None,
         version: str = "latest",
@@ -727,8 +727,9 @@ class QueryResult:
             version: (optional, default: 'latest') version of the model in the mlflow registry
             pre_hook: (optional, default: identity function) function that runs
             before the datapoint is sent to the model
-            post_hook: function that converts mlflow model output converts to labelstudio format
-            batch_size: function that converts to labelstudio format
+            post_hook: (optional, default: identity function) function that converts
+            mlflow model output converts to labelstudio format
+            batch_size: (optional, default: 1) batched annotation size
         """
         self.predict_with_mlflow_model(
             repo,
@@ -740,6 +741,7 @@ class QueryResult:
             batch_size=batch_size,
             log_to_field=log_to_field,
         )
+        self.metadata_field(log_to_field).set_annotation().apply()
 
     def annotate(
         self,
