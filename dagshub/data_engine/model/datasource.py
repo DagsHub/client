@@ -76,8 +76,9 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
-    timeZone: Optional[str] = field(default=None,
-                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    timeZone: Optional[str] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
 
 
 @dataclass
@@ -270,27 +271,33 @@ class Datasource:
         self._download_document_fields(res)
         return res
 
-    def head(self, size=100) -> "QueryResult":
+    def head(self, size=100, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing first ``size`` datapoints
 
         Args:
             size: how many datapoints to get. Default is 100
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
         """
         self._check_preprocess()
         send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
         res = self._source.client.head(self, size)
-        res._load_autoload_fields()
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
         return res
 
-    def all(self) -> "QueryResult":
+    def all(self, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
+
+        Args:
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
         """
         self._check_preprocess()
         self._autolog_mlflow()
         res = self._source.client.get_datapoints(self)
-        res._load_autoload_fields()
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
 
         return res
 
@@ -1133,7 +1140,7 @@ class Datasource:
         # Otherwise we're doing querying
         new_ds = self.__deepcopy__()
         if isinstance(other, (str, Field)):
-            query_field: Field = Field(other) if type(other) is str else other
+            query_field: Field = Field(other) if isinstance(other, str) else other
             other_query = QueryFilterTree(
                 query_field.field_name,
                 query_field.as_of_timestamp,
@@ -1342,7 +1349,9 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str]]] = None
+        self,
+        op: str,
+        other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str], datetime.datetime]] = None,
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
@@ -1510,8 +1519,9 @@ def _get_datetime_utc_offset(t):
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
-    time_zone: Optional[str] = field(default=None,
-                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    time_zone: Optional[str] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
