@@ -956,9 +956,11 @@ class Datasource:
         def fn_encoder(fn):
             return base64.b64encode(cloudpickle.dumps(fn)).decode("utf-8")
 
+        if not ngrok_authtoken and project_name:
+            raise ValueError(f"As `ngrok_authtoken` is not specified, project will have to be added manually.")
         with get_rich_progress() as progress:
             task = progress.add_task("Initializing LS Model...", start=False)  # noqa: F841
-            requests.post(
+            res = requests.post(
                 f"{LS_ORCHESTRATOR_URL}:{port}/configure",
                 headers={"Content-Type": "application/json"},
                 json=json.dumps(
@@ -976,19 +978,21 @@ class Datasource:
                     }
                 ),
             )
+            if res.status_code // 100 != 2:
+                raise ValueError(f"Adding backend failed! Response: {res.text}")
         if ngrok_authtoken:
             endpoint = ngrok.forward(port, authtoken=ngrok_authtoken).url()
         else:
             endpoint = f"{LS_ORCHESTRATOR_URL}:{port}/"
 
         if project_name:
-            if not ngrok_authtoken:
-                raise ValueError(f"Ngrok authtoken is not defined, endpoint has to be forwarded manually.")
             ls_api_endpoint = multi_urljoin(self.source.repoApi.host, self.source.repo, "annotations/de/api")
             res = requests.get(
                 multi_urljoin(ls_api_endpoint, "projects"),
                 headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
             )
+            if res.status_code // 100 != 2:
+                raise ValueError(f"Adding backend failed! Response: {res.text}")
             projects = {project["title"]: str(project["id"]) for project in res.json()["results"]}
 
             if project_name not in projects:
@@ -999,7 +1003,7 @@ class Datasource:
                 headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
                 data=json.dumps({"url": endpoint, "project": projects[project_name]}),
             )
-            if res.status_code == 201:
+            if res.status_code // 100 == 2:
                 print("Backend added successfully!")
             else:
                 raise ValueError(f"Adding backend failed! Response: {res.text}")
