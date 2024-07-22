@@ -5,4 +5,4 @@ pytest-git==1.7.0
 pytest-env==1.1.3
 pytest-mock==3.14.0
 fiftyone==0.24.1
-datasets==2.19.1
+datasets==2.20.0
