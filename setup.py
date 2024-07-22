@@ -46,8 +46,8 @@ install_requires = [
 extras_require = {
     "jupyter": ["rich[jupyter]~=13.1.0"],
     "fuse": ["fusepy>=3"],
-    "ngrok": ["ngrok~=1.3.0",
-              "cloudpickle==3.0.0"]
+    "autolabelling": ["ngrok~=1.3.0",
+                      "cloudpickle==3.0.0"]
 }
 
 packages = setuptools.find_packages(exclude=["tests", "tests.*"])
