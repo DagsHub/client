@@ -312,7 +312,13 @@ class QueryResult:
         path_format: Literal["str", "path"] = "path",
     ) -> "QueryResult":
         """
-        Downloads data from blob fields
+        Downloads data from blob fields.
+
+        If ``load_into_memory`` is set to ``True``, then we additionally convert special fields to new types:
+
+            - Annotation fields are converted to \
+                :class:`MetadataAnnotations <dagshub.data_engine.annotation.metadata.MetadataAnnotations>`
+            - Document fields are converted to strings
 
         Args:
             fields: list of binary fields to download blobs for. If empty, download all blob fields.
@@ -382,26 +388,28 @@ class QueryResult:
                         logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
                     progress.update(task, advance=1)
 
-        # Convert any downloaded annotation column
-        annotation_fields = [f for f in fields if f in self.annotation_fields]
-        if annotation_fields:
-            # Convert them
-            for dp in self:
-                for fld in annotation_fields:
-                    if fld in dp.metadata:
-                        dp.metadata[fld] = MetadataAnnotations.from_ls_task(
-                            datapoint=dp, field=fld, ls_task=dp.metadata[fld]
-                        )
-                    else:
-                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+        # Perform conversions for special blob fields (only if they are in memory)
+        if load_into_memory:
+            # Convert any downloaded annotation column
+            annotation_fields = [f for f in fields if f in self.annotation_fields]
+            if annotation_fields:
+                # Convert them
+                for dp in self:
+                    for fld in annotation_fields:
+                        if fld in dp.metadata:
+                            dp.metadata[fld] = MetadataAnnotations.from_ls_task(
+                                datapoint=dp, field=fld, ls_task=dp.metadata[fld]
+                            )
+                        else:
+                            dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
 
-        # Convert any downloaded document fields
-        document_fields = [f for f in fields if f in self.document_fields]
-        if document_fields:
-            for dp in self:
-                for fld in document_fields:
-                    if fld in dp.metadata:
-                        dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
+            # Convert any downloaded document fields
+            document_fields = [f for f in fields if f in self.document_fields]
+            if document_fields:
+                for dp in self:
+                    for fld in document_fields:
+                        if fld in dp.metadata:
+                            dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
 
         return self
 
@@ -434,6 +442,7 @@ class QueryResult:
             return self
 
         log_message(f"Downloading annotation fields {self.annotation_fields}...")
+        # Make sure that annotations are being loaded into memory
         if "load_into_memory" in kwargs:
             del kwargs["load_into_memory"]
         self.get_blob_fields(*self.annotation_fields, load_into_memory=True, **kwargs)
