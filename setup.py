@@ -32,7 +32,6 @@ install_requires = [
     "rich~=13.1.0",
     # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
     "dacite~=1.6.0",
-    "tenacity~=8.2.2",
     "gql[requests]",
     "dataclasses-json",
     "pandas",

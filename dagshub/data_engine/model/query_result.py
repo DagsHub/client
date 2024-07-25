@@ -741,7 +741,7 @@ class QueryResult:
             batch_size=batch_size,
             log_to_field=log_to_field,
         )
-        self.metadata_field(log_to_field).set_annotation().apply()
+        self.datasource.metadata_field(log_to_field).set_annotation().apply()
 
     def annotate(
         self,

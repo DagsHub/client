@@ -9,14 +9,13 @@ import time
 import uuid
 import requests
 import webbrowser
-import cloudpickle
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
+from tenacity import retry, wait_fixed, stop_after_attempt
 
-import ngrok
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
@@ -61,10 +60,14 @@ if TYPE_CHECKING:
     import pandas
     import mlflow
     import mlflow.entities
+    import cloudpickle
+    import ngrok
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     mlflow = lazy_load("mlflow")
+    ngrok = lazy_load("ngrok")
+    cloudpickle = lazy_load("cloudpickle")
 
 logger = logging.getLogger(__name__)
 
@@ -927,6 +930,40 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
+    @retry(wait=wait_fixed(3), stop=stop_after_attempt(5))
+    def add_annotation_model_from_config(self, config, project_name, ngrok_authtoken, port=9090):
+        ls_api_endpoint = multi_urljoin(self.source.repoApi.host, self.source.repo, "annotations/de/api/projects")
+
+        res = requests.get(
+            ls_api_endpoint,
+            headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
+        )
+        if res.status_code // 100 != 2:
+            raise ValueError(f"Adding backend failed! Response: {res.text}")
+        projects = {project["title"]: str(project["id"]) for project in res.json()["results"]}
+
+        if project_name not in projects:
+            res = requests.post(
+                ls_api_endpoint,
+                headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
+                data=json.dumps({"title": project_name, "label_config": config.pop('label_config')}),
+            )
+            if res.status_code // 100 != 2:
+                raise ValueError(f"Adding backend failed! Response: {res.text}")
+        else:
+            res = requests.patch(
+                multi_urljoin(ls_api_endpoint, projects[project_name]),
+                headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
+                data=json.dumps({"label_config": config.pop('label_config')}),
+            )
+            if res.status_code // 100 != 2:
+                raise ValueError(f"Adding backend failed! Response: {res.text}")
+
+        self.add_annotation_model(**config, port=port,
+                                  project_name=project_name,
+                                  ngrok_authtoken=ngrok_authtoken)
+
+    @retry(wait=wait_fixed(3), stop=stop_after_attempt(5))
     def add_annotation_model(
         self,
         repo: str,
