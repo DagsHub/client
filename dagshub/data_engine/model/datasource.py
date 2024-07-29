@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
-from tenacity import retry, wait_fixed, stop_after_attempt
+from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
 
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
@@ -42,6 +42,7 @@ from dagshub.data_engine.model.errors import (
     DatasetFieldComparisonError,
     FieldNotFoundError,
     DatasetNotFoundError,
+    LSInitializingError,
 )
 from dagshub.data_engine.model.metadata import (
     validate_uploading_metadata,
@@ -165,6 +166,8 @@ class Datasource:
         # meta-data update 'with' block
         self._explicit_update_ctx: Optional[MetadataContextManager] = None
         self.assigned_dataset = from_dataset
+
+        self.ngrok_listener = None
 
     @property
     def has_explicit_context(self):
@@ -930,7 +933,7 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
-    @retry(wait=wait_fixed(3), stop=stop_after_attempt(5))
+    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     def add_annotation_model_from_config(self, config, project_name, ngrok_authtoken, port=9090):
         ls_api_endpoint = multi_urljoin(self.source.repoApi.host, self.source.repo, "annotations/de/api/projects")
 
@@ -938,7 +941,9 @@ class Datasource:
             ls_api_endpoint,
             headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
         )
-        if res.status_code // 100 != 2:
+        if res.text.startswith('<!DOCTYPE html>'):
+            raise LSInitializingError()
+        elif res.status_code // 100 != 2:
             raise ValueError(f"Adding backend failed! Response: {res.text}")
         projects = {project["title"]: str(project["id"]) for project in res.json()["results"]}
 
@@ -963,7 +968,7 @@ class Datasource:
                                   project_name=project_name,
                                   ngrok_authtoken=ngrok_authtoken)
 
-    @retry(wait=wait_fixed(3), stop=stop_after_attempt(5))
+    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     def add_annotation_model(
         self,
         repo: str,
@@ -1018,7 +1023,9 @@ class Datasource:
             if res.status_code // 100 != 2:
                 raise ValueError(f"Adding backend failed! Response: {res.text}")
         if ngrok_authtoken:
-            endpoint = ngrok.forward(port, authtoken=ngrok_authtoken).url()
+            if not self.ngrok_listener:
+                self.ngrok_listener = ngrok.forward(port, authtoken=ngrok_authtoken)
+            endpoint = self.ngrok_listener.url()
         else:
             endpoint = f"{LS_ORCHESTRATOR_URL}:{port}/"
 
@@ -1028,7 +1035,9 @@ class Datasource:
                 multi_urljoin(ls_api_endpoint, "projects"),
                 headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
             )
-            if res.status_code // 100 != 2:
+            if res.text.startswith('<!DOCTYPE html>'):
+                raise LSInitializingError()
+            elif res.status_code // 100 != 2:
                 raise ValueError(f"Adding backend failed! Response: {res.text}")
             projects = {project["title"]: str(project["id"]) for project in res.json()["results"]}
 

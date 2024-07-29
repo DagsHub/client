@@ -75,3 +75,13 @@ class DatasetNotFoundError(Exception):
 
     def __str__(self):
         return f"Dataset with name {self.name} or id {self.id} not found " f"in repository {self.repo}"
+
+
+class LSInitializingError(Exception):
+    def __init__(self):
+        super().__init__()
+
+    def __str__(self):
+        return (
+            f"Label Studio on DagsHub is starting up! Please try again in a couple of seconds"
+        )
