@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
 from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
 
+
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
@@ -83,6 +84,8 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
+    timeZone: Optional[str] = field(default=None,
+                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
 
 
 @dataclass
@@ -373,6 +376,24 @@ class Datasource:
         new_ds = self.__deepcopy__()
 
         new_ds._query.as_of = to_timestamp(time)
+        return new_ds
+
+    def with_time_zone(self, tz_val: str) -> "Datasource":
+        """
+        A time zone offset string in the form of "+HH:mm" or "-HH:mm".
+
+        A metadata of type datetime is always stored in DB as a UTC time, when a query is done on this field
+        there are 3 options:
+
+        - Metadata was saved with a timezone, in which case it will be used.
+
+        - Metadata was saved without a timezone, in which case UTC will be used.
+
+        - with_time_zone specified a time zone and it will override whatever is in the database.
+        """
+        new_ds = self.__deepcopy__()
+
+        new_ds._query.time_zone = tz_val
         return new_ds
 
     def order_by(self, *args: Union[str, Tuple[str, Union[bool, str]]]) -> "Datasource":
@@ -1323,6 +1344,71 @@ class Datasource:
         self._test_not_comparing_other_ds(item)
         return self.add_query_op("contains", item)
 
+    def _periodic_filter(self, periodtype, items):
+        periods = [str(s) for s in items]
+        return self.add_query_op(periodtype, periods)
+
+    def date_field_in_years(self, *item: int):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given years list.
+
+        Args:
+            List of years.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_years(1979, 2003)
+
+        """
+
+        return self._periodic_filter("year", item)
+
+    def date_field_in_months(self, *item: int):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given months list.
+
+        Args:
+            List of months.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_months(12, 2)
+
+        """
+        return self._periodic_filter("month", item)
+
+    def date_field_in_days(self, *item: int):
+        """
+        Checks if a metadata field (which is of datetime type) is in one of given days list.
+
+        Args:
+            List of days.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_days(25, 2)
+
+        """
+        return self._periodic_filter("day", item)
+
+    def date_field_in_timeofday(self, item: str):
+        """
+        Checks if a metadata field (which is of datetime type) is in given minute range inside the day (any day).
+        range is in the format of: "HH:mm-HH:mm" (or "HH:mm:ss-HH:mm:ss") where start hour is on the left.
+        a range that starts at one day and ends at next day,
+        should be expressed as OR of 2 range filter.
+
+        Args:
+            Time range string.
+
+        Examples::
+
+            datasource[(datasource["y"].date_field_in_timeofday("11:30-12:30")
+
+        """
+        self._test_not_comparing_other_ds(item)
+        return self.add_query_op("timeofday", item)
+
     def startswith(self, item: str):
         """
         Check if the filtering field starts with the specified string item.
@@ -1389,7 +1475,7 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree"]] = None
+        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str]]] = None
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
@@ -1510,12 +1596,14 @@ class MetadataContextManager:
                         if k not in document_fields:
                             continue
 
+                    time_zone = None
                     if isinstance(v, str) and k in document_fields:
                         v = v.encode("utf-8")
                     if isinstance(v, bytes):
                         v = wrap_bytes(v)
                     if isinstance(v, datetime.datetime):
-                        v = int(v.timestamp())
+                        time_zone = _get_datetime_utc_offset(v)
+                        v = int(v.timestamp() * 1000)
 
                     self._metadata_entries.append(
                         DatapointMetadataUpdateEntry(
@@ -1525,6 +1613,7 @@ class MetadataContextManager:
                             valueType=value_type,
                             # todo: preliminary type check
                             allowMultiple=k in self._multivalue_fields,
+                            timeZone=time_zone,
                         )
                     )
 
@@ -1532,9 +1621,30 @@ class MetadataContextManager:
         return self._metadata_entries
 
 
+def _get_datetime_utc_offset(t):
+    """
+    return a timezone offset in the form of "+03:00" or "-03:00"
+    """
+
+    if t.tzinfo is None:
+        return None
+
+    offset = t.utcoffset()
+    if offset is None:
+        return None
+
+    # Format the offset as a string
+    offset_hours = int(offset.total_seconds() // 3600)
+    offset_minutes = int((offset.total_seconds() % 3600) // 60)
+    offset_str = f"{offset_hours:+03d}:{offset_minutes:02d}"
+    return offset_str
+
+
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    time_zone: Optional[str] = field(default=None,
+                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
@@ -1547,6 +1657,7 @@ class DatasourceQuery(DataClassJsonMixin):
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
             as_of=self.as_of,
+            time_zone=self.time_zone,
             filter=self.filter.__deepcopy__(),
         )
         if self.select is not None:
@@ -1574,6 +1685,8 @@ class DatasourceQuery(DataClassJsonMixin):
                 self.select = other_query.select
             if other_query.as_of is not None:
                 self.as_of = other_query.as_of
+            if other_query.time_zone is not None:
+                self.time_zone = other_query.time_zone
             if other_query.order_by is not None:
                 self.order_by = other_query.order_by
 

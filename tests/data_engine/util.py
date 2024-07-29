@@ -35,6 +35,11 @@ def add_document_fields(ds: Datasource, *names: str):
         add_metadata_field(ds, name, MetadataFieldType.BLOB, tags={ReservedTags.DOCUMENT.value})
 
 
+def add_datetime_fields(ds: Datasource, *names: str):
+    for name in names:
+        add_metadata_field(ds, name, MetadataFieldType.DATETIME)
+
+
 def add_metadata_field(
     ds: Datasource,
     name: str,

@@ -42,7 +42,12 @@ class GqlQueries:
     @staticmethod
     @functools.lru_cache()
     def datasource_query(include_metadata: bool, introspection: "TypesIntrospection") -> GqlQuery:
-        metadata_fields = "metadata { key value }" if include_metadata else ""
+        metadata_fields = ""
+        if include_metadata:
+            # Filter out the unavailable fields
+            queryable_fields = ["key", "value", "timeZone"]
+            queryable_fields = Validators.filter_supported_fields(queryable_fields, "MetadataField", introspection)
+            metadata_fields = "metadata " + "{" + " ".join(queryable_fields) + "}"
         q = (
             GqlQuery()
             .operation(

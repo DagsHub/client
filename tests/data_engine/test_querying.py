@@ -13,6 +13,7 @@ from tests.data_engine.util import (
     add_float_fields,
     add_boolean_fields,
     add_blob_fields,
+    add_datetime_fields,
 )
 
 
@@ -559,3 +560,124 @@ def test_dataset_clear_query(ds_with_dataset):
 
     ds_with_dataset.clear_query(reset_to_dataset=False)
     assert ds_with_dataset.get_query().filter.is_empty
+
+
+def test_basic_datetime_query(ds):
+    add_datetime_fields(ds, "x")
+    t = dateutil.parser.parse("2022-04-05T15:30:00.99999+05:30")
+
+    ds2 = (ds[ds["x"] > t])
+
+    q = ds2.get_query().filter
+
+    print(q.tree_to_dict())
+    print(ds2.serialize_gql_query_input())
+    expected = {
+        'gt': {
+            'data': {
+                'field': 'x',
+                'value': t
+            }
+        }
+    }
+
+    assert q.tree_to_dict() == expected
+
+    expected_serialized = {
+        'query': {
+            'filter': {
+                'key': 'x',
+                'value': '1649152800999',
+                'valueType': 'DATETIME',
+                'comparator': 'GREATER_THAN'
+            }
+        }
+    }
+    assert ds2.serialize_gql_query_input() == expected_serialized
+
+
+@pytest.mark.parametrize("period", ["day", "month", "year"])
+def test_periodic_datetime_periods(ds, period):
+    add_datetime_fields(ds, "x")
+
+    ds2 = None
+    if period == "day":
+        ds2 = (ds[ds["x"]].date_field_in_days(1, 3)).with_time_zone("+03:00")
+    elif period == "month":
+        ds2 = (ds[ds["x"]].date_field_in_months(1, 3)).with_time_zone("+03:00")
+    elif period == "year":
+        ds2 = (ds[ds["x"]].date_field_in_years(1, 3)).with_time_zone("+03:00")
+
+    q = ds2.get_query().filter
+
+    print(q.tree_to_dict())
+    print(ds2.serialize_gql_query_input())
+    expected = {
+        f"{period}": {
+            'data': {
+                'field': 'x',
+                'value': [
+                    '1',
+                    '3'
+                ]
+            }
+        }
+    }
+
+    assert q.tree_to_dict() == expected
+
+    expected_serialized = {
+        'timeZone': '+03:00',
+        'query': {
+            'filter': {
+                'key': 'x',
+                'value': 0,
+                'valueType': 'DATETIME',
+                'comparator': 'DATE_TIME_FILTER',
+                'valueRange': [
+                    '1',
+                    '3'
+                ],
+                'timeFilter': f"{period.upper()}"
+            }
+        }
+    }
+
+    assert ds2.serialize_gql_query_input() == expected_serialized
+
+
+def test_periodic_datetime_timeofday(ds):
+    add_datetime_fields(ds, "x")
+
+    ds2 = (ds[ds["x"]].date_field_in_timeofday("12:00-13:00")).with_time_zone("+03:00")
+
+    q = ds2.get_query().filter
+
+    print(q.tree_to_dict())
+    print(ds2.serialize_gql_query_input())
+    expected = {
+        'timeofday': {
+            'data': {
+                'field': 'x',
+                'value': '12:00-13:00'
+            }
+        }
+    }
+
+    assert q.tree_to_dict() == expected
+
+    expected_serialized = {
+        'timeZone': '+03:00',
+        'query': {
+            'filter': {
+                'key': 'x',
+                'value': '12:00-13:00',
+                'valueType': 'DATETIME',
+                'comparator': 'DATE_TIME_FILTER',
+                'valueRange': 0,
+                'timeFilter': 'TIMEOFDAY'
+            }
+        }
+    }
+
+    assert ds2.serialize_gql_query_input() == expected_serialized

@@ -75,16 +75,29 @@ class DateTime(DagshubDataType):
     """Basic python ``datetime.datetime``
 
     .. note::
-        dagshub backend can receive only an integer timestamp (utc timestamp).
-        in the below example the dagshub client sends int(t.timestamp()) to the backend
-        if you want to save your own timestamp it must be rounded like this.
+        Dagshub backend receives an integer millisecond timestamp (utc timestamp), and optionally a timezone.
+
+        A metadata of type datetime is always stored in DB as a UTC time, when a query is done on this field
+        there are 3 options:
+
+        - Metadata was saved with a timezone, in which case it will be used.
+
+        - Metadata was saved without a timezone, in which case UTC will be used.
+
+        - with_time_zone specified a time zone and it will override whatever is in the database.
 
     Example::
 
+        # dagshub client sends int(t.timestamp() * 1000) to the backend
+        # and the +05:30 offset
         datapoints = datasource.all()
         t = dateutil.parser.parse("2022-04-05T15:30:00.99999+05:30")
         datapoints[path][name] = t
         datapoints[path].save()
+
+        # or:
+        # send only a millisecond timestamp, without timezone (will be saved as utc)
+        datapoints[path][name] = int(dateutil.parser.parse("2022-04-05T15:30:00.99999+05:30").timestamp() * 1000)
     """
     backing_field_type = MetadataFieldType.DATETIME
 

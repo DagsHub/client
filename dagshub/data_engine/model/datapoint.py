@@ -1,5 +1,4 @@
 import datetime
-import pytz
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -129,7 +128,8 @@ class Datapoint:
                 value = float(value)
             else:
                 if key in date_fields:
-                    value = datetime.datetime.fromtimestamp(value).astimezone(pytz.utc)
+                    timezone = meta_dict.get("timeZone")
+                    value = _datetime_from_timestamp(value / 1000, timezone or "+00:00")
             res.metadata[key] = value
         return res
 
@@ -283,3 +283,12 @@ def _get_blob(
         if path_format == "str":
             cache_path = str(cache_path)
         return cache_path
+
+
+def _datetime_from_timestamp(timestamp, utc_offset):
+    offset_hours, offset_minutes = map(int, utc_offset.split(':'))
+    offset = datetime.timedelta(hours=offset_hours, minutes=offset_minutes)
+
+    tz = datetime.timezone(offset)
+
+    return datetime.datetime.fromtimestamp(timestamp).astimezone(tz)
