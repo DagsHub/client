@@ -21,7 +21,7 @@ from tenacity import retry, retry_if_result, stop_after_attempt, wait_exponentia
 from dagshub.common import config, is_inside_notebook, is_inside_colab
 from dagshub.common.api.repo import RepoAPI, CommitNotFoundError
 from dagshub.common.api.responses import ContentAPIEntry, StorageContentAPIResult
-from dagshub.common.helpers import http_request, get_project_root
+from dagshub.common.helpers import http_request, get_project_root, log_message
 from dagshub.streaming.dataclasses import DagshubPath
 from dagshub.streaming.errors import FilesystemAlreadyMountedError
 
@@ -854,6 +854,13 @@ class DagsHubFilesystem:
         self._install_framework_hooks()
 
         DagsHubFilesystem.hooked_instance = self
+
+        msg = (
+            f'Repository "{self._api.full_name}" is now hooked at path "{fs.project_root}".\n'
+            f"Any calls to Python file access function like open() and listdir() inside "
+            f"of this directory will include results from the repository."
+        )
+        log_message(msg, logger)
 
     _framework_key_prefix = "framework_"
 
