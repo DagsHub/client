@@ -856,7 +856,7 @@ class DagsHubFilesystem:
         DagsHubFilesystem.hooked_instance = self
 
         msg = (
-            f'Repository "{self._api.full_name}" is now hooked at path "{fs.project_root}".\n'
+            f'Repository "{self._api.full_name}" is now hooked at path "{self.project_root}".\n'
             f"Any calls to Python file access function like open() and listdir() inside "
             f"of this directory will include results from the repository."
         )
