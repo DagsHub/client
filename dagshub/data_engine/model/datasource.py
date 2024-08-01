@@ -584,6 +584,7 @@ class Datasource:
                                 update_entry.allowMultiple = True
                     for sub_val in val:
                         value_type = field_value_types.get(key)
+                        time_zone = None
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[key] = value_type
@@ -598,9 +599,17 @@ class Datasource:
                             sub_val = sub_val.encode("utf-8")
                         if isinstance(sub_val, bytes):
                             sub_val = wrap_bytes(sub_val)
+                        if isinstance(sub_val, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(sub_val)
+                            sub_val = int(sub_val.timestamp() * 1000)
                         res.append(
                             DatapointMetadataUpdateEntry(
-                                url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
+                                url=datapoint,
+                                key=key,
+                                value=str(sub_val),
+                                valueType=value_type,
+                                allowMultiple=True,
+                                timeZone=time_zone,
                             )
                         )
                 else:
@@ -612,6 +621,7 @@ class Datasource:
                     if value_type == MetadataFieldType.BLOB and not isinstance(val, bytes):
                         if key not in document_fields:
                             continue
+                    time_zone = None
                     # Pandas quirk - integers are floats on the backend
                     if value_type == MetadataFieldType.INTEGER:
                         val = int(val)
@@ -619,6 +629,9 @@ class Datasource:
                         val = val.encode("utf-8")
                     if isinstance(val, bytes):
                         val = wrap_bytes(val)
+                    if isinstance(val, datetime.datetime):
+                        time_zone = _get_datetime_utc_offset(val)
+                        val = int(val.timestamp() * 1000)
                     res.append(
                         DatapointMetadataUpdateEntry(
                             url=datapoint,
@@ -626,6 +639,7 @@ class Datasource:
                             value=str(val),
                             valueType=value_type,
                             allowMultiple=key in multivalue_fields,
+                            timeZone=time_zone,
                         )
                     )
         return res
@@ -1438,6 +1452,7 @@ class MetadataContextManager:
                             if e.key == k:
                                 e.allowMultiple = True
                     for sub_val in v:
+                        time_zone = None
                         value_type = field_value_types.get(k)
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
@@ -1449,6 +1464,9 @@ class MetadataContextManager:
                                 continue
                         if isinstance(v, str) and k in document_fields:
                             v = v.encode("utf-8")
+                        if isinstance(v, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(v)
+                            v = int(v.timestamp() * 1000)
                         if isinstance(v, bytes):
                             sub_val = wrap_bytes(sub_val)
                         self._metadata_entries.append(
@@ -1459,6 +1477,7 @@ class MetadataContextManager:
                                 # todo: preliminary type check
                                 valueType=value_type,
                                 allowMultiple=k in self._multivalue_fields,
+                                timeZone=time_zone,
                             )
                         )
 

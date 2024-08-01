@@ -149,8 +149,12 @@ def test_pandas_timestamp(ds):
     actual = Datasource._df_to_metadata(ds, df)
 
     expected = [
-        DatapointMetadataUpdateEntry("test1", "key1", "2020-10-10 10:10:00", MetadataFieldType.DATETIME),
-        DatapointMetadataUpdateEntry("test2", "key1", "2030-10-10 10:20:20", MetadataFieldType.DATETIME),
+        DatapointMetadataUpdateEntry(
+            "test1", "key1", f"{int(data_dict['key1'][0].timestamp()) * 1000}", MetadataFieldType.DATETIME
+        ),
+        DatapointMetadataUpdateEntry(
+            "test2", "key1", f"{int(data_dict['key1'][1].timestamp()) * 1000}", MetadataFieldType.DATETIME
+        ),
     ]
 
     assert expected == actual
