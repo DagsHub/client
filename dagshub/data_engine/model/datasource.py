@@ -598,6 +598,9 @@ class Datasource:
                             sub_val = sub_val.encode("utf-8")
                         if isinstance(sub_val, bytes):
                             sub_val = wrap_bytes(sub_val)
+                        if isinstance(sub_val, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(sub_val)
+                            sub_val = int(sub_val.timestamp() * 1000)
                         res.append(
                             DatapointMetadataUpdateEntry(
                                 url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
@@ -619,6 +622,9 @@ class Datasource:
                         val = val.encode("utf-8")
                     if isinstance(val, bytes):
                         val = wrap_bytes(val)
+                    if isinstance(val, datetime.datetime):
+                        time_zone = _get_datetime_utc_offset(val)
+                        val = int(val.timestamp() * 1000)
                     res.append(
                         DatapointMetadataUpdateEntry(
                             url=datapoint,
@@ -1449,6 +1455,9 @@ class MetadataContextManager:
                                 continue
                         if isinstance(v, str) and k in document_fields:
                             v = v.encode("utf-8")
+                        if isinstance(v, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(v)
+                            v = int(v.timestamp() * 1000)
                         if isinstance(v, bytes):
                             sub_val = wrap_bytes(sub_val)
                         self._metadata_entries.append(
