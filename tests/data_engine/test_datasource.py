@@ -1,3 +1,4 @@
+import datetime
 from unittest.mock import MagicMock
 
 import pandas as pd
@@ -131,3 +132,25 @@ def test_uploading_to_document_turns_into_blob(ds):
         )
     ]
     client_mock.update_metadata.assert_called_with(ds, expected_data_upload)
+
+
+def test_pandas_timestamp(ds):
+    data_dict = {
+        "file": ["test1", "test2"],
+        "key1": [
+            datetime.datetime(2020, 10, 10, 10, 10, 0),
+            datetime.datetime(2030, 10, 10, 10, 20, 20),
+        ],
+    }
+    df = pd.DataFrame.from_dict(data_dict)
+
+    df["key1"] = pd.to_datetime(df["key1"])
+
+    actual = Datasource._df_to_metadata(ds, df)
+
+    expected = [
+        DatapointMetadataUpdateEntry("test1", "key1", "2020-10-10 10:10:00", MetadataFieldType.DATETIME),
+        DatapointMetadataUpdateEntry("test2", "key1", "2030-10-10 10:20:20", MetadataFieldType.DATETIME),
+    ]
+
+    assert expected == actual
