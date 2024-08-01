@@ -584,6 +584,7 @@ class Datasource:
                                 update_entry.allowMultiple = True
                     for sub_val in val:
                         value_type = field_value_types.get(key)
+                        time_zone = None
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[key] = value_type
@@ -603,7 +604,12 @@ class Datasource:
                             sub_val = int(sub_val.timestamp() * 1000)
                         res.append(
                             DatapointMetadataUpdateEntry(
-                                url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
+                                url=datapoint,
+                                key=key,
+                                value=str(sub_val),
+                                valueType=value_type,
+                                allowMultiple=True,
+                                timeZone=time_zone,
                             )
                         )
                 else:
@@ -615,6 +621,7 @@ class Datasource:
                     if value_type == MetadataFieldType.BLOB and not isinstance(val, bytes):
                         if key not in document_fields:
                             continue
+                    time_zone = None
                     # Pandas quirk - integers are floats on the backend
                     if value_type == MetadataFieldType.INTEGER:
                         val = int(val)
@@ -632,6 +639,7 @@ class Datasource:
                             value=str(val),
                             valueType=value_type,
                             allowMultiple=key in multivalue_fields,
+                            timeZone=time_zone,
                         )
                     )
         return res
@@ -1444,6 +1452,7 @@ class MetadataContextManager:
                             if e.key == k:
                                 e.allowMultiple = True
                     for sub_val in v:
+                        time_zone = None
                         value_type = field_value_types.get(k)
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
@@ -1468,6 +1477,7 @@ class MetadataContextManager:
                                 # todo: preliminary type check
                                 valueType=value_type,
                                 allowMultiple=k in self._multivalue_fields,
+                                timeZone=time_zone,
                             )
                         )
 
