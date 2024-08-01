@@ -63,6 +63,7 @@ else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     mlflow = lazy_load("mlflow")
+    pandas = lazy_load("pandas")
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +77,9 @@ class DatapointMetadataUpdateEntry(DataClassJsonMixin):
     value: str
     valueType: MetadataFieldType = field(metadata=config(encoder=lambda val: val.value))
     allowMultiple: bool = False
-    timeZone: Optional[str] = field(default=None,
-                                    metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    timeZone: Optional[str] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
 
 
 @dataclass
@@ -563,9 +565,16 @@ class Datasource:
                     continue
                 if val is None:
                     continue
-                # ONLY FOR PANDAS: since pandas doesn't distinguish between None and NaN, don't upload it
+                # Pandas specific: since pandas doesn't distinguish between None and NaN, don't upload it
                 if isinstance(val, float) and math.isnan(val):
                     continue
+                # Pandas specific: Cast pandas Timestamp to datetime
+                if isinstance(val, list) or isinstance(val, pandas._libs.tslibs.timestamps.Timestamp):
+                    if isinstance(val, list):
+                        if isinstance(val[0], pandas._libs.tslibs.timestamps.Timestamp):
+                            val = [val.to_pydatetime() for val in val]
+                    else:
+                        val = val.to_pydatetime()
                 if isinstance(val, list):
                     if key not in multivalue_fields:
                         multivalue_fields.add(key)
@@ -1510,8 +1519,9 @@ def _get_datetime_utc_offset(t):
 @dataclass
 class DatasourceQuery(DataClassJsonMixin):
     as_of: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
-    time_zone: Optional[str] = field(default=None,
-                                     metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL))
+    time_zone: Optional[str] = field(
+        default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
         default=QueryFilterTree(),
