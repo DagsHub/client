@@ -58,7 +58,7 @@ class DagsHubDataset:
 
         self.tensorizers = (
             self._get_tensorizers(tensorizers)
-            if type(tensorizers) is str or type(tensorizers[0]) is str
+            if type(tensorizers) is str or (type(tensorizers) is list and type(tensorizers[0]) is str)
             else tensorizers
         )
 
@@ -124,7 +124,10 @@ class DagsHubDataset:
         return out
 
     def __getitem__(self, idx: int) -> List[Union["torch.Tensor", "tf.Tensor"]]:  # noqa: F821
-        return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, self.get(idx))]
+        if type(self.tensorizers) is list:
+            return [tensorizer(data) for tensorizer, data in zip(self.tensorizers, self.get(idx))]
+        else:
+            return self.tensorizers(self.get(idx))
 
     def pull(self) -> None:
         if self.order is not None:
