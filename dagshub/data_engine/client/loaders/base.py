@@ -17,7 +17,7 @@ class DagsHubDataset:
         metadata_columns: List[str] = [],
         file_columns: List[str] = None,
         strategy: str = "lazy",
-        tensorizers: Union[str, List[Union[str, FunctionType]]] = "auto",
+        tensorizers: Union[str, List[Union[str, FunctionType]], FunctionType] = "auto",
         savedir: str = None,
         processes: int = 8,
         for_dataloader: bool = False,
@@ -31,7 +31,7 @@ class DagsHubDataset:
             columns that are returned from the metadata as part of the dataloader.Defaults to [].
         file_columns (List[str], optional): columns with a datapoint metadata that are files. Defaults to None.
         strategy (str, optional): Download strategy - preload|background|lazy. Defaults to "lazy".
-        tensorizers (Union[str, List[Union[str, FunctionType]]], optional):
+        tensorizers (Union[str, List[Union[str, FunctionType]], FunctionType], optional):
             Tensorization strategy - auto|image|<function>. Defaults to "auto".
         savedir (str, optional): Location where the dataset is stored. Defaults to None.
         processes (int, optional): number of parallel processes that download the dataset. Defaults to 8.
