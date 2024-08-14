@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 import logging
+import tempfile
 import math
 import os.path
 import threading
@@ -567,19 +568,13 @@ class Datasource:
     def _remote_upload_metadata_from_dataframe(
         self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None
     ):
-        random_file_name = str(uuid.uuid4())
-        file_path = f"{random_file_name}.parquet"
-        df.to_parquet(file_path, index=False)
         datasource_name = self.source.name
 
-        task_result = None
-        try:
-            task_result = self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
-        except:  # noqa # todo better exception handling when we'll have feedback from the backend
-            pass
-        finally:
-            os.remove(file_path)
-        return task_result
+        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=True) as tmp:
+            file_path = tmp.name
+            df.to_parquet(file_path, index=False)
+
+            self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
 
     def _get_multivalue_fields(self) -> Set[str]:
         res = set()
