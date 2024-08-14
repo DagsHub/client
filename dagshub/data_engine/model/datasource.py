@@ -15,7 +15,6 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
 
-import pandas as pd
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
@@ -1440,13 +1439,13 @@ class Datasource:
     def _convert_file_to_df(file_path: str):
         # prepare dataframe for import_metadata
         if file_path.lower().endswith(".csv"):
-            df = pd.read_csv(file_path)
+            df = pandas.read_csv(file_path)
         elif file_path.lower().endswith(".parquet"):
-            df = pd.read_parquet(file_path)
+            df = pandas.read_parquet(file_path)
         elif file_path.lower().endswith(".zip"):
-            df = pd.read_csv(file_path, compression="zip")
+            df = pandas.read_csv(file_path, compression="zip")
         elif file_path.lower().endswith(".gz"):
-            df = pd.read_csv(file_path, compression="gzip")
+            df = pandas.read_csv(file_path, compression="gzip")
         else:
             raise RuntimeError(
                 f"File '{file_path}' needs to be a .csv/.parquet or a compressed .zip/.gz to be imported"
