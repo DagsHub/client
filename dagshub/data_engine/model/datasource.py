@@ -514,7 +514,9 @@ class Datasource:
 
         return func()
 
-    def upload_metadata_from_file(self, file_path, path_column: Optional[Union[str, int]] = None, remote: bool = False):
+    def upload_metadata_from_file(
+        self, file_path, path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
         """
         Upload metadata from a file.
 
@@ -522,21 +524,21 @@ class Datasource:
             file_path: Path to the file with metadata. Allowed formats are CSV, Parquet, ZIP, GZ.
             path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
                 If not specified, the first column is used.
-            remote: Whether to upload the metadata via remote or local upload. Default is False.
-                Remote upload means that the data engine API calls will be done from remote machine,
-                rather than from local machine which runs this client.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
         """
         send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
 
-        if remote:
+        if ingest_on_server:
             datasource_name = self.source.name
             self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
         else:
             df = self._convert_file_to_df(file_path)
-            self.upload_metadata_from_dataframe(df, path_column, remote)
+            self.upload_metadata_from_dataframe(df, path_column, ingest_on_server)
 
     def upload_metadata_from_dataframe(
-        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, remote: bool = False
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
     ):
         """
         Upload metadata from a pandas dataframe.
@@ -548,14 +550,14 @@ class Datasource:
                 DataFrame with metadata
             path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
                 If not specified, the first column is used.
-            remote: Whether to upload the metadata via remote or local upload. Default is False.
-                Remote upload means that the data engine API calls will be done from remote machine,
-                rather than from local machine which runs this client.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
         """
         self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
 
-        if remote:
+        if ingest_on_server:
             self._remote_upload_metadata_from_dataframe(df, path_column)
         else:
             metadata = self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields())
