@@ -14,7 +14,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
 
-
+import pandas as pd
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
 from pathvalidate import sanitize_filepath
@@ -512,6 +512,31 @@ class Datasource:
                 self._explicit_update_ctx = None
 
         return func()
+
+    def upload_metadata_from_file(self, file_path, path_column: Optional[Union[str, int]] = None, remote: bool = False):
+        """
+        Upload metadata from a file.
+
+        Args:
+            file_path: Path to the file with metadata. Allowed formats are CSV, Parquet, ZIP, GZ.
+            path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
+                If not specified, the first column is used.
+            remote: Whether to upload the metadata via remote or local upload. Default is False.
+                Remote upload means that the data engine API calls will be done from remote machine,
+                rather than from local machine which runs this client.
+        """
+        self.source.get_from_dagshub()
+        send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
+
+        if remote:
+            try:
+                datasource_name = self.source.name
+                self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
+            except:  # noqa # todo better exception handling when we'll have feedback from the backend
+                pass
+        else:
+            df = self._convert_file_to_df(file_path)
+            self.upload_metadata_from_dataframe(df, path_column, remote)
 
     def upload_metadata_from_dataframe(
         self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, remote: bool = False
@@ -1417,6 +1442,21 @@ class Datasource:
     def _test_not_comparing_other_ds(other):
         if type(other) is Datasource:
             raise DatasetFieldComparisonError()
+
+    @staticmethod
+    def _convert_file_to_df(file_path: str):
+        # prepare dataframe for import_metadata
+        if file_path.lower().endswith(".csv"):
+            df = pd.read_csv(file_path)
+        elif file_path.lower().endswith(".parquet"):
+            df = pd.read_parquet(file_path)
+        elif file_path.lower().endswith(".zip"):
+            df = pd.read_csv(file_path, compression="zip")
+        elif file_path.lower().endswith(".gz"):
+            df = pd.read_csv(file_path, compression="gzip")
+        else:
+            raise RuntimeError(f"Unsupported file format: {file_path}")
+        return df
 
 
 class MetadataContextManager:
