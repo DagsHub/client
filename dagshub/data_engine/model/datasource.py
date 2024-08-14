@@ -513,7 +513,9 @@ class Datasource:
 
         return func()
 
-    def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
+    def upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, remote: bool = False
+    ):
         """
         Upload metadata from a pandas dataframe.
 
@@ -524,10 +526,35 @@ class Datasource:
                 DataFrame with metadata
             path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
                 If not specified, the first column is used.
+            remote: Whether to upload the metadata via remote or local upload. Default is False.
+                Remote upload means that the data engine API calls will be done from remote machine,
+                rather than from local machine which runs this client.
         """
         self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
-        self._upload_metadata(self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields()))
+
+        if remote:
+            self._remote_upload_metadata_from_dataframe(df, path_column)
+        else:
+            metadata = self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields())
+            self._upload_metadata(metadata)
+
+    def _remote_upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None
+    ):
+        random_file_name = str(uuid.uuid4())
+        file_path = f"{random_file_name}.parquet"
+        df.to_parquet(file_path, index=False)
+        datasource_name = self.source.name
+
+        task_result = None
+        try:
+            task_result = self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
+        except:  # noqa # todo better exception handling when we'll have feedback from the backend
+            pass
+        finally:
+            os.remove(file_path)
+        return task_result
 
     def _get_multivalue_fields(self) -> Set[str]:
         res = set()

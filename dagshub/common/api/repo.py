@@ -1,7 +1,7 @@
 import logging
 from os import PathLike
 from pathlib import Path, PurePosixPath
-
+import mimetypes
 import rich.progress
 
 from dagshub.common.api.responses import (
@@ -388,6 +388,30 @@ class RepoAPI:
         download_files(file_tuples, skip_if_exists=not redownload)
         log_message(f"Downloaded {len(files)} file(s) to {local_path.resolve()}")
 
+    def import_metadata_from_file(self, datasource_name: str, file_path: Union[str, PathLike], path_column: str):
+        files = {
+            "file": (
+                Path(file_path).name,
+                open(file_path, "rb"),
+                mimetypes.guess_type(file_path)[0] or "application/octet-stream",
+            ),
+        }
+
+        data = {
+            "datasource_name": datasource_name,
+            "path_column": path_column,
+        }
+
+        res = self._http_request("POST", self.repo_import_metadata_from_file_url(), data=data, files=files)
+        if res.status_code == 404:
+            raise PathNotFoundError(f"Datasource {datasource_name} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when importing metadata to datasource {datasource_name}"
+            logger.error(error_msg)
+            logger.debug(res.content)
+            raise RuntimeError(error_msg)
+        return res.content
+
     @staticmethod
     def _sanitize_storage_path(path: Union[str, PathLike]) -> Tuple[str, bool]:
         """
@@ -562,6 +586,9 @@ class RepoAPI:
         :meta private:
         """
         return multi_urljoin(self.host, "api/v1/repo-buckets/s3", self.owner)
+
+    def repo_import_metadata_from_file_url(self) -> str:
+        return multi_urljoin(self.data_engine_url, "import/metadata")
 
     @staticmethod
     def parse_repo(repo: str) -> Tuple[str, str]:
