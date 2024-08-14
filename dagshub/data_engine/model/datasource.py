@@ -1450,7 +1450,9 @@ class Datasource:
         elif file_path.lower().endswith(".gz"):
             df = pd.read_csv(file_path, compression="gzip")
         else:
-            raise RuntimeError(f"Unsupported file format: {file_path}")
+            raise RuntimeError(
+                f"File '{file_path}' needs to be a .csv/.parquet or a compressed .zip/.gz to be imported"
+            )
         return df
 
 
