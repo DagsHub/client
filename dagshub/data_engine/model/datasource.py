@@ -530,11 +530,8 @@ class Datasource:
         send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
 
         if remote:
-            try:
-                datasource_name = self.source.name
-                self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
-            except:  # noqa # todo better exception handling when we'll have feedback from the backend
-                pass
+            datasource_name = self.source.name
+            self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
         else:
             df = self._convert_file_to_df(file_path)
             self.upload_metadata_from_dataframe(df, path_column, remote)
