@@ -1,10 +1,11 @@
 import logging
+import mimetypes
 import re
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 from typing import Optional, Union, Mapping, Any, Dict, List
-
-from dagshub.common.api.repo import RepoAPI
+from os import PathLike
+from dagshub.common.api.repo import RepoAPI, PathNotFoundError
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, MetadataFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint
@@ -216,3 +217,28 @@ class DatasourceState:
         ds = DatasourceState(repo)
         ds._update_from_ds_result(res)
         return ds
+
+    def import_metadata_from_file(self, datasource_name: str, file_path: Union[str, PathLike], path_column: str):
+        files = {
+            "file": (
+                Path(file_path).name,
+                open(file_path, "rb"),
+                mimetypes.guess_type(file_path)[0] or "application/octet-stream",
+            ),
+        }
+
+        data = {
+            "datasource_name": datasource_name,
+            "path_column": path_column,
+        }
+
+        url = multi_urljoin(self.repoApi.data_engine_url, "import/metadata")
+        res = self.repoApi._http_request("POST", url, data=data, files=files)
+        if res.status_code == 404:
+            raise PathNotFoundError(f"Datasource {datasource_name} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when importing metadata to datasource {datasource_name}"
+            logger.error(error_msg)
+            logger.debug(res.content)
+            raise RuntimeError(error_msg)
+        return res.content

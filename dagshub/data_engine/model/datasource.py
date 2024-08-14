@@ -532,7 +532,7 @@ class Datasource:
 
         if ingest_on_server:
             datasource_name = self.source.name
-            self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
         else:
             df = self._convert_file_to_df(file_path)
             self.upload_metadata_from_dataframe(df, path_column, ingest_on_server)
@@ -572,7 +572,7 @@ class Datasource:
             file_path = tmp.name
             df.to_parquet(file_path, index=False)
 
-            self.source.repoApi.import_metadata_from_file(datasource_name, file_path, path_column)
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
 
     def _get_multivalue_fields(self) -> Set[str]:
         res = set()
