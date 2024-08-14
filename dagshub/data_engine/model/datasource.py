@@ -526,7 +526,6 @@ class Datasource:
                 Remote upload means that the data engine API calls will be done from remote machine,
                 rather than from local machine which runs this client.
         """
-        self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
 
         if remote:
