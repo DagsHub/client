@@ -219,14 +219,19 @@ class DatasourceState:
         return ds
 
     def import_metadata_from_file(self, datasource_name: str, file_path: Union[str, PathLike], path_column: str):
-        files = {
-            "file": (
-                Path(file_path).name,
-                open(file_path, "rb"),
-                mimetypes.guess_type(file_path)[0] or "application/octet-stream",
-            ),
-        }
+        load_location = self._determine_load_location(file_path)
+        file_name = Path(file_path).name
+        file_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
 
+        file_bytes = None
+        if load_location == "disk":
+            file_bytes = open(file_path, "rb")
+        elif load_location == "repo":
+            file_bytes = self.repoApi.get_file(file_path)
+
+        files = {
+            "file": (file_name, file_bytes, file_type),
+        }
         data = {
             "datasource_name": datasource_name,
             "path_column": path_column,
@@ -242,3 +247,21 @@ class DatasourceState:
             logger.debug(res.content)
             raise RuntimeError(error_msg)
         return res.content
+
+    def _determine_load_location(self, file_path: Union[str, Path]) -> str:
+        # Local files take priority
+        if Path(file_path).exists():
+            return "disk"
+
+        # Try to find it in the repo otherwise
+        try:
+            files = self.repoApi.list_path(Path(file_path).as_posix())
+            if len(files) > 0:
+                return "repo"
+        except PathNotFoundError:
+            pass
+
+        # TODO: handle repo bucket too
+        # TODO: improve and reuse https://github.com/DagsHub/client/pull/517#issuecomment-2288690281
+
+        raise PathNotFoundError(f"Path {file_path} not found")
