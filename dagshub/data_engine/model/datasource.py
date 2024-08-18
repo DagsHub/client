@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 import logging
+import tempfile
 import math
 import os.path
 import threading
@@ -13,7 +14,6 @@ from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
-
 
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
@@ -513,7 +513,32 @@ class Datasource:
 
         return func()
 
-    def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
+    def upload_metadata_from_file(
+        self, file_path, path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
+        """
+        Upload metadata from a file.
+
+        Args:
+            file_path: Path to the file with metadata. Allowed formats are CSV, Parquet, ZIP, GZ.
+            path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
+                If not specified, the first column is used.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
+        """
+        send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
+
+        if ingest_on_server:
+            datasource_name = self.source.name
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
+        else:
+            df = self._convert_file_to_df(file_path)
+            self.upload_metadata_from_dataframe(df, path_column, ingest_on_server)
+
+    def upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
         """
         Upload metadata from a pandas dataframe.
 
@@ -524,10 +549,29 @@ class Datasource:
                 DataFrame with metadata
             path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
                 If not specified, the first column is used.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
         """
         self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
-        self._upload_metadata(self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields()))
+
+        if ingest_on_server:
+            self._remote_upload_metadata_from_dataframe(df, path_column)
+        else:
+            metadata = self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields())
+            self._upload_metadata(metadata)
+
+    def _remote_upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None
+    ):
+        datasource_name = self.source.name
+
+        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=True) as tmp:
+            file_path = tmp.name
+            df.to_parquet(file_path, index=False)
+
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
 
     def _get_multivalue_fields(self) -> Set[str]:
         res = set()
@@ -1390,6 +1434,23 @@ class Datasource:
     def _test_not_comparing_other_ds(other):
         if type(other) is Datasource:
             raise DatasetFieldComparisonError()
+
+    @staticmethod
+    def _convert_file_to_df(file_path: str):
+        # prepare dataframe for import_metadata
+        if file_path.lower().endswith(".csv"):
+            df = pandas.read_csv(file_path)
+        elif file_path.lower().endswith(".parquet"):
+            df = pandas.read_parquet(file_path)
+        elif file_path.lower().endswith(".zip"):
+            df = pandas.read_csv(file_path, compression="zip")
+        elif file_path.lower().endswith(".gz"):
+            df = pandas.read_csv(file_path, compression="gzip")
+        else:
+            raise RuntimeError(
+                f"File '{file_path}' needs to be a .csv/.parquet or a compressed .zip/.gz to be imported"
+            )
+        return df
 
 
 class MetadataContextManager:
