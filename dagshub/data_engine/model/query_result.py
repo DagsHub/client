@@ -516,7 +516,10 @@ class QueryResult:
             The path to the YAML file with the metadata. Pass this path to ``YOLO.train()`` to train a model.
         """
         if annotation_field is None:
-            annotation_field = sorted([f.name for f in self.fields if f.is_annotation()])[0]
+            annotation_field = sorted([f.name for f in self.fields if f.is_annotation()])
+            if len(annotation_field) == 0:
+                raise ValueError("No annotation fields found in the datasource")
+            annotation_field = annotation_field[0]
             log_message(f"Using annotations from field {annotation_field}")
 
         if download_dir is None:
