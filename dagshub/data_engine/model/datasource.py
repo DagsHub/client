@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 import logging
+import tempfile
 import math
 import os.path
 import threading
@@ -13,7 +14,6 @@ from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal
-
 
 import rich.progress
 from dataclasses_json import config, LetterCase, DataClassJsonMixin
@@ -63,6 +63,7 @@ else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     mlflow = lazy_load("mlflow")
+    pandas = lazy_load("pandas")
 
 logger = logging.getLogger(__name__)
 
@@ -518,7 +519,32 @@ class Datasource:
 
         return func()
 
-    def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
+    def upload_metadata_from_file(
+        self, file_path, path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
+        """
+        Upload metadata from a file.
+
+        Args:
+            file_path: Path to the file with metadata. Allowed formats are CSV, Parquet, ZIP, GZ.
+            path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
+                If not specified, the first column is used.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
+        """
+        send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
+
+        if ingest_on_server:
+            datasource_name = self.source.name
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
+        else:
+            df = self._convert_file_to_df(file_path)
+            self.upload_metadata_from_dataframe(df, path_column, ingest_on_server)
+
+    def upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
         """
         Upload metadata from a pandas dataframe.
 
@@ -529,10 +555,29 @@ class Datasource:
                 DataFrame with metadata
             path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
                 If not specified, the first column is used.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
         """
         self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
-        self._upload_metadata(self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields()))
+
+        if ingest_on_server:
+            self._remote_upload_metadata_from_dataframe(df, path_column)
+        else:
+            metadata = self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields())
+            self._upload_metadata(metadata)
+
+    def _remote_upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None
+    ):
+        datasource_name = self.source.name
+
+        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=True) as tmp:
+            file_path = tmp.name
+            df.to_parquet(file_path, index=False)
+
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
 
     def _get_multivalue_fields(self) -> Set[str]:
         res = set()
@@ -570,9 +615,16 @@ class Datasource:
                     continue
                 if val is None:
                     continue
-                # ONLY FOR PANDAS: since pandas doesn't distinguish between None and NaN, don't upload it
+                # Pandas specific: since pandas doesn't distinguish between None and NaN, don't upload it
                 if isinstance(val, float) and math.isnan(val):
                     continue
+                # Pandas specific: Cast pandas Timestamp to datetime
+                if isinstance(val, list) or isinstance(val, pandas._libs.tslibs.timestamps.Timestamp):
+                    if isinstance(val, list):
+                        if isinstance(val[0], pandas._libs.tslibs.timestamps.Timestamp):
+                            val = [val.to_pydatetime() for val in val]
+                    else:
+                        val = val.to_pydatetime()
                 if isinstance(val, list):
                     if key not in multivalue_fields:
                         multivalue_fields.add(key)
@@ -582,6 +634,7 @@ class Datasource:
                                 update_entry.allowMultiple = True
                     for sub_val in val:
                         value_type = field_value_types.get(key)
+                        time_zone = None
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[key] = value_type
@@ -596,9 +649,17 @@ class Datasource:
                             sub_val = sub_val.encode("utf-8")
                         if isinstance(sub_val, bytes):
                             sub_val = wrap_bytes(sub_val)
+                        if isinstance(sub_val, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(sub_val)
+                            sub_val = int(sub_val.timestamp() * 1000)
                         res.append(
                             DatapointMetadataUpdateEntry(
-                                url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
+                                url=datapoint,
+                                key=key,
+                                value=str(sub_val),
+                                valueType=value_type,
+                                allowMultiple=True,
+                                timeZone=time_zone,
                             )
                         )
                 else:
@@ -610,6 +671,7 @@ class Datasource:
                     if value_type == MetadataFieldType.BLOB and not isinstance(val, bytes):
                         if key not in document_fields:
                             continue
+                    time_zone = None
                     # Pandas quirk - integers are floats on the backend
                     if value_type == MetadataFieldType.INTEGER:
                         val = int(val)
@@ -617,6 +679,9 @@ class Datasource:
                         val = val.encode("utf-8")
                     if isinstance(val, bytes):
                         val = wrap_bytes(val)
+                    if isinstance(val, datetime.datetime):
+                        time_zone = _get_datetime_utc_offset(val)
+                        val = int(val.timestamp() * 1000)
                     res.append(
                         DatapointMetadataUpdateEntry(
                             url=datapoint,
@@ -624,6 +689,7 @@ class Datasource:
                             value=str(val),
                             valueType=value_type,
                             allowMultiple=key in multivalue_fields,
+                            timeZone=time_zone,
                         )
                     )
         return res
@@ -1377,6 +1443,23 @@ class Datasource:
         if type(other) is Datasource:
             raise DatasetFieldComparisonError()
 
+    @staticmethod
+    def _convert_file_to_df(file_path: str):
+        # prepare dataframe for import_metadata
+        if file_path.lower().endswith(".csv"):
+            df = pandas.read_csv(file_path)
+        elif file_path.lower().endswith(".parquet"):
+            df = pandas.read_parquet(file_path)
+        elif file_path.lower().endswith(".zip"):
+            df = pandas.read_csv(file_path, compression="zip")
+        elif file_path.lower().endswith(".gz"):
+            df = pandas.read_csv(file_path, compression="gzip")
+        else:
+            raise RuntimeError(
+                f"File '{file_path}' needs to be a .csv/.parquet or a compressed .zip/.gz to be imported"
+            )
+        return df
+
 
 class MetadataContextManager:
     """
@@ -1438,6 +1521,7 @@ class MetadataContextManager:
                             if e.key == k:
                                 e.allowMultiple = True
                     for sub_val in v:
+                        time_zone = None
                         value_type = field_value_types.get(k)
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
@@ -1449,6 +1533,9 @@ class MetadataContextManager:
                                 continue
                         if isinstance(v, str) and k in document_fields:
                             v = v.encode("utf-8")
+                        if isinstance(v, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(v)
+                            v = int(v.timestamp() * 1000)
                         if isinstance(v, bytes):
                             sub_val = wrap_bytes(sub_val)
                         self._metadata_entries.append(
@@ -1459,6 +1546,7 @@ class MetadataContextManager:
                                 # todo: preliminary type check
                                 valueType=value_type,
                                 allowMultiple=k in self._multivalue_fields,
+                                timeZone=time_zone,
                             )
                         )
 
