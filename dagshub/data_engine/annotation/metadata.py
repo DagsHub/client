@@ -1,7 +1,8 @@
-from typing import TYPE_CHECKING, Optional, Sequence, Tuple, Union, Literal
+from typing import TYPE_CHECKING, Optional, Sequence, Tuple, Union, Literal, Dict
 
 from dagshub_annotation_converter.formats.label_studio.task import parse_ls_task, LabelStudioTask
-from dagshub_annotation_converter.formats.yolo import YoloContext, import_lookup, import_yolo_result
+from dagshub_annotation_converter.formats.yolo import import_lookup, import_yolo_result, YoloContext
+from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.ir.image import (
     IRBBoxImageAnnotation,
     CoordinateStyle,
@@ -20,6 +21,16 @@ if TYPE_CHECKING:
     import ultralytics.engine.results
 
 
+class AnnotationMetaDict(dict):
+    def __init__(self, annotation: "MetadataAnnotations", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.annotation = annotation
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.annotation._update_datapoint()
+
+
 class MetadataAnnotations:
     """
     Class that holds metadata annotations for a datapoint.
@@ -36,10 +47,13 @@ class MetadataAnnotations:
         anns: MetadataAnnotations = dp["exported_annotations"]
         anns.add_image_bbox("person", 0.1, 0.1, 0.1, 0.1)
         anns.add_image_bbox("cat", 0.2, 0.2, 0.1, 0.1)
+        anns.meta["some_key"] = "some_value"
         dp.save()
 
+    You can use the ``meta`` dictionary to add additional metadata to the task, as long as it is JSON-serializable.
+
     All functions for adding annotations have additional arguments of ``image_width``/``image_height``.
-    They are required, but if there are already annotations existing,
+    They are required for new datapoints, but if there are already annotations existing,
     or if there is width/height in the metadata, they can be omitted.
     """
 
@@ -48,24 +62,22 @@ class MetadataAnnotations:
         datapoint: "Datapoint",
         field: str,
         annotations: Optional[Sequence["IRAnnotationBase"]] = None,
-        original_ls_task: Optional["LabelStudioTask"] = None,
+        meta: Optional[Dict] = None,
     ):
         self.datapoint = datapoint
         self.field = field
         self.annotations: list["IRAnnotationBase"]
-        self.original_ls_task = original_ls_task
         if annotations is None:
             annotations = []
         self.annotations = list(annotations)
+        self.meta = AnnotationMetaDict(self, meta or {})
 
     @staticmethod
     def from_ls_task(datapoint: "Datapoint", field: str, ls_task: bytes) -> "MetadataAnnotations":
         parsed_ls_task = parse_ls_task(ls_task)
         annotations = parsed_ls_task.to_ir_annotations(filename=datapoint.path)
 
-        return MetadataAnnotations(
-            datapoint=datapoint, field=field, annotations=annotations, original_ls_task=parsed_ls_task
-        )
+        return MetadataAnnotations(datapoint=datapoint, field=field, annotations=annotations, meta=parsed_ls_task.meta)
 
     def to_ls_task(self) -> Optional[bytes]:
         """
@@ -79,22 +91,8 @@ class MetadataAnnotations:
         task.data["image"] = self.datapoint.download_url
         # TODO: need to filter out non-image annotations here maybe?
         task.add_ir_annotations(self.annotations)
+        task.meta.update(self.meta)
         return task.model_dump_json().encode("utf-8")
-
-    def has_changed(self) -> bool:
-        """
-        Checks that the annotations have changed from the original LS task.
-        NOTE: This deserializes the LS task, so it's not a super cheap operation, use sparingly.
-
-        :meta private:
-        """
-        if self.original_ls_task is None:
-            if len(self.annotations) == 0:
-                return False
-            return True
-
-        reparsed = self.original_ls_task.to_ir_annotations(filename=self.datapoint.path)
-        return reparsed != self.annotations
 
     def __repr__(self):
         return f"Annotations:\n\t{self.annotations}"
@@ -214,6 +212,16 @@ class MetadataAnnotations:
         the bounding box is instead created from the points.
 
         Points need to be a list of tuples of ``(x, y)`` or ``(x, y, visible)`` values, normalized from 0 to 1.
+
+        Args:
+            category: Annotation category
+            points: List of points of the pose
+            bbox_left: Left coordinate of the bounding box
+            bbox_top: Top coordinate of the bounding box
+            bbox_width: Width of the bounding box
+            bbox_height: Height of the bounding box
+            image_width: Width of the image. If not supplied, tries to get it from the `width` field in datapoint
+            image_height: Height of the image. If not supplied, tries to get it from the `height` field in datapoint
         """
 
         image_width, image_height = self.get_image_dimensions(image_width, image_height)
@@ -247,20 +255,28 @@ class MetadataAnnotations:
         self,
         annotation_type: Literal["bbox", "segmentation", "pose"],
         annotation: Union[str, "ultralytics.engine.results.Results"],
-        yolo_context: Optional["YoloContext"] = None,
+        categories: Optional[Dict[int, str]] = None,
         image_width: Optional[int] = None,
         image_height: Optional[int] = None,
+        pose_keypoint_dim: Optional[int] = None,
     ):
         """
-        Add a YOLO annotation.
+        Add a YOLO annotation from string or from a result of prediction with a YOLO model.
 
         This could be either a string of an annotations from a YOLO file, or a result of evaluating a YOLO model.
+        Args:
+
         """
         annotations: list[IRAnnotationBase] = []
         if isinstance(annotation, str):
-            if yolo_context is None:
-                raise ValueError("YoloContext is required when importing annotations from a string")
+            if categories is None:
+                raise ValueError("`categories` dictionary is required when importing annotations from a string")
             image_width, image_height = self.get_image_dimensions(image_width, image_height)
+            yolo_context = self._generate_yolo_context(annotation_type, categories)
+            if annotation_type == "pose":
+                if pose_keypoint_dim is None:
+                    raise ValueError("`pose_keypoint_dim` is required when importing pose annotations")
+                yolo_context.keypoint_dim = pose_keypoint_dim
             parse_fn = import_lookup[annotation_type]
             for ann in annotation.split("\n"):
                 new_ann = parse_fn(ann, yolo_context, image_width, image_height, None)
@@ -274,3 +290,10 @@ class MetadataAnnotations:
         self.annotations.extend(annotations)
         log_message(f"Added {len(annotations)} YOLO annotation(s) to datapoint {self.datapoint.path}")
         self._update_datapoint()
+
+    @staticmethod
+    def _generate_yolo_context(annotation_type, categories: Dict[int, str]) -> YoloContext:
+        cats = Categories()
+        for cat_id, cat_name in categories.items():
+            cats.add(cat_name, cat_id)
+        return YoloContext(annotation_type=annotation_type, categories=cats)
