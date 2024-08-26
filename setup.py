@@ -42,10 +42,7 @@ install_requires = [
     "python-dateutil",
     "tenacity~=8.2.3",
     "boto3",
-    # FIXME: GO BACK TO REGULAR IMPORT AFTER THIS IS MERGED
-    "dagshub-annotation-converter @ "
-    + "git+https://github.com/DagsHub/"
-    + "dagshub-annotation-converter@refactor/static-annotations#egg=dagshub-annotation-converter",
+    "dagshub-annotation-converter>=0.1.0",
 ]
 
 extras_require = {
