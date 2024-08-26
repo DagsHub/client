@@ -130,13 +130,13 @@ def download_url_to_bucket_path(url: str) -> Optional[Tuple[str, str, str]]:
 class DownloadError(Exception):
     def __init__(self, response: Response):
         self.response = response
-        super().__init__("Download failed with status code {response.status_code}")
+        super().__init__(f"Download failed with status code {response.status_code}")
 
 
 def is_download_server_error(error: BaseException) -> bool:
     if not isinstance(error, DownloadError):
         return False
-    return is_server_error(error.response)
+    return error.response.status_code >= 500
 
 
 @retry(

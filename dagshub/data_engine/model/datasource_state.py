@@ -1,10 +1,11 @@
 import logging
+import mimetypes
 import re
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 from typing import Optional, Union, Mapping, Any, Dict, List
-
-from dagshub.common.api.repo import RepoAPI
+from os import PathLike
+from dagshub.common.api.repo import RepoAPI, PathNotFoundError
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, MetadataFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint
@@ -216,3 +217,51 @@ class DatasourceState:
         ds = DatasourceState(repo)
         ds._update_from_ds_result(res)
         return ds
+
+    def import_metadata_from_file(self, datasource_name: str, file_path: Union[str, PathLike], path_column: str):
+        load_location = self._determine_load_location(file_path)
+        file_name = Path(file_path).name
+        file_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+
+        file_bytes = None
+        if load_location == "disk":
+            file_bytes = open(file_path, "rb")
+        elif load_location == "repo":
+            file_bytes = self.repoApi.get_file(file_path)
+
+        files = {
+            "file": (file_name, file_bytes, file_type),
+        }
+        data = {
+            "datasource_name": datasource_name,
+            "path_column": path_column,
+        }
+
+        url = multi_urljoin(self.repoApi.data_engine_url, "import/metadata")
+        res = self.repoApi._http_request("POST", url, data=data, files=files)
+        if res.status_code == 404:
+            raise PathNotFoundError(f"Datasource {datasource_name} not found")
+        elif res.status_code >= 400:
+            error_msg = f"Got status code {res.status_code} when importing metadata to datasource {datasource_name}"
+            logger.error(error_msg)
+            logger.debug(res.content)
+            raise RuntimeError(error_msg)
+        return res.content
+
+    def _determine_load_location(self, file_path: Union[str, Path]) -> str:
+        # Local files take priority
+        if Path(file_path).exists():
+            return "disk"
+
+        # Try to find it in the repo otherwise
+        try:
+            files = self.repoApi.list_path(Path(file_path).as_posix())
+            if len(files) > 0:
+                return "repo"
+        except PathNotFoundError:
+            pass
+
+        # TODO: handle repo bucket too
+        # TODO: improve and reuse https://github.com/DagsHub/client/pull/517#issuecomment-2288690281
+
+        raise PathNotFoundError(f"Path {file_path} not found")

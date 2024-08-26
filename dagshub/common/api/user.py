@@ -1,5 +1,5 @@
-from functools import cached_property, lru_cache
-from typing import Optional, Any, Union
+from functools import cached_property
+from typing import Optional, Any, Union, Dict
 
 import dacite
 
@@ -13,6 +13,9 @@ from dagshub.common.util import multi_urljoin
 
 class UserNotFoundError(Exception):
     pass
+
+
+_token_user_cache: Dict[str, "UserAPI"] = {}
 
 
 class UserAPI:
@@ -32,10 +35,17 @@ class UserAPI:
 
     @staticmethod
     def get_user_from_token(token_or_authenticator: Union[str, Any], host: Optional[str] = None) -> "UserAPI":
+        """
+        Get a user associated with the token.
+
+        This function has primitive caching for string tokens.
+        """
         if host is None:
             host = config.host
         user_url = multi_urljoin(host, "api/v1/user")
         if isinstance(token_or_authenticator, str):
+            if token_or_authenticator in _token_user_cache:
+                return _token_user_cache[token_or_authenticator]
             auth = HTTPBearerAuth(token_or_authenticator)
         else:
             auth = token_or_authenticator
@@ -45,7 +55,10 @@ class UserAPI:
         if resp.status_code != 200:
             raise RuntimeError(f"Got HTTP status {resp.status_code} while trying to get user: {resp.content}")
         user_info = dacite.from_dict(UserAPIResponse, resp.json())
-        return UserAPI(user=user_info, host=host, auth=auth)
+        res = UserAPI(user=user_info, host=host, auth=auth)
+        if isinstance(token_or_authenticator, str):
+            _token_user_cache[token_or_authenticator] = res
+        return res
 
     @staticmethod
     @lru_cache
