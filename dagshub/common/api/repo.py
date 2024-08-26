@@ -1,7 +1,6 @@
 import logging
 from os import PathLike
 from pathlib import Path, PurePosixPath
-
 import rich.progress
 
 from dagshub.common.api.responses import (
