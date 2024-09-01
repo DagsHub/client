@@ -69,6 +69,7 @@ else:
 logger = logging.getLogger(__name__)
 
 DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
+MLFLOW_TAG_NAME = "dagshub.datasets.datasource_id"
 
 
 @dataclass
@@ -863,7 +864,9 @@ class Datasource:
             run = mlflow.active_run()
             if run is None:
                 run = mlflow.start_run()
-        mlflow.MlflowClient().log_dict(run.info.run_id, self._to_dict(), artifact_name)
+        client = mlflow.MlflowClient()
+        client.set_tag(run.info.run_id, MLFLOW_TAG_NAME, str(self.source.id))
+        client.log_dict(run.info.run_id, self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
         return run
 
