@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 import logging
+import tempfile
 import math
 import os.path
 import threading
@@ -28,6 +29,7 @@ from dagshub.common.environment import is_mlflow_installed
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none
+from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationType, AnnotationLocation
 from dagshub.data_engine.client.models import (
     PreprocessingStatus,
     MetadataFieldSchema,
@@ -68,6 +70,7 @@ else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     mlflow = lazy_load("mlflow")
+    pandas = lazy_load("pandas")
     ngrok = lazy_load("ngrok")
     cloudpickle = lazy_load("cloudpickle")
 
@@ -75,6 +78,8 @@ logger = logging.getLogger(__name__)
 
 LS_ORCHESTRATOR_URL = "http://127.0.0.1"
 DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
+MLFLOW_DATASOURCE_TAG_NAME = "dagshub.datasets.datasource_id"
+MLFLOW_DATASET_TAG_NAME = "dagshub.datasets.dataset_id"
 
 
 @dataclass
@@ -281,27 +286,33 @@ class Datasource:
         self._download_document_fields(res)
         return res
 
-    def head(self, size=100) -> "QueryResult":
+    def head(self, size=100, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing first ``size`` datapoints
 
         Args:
             size: how many datapoints to get. Default is 100
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
         """
         self._check_preprocess()
         send_analytics_event("Client_DataEngine_DisplayTopResults", repo=self.source.repoApi)
         res = self._source.client.head(self, size)
-        res._load_autoload_fields()
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
         return res
 
-    def all(self) -> "QueryResult":
+    def all(self, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing all datapoints
+
+        Args:
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
         """
         self._check_preprocess()
         self._autolog_mlflow()
         res = self._source.client.get_datapoints(self)
-        res._load_autoload_fields()
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
 
         return res
 
@@ -522,7 +533,32 @@ class Datasource:
 
         return func()
 
-    def upload_metadata_from_dataframe(self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None):
+    def upload_metadata_from_file(
+        self, file_path, path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
+        """
+        Upload metadata from a file.
+
+        Args:
+            file_path: Path to the file with metadata. Allowed formats are CSV, Parquet, ZIP, GZ.
+            path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
+                If not specified, the first column is used.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
+        """
+        send_analytics_event("Client_DataEngine_addEnrichmentsWithFile", repo=self.source.repoApi)
+
+        if ingest_on_server:
+            datasource_name = self.source.name
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
+        else:
+            df = self._convert_file_to_df(file_path)
+            self.upload_metadata_from_dataframe(df, path_column, ingest_on_server)
+
+    def upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None, ingest_on_server: bool = False
+    ):
         """
         Upload metadata from a pandas dataframe.
 
@@ -533,10 +569,29 @@ class Datasource:
                 DataFrame with metadata
             path_column: Column with the datapoints' paths. Can either be the name of the column, or its index.
                 If not specified, the first column is used.
+            ingest_on_server: Set to ``True`` to process the metadata asynchronously.
+                The file will be sent to our server and ingested into the datasource there.
+                Default is ``False``.
         """
         self.source.get_from_dagshub()
         send_analytics_event("Client_DataEngine_addEnrichmentsWithDataFrame", repo=self.source.repoApi)
-        self._upload_metadata(self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields()))
+
+        if ingest_on_server:
+            self._remote_upload_metadata_from_dataframe(df, path_column)
+        else:
+            metadata = self._df_to_metadata(df, path_column, multivalue_fields=self._get_multivalue_fields())
+            self._upload_metadata(metadata)
+
+    def _remote_upload_metadata_from_dataframe(
+        self, df: "pandas.DataFrame", path_column: Optional[Union[str, int]] = None
+    ):
+        datasource_name = self.source.name
+
+        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=True) as tmp:
+            file_path = tmp.name
+            df.to_parquet(file_path, index=False)
+
+            self._source.import_metadata_from_file(datasource_name, file_path, path_column)
 
     def _get_multivalue_fields(self) -> Set[str]:
         res = set()
@@ -574,9 +629,16 @@ class Datasource:
                     continue
                 if val is None:
                     continue
-                # ONLY FOR PANDAS: since pandas doesn't distinguish between None and NaN, don't upload it
+                # Pandas specific: since pandas doesn't distinguish between None and NaN, don't upload it
                 if isinstance(val, float) and math.isnan(val):
                     continue
+                # Pandas specific: Cast pandas Timestamp to datetime
+                if isinstance(val, list) or isinstance(val, pandas._libs.tslibs.timestamps.Timestamp):
+                    if isinstance(val, list):
+                        if isinstance(val[0], pandas._libs.tslibs.timestamps.Timestamp):
+                            val = [val.to_pydatetime() for val in val]
+                    else:
+                        val = val.to_pydatetime()
                 if isinstance(val, list):
                     if key not in multivalue_fields:
                         multivalue_fields.add(key)
@@ -586,6 +648,7 @@ class Datasource:
                                 update_entry.allowMultiple = True
                     for sub_val in val:
                         value_type = field_value_types.get(key)
+                        time_zone = None
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
                             field_value_types[key] = value_type
@@ -600,9 +663,17 @@ class Datasource:
                             sub_val = sub_val.encode("utf-8")
                         if isinstance(sub_val, bytes):
                             sub_val = wrap_bytes(sub_val)
+                        if isinstance(sub_val, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(sub_val)
+                            sub_val = int(sub_val.timestamp() * 1000)
                         res.append(
                             DatapointMetadataUpdateEntry(
-                                url=datapoint, key=key, value=str(sub_val), valueType=value_type, allowMultiple=True
+                                url=datapoint,
+                                key=key,
+                                value=str(sub_val),
+                                valueType=value_type,
+                                allowMultiple=True,
+                                timeZone=time_zone,
                             )
                         )
                 else:
@@ -614,6 +685,7 @@ class Datasource:
                     if value_type == MetadataFieldType.BLOB and not isinstance(val, bytes):
                         if key not in document_fields:
                             continue
+                    time_zone = None
                     # Pandas quirk - integers are floats on the backend
                     if value_type == MetadataFieldType.INTEGER:
                         val = int(val)
@@ -621,6 +693,9 @@ class Datasource:
                         val = val.encode("utf-8")
                     if isinstance(val, bytes):
                         val = wrap_bytes(val)
+                    if isinstance(val, datetime.datetime):
+                        time_zone = _get_datetime_utc_offset(val)
+                        val = int(val.timestamp() * 1000)
                     res.append(
                         DatapointMetadataUpdateEntry(
                             url=datapoint,
@@ -628,6 +703,7 @@ class Datasource:
                             value=str(val),
                             valueType=value_type,
                             allowMultiple=key in multivalue_fields,
+                            timeZone=time_zone,
                         )
                     )
         return res
@@ -800,7 +876,11 @@ class Datasource:
             run = mlflow.active_run()
             if run is None:
                 run = mlflow.start_run()
-        mlflow.MlflowClient().log_dict(run.info.run_id, self._to_dict(), artifact_name)
+        client = mlflow.MlflowClient()
+        client.set_tag(run.info.run_id, MLFLOW_DATASOURCE_TAG_NAME, self.source.id)
+        if self.assigned_dataset is not None:
+            client.set_tag(run.info.run_id, MLFLOW_DATASET_TAG_NAME, self.assigned_dataset.dataset_id)
+        client.log_dict(run.info.run_id, self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
         return run
 
@@ -1282,7 +1362,7 @@ class Datasource:
         # Otherwise we're doing querying
         new_ds = self.__deepcopy__()
         if isinstance(other, (str, Field)):
-            query_field: Field = Field(other) if type(other) is str else other
+            query_field: Field = Field(other) if isinstance(other, str) else other
             other_query = QueryFilterTree(
                 query_field.field_name,
                 query_field.as_of_timestamp,
@@ -1491,7 +1571,9 @@ class Datasource:
         raise NotImplementedError
 
     def add_query_op(
-        self, op: str, other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str]]] = None
+        self,
+        op: str,
+        other: Optional[Union[str, int, float, "Datasource", "QueryFilterTree", List[str], datetime.datetime]] = None,
     ) -> "Datasource":
         """
         Add a query operation to the current Datasource instance.
@@ -1516,6 +1598,109 @@ class Datasource:
     def _test_not_comparing_other_ds(other):
         if type(other) is Datasource:
             raise DatasetFieldComparisonError()
+
+    @staticmethod
+    def _convert_file_to_df(file_path: str):
+        # prepare dataframe for import_metadata
+        if file_path.lower().endswith(".csv"):
+            df = pandas.read_csv(file_path)
+        elif file_path.lower().endswith(".parquet"):
+            df = pandas.read_parquet(file_path)
+        elif file_path.lower().endswith(".zip"):
+            df = pandas.read_csv(file_path, compression="zip")
+        elif file_path.lower().endswith(".gz"):
+            df = pandas.read_csv(file_path, compression="gzip")
+        else:
+            raise RuntimeError(
+                f"File '{file_path}' needs to be a .csv/.parquet or a compressed .zip/.gz to be imported"
+            )
+        return df
+
+    def import_annotations_from_files(
+        self,
+        annotation_type: AnnotationType,
+        path: Union[str, Path],
+        field: str = "imported_annotation",
+        load_from: Optional[AnnotationLocation] = None,
+        remapping_function: Optional[Callable[[str], str]] = None,
+        **kwargs,
+    ):
+        """
+        Imports annotations into the datasource from files
+
+        The annotations will be downloaded and converted into Label Studio tasks,
+        that are then uploaded into the specified fields.
+
+        If the annotations are stored in a repo and not locally, they are downloaded to a temporary directory.
+
+        Caveats:
+            - YOLO:
+                - Images need to also be downloaded to get their dimensions.
+                - The .YAML file needs to have the ``path`` argument set to the relative path to the data. \
+                    We're using that to download the files
+                - You have to specify the ``yolo_type`` kwarg with the type of annotation to import
+
+        Args:
+            annotation_type: Type of annotations to import. Possible values are ``yolo`` and ``cvat``
+            path: If YOLO - path to the .yaml file, if CVAT - path to the .zip file. \
+                Can be either on disk or in repository
+            field: Which field to upload the annotations into. \
+                If it's an existing field, it has to be a blob field, \
+                and it will have the annotations flag set afterwards.
+            load_from: Force specify where to get the files from. \
+                By default, we're trying to load files from the disk first, and then repository.
+                If this is specified, then that check is being skipped and \
+                we'll try to download from the specified location.
+            remapping_function: Function that maps from a path of the annotation to the path of the datapoint. \
+                If None, we try to make a best guess based on the first imported annotation. \
+                This might fail, if there is no matching datapoint in the datasource for some annotations \
+                or if the paths are wildly different.
+
+        Keyword Args:
+            yolo_type: Type of YOLO annotations to import. Either ``bbox``, ``segmentation`` or ``pose``.
+
+        Example to import segmentation annotations into an ``imported_annotations`` field,
+        using YOLO information from an ``annotations.yaml`` file (can be local, or in the repo)::
+
+            ds.import_annotations_from_files(
+                annotation_type="yolo",
+                annotations_path="annotations.yaml",
+                annotations_field="imported_annotations",
+                yolo_type="segmentation"
+            )
+        """
+
+        # Make sure the annotation field exists, is a blob field + has the annotation tag
+        existing_fields = [f for f in self.fields if f.name == field]
+        if len(existing_fields) != 0:
+            f = existing_fields[0]
+            if f.valueType != MetadataFieldType.BLOB:
+                raise RuntimeError(
+                    f"Field {f.name} is not a blob field. "
+                    f"Choose a new field or an existing blob field to upload annotations to."
+                )
+        self.metadata_field(field).set_type(bytes).set_annotation().apply()
+
+        # Run import
+        importer = AnnotationImporter(
+            ds=self,
+            annotations_type=annotation_type,
+            annotations_file=path,
+            load_from=load_from,
+            **kwargs,
+        )
+        annotation_dict = importer.import_annotations()
+
+        annotation_dict = importer.remap_annotations(annotation_dict, remap_func=remapping_function)
+
+        with rich_console.status("Converting annotations to tasks..."):
+            tasks = importer.convert_to_ls_tasks(annotation_dict)
+
+        with self.metadata_context() as ctx:
+            for dp, task in tasks.items():
+                ctx.update_metadata(dp, {field: task})
+
+        log_message(f'Done! Uploaded annotations for {len(tasks)} datapoints to field "{field}"')
 
 
 class MetadataContextManager:
@@ -1578,6 +1763,7 @@ class MetadataContextManager:
                             if e.key == k:
                                 e.allowMultiple = True
                     for sub_val in v:
+                        time_zone = None
                         value_type = field_value_types.get(k)
                         if value_type is None:
                             value_type = metadataTypeLookup[type(sub_val)]
@@ -1589,6 +1775,9 @@ class MetadataContextManager:
                                 continue
                         if isinstance(v, str) and k in document_fields:
                             v = v.encode("utf-8")
+                        if isinstance(v, datetime.datetime):
+                            time_zone = _get_datetime_utc_offset(v)
+                            v = int(v.timestamp() * 1000)
                         if isinstance(v, bytes):
                             sub_val = wrap_bytes(sub_val)
                         self._metadata_entries.append(
@@ -1599,6 +1788,7 @@ class MetadataContextManager:
                                 # todo: preliminary type check
                                 valueType=value_type,
                                 allowMultiple=k in self._multivalue_fields,
+                                timeZone=time_zone,
                             )
                         )
 

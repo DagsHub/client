@@ -40,6 +40,7 @@ install_requires = [
     "python-dateutil",
     "tenacity~=8.2.3",
     "boto3",
+    "dagshub-annotation-converter>=0.1.0",
 ]
 
 extras_require = {
