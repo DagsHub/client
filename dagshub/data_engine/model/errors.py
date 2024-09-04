@@ -82,6 +82,4 @@ class LSInitializingError(Exception):
         super().__init__()
 
     def __str__(self):
-        return (
-            f"Label Studio on DagsHub is starting up! Please try again in a couple of seconds"
-        )
+        return "Label Studio on DagsHub is starting up! Please try again in a couple of seconds"
