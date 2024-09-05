@@ -882,7 +882,9 @@ class Datasource:
                 "datasource_id": self.source.id,
                 "datasource_name": self.source.name,
             }
-            client.set_tag(run.info.run_id, f"{MLFLOW_DATASET_TAG_NAME}.{self.assigned_dataset.dataset_id}", json.dumps(info))
+            client.set_tag(
+                run.info.run_id, f"{MLFLOW_DATASET_TAG_NAME}.{self.assigned_dataset.dataset_id}", json.dumps(info)
+            )
         client.log_dict(run.info.run_id, self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
         return run
