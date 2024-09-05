@@ -866,9 +866,23 @@ class Datasource:
             if run is None:
                 run = mlflow.start_run()
         client = mlflow.MlflowClient()
-        client.set_tag(run.info.run_id, f"{MLFLOW_DATASOURCE_TAG_NAME}.{self.source.id}", "")
-        if self.assigned_dataset is not None:
-            client.set_tag(run.info.run_id, f"{MLFLOW_DATASET_TAG_NAME}.{self.assigned_dataset.dataset_id}", "")
+        is_datasource_query = self.is_query_different_from_dataset or self.assigned_dataset is None
+        if is_datasource_query:
+            info = {
+                "id": self.source.id,
+                "name": self.source.name,
+                "as_of": self._query.as_of,
+            }
+            client.set_tag(run.info.run_id, f"{MLFLOW_DATASOURCE_TAG_NAME}.{self.source.id}", json.dumps(info))
+        else:
+            info = {
+                "id": self.assigned_dataset.dataset_id,
+                "name": self.assigned_dataset.dataset_name,
+                "as_of": self._query.as_of,
+                "datasource_id": self.source.id,
+                "datasource_name": self.source.name,
+            }
+            client.set_tag(run.info.run_id, f"{MLFLOW_DATASET_TAG_NAME}.{self.assigned_dataset.dataset_id}", json.dumps(info))
         client.log_dict(run.info.run_id, self._to_dict(), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
         return run
