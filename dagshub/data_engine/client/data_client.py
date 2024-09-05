@@ -133,6 +133,7 @@ class DataClient:
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
                 res.fields = new_entries.fields
+                res.query_data_time = new_entries.query_data_time
                 left -= take
                 progress.update(total_task, advance=len(res.entries), refresh=True)
         return res
@@ -159,6 +160,7 @@ class DataClient:
                 new_entries = QueryResult.from_gql_query(resp, datasource)
                 res.entries += new_entries.entries
                 res.fields = new_entries.fields
+                res.query_data_time = new_entries.query_data_time
                 progress.update(total_task, advance=len(new_entries.entries), refresh=True)
 
         return res

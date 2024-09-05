@@ -1,3 +1,4 @@
+import datetime
 import inspect
 import logging
 from collections import Counter
@@ -71,6 +72,7 @@ class QueryResult:
     _entries: List[Datapoint]
     datasource: "Datasource"
     fields: List[MetadataSelectFieldSchema]
+    query_data_time: Optional[datetime.datetime] = None
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
 
     def __post_init__(self):
@@ -132,12 +134,9 @@ class QueryResult:
         if edges is None:
             edges = []
         datapoints = [Datapoint.from_gql_edge(edge, datasource, fields) for edge in edges]
+        query_data_time = datetime.datetime.fromtimestamp(query_resp.get("queryDataTime"), tz=datetime.timezone.utc)
 
-        return QueryResult(
-            datapoints,
-            datasource,
-            fields,
-        )
+        return QueryResult(datapoints, datasource, fields, query_data_time=query_data_time)
 
     def as_ml_dataset(self, flavor: str, **kwargs):
         """
