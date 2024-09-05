@@ -136,7 +136,7 @@ class QueryResult:
         datapoints = [Datapoint.from_gql_edge(edge, datasource, fields) for edge in edges]
         query_data_time = datetime.datetime.fromtimestamp(query_resp.get("queryDataTime"), tz=datetime.timezone.utc)
 
-        return QueryResult(datapoints, datasource, fields, query_data_time=query_data_time)
+        return QueryResult(_entries=datapoints, datasource=datasource, fields=fields, query_data_time=query_data_time)
 
     def as_ml_dataset(self, flavor: str, **kwargs):
         """
