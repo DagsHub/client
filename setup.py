@@ -28,25 +28,24 @@ install_requires = [
     "fusepy>=3",
     "appdirs>=1.4.4",
     "click>=8.0.4",
-    "httpx~=0.23.0",
+    "httpx>=0.23.0",
     "GitPython>=3.1.29",
-    "rich~=13.1.0",
+    "rich>=13.1.0",
     # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
     "dacite~=1.6.0",
-    "tenacity~=8.2.2",
+    "tenacity>=8.2.2",
     "gql[requests]",
     "dataclasses-json",
     "pandas",
-    "treelib~=1.6.4",
-    "pathvalidate~=3.0.0",
+    "treelib>=1.6.4",
+    "pathvalidate>=3.0.0",
     "python-dateutil",
-    "tenacity~=8.2.3",
     "boto3",
     "dagshub-annotation-converter>=0.1.0",
 ]
 
 extras_require = {
-    "jupyter": ["rich[jupyter]~=13.1.0"],
+    "jupyter": ["rich[jupyter]>=13.1.0"],
     "fuse": ["fusepy>=3"],
 }
 
