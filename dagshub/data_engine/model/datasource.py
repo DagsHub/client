@@ -1515,8 +1515,8 @@ class Datasource:
 
             ds.import_annotations_from_files(
                 annotation_type="yolo",
-                annotations_path="annotations.yaml",
-                annotations_field="imported_annotations",
+                path="annotations.yaml",
+                field="imported_annotations",
                 yolo_type="segmentation"
             )
         """
