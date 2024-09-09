@@ -6,6 +6,6 @@ pytest-env==1.1.4
 pytest-mock==3.14.0
 fiftyone==0.25.1
 datasets==2.21.0
-ultralytics==8.2.48
+ultralytics==8.2.90
 # TODO: REMOVE AFTER pytest-shutil has been fixed: https://github.com/man-group/pytest-plugins/issues/224
 path==16.0.0
