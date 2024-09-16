@@ -1,5 +1,5 @@
 sphinx==8.0.2
 furo==2024.8.6
-sphinx-autobuild==2024.4.16
+sphinx-autobuild==2024.9.3
 sphinx-copybutton==0.5.2
 sphinx-sitemap==2.6.0
