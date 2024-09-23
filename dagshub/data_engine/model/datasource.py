@@ -844,7 +844,7 @@ class Datasource:
             return
         source_name = self.source.name
 
-        now_time = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
+        now_time = qr.query_data_time.strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
         uuid_chunk = str(uuid.uuid4())[-4:]
 
         artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
