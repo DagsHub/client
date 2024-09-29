@@ -1,4 +1,4 @@
-__version__ = "0.3.36"
+__version__ = "0.3.37"
 from .logger import DAGsHubLogger, dagshub_logger
 from .common.init import init
 from .upload.wrapper import upload_files
