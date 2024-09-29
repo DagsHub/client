@@ -434,14 +434,15 @@ class QueryResult:
                     else:
                         dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
 
-        log_message("Warning: The following datapoints had invalid annotations, "
-                    "any annotation-related operations will not work on these:")
+        log_message(
+            "Warning: The following datapoints had invalid annotations, "
+            "any annotation-related operations will not work on these:"
+        )
         err_msg = ""
         for fld, dps in bad_annotations.items():
             err_msg += f'Field "{fld}" in datapoints:\n\t'
             err_msg += "\n\t".join(dps)
         log_message(err_msg)
-
 
     def download_binary_columns(
         self,
