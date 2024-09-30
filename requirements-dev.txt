@@ -8,4 +8,4 @@ fiftyone==0.25.2
 datasets==3.0.1
 ultralytics==8.3.0
 # TODO: REMOVE AFTER pytest-shutil has been fixed: https://github.com/man-group/pytest-plugins/issues/224
-path==16.0.0
+path==17.0.0
