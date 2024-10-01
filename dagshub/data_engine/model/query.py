@@ -23,7 +23,7 @@ def bytes_deserializer(val: str) -> bytes:
 _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
     bytes: bytes_deserializer,
-    datetime.datetime: lambda x: datetime.datetime.fromtimestamp(int(x) / 1000).astimezone(pytz.utc)
+    datetime.datetime: lambda x: datetime.datetime.fromtimestamp(int(x) / 1000).astimezone(pytz.utc),
 }
 
 
@@ -47,10 +47,12 @@ class FieldFilterDateTimeFilter(enum.Enum):
     TIMEOFDAY = "TIMEOFDAY"
 
 
-dt_range_ops = [FieldFilterDateTimeFilter.YEAR,
-                FieldFilterDateTimeFilter.MONTH,
-                FieldFilterDateTimeFilter.DAY,
-                FieldFilterDateTimeFilter.TIMEOFDAY]
+dt_range_ops = [
+    FieldFilterDateTimeFilter.YEAR,
+    FieldFilterDateTimeFilter.MONTH,
+    FieldFilterDateTimeFilter.DAY,
+    FieldFilterDateTimeFilter.TIMEOFDAY,
+]
 
 
 fieldFilterOperandMap = {
@@ -63,14 +65,14 @@ fieldFilterOperandMap = {
     "isnull": FieldFilterOperand.IS_NULL,
     "startswith": FieldFilterOperand.STARTS_WITH,
     "endswith": FieldFilterOperand.ENDS_WITH,
-    "date_time_filter": FieldFilterOperand.DATE_TIME_FILTER
+    "date_time_filter": FieldFilterOperand.DATE_TIME_FILTER,
 }
 
 fieldFilterDateTimeFilterMap = {
     "year": FieldFilterDateTimeFilter.YEAR,
     "month": FieldFilterDateTimeFilter.MONTH,
     "day": FieldFilterDateTimeFilter.DAY,
-    "timeofday": FieldFilterDateTimeFilter.TIMEOFDAY
+    "timeofday": FieldFilterDateTimeFilter.TIMEOFDAY,
 }
 fieldFilterOperandMapReverseMap: Dict[str, str] = {}
 
@@ -270,6 +272,8 @@ class QueryFilterTree:
     @staticmethod
     def _deserialize_node(node_dict: Dict, tree: Tree, parent_node=None) -> None:
         keys = list(node_dict.keys())
+        if len(keys) == 0:
+            return
 
         is_negative = node_dict.get("not", False)
         if is_negative:
