@@ -57,7 +57,10 @@ from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilde
 from dagshub.data_engine.model.query import QueryFilterTree
 from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
 from dagshub.data_engine.model.datasource_state import DatasourceState
-
+# 👇 Required for running adding of LS backend from a notebook
+import asyncio
+import nest_asyncio
+nest_asyncio.apply()
 if TYPE_CHECKING:
     from dagshub.data_engine.model.query_result import QueryResult
     import fiftyone as fo
@@ -1136,7 +1139,7 @@ class Datasource:
 
             if ngrok_authtoken:
                 if not self.ngrok_listener:
-                    self.ngrok_listener = ngrok.forward(port, authtoken=ngrok_authtoken)
+                    self.ngrok_listener = asyncio.run(ngrok.forward(port, authtoken=ngrok_authtoken))
                 endpoint = self.ngrok_listener.url()
             else:
                 endpoint = f"{LS_ORCHESTRATOR_URL}:{port}/"
