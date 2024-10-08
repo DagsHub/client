@@ -1036,7 +1036,7 @@ class Datasource:
         return self.source.metadata_fields
 
     @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
-    def add_annotation_model_from_config(self, config, project_name, ngrok_authtoken, port=9090):
+    async def add_annotation_model_from_config(self, config, project_name, ngrok_authtoken, port=9090):
         """
         Initialize a LS backend for ML annotation using a preset configuration.
 
@@ -1076,10 +1076,10 @@ class Datasource:
             if res.status_code // 100 != 2:
                 raise ValueError(f"Adding backend failed! Response: {res.text}")
 
-        self.add_annotation_model(**config, port=port, project_name=project_name, ngrok_authtoken=ngrok_authtoken)
+        await self.add_annotation_model(**config, port=port, project_name=project_name, ngrok_authtoken=ngrok_authtoken)
 
     @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
-    def add_annotation_model(
+    async def add_annotation_model(
         self,
         repo: str,
         name: str,
@@ -1136,7 +1136,7 @@ class Datasource:
 
             if ngrok_authtoken:
                 if not self.ngrok_listener:
-                    self.ngrok_listener = ngrok.forward(port, authtoken=ngrok_authtoken)
+                    self.ngrok_listener = await ngrok.forward(port, authtoken=ngrok_authtoken)
                 endpoint = self.ngrok_listener.url()
             else:
                 endpoint = f"{LS_ORCHESTRATOR_URL}:{port}/"
