@@ -421,6 +421,9 @@ class QueryResult:
             for dp in self:
                 for fld in annotation_fields:
                     if fld in dp.metadata:
+                        # Already loaded - skip
+                        if isinstance(dp.metadata[fld], MetadataAnnotations):
+                            continue
                         # Override the load_into_memory flag, because we need the contents
                         if not load_into_memory:
                             dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
@@ -433,15 +436,16 @@ class QueryResult:
                     else:
                         dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
 
-        log_message(
-            "Warning: The following datapoints had invalid annotations, "
-            "any annotation-related operations will not work on these:"
-        )
-        err_msg = ""
-        for fld, dps in bad_annotations.items():
-            err_msg += f'Field "{fld}" in datapoints:\n\t'
-            err_msg += "\n\t".join(dps)
-        log_message(err_msg)
+        if bad_annotations:
+            log_message(
+                "Warning: The following datapoints had invalid annotations, "
+                "any annotation-related operations will not work on these:"
+            )
+            err_msg = ""
+            for fld, dps in bad_annotations.items():
+                err_msg += f'Field "{fld}" in datapoints:\n\t'
+                err_msg += "\n\t".join(dps)
+            log_message(err_msg)
 
     def download_binary_columns(
         self,
