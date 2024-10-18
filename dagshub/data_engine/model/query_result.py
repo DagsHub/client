@@ -1,6 +1,7 @@
+import datetime
 import inspect
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
@@ -17,6 +18,7 @@ from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
 from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
+from pydantic import ValidationError
 
 from dagshub.auth import get_token
 from dagshub.common import config
@@ -76,6 +78,7 @@ class QueryResult:
     _entries: List[Datapoint]
     datasource: "Datasource"
     fields: List[MetadataSelectFieldSchema]
+    query_data_time: Optional[datetime.datetime] = None
     _datapoint_path_lookup: Dict[str, Datapoint] = field(init=False)
 
     def __post_init__(self):
@@ -137,12 +140,9 @@ class QueryResult:
         if edges is None:
             edges = []
         datapoints = [Datapoint.from_gql_edge(edge, datasource, fields) for edge in edges]
+        query_data_time = datetime.datetime.fromtimestamp(query_resp.get("queryDataTime"), tz=datetime.timezone.utc)
 
-        return QueryResult(
-            datapoints,
-            datasource,
-            fields,
-        )
+        return QueryResult(_entries=datapoints, datasource=datasource, fields=fields, query_data_time=query_data_time)
 
     def as_ml_dataset(self, flavor: str, **kwargs):
         """
@@ -400,21 +400,7 @@ class QueryResult:
                         logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
                     progress.update(task, advance=1)
 
-        # Convert any downloaded annotation column
-        annotation_fields = [f for f in fields if f in self.annotation_fields]
-        if annotation_fields:
-            # Convert them
-            for dp in self:
-                for fld in annotation_fields:
-                    if fld in dp.metadata:
-                        # Override the load_into_memory flag, because we need the contents
-                        if not load_into_memory:
-                            dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
-                        dp.metadata[fld] = MetadataAnnotations.from_ls_task(
-                            datapoint=dp, field=fld, ls_task=dp.metadata[fld]
-                        )
-                    else:
-                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+        self._convert_annotation_fields(*fields, load_into_memory=load_into_memory)
 
         # Convert any downloaded document fields
         document_fields = [f for f in fields if f in self.document_fields]
@@ -428,6 +414,43 @@ class QueryResult:
                         dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
 
         return self
+
+    def _convert_annotation_fields(self, *fields, load_into_memory):
+        # Convert any downloaded annotation column
+        annotation_fields = [f for f in fields if f in self.annotation_fields]
+
+        bad_annotations = defaultdict(list)
+
+        if annotation_fields:
+            # Convert them
+            for dp in self:
+                for fld in annotation_fields:
+                    if fld in dp.metadata:
+                        # Already loaded - skip
+                        if isinstance(dp.metadata[fld], MetadataAnnotations):
+                            continue
+                        # Override the load_into_memory flag, because we need the contents
+                        if not load_into_memory:
+                            dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
+                        try:
+                            dp.metadata[fld] = MetadataAnnotations.from_ls_task(
+                                datapoint=dp, field=fld, ls_task=dp.metadata[fld]
+                            )
+                        except ValidationError:
+                            bad_annotations[fld].append(dp.path)
+                    else:
+                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+
+        if bad_annotations:
+            log_message(
+                "Warning: The following datapoints had invalid annotations, "
+                "any annotation-related operations will not work on these:"
+            )
+            err_msg = ""
+            for fld, dps in bad_annotations.items():
+                err_msg += f'Field "{fld}" in datapoints:\n\t'
+                err_msg += "\n\t".join(dps)
+            log_message(err_msg)
 
     def download_binary_columns(
         self,

@@ -27,24 +27,24 @@ install_requires = [
     "PyYAML>=5",
     "appdirs>=1.4.4",
     "click>=8.0.4",
-    "httpx~=0.23.0",
+    "httpx>=0.23.0",
     "GitPython>=3.1.29",
-    "rich~=13.1.0",
+    "rich>=13.1.0",
     # Need to keep dacite version in lockstep with voxel, otherwise stuff breaks on their end
     "dacite~=1.6.0",
+    "tenacity>=8.2.2",
     "gql[requests]",
     "dataclasses-json",
     "pandas",
-    "treelib~=1.6.4",
-    "pathvalidate~=3.0.0",
+    "treelib>=1.6.4",
+    "pathvalidate>=3.0.0",
     "python-dateutil",
-    "tenacity~=8.2.3",
     "boto3",
     "dagshub-annotation-converter>=0.1.0",
 ]
 
 extras_require = {
-    "jupyter": ["rich[jupyter]~=13.1.0"],
+    "jupyter": ["rich[jupyter]>=13.1.0"],
     "fuse": ["fusepy>=3"],
     "autolabeling": ["ngrok>=1.3.0", "cloudpickle>=3.0.0"],
 }
@@ -69,6 +69,6 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     entry_points={"console_scripts": ["dagshub = dagshub.common.cli:cli"]},
 )
