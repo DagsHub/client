@@ -25,7 +25,6 @@ with open("README.md", "r", encoding="utf8") as fh:
 
 install_requires = [
     "PyYAML>=5",
-    "fusepy>=3",
     "appdirs>=1.4.4",
     "click>=8.0.4",
     "httpx>=0.23.0",
@@ -47,6 +46,7 @@ install_requires = [
 extras_require = {
     "jupyter": ["rich[jupyter]>=13.1.0"],
     "fuse": ["fusepy>=3"],
+    "autolabeling": ["ngrok>=1.3.0", "cloudpickle>=3.0.0"],
 }
 
 packages = setuptools.find_packages(exclude=["tests", "tests.*"])
