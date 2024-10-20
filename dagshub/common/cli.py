@@ -262,7 +262,7 @@ def upload(
 
     FILENAME can be a directory.
 
-    REPO should be of the form <owner>/<repo-name>, i.e nirbarazida/yolov6.
+    REPO should be of the form <owner>/<repo-name>, e.g: nirbarazida/yolov6.
 
     TARGET should include the full path inside the repo, including the filename itself.
     If TARGET is omitted, it defaults to using the relative path to FILENAME from current working directory,
