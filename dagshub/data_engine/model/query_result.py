@@ -6,7 +6,9 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
+import json
+import os
 import os.path
 
 import dacite
@@ -18,12 +20,13 @@ from dagshub_annotation_converter.formats.yolo.common import ir_mapping
 from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
 from pydantic import ValidationError
 
+from dagshub.auth import get_token
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.common.util import lazy_load
+from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_voxel_annotations,
@@ -42,11 +45,13 @@ if TYPE_CHECKING:
     import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
     import datasets as hf_ds
     import tensorflow as tf
+    import mlflow
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
     tf = lazy_load("tensorflow")
     hf_ds = lazy_load("datasets")
+    mlflow = lazy_load("mlflow")
 
 logger = logging.getLogger(__name__)
 
@@ -466,6 +471,86 @@ class QueryResult:
             num_proc=num_proc,
         )
 
+    def predict_with_mlflow_model(
+        self,
+        repo: str,
+        name: str,
+        host: Optional[str] = None,
+        version: str = "latest",
+        pre_hook: Callable[[Any], Any] = lambda x: x,
+        post_hook: Callable[[Any], Any] = lambda x: x,
+        batch_size: int = 1,
+        log_to_field: Optional[str] = None,
+    ) -> Optional[list]:
+        """
+        Sends all the datapoints returned in this QueryResult as prediction targets for
+        an MLFlow model registered on DagsHub.
+
+        Args:
+            repo: repository to extract the model from
+            name: name of the model in the mlflow registry
+            version: (optional, default: 'latest') version of the model in the mlflow registry
+            pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
+            post_hook: (optional, default: identity function) function that converts mlflow model output
+            to the desired format
+            batch_size: (optional, default: 1) function that sets batch_size
+            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
+            If None, just returns predictions.
+            (in addition to logging to a field, iff that parameter is set)
+        """
+
+        # to support depedency-free dataloading, `Batcher` is a barebones dataloader that sets up batched inference
+        class Batcher:
+            def __init__(self, dset, batch_size):
+                self.dset = dset
+                self.batch_size = batch_size
+
+            def __iter__(self):
+                self.curr_idx = 0
+                return self
+
+            def __next__(self):
+                self.curr_idx += self.batch_size
+                return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
+
+        if not host:
+            host = self.datasource.source.repoApi.host
+        prev_uri = mlflow.get_tracking_uri()
+        os.environ["MLFLOW_TRACKING_URI"] = multi_urljoin(host, f"{repo}.mlflow")
+        os.environ["MLFLOW_TRACKING_USERNAME"] = get_token()
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = get_token()
+        try:
+            model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
+        finally:
+            os.environ["MLFLOW_TRACKING_URI"] = prev_uri
+
+        dset = DagsHubDataset(self, tensorizers=[lambda x: x])
+
+        predictions = {}
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Running inference...", total=len(dset))
+        with progress:
+            for idx, local_paths in enumerate(
+                Batcher(dset, batch_size) if batch_size != 1 else dset
+            ):  # encapsulates dataset with batcher if necessary and iterates over it
+                for prediction, remote_path in zip(
+                    post_hook(model.predict(pre_hook(local_paths))),
+                    [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
+                ):
+                    predictions[remote_path] = {
+                        "data": {"image": multi_urljoin(self.datasource.source.root_raw_path, remote_path)},
+                        "annotations": [prediction],
+                    }
+                progress.update(task, advance=batch_size, refresh=True)
+
+        if log_to_field:
+            with self.datasource.metadata_context() as ctx:
+                for remote_path in predictions:
+                    ctx.update_metadata(
+                        remote_path, {log_to_field: json.dumps(predictions[remote_path]).encode("utf-8")}
+                    )
+        return predictions
+
     def get_annotations(self, **kwargs) -> "QueryResult":
         """
         Loads all annotation fields using :func:`get_blob_fields`.
@@ -768,11 +853,52 @@ class QueryResult:
 
             return sess
 
+    def annotate_with_mlflow_model(
+        self,
+        repo: str,
+        name: str,
+        post_hook: Callable = lambda x: x,
+        pre_hook: Callable = lambda x: x,
+        host: Optional[str] = None,
+        version: str = "latest",
+        batch_size: int = 1,
+        log_to_field: str = "annotation",
+    ) -> Optional[str]:
+        """
+        Sends all the datapoints returned in this QueryResult to an MLFlow model which automatically labels datapoints.
+
+        Args:
+            repo: repository to extract the model from
+            name: name of the model in the mlflow registry
+            version: (optional, default: 'latest') version of the model in the mlflow registry
+            pre_hook: (optional, default: identity function) function that runs
+            before the datapoint is sent to the model
+            post_hook: (optional, default: identity function) function that converts
+            mlflow model output converts to labelstudio format
+            batch_size: (optional, default: 1) batched annotation size
+        """
+        self.predict_with_mlflow_model(
+            repo,
+            name,
+            host=host,
+            version=version,
+            pre_hook=pre_hook,
+            post_hook=post_hook,
+            batch_size=batch_size,
+            log_to_field=log_to_field,
+        )
+        self.datasource.metadata_field(log_to_field).set_annotation().apply()
+
     def annotate(
-        self, open_project=True, ignore_warning=True, fields_to_embed=None, fields_to_exclude=None
+        self,
+        open_project: bool = True,
+        ignore_warning: bool = True,
+        fields_to_embed: Optional[List[str]] = None,
+        fields_to_exclude: Optional[List[str]] = None,
     ) -> Optional[str]:
         """
         Sends all the datapoints returned in this QueryResult to be annotated in Label Studio on DagsHub.
+        Alternatively, uses MLFlow to automatically label datapoints.
 
         Args:
             open_project: Automatically open the Label Studio project in the browser
