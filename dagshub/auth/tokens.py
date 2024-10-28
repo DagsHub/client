@@ -31,6 +31,9 @@ class InvalidTokenError(Exception):
         print("The token is not a valid DagsHub token")
 
 
+_validated_env_tokens = set()
+
+
 class TokenStorage:
     def __init__(self, cache_location: Optional[str] = None, **kwargs):
         cache_location = cache_location or config.cache_location
@@ -131,11 +134,13 @@ class TokenStorage:
 
         host = host or config.host
         if host == config.host and config.token is not None:
-            user = TokenStorage.get_username_of_token(config.token, host)
-            if user is not None:
-                self._print_accessing_as(user)
-            else:
-                raise RuntimeError("Provided DagsHub token is not valid")
+            if config.token not in _validated_env_tokens:
+                user = TokenStorage.get_username_of_token(config.token, host)
+                if user is not None:
+                    self._print_accessing_as(user)
+                    _validated_env_tokens.add(config.token)
+                else:
+                    raise RuntimeError("Provided DagsHub token is not valid")
             return EnvVarDagshubToken(config.token, host)
 
         with self._token_access_lock:
