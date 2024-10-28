@@ -158,6 +158,9 @@ class Field:
         return res_dict
 
 
+_metadata_contexts: Dict[Union[int, str], "MetadataContextManager"] = {}
+
+
 class Datasource:
     def __init__(
         self,
@@ -169,8 +172,6 @@ class Datasource:
         if query is None:
             query = DatasourceQuery()
         self._query = query
-        # a per datasource context used for dict update syntax
-        self._implicit_update_ctx: Optional[MetadataContextManager] = None
         # this ref marks if source is currently used in
         # meta-data update 'with' block
         self._explicit_update_ctx: Optional[MetadataContextManager] = None
@@ -181,12 +182,6 @@ class Datasource:
     @property
     def has_explicit_context(self):
         return self._explicit_update_ctx is not None
-
-    def _get_source_implicit_metadata_entries(self):
-        if self._implicit_update_ctx is not None:
-            return self._implicit_update_ctx.get_metadata_entries()
-        else:
-            return []
 
     @property
     def source(self) -> "DatasourceState":
@@ -208,9 +203,6 @@ class Datasource:
     def __deepcopy__(self, memodict={}) -> "Datasource":
         res = Datasource(self._source, self._query.__deepcopy__())
         res.assigned_dataset = self.assigned_dataset
-
-        # Carry over the update context, that way we'll keep track of the metadata being uploaded
-        res._implicit_update_ctx = self._implicit_update_ctx
 
         return res
 
@@ -489,21 +481,25 @@ class Datasource:
 
     @property
     def implicit_update_context(self) -> "MetadataContextManager":
-        if not self._implicit_update_ctx:
-            self._implicit_update_ctx = MetadataContextManager(self)
+        """
+        Context that is used when updating metadata through ``dp[field] = value`` syntax, can be created on demand.
 
-        return self._implicit_update_ctx
+        :meta private:
+        """
+        key = self.source.id
+        if key not in _metadata_contexts:
+            _metadata_contexts[key] = MetadataContextManager(self)
+        return _metadata_contexts[key]
 
     def upload_metadata_of_implicit_context(self):
         """
         commit meta data changes done in dictionary assignment context
         :meta private:
         """
-        if self._implicit_update_ctx:
-            try:
-                self._upload_metadata(self._get_source_implicit_metadata_entries())
-            finally:
-                self._implicit_update_ctx = None
+        try:
+            self._upload_metadata(self.implicit_update_context.get_metadata_entries())
+        finally:
+            self.implicit_update_context.clear()
 
     def metadata_context(self) -> ContextManager["MetadataContextManager"]:
         """
@@ -526,9 +522,12 @@ class Datasource:
             self._explicit_update_ctx = ctx
             yield ctx
             try:
-                self._upload_metadata(ctx.get_metadata_entries() + self._get_source_implicit_metadata_entries())
+                entries = ctx.get_metadata_entries() + self.implicit_update_context.get_metadata_entries()
+                self._upload_metadata(entries)
             finally:
-                self._implicit_update_ctx = None
+                # Clear the implicit context because it can persist
+                self.implicit_update_context.clear()
+                # The explicit one created with with: can go away
                 self._explicit_update_ctx = None
 
         return func()
@@ -1825,6 +1824,12 @@ class MetadataContextManager:
 
     def get_metadata_entries(self):
         return self._metadata_entries
+
+    def clear(self):
+        self._metadata_entries.clear()
+
+    def __len__(self):
+        return len(self._metadata_entries)
 
 
 def _get_datetime_utc_offset(t):
