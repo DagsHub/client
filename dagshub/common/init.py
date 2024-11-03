@@ -8,7 +8,7 @@ from typing import Optional
 
 from dagshub.auth import get_token
 from dagshub.common import config
-from dagshub.common.api import RepoAPI
+from dagshub.common.api import RepoAPI, UserAPI
 from dagshub.common.api.repo import RepoNotFoundError
 from dagshub.common.determine_repo import determine_repo
 from dagshub.common.helpers import log_message
@@ -93,7 +93,7 @@ def init(
     # Configure MLFlow
     if mlflow:
         os.environ["MLFLOW_TRACKING_URI"] = f"{url}.mlflow"
-        os.environ["MLFLOW_TRACKING_USERNAME"] = token
+        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token).username
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
         log_message(f'Initialized MLflow to track repo "{repo_owner}/{repo_name}"')
