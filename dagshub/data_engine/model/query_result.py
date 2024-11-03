@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from dagshub.auth import get_token
 from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
+from dagshub.common.api import UserAPI
 from dagshub.common.download import download_files
 from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
 from dagshub.common.rich_util import get_rich_progress
@@ -517,8 +518,9 @@ class QueryResult:
             host = self.datasource.source.repoApi.host
         prev_uri = mlflow.get_tracking_uri()
         os.environ["MLFLOW_TRACKING_URI"] = multi_urljoin(host, f"{repo}.mlflow")
-        os.environ["MLFLOW_TRACKING_USERNAME"] = get_token()
-        os.environ["MLFLOW_TRACKING_PASSWORD"] = get_token()
+        token = get_token()
+        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token).username
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = token
         try:
             model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
         finally:
