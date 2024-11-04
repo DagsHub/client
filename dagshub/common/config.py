@@ -61,3 +61,12 @@ if download_threads > DEFAULT_DOWNLOAD_THREADS:
         f"Number of download threads was set to {download_threads}. "
         f"We recommend lowering the value if you get met with rate limits"
     )
+
+
+def set_host(new_host: str):
+    _parsed_host = urlparse(new_host)
+    _hostname = _parsed_host.hostname
+    _host = _parsed_host.geturl().rstrip("/")
+
+    global hostname, host, parsed_host
+    hostname, host, parsed_host = _hostname, _host, _parsed_host

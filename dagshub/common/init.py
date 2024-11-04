@@ -47,12 +47,15 @@ def init(
         root: Path to the locally hosted git repository.
             If it's not set, tries to find a repository traversing up the filesystem.
         host: Address of the DagsHub instance with the repository.
+            If specified, then all request to dagshub are going to be sent to this instance.
         mlflow: Configure MLflow to log experiments to DagsHub.
         dvc: Configure a dvc remote in the repository.
         patch_mlflow: Run :func:`dagshub.mlflow.patch_mlflow` so errors while logging with MLflow don't stop execution
     """
     if host is None:
         host = config.host
+    else:
+        config.set_host(host)
 
     if root is None:
         root = os.path.abspath(".")
