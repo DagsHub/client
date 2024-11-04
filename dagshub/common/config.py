@@ -21,9 +21,21 @@ DAGSHUB_PASSWORD_KEY = "DAGSHUB_PASSWORD"
 HTTP_TIMEOUT_KEY = "DAGSHUB_HTTP_TIMEOUT"
 DAGSHUB_QUIET_KEY = "DAGSHUB_QUIET"
 
-parsed_host = urlparse(os.environ.get(HOST_KEY, DEFAULT_HOST))
-hostname = parsed_host.hostname
-host = parsed_host.geturl().rstrip("/")
+
+def set_host(new_host: str):
+    _parsed_host = urlparse(new_host)
+    _hostname = _parsed_host.hostname
+    _host = _parsed_host.geturl().rstrip("/")
+
+    global hostname, host, parsed_host
+    hostname, host, parsed_host = _hostname, _host, _parsed_host
+
+
+hostname = ""
+host = ""
+parsed_host = ""
+set_host(os.environ.get(HOST_KEY, DEFAULT_HOST))
+
 client_id = os.environ.get(CLIENT_ID_KEY, DEFAULT_CLIENT_ID)
 cache_location = os.environ.get(TOKENS_CACHE_LOCATION_KEY, DEFAULT_TOKENS_CACHE_LOCATION)
 token = os.environ.get(DAGSHUB_USER_TOKEN_KEY)
