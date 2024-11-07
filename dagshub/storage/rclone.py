@@ -197,6 +197,10 @@ def mount(repo: str, cache: bool = False, path: Path = None) -> os.PathLike:
 
     :param path: Optional. A Path object specifying the custom mount path. If not provided, the mount directory is
         determined based on the current working directory and the repository name.
+
+    .. note::
+        This function, as well :func:`sync` are using `RClone <https://rclone.org/>`_ to work.
+        If it's not installed, you'll get instructions how to install it.
     """
     # Parse the repo string to get the repo owner and name
     repo_owner, repo_name = repo.split("/")
