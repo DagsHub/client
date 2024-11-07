@@ -47,9 +47,7 @@ def check_and_provide_install_script(quiet=False):
         # Format a string listing all missing packages
         missing_packages_list = ", ".join([pkg for pkg, _ in missing_packages])
         if not quiet:
-            log_message(
-                f"The following packages are not installed: {missing_packages_list}."
-            )
+            log_message(f"The following packages are not installed: {missing_packages_list}.")
         if platform.system().lower() == "linux" and shutil.which("apt") is not None:
             response = prompt_user("Do you want to install all missing packages?")
 
@@ -62,45 +60,34 @@ def check_and_provide_install_script(quiet=False):
                     except subprocess.CalledProcessError as e:
                         logger.error(f"Failed to install {package}: {e}")
                         # Non-Linux OS or 'apt' not available
+                        log_message("Manual installation required. Please install Rclone and fuse3 for your system.")
+                        log_message("Rclone installation instructions: https://rclone.org/install/")
                         log_message(
-                            "Manual installation required. Please install Rclone and fuse3 for your system."
-                        )
-                        log_message(
-                            "Rclone installation instructions: https://rclone.org/install/"
-                        )
-                        log_message(
-                            "For fuse3, please consult your operating system's package manager or "
-                            "documentation."
+                            "For fuse3, please consult your operating system's package manager or " "documentation."
                         )
             else:
                 log_message("Skipping installation of missing packages.")
         else:
             # Non-Linux OS or 'apt' not available
-            log_message(
-                "Manual installation required. Please install Rclone and fuse3 for your system."
-            )
+            log_message("Manual installation required. Please install Rclone and fuse3 for your system.")
             log_message("Rclone installation instructions: https://rclone.org/install/")
-            log_message(
-                "For fuse3, please consult your operating system's package manager or documentation."
-            )
+            log_message("For fuse3, please consult your operating system's package manager or documentation.")
             return
     else:
         if not quiet:
             log_message("All packages are installed.")
 
 
-def rclone_init(
-    repo_owner: str, conf_path: Optional[Path] = None, update=False, quiet=False
-) -> Tuple[str, Path]:
+def rclone_init(repo_owner: str, conf_path: Optional[Path] = None, update=False, quiet=False) -> Tuple[str, Path]:
     """
     Initializes or updates the Rclone configuration for a DAGsHub repository.
 
     :param repo_owner: The owner of the repository. This is used to create a unique section in the Rclone configuration.
     :param conf_path: Optional. The path to the Rclone configuration file. If not provided, the default path is used.
     :param update: Optional. A boolean flag indicating whether to update the configuration if it already exists.
-    Defaults to False.
+        Defaults to False.
     :param quiet: Optional. A boolean flag that controls the output of the function. If False, the function will
-    print messages about its operation.
+        print messages about its operation.
     :return: Name of the remote for rclone + The absolute path to the Rclone configuration file.
     """
     # Make sure RClone and fuse3 are properly installed
@@ -139,9 +126,7 @@ def rclone_init(
 
     if not quiet:
         # Inform the user about the remote name
-        log_message(
-            f"Configuration complete. The remote '{remote_name}' has been created/updated in '{conf_path}'."
-        )
+        log_message(f"Configuration complete. The remote '{remote_name}' has been created/updated in '{conf_path}'.")
         log_message(
             f"Example usage with rclone: `rclone ls {remote_name}:<your-bucket-name>` to list the contents of "
             f"'your-bucket-name'."
@@ -150,9 +135,7 @@ def rclone_init(
     return remote_name, conf_path.absolute()
 
 
-def sync(
-    repo: str, local_path: Union[str, os.PathLike], remote_path: Union[str, os.PathLike]
-):
+def sync(repo: str, local_path: Union[str, os.PathLike], remote_path: Union[str, os.PathLike]):
     """
     Synchronizes the contents of a local directory with a specified remote directory in a DAGsHub repository using
     Rclone.
@@ -193,13 +176,9 @@ def sync(
             for line in p.stdout:
                 log_message(line)
 
-        log_message(
-            f"Successfully synchronized {local_path_str} to DagsHub Storage {remote_path}."
-        )
+        log_message(f"Successfully synchronized {local_path_str} to DagsHub Storage {remote_path}.")
     except subprocess.CalledProcessError as e:
-        log_message(
-            f"Failed to synchronize {local_path_str} to DagsHub Storage {remote_path}: {e}"
-        )
+        log_message(f"Failed to synchronize {local_path_str} to DagsHub Storage {remote_path}: {e}")
 
 
 def mount(repo: str, cache: bool = False, path: Path = None) -> os.PathLike:
@@ -265,12 +244,8 @@ def mount(repo: str, cache: bool = False, path: Path = None) -> os.PathLike:
     try:
         # Execute the mount command
         subprocess.run(mount_command, check=True)
-        log_message(
-            f"Successfully mounted DagsHub Storage in '{repo_name}' to '{mount_dir}'."
-        )
-        log_message(
-            f'To unmount, run `dagshub.storage.unmount(repo="{repo}", path="{mount_dir}")`.'
-        )
+        log_message(f"Successfully mounted DagsHub Storage in '{repo_name}' to '{mount_dir}'.")
+        log_message(f'To unmount, run `dagshub.storage.unmount(repo="{repo}", path="{mount_dir}")`.')
         return mount_dir
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to mount DagsHub Storage in '{repo_name}': {e}")
