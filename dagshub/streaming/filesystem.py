@@ -326,15 +326,12 @@ class DagsHubFilesystem:
             DagsHubFilesystem.already_mounted_filesystems.pop(self.project_root)
 
     def _parse_path(self, file: Union[str, PathLike, int]) -> DagshubPath:
+        orig_path = Path(file)
         if isinstance(file, int):
-            return DagshubPath(self, None, None, Path(file))
+            return DagshubPath(self, None, None, orig_path)
         if file == "":
-            return DagshubPath(self, None, None, Path(file))
-
-        expanded = os.path.expanduser(file)
-        orig_path = Path(expanded)
-        abspath = Path(os.path.abspath(expanded))
-
+            return DagshubPath(self, None, None, orig_path)
+        abspath = Path(os.path.abspath(file))
         try:
             relpath = abspath.relative_to(os.path.abspath(self.project_root))
             if str(relpath).startswith("<"):
