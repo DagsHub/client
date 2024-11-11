@@ -599,7 +599,7 @@ class DagsHubFilesystem:
         parsed_path = self._parse_path(str_path)
         if parsed_path.is_in_repo:
             if parsed_path.is_passthrough_path:
-                return self.listdir(parsed_path.original_path)
+                return self.__listdir(parsed_path.original_path)
             else:
                 dircontents: Set[str] = set()
                 error = None

@@ -25,8 +25,19 @@ class DagshubPath:
     # TODO: this couples this class hard to the fs, need to decouple later
     fs: "DagsHubFilesystem"  # Actual type is DagsHubFilesystem, but imports are wonky
     absolute_path: Optional[Path]
+    """
+    Absolute path in the OS filesystem
+    """
     relative_path: Optional[Path]
+    """
+    Path relative to the root of the repository the fs is hooked to.
+    """
     original_path: Optional[Path]
+    """
+    Original path requested by the user almost as-is (except for transformation to Path)
+    Required to keep listdir working correctly, since its behavior changes based on how it's being called
+    (relative vs. absolute path)
+    """
 
     def __post_init__(self):
         # Handle storage paths - translate s3:/bla-bla to .dagshub/storage/s3/bla-bla
@@ -35,9 +46,7 @@ class DagshubPath:
             for storage_schema in storage_schemas:
                 if str_path.startswith(f"{storage_schema}:/"):
                     str_path = str_path[len(storage_schema) + 2 :]
-                    self.relative_path = (
-                        Path(".dagshub/storage") / storage_schema / str_path
-                    )
+                    self.relative_path = Path(".dagshub/storage") / storage_schema / str_path
                     self.absolute_path = self.fs.project_root / self.relative_path
 
     @cached_property
