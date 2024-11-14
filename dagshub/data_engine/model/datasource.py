@@ -275,7 +275,7 @@ class Datasource:
         if start is not None:
             logger.warning("Starting slices is not implemented for now")
         res = self._source.client.sample(self, end, include_metadata=True)
-        self._download_document_fields(res)
+        res._load_autoload_fields()
         return res
 
     def head(self, size=100, load_documents=True, load_annotations=True) -> "QueryResult":
