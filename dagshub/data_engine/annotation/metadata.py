@@ -63,6 +63,7 @@ class MetadataAnnotations:
         field: str,
         annotations: Optional[Sequence["IRAnnotationBase"]] = None,
         meta: Optional[Dict] = None,
+        original_value: Optional[bytes] = None,
     ):
         self.datapoint = datapoint
         self.field = field
@@ -71,13 +72,16 @@ class MetadataAnnotations:
             annotations = []
         self.annotations = list(annotations)
         self.meta = AnnotationMetaDict(self, meta or {})
+        self._original_value = original_value
 
     @staticmethod
     def from_ls_task(datapoint: "Datapoint", field: str, ls_task: bytes) -> "MetadataAnnotations":
         parsed_ls_task = parse_ls_task(ls_task)
         annotations = parsed_ls_task.to_ir_annotations(filename=datapoint.path)
 
-        return MetadataAnnotations(datapoint=datapoint, field=field, annotations=annotations, meta=parsed_ls_task.meta)
+        return MetadataAnnotations(
+            datapoint=datapoint, field=field, annotations=annotations, meta=parsed_ls_task.meta, original_value=ls_task
+        )
 
     def to_ls_task(self) -> Optional[bytes]:
         """
@@ -93,6 +97,19 @@ class MetadataAnnotations:
         task.add_ir_annotations(self.annotations)
         task.meta.update(self.meta)
         return task.model_dump_json().encode("utf-8")
+
+    @property
+    def value(self) -> Optional[bytes]:
+        """
+        Returns the contents of annotation as a byte array.
+        If it was loaded from the backend and not changed, it will return the original value.
+
+        If there were any changes, it will instead return the serialized version of the annotations
+        (the username will be set to the current user).
+        """
+        if self._original_value is not None:
+            return self._original_value
+        return self.to_ls_task()
 
     def __repr__(self):
         return f"Annotations:\n\t{self.annotations}"
@@ -122,6 +139,7 @@ class MetadataAnnotations:
         Fire this method on every update to save annotations in the datapoint
         """
         self.datapoint[self.field] = self
+        self._original_value = self.to_ls_task()
 
     def add_image_bbox(
         self,
