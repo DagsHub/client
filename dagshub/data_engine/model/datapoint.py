@@ -1,8 +1,11 @@
 import datetime
+import logging
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING, Literal, Sequence
+
+from tenacity import Retrying, stop_after_attempt, wait_exponential, before_sleep_log, retry_if_exception_type
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
@@ -18,6 +21,8 @@ _generated_fields: Dict[str, Callable[["Datapoint"], Any]] = {
     "datapoint_id": lambda dp: dp.datapoint_id,
     "dagshub_download_url": lambda dp: dp.download_url,
 }
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -267,12 +272,26 @@ def _get_blob(
                 cache_path = str(cache_path)
             return cache_path
 
-    try:
-        # TODO: add retries here
+    def get():
         resp = http_request("GET", url, auth=auth)
-        if resp.status_code >= 400:
-            return f"Error while downloading binary blob (Status code {resp.status_code}): {resp.content.decode()}"
-        content = resp.content
+        if 200 <= resp.status_code < 300:
+            return resp.content
+        elif resp.status_code == 404:
+            raise Exception(f"Blob not found at {url}")
+        elif resp.status_code > 400:
+            raise RuntimeError(f"Got status code {resp.status_code} from server")
+        else:
+            raise Exception(f"Non-retrying status code {resp.status_code} returned")
+
+    try:
+        for attempt in Retrying(
+            retry=retry_if_exception_type(RuntimeError),
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=1, min=4, max=10),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+        ):
+            with attempt:
+                content = get()
     except Exception as e:
         return f"Error while downloading binary blob: {e}"
 
@@ -289,7 +308,7 @@ def _get_blob(
 
 
 def _datetime_from_timestamp(timestamp, utc_offset):
-    offset_hours, offset_minutes = map(int, utc_offset.split(':'))
+    offset_hours, offset_minutes = map(int, utc_offset.split(":"))
     offset = datetime.timedelta(hours=offset_hours, minutes=offset_minutes)
 
     tz = datetime.timezone(offset)
