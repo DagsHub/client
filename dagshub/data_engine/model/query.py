@@ -147,6 +147,13 @@ class QueryFilterTree:
         if self._column_filter_node is not None:
             # If there was an unfilled query node with a column - put the operand in that node
             node = self._column_filter_node
+            if op.startswith("!"):
+                # Negation in the operation - prepend a not node before the current node
+                tree = self._operand_tree
+                parent_id = tree.parent(node.identifier)
+                not_node = tree.create_node("not", parent=parent_id)
+                tree.move_node(node.identifier, not_node.identifier)
+                op = op[1:]
             node.tag = op
             node.data.update({"value": other})
         elif op == "isnull":

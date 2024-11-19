@@ -1560,7 +1560,9 @@ class Datasource:
 
         :meta private:
         """
-        return self.is_null().add_query_op("not")
+        field = self._get_filtering_field()
+        value_type = metadataTypeLookupReverse[field.valueType.value]
+        return self.add_query_op("!isnull", value_type())
 
     def _get_filtering_field(self) -> MetadataFieldSchema:
         field_name = self.get_query().filter.column_filter

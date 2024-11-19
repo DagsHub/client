@@ -508,6 +508,24 @@ def test_sequential_querying(ds):
     assert queried2.get_query().filter.tree_to_dict() == expected
 
 
+def test_is_not_null_composition(ds):
+    add_int_fields(ds, "col1", "col2")
+    queried = ds["col1"] >= 2
+    queried = queried["col2"].is_not_null()
+
+    expected = {
+        "and": {
+            "children": [
+                {"ge": {"data": {"field": "col1", "value": 2}}},
+                {"not": {"children": [{"isnull": {"data": {"field": "col2", "value": 0}}}], "data": None}},
+            ],
+            "data": None,
+        }
+    }
+
+    assert queried.get_query().filter.tree_to_dict() == expected
+
+
 def test_composition_string_then_field(ds):
     add_int_fields(ds, "col1")
     add_int_fields(ds, "col2")
@@ -566,31 +584,19 @@ def test_basic_datetime_query(ds):
     add_datetime_fields(ds, "x")
     t = dateutil.parser.parse("2022-04-05T15:30:00.99999+05:30")
 
-    ds2 = (ds[ds["x"] > t])
+    ds2 = ds[ds["x"] > t]
 
     q = ds2.get_query().filter
 
     print(q.tree_to_dict())
     print(ds2.serialize_gql_query_input())
-    expected = {
-        'gt': {
-            'data': {
-                'field': 'x',
-                'value': t
-            }
-        }
-    }
+    expected = {"gt": {"data": {"field": "x", "value": t}}}
 
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'query': {
-            'filter': {
-                'key': 'x',
-                'value': '1649152800999',
-                'valueType': 'DATETIME',
-                'comparator': 'GREATER_THAN'
-            }
+        "query": {
+            "filter": {"key": "x", "value": "1649152800999", "valueType": "DATETIME", "comparator": "GREATER_THAN"}
         }
     }
     assert ds2.serialize_gql_query_input() == expected_serialized
@@ -612,35 +618,22 @@ def test_periodic_datetime_periods(ds, period):
 
     print(q.tree_to_dict())
     print(ds2.serialize_gql_query_input())
-    expected = {
-        f"{period}": {
-            'data': {
-                'field': 'x',
-                'value': [
-                    '1',
-                    '3'
-                ]
-            }
-        }
-    }
+    expected = {f"{period}": {"data": {"field": "x", "value": ["1", "3"]}}}
 
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'timeZone': '+03:00',
-        'query': {
-            'filter': {
-                'key': 'x',
-                'value': 0,
-                'valueType': 'DATETIME',
-                'comparator': 'DATE_TIME_FILTER',
-                'valueRange': [
-                    '1',
-                    '3'
-                ],
-                'timeFilter': f"{period.upper()}"
+        "timeZone": "+03:00",
+        "query": {
+            "filter": {
+                "key": "x",
+                "value": 0,
+                "valueType": "DATETIME",
+                "comparator": "DATE_TIME_FILTER",
+                "valueRange": ["1", "3"],
+                "timeFilter": f"{period.upper()}",
             }
-        }
+        },
     }
 
     assert ds2.serialize_gql_query_input() == expected_serialized
@@ -655,29 +648,22 @@ def test_periodic_datetime_timeofday(ds):
 
     print(q.tree_to_dict())
     print(ds2.serialize_gql_query_input())
-    expected = {
-        'timeofday': {
-            'data': {
-                'field': 'x',
-                'value': '12:00-13:00'
-            }
-        }
-    }
+    expected = {"timeofday": {"data": {"field": "x", "value": "12:00-13:00"}}}
 
     assert q.tree_to_dict() == expected
 
     expected_serialized = {
-        'timeZone': '+03:00',
-        'query': {
-            'filter': {
-                'key': 'x',
-                'value': '12:00-13:00',
-                'valueType': 'DATETIME',
-                'comparator': 'DATE_TIME_FILTER',
-                'valueRange': 0,
-                'timeFilter': 'TIMEOFDAY'
+        "timeZone": "+03:00",
+        "query": {
+            "filter": {
+                "key": "x",
+                "value": "12:00-13:00",
+                "valueType": "DATETIME",
+                "comparator": "DATE_TIME_FILTER",
+                "valueRange": 0,
+                "timeFilter": "TIMEOFDAY",
             }
-        }
+        },
     }
 
     assert ds2.serialize_gql_query_input() == expected_serialized
