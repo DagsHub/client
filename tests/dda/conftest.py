@@ -32,7 +32,9 @@ def current_revision(dagshub_repo: pytest_git.GitRepo) -> str:
 
 @pytest.fixture
 def mock_api(dagshub_repo: pytest_git.GitRepo) -> MockApi:
-    with MockApi(git_repo=dagshub_repo, base_url="https://dagshub.com", assert_all_called=False) as respx_mock:
+    with MockApi(
+        git_repo=dagshub_repo, base_url="https://dagshub.com", assert_all_called=False, using="httpx"
+    ) as respx_mock:
         yield respx_mock
 
 

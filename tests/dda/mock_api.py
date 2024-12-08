@@ -340,8 +340,6 @@ class MockApi(MockRouter):
                 "timestamp": "2021-08-10T09:03:32Z",
             }
         }
-        url = f"/api/v1/repos/{self.repourlpath}/commits/{revision}"
-        print(f"Adding mock for url: {url}")
-        branch_route = self.get(url=url)
+        branch_route = self.get(url=f"/api/v1/repos/{self.repourlpath}/commits/{revision}")
         branch_route.mock(Response(200, json=resp_json))
         return branch_route
