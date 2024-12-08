@@ -8,8 +8,7 @@ from dagshub.common.api.repo import PathNotFoundError
 from dagshub.common.api.responses import StorageAPIEntry, ContentAPIEntry, CommitAPIResponse
 
 
-class MockError(Exception):
-    ...
+class MockError(Exception): ...
 
 
 class MockRepoAPI(RepoAPI):
@@ -142,7 +141,7 @@ class MockRepoAPI(RepoAPI):
         return content
 
     def list_storage_path(self, path: str, include_size: bool = False) -> List[ContentAPIEntry]:
-        content = self.storage_contents.get(path)
+        content = self.storage_contents.get(path.rstrip("/"))
         if content is None:
             raise PathNotFoundError
         return content
