@@ -464,7 +464,7 @@ def clear_token_cache(force=False):
     """
     cache = config.cache_location
     if not force:
-        prompt = prompt_user(f"This will remove ALL tokens stored in the cache file at {cache}.", default=True)
+        prompt = prompt_user(f"This will remove ALL tokens stored in the cache file at {cache}.")
         if not prompt:
             return
 
