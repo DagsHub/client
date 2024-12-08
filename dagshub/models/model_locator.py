@@ -94,12 +94,12 @@ class ModelLocator:
 
     def _handle_path(self, path: str) -> Tuple[str, StorageType]:
         """
-        Handles user-printed path.
-        Returns a resulting path that can be queried from DagsHub + enum for whether it's a repo or a bucket path
+        Handles user-printed path, determining where it belongs (repo, bucket or repo's bucket).
+
         If path is a repo path, returns (path as is, StorageType.Repo)
         If path is a storage path, ({actual path in storage} + StorageType.Bucket/DagshubStorage)
         Storage path resolution is based on bucket name, if the path starts with a name of an existing bucket,
-        assume that it's a storage path
+        then greedily return that bucket as the bucket with the path.
         """
         str_path = str(path)
 
