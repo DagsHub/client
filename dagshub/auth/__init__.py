@@ -1,4 +1,4 @@
-from .tokens import get_token, add_app_token, add_oauth_token, InvalidTokenError, get_authenticator
+from .tokens import get_token, add_app_token, add_oauth_token, InvalidTokenError, get_authenticator, clear_token_cache
 from .oauth import OauthNonInteractiveShellException
 
 __all__ = [
@@ -8,4 +8,5 @@ __all__ = [
     OauthNonInteractiveShellException.__name__,
     InvalidTokenError.__name__,
     get_authenticator.__name__,
+    clear_token_cache.__name__,
 ]
