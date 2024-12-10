@@ -2,7 +2,8 @@ import datetime
 import types
 import logging
 import importlib
-from typing import Union
+from pathlib import PurePath
+from typing import Union, TypeVar
 from urllib.parse import urljoin, quote
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,18 @@ def lazy_load(module_name, source_package=None, callback=None):
         # TODO: need to have a map for commonly used imports here. Also handle dots
         source_package = module_name
     return LazyModule(module_name, source_package, callback)
+
+
+pathSubclass = TypeVar("pathSubclass", bound=PurePath)
+
+
+def is_path_relative_to(path_a: pathSubclass, path_b: pathSubclass) -> bool:
+    # Polyfill of Path.is_relative
+    try:
+        path_a.relative_to(path_b)
+        return True
+    except ValueError:
+        return False
 
 
 class LazyModule(types.ModuleType):

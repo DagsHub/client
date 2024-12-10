@@ -16,6 +16,7 @@ from dagshub.common.api.repo import PathNotFoundError
 from dagshub.common.api.responses import StorageAPIEntry
 from dagshub.common.determine_repo import determine_repo
 from dagshub.common.helpers import log_message
+from dagshub.common.util import is_path_relative_to
 from dagshub.models.model_loaders import (
     ModelLoader,
     RepoModelLoader,
@@ -111,7 +112,7 @@ class ModelLocator:
         in_path = PurePosixPath(str_path)
         for storage in self.repo_storages:
             storage_path = PurePosixPath(storage.name)
-            if in_path.is_relative_to(storage_path):
+            if is_path_relative_to(in_path, storage_path):
                 bucketPath = f"{storage.protocol}/{str_path}"
                 return bucketPath, StorageType.Bucket
         return path, StorageType.Repo
