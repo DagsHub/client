@@ -108,8 +108,10 @@ class ModelLocator:
 
         if str_path.startswith("dagshub_storage/"):
             return str_path[len("dagshub_storage/") :], StorageType.DagshubStorage
+        in_path = PurePosixPath(str_path)
         for storage in self.repo_storages:
-            if str_path.startswith(f"{storage.name}"):
+            storage_path = PurePosixPath(storage.name)
+            if in_path.is_relative_to(storage_path):
                 bucketPath = f"{storage.protocol}/{str_path}"
                 return bucketPath, StorageType.Bucket
         return path, StorageType.Repo

@@ -68,6 +68,26 @@ def test_found_when_passed_bucket_root_as_path(repo_mock):
     assert loader.path == PosixPath(f"s3/{bucket_name}")
 
 
+def test_found_in_repo_when_bucket_name_is_longer(repo_mock):
+    bucket_name = "some-bucket/random/prefix"
+    repo_mock.add_storage("s3", bucket_name)
+    repo_mock.add_storage_file(f"s3/{bucket_name}/model.pt", b"blablabla")
+    repo_mock.add_repo_file("some-bucket/random/prefixasdf/model.pt", b"blablabla")
+    locator = ModelLocator(repo_mock, path="some-bucket/random/prefixasdf")
+    loader = locator.find_model()
+    assert isinstance(loader, RepoModelLoader)
+    assert loader.path == PosixPath("some-bucket/random/prefixasdf")
+
+
+def test_not_found_when_path_is_longer_than_bucket(repo_mock):
+    bucket_name = "some-bucket/random/prefixasdf"
+    repo_mock.add_storage("s3", bucket_name)
+    repo_mock.add_storage_file(f"s3/{bucket_name}/model.pt", b"blablabla")
+    locator = ModelLocator(repo_mock, path="some-bucket/random/prefix")
+    with pytest.raises(ModelNotFoundError):
+        locator.find_model()
+
+
 def test_raises_when_passed_path_and_not_found(repo_with_repo_model):
     # The existing model should be ignored
     repo_mock, _ = repo_with_repo_model
