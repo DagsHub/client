@@ -18,7 +18,7 @@ from dagshub.auth.token_auth import (
     DagshubAuthenticator,
 )
 from dagshub.common import config
-from dagshub.common.helpers import http_request, log_message
+from dagshub.common.helpers import http_request, log_message, prompt_user
 from dagshub.common.util import multi_urljoin
 
 logger = logging.getLogger(__name__)
@@ -453,3 +453,20 @@ def add_oauth_token(host: Optional[str] = None, referrer: Optional[str] = None, 
     host = host or config.host
     token = oauth.oauth_flow(host, referrer=referrer)
     _get_token_storage(**kwargs).add_token(token, host, skip_validation=True)
+
+
+def clear_token_cache(force=False):
+    """
+    Clear the token cache file.
+
+    .. warning::
+        This will remove ALL tokens you have stored for any dagshub instance you connected to.
+    """
+    cache = config.cache_location
+    if not force:
+        prompt = prompt_user(f"This will remove ALL tokens stored in the cache file at {cache}.")
+        if not prompt:
+            return
+
+    os.remove(cache)
+    print(f"Removed all tokens stored at {cache}")

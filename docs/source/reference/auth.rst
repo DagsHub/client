@@ -39,9 +39,15 @@ Triggering the OAuth flow explicitly
 
 You can also trigger the OAuth flow by doing ``dagshub login`` in CLI.
 
+Clearing the token cache
++++++++++++++++++++++++++++
+
+.. autofunction:: dagshub.auth.clear_token_cache
+
 Connecting to a hosted DagsHub instance
 ++++++++++++++++++++++++++++++++++++++++++++++
 
 If you are a self-serve customer of DagsHub, set ``DAGSHUB_CLIENT_HOST`` environment variable
 to the url of the DagsHub deployment. All client functions will automatically connect to the hosted instance.
+
 
