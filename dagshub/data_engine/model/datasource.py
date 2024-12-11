@@ -845,6 +845,33 @@ class Datasource:
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
 
+    def log_to_mlflow(
+        self,
+        run: Optional["mlflow.entities.Run"] = None,
+        as_of: Optional[datetime.datetime] = None,
+    ) -> "mlflow.Entities.Run":
+        """
+        Logs the current datasource state to MLflow as an artifact.
+
+        Args:
+            run: MLflow run to save to. If ``None``, uses the active MLflow run or creates a new run.
+            as_of: The querying time for which to save the artifact.
+                Any time the datasource is recreated from the artifact, it will be queried as of this timestamp.
+                If None, the current machine time will be used.
+                If the artifact is autologged to MLflow (will happen if you have an active MLflow run),
+                then the timestamp of the query will be used.
+
+        Returns:
+            Run to which the artifact was logged.
+        """
+
+        now_time = datetime.datetime.now.strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
+        uuid_chunk = str(uuid.uuid4())[-4:]
+
+        artifact_name = f"log_{self.source.name}_{now_time}_{uuid_chunk}.dagshub.json"
+
+        return self._log_to_mlflow(artifact_name, run, as_of)
+
     def _autolog_mlflow(self, qr: "QueryResult"):
         if not is_mlflow_installed:
             return
@@ -859,31 +886,16 @@ class Datasource:
 
         artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
         threading.Thread(
-            target=self.log_to_mlflow,
+            target=self._log_to_mlflow,
             kwargs={"artifact_name": artifact_name, "run": active_run, "as_of": qr.query_data_time},
         ).start()
 
-    def log_to_mlflow(
+    def _log_to_mlflow(
         self,
-        artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME,
+        artifact_name,
         run: Optional["mlflow.entities.Run"] = None,
         as_of: Optional[datetime.datetime] = None,
     ) -> "mlflow.Entities.Run":
-        """
-        Logs the current datasource state to MLflow as an artifact.
-
-        Args:
-            artifact_name: Name of the artifact that will be stored in the MLflow run.
-            run: MLflow run to save to. If ``None``, uses the active MLflow run or creates a new run.
-            as_of: The querying time for which to save the artifact.
-                Any time the datasource is recreated from the artifact, it will be queried as of this timestamp.
-                If None, the current machine time will be used.
-                If the artifact is autologged to MLflow (will happen if you have an active MLflow run),
-                then the timestamp of the query will be used.
-
-        Returns:
-            Run to which the artifact was logged.
-        """
         if run is None:
             run = mlflow.active_run()
             if run is None:
