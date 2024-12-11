@@ -867,7 +867,7 @@ class Datasource:
         now_time = datetime.datetime.now.strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
         uuid_chunk = str(uuid.uuid4())[-4:]
 
-        artifact_name = f"log_{self.source.name}_{now_time}_{uuid_chunk}.dagshub.json"
+        artifact_name = f"log_{self.source.name}_{now_time}_{uuid_chunk}.dagshub.dataset.json"
 
         return self._log_to_mlflow(artifact_name, run, as_of)
 
@@ -883,7 +883,7 @@ class Datasource:
         now_time = qr.query_data_time.strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
         uuid_chunk = str(uuid.uuid4())[-4:]
 
-        artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
+        artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.dataset.json"
         threading.Thread(
             target=self._log_to_mlflow,
             kwargs={"artifact_name": artifact_name, "run": active_run, "as_of": qr.query_data_time},
