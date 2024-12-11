@@ -77,7 +77,6 @@ else:
 logger = logging.getLogger(__name__)
 
 LS_ORCHESTRATOR_URL = "http://127.0.0.1"
-DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
 MLFLOW_DATASOURCE_TAG_NAME = "dagshub.datasets.datasource_id"
 MLFLOW_DATASET_TAG_NAME = "dagshub.datasets.dataset_id"
 

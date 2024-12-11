@@ -4,7 +4,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.client.models import DatasetResult
 from dagshub.data_engine import datasources
-from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME, DatasetState
+from dagshub.data_engine.model.datasource import Datasource, DatasetState
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DatasetNotFoundError
 
@@ -61,7 +61,7 @@ def get_dataset_from_file(path: str) -> Datasource:
     return datasources.get_datasource_from_file(path)
 
 
-def get_from_mlflow(run=None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME) -> Datasource:
+def get_from_mlflow(run=None, artifact_name: Optional[str] = None) -> Datasource:
     """
     Load a dataset from an MLflow run.
 

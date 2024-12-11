@@ -6,7 +6,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.common.util import lazy_load
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.model.datasource import Datasource, DEFAULT_MLFLOW_ARTIFACT_NAME
+from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
 from dagshub.data_engine.model.errors import DatasourceNotFoundError
 
@@ -169,7 +169,7 @@ def get_datasources(repo: str) -> List[Datasource]:
 
 
 def get_from_mlflow(
-    run: Optional[Union["mlflow.entities.Run", str]] = None, artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME
+    run: Optional[Union["mlflow.entities.Run", str]] = None, artifact_name: Optional[str] = None
 ) -> Datasource:
     """
     Load a datasource from an MLflow run.
@@ -189,6 +189,9 @@ def get_from_mlflow(
         mlflow_run = mlflow.get_run(run)
     else:
         mlflow_run = run
+
+    if artifact_name is None:
+        raise ValueError("artifact_name must be specified")
 
     artifact_uri: str = mlflow_run.info.artifact_uri
     artifact_path = f"{artifact_uri.rstrip('/')}/{artifact_name.lstrip('/')}"
