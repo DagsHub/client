@@ -339,6 +339,17 @@ class DataClient:
         )
         return self._exec(q, params)
 
+    def delete_dataset(self, dataset_id: Union[str, int]):
+        """
+        Removes a dataset. This doesn't remove the underlying source.
+        """
+        q = GqlMutations.delete_dataset()
+
+        assert dataset_id is not None
+
+        params = GqlMutations.delete_dataset_params(dataset_id=dataset_id)
+        return self._exec(q, params)
+
     def get_datasets(self, id: Optional[Union[str, int]], name: Optional[str]) -> List[DatasetResult]:
         """
         Retrieve a list of datasets based on optional filtering criteria.

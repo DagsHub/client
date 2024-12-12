@@ -732,6 +732,31 @@ class Datasource:
                 return
         self.source.client.delete_datasource(self)
 
+    def delete_dataset(self, force: bool = False):
+        """
+        Deletes the dataset, if this object was created from a dataset
+        (e.g. from :func:`.datasets.get_dataset()`).
+
+        This doesn't delete the underlying datasource and its metadata, only deleting the dataset and its query.
+
+        If this datasource object wasn't created from a dataset, raises a ``ValueError``.
+
+        Args:
+            force: Skip the confirmation prompt
+        """
+        if self.assigned_dataset is None:
+            raise ValueError("This datasource was not created from a dataset")
+        prompt = (
+            f'You are about to delete dataset "{self.assigned_dataset.dataset_name}" for repo "{self.source.repo}"\n'
+            f'The datasource "{self.source.name}" will still exist, but the dataset entry will be removed'
+        )
+        if not force:
+            user_response = prompt_user(prompt)
+            if not user_response:
+                print("Deletion cancelled")
+                return
+        self.source.client.delete_dataset(self.assigned_dataset.dataset_id)
+
     def scan_source(self, options: Optional[List[ScanOption]] = None):
         """
         This function fires a call to the backend to rescan the datapoints.

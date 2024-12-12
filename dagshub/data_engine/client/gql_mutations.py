@@ -242,3 +242,21 @@ class GqlMutations:
             "name": name,
             "filter": query_input,
         }
+
+    @staticmethod
+    @functools.lru_cache()
+    def delete_dataset():
+        q = (
+            GqlQuery()
+            .operation("mutation", name="deleteDataset", input={"$id": "ID!"})
+            .query("deleteDataset", input={"id": "$id"})
+            .fields(["id"])
+            .generate()
+        )
+        return q
+
+    @staticmethod
+    def delete_dataset_params(dataset_id: Union[int, str]):
+        return {
+            "id": dataset_id,
+        }
