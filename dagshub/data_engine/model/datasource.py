@@ -740,6 +740,9 @@ class Datasource:
         This doesn't delete the underlying datasource and its metadata, only deleting the dataset and its query.
 
         If this datasource object wasn't created from a dataset, raises a ``ValueError``.
+
+        Args:
+            force: Skip the confirmation prompt
         """
         if self.assigned_dataset is None:
             raise ValueError("This datasource was not created from a dataset")
