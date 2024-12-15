@@ -1,10 +1,10 @@
 import json
 import logging
-from typing import Optional, Union, List, TYPE_CHECKING
+from typing import Optional, Union, List, TYPE_CHECKING, Dict
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
-from dagshub.common.util import lazy_load
+from dagshub.common.util import lazy_load, removeprefix
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
@@ -170,9 +170,9 @@ def get_datasources(repo: str) -> List[Datasource]:
 
 def get_from_mlflow(
     run: Optional[Union["mlflow.entities.Run", str]] = None, artifact_name: Optional[str] = None
-) -> Datasource:
+) -> Dict[str, Datasource]:
     """
-    Load a datasource from an MLflow run.
+    Load datasources from an MLflow run.
 
     To save a datasource to MLflow, use
     :func:`QueryResult.log_to_mlflow()<dagshub.data_engine.model.query_result.QueryResult.log_to_mlflow>`.
@@ -181,6 +181,10 @@ def get_from_mlflow(
         run: MLflow Run or its ID to load the datasource from.
             If ``None``, loads datasource from the current active run.
         artifact_name: Name of the datasource artifact in the run.
+            If specified, will only return the datasource defined in this artifact.
+
+    Returns:
+        Dictionary where keys are the artifacts, and the values are the datasource stored in the artifact.
     """
     mlflow_run: "mlflow.entities.Run"
     if run is None:
@@ -190,14 +194,7 @@ def get_from_mlflow(
     else:
         mlflow_run = run
 
-    if artifact_name is None:
-        raise ValueError("artifact_name must be specified")
-
-    artifact_uri: str = mlflow_run.info.artifact_uri
-    artifact_path = f"{artifact_uri.rstrip('/')}/{artifact_name.lstrip('/')}"
-
-    ds_state = mlflow_artifacts.load_dict(artifact_path)
-    return Datasource.load_from_serialized_state(ds_state)
+    return _load_datasources_from_run(mlflow_run, artifact_name)
 
 
 def get(*args, **kwargs) -> Datasource:
@@ -211,6 +208,29 @@ def _create_datasource_state(repo: str, name: str, source_type: DatasourceType, 
     ds.path = path
     ds.create()
     return ds
+
+
+def _load_datasources_from_run(
+    run: "mlflow.entities.Run", artifact_name: Optional[str] = None
+) -> Dict[str, Datasource]:
+    if artifact_name is not None:
+        artifact_uri: str = run.info.artifact_uri
+        artifact_path = f"{artifact_uri.rstrip('/')}/{artifact_name.lstrip('/')}"
+
+        ds_states = {artifact_name: mlflow_artifacts.load_dict(artifact_path)}
+    else:
+        # Load all artifacts ending with ".dagshub.dataset.json"
+        artifacts = mlflow_artifacts.list_artifacts(run.info.artifact_uri)
+        # mlflow returns paths with `artifacts/` in the beginning. Need to cut it off because it's also in artifact_uri
+        artifact_paths = [removeprefix(a.path, "artifacts/") for a in artifacts]
+
+        ds_states = {
+            p: mlflow_artifacts.load_dict(f"{run.info.artifact_uri}/{p}")
+            for p in artifact_paths
+            if p.endswith(".dagshub.dataset.json")
+        }
+
+    return {p: Datasource.load_from_serialized_state(ds_state) for p, ds_state in ds_states.items()}
 
 
 __all__ = [

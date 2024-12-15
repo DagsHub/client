@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 from dagshub.common.analytics import send_analytics_event
 from dagshub.data_engine.client.data_client import DataClient
@@ -61,9 +61,9 @@ def get_dataset_from_file(path: str) -> Datasource:
     return datasources.get_datasource_from_file(path)
 
 
-def get_from_mlflow(run=None, artifact_name: Optional[str] = None) -> Datasource:
+def get_from_mlflow(run=None, artifact_name: Optional[str] = None) -> Dict[str, Datasource]:
     """
-    Load a dataset from an MLflow run.
+    Load datasets from an MLflow run.
 
     To save a datasource to MLflow, use
     :func:`QueryResult.log_to_mlflow()<dagshub.data_engine.model.query_result.QueryResult.log_to_mlflow>`.
@@ -74,6 +74,10 @@ def get_from_mlflow(run=None, artifact_name: Optional[str] = None) -> Datasource
         run: Run or ID of the MLflow run to load the datasource from.
             If ``None``, gets it from the current active run.
         artifact_name: Name of the artifact in the run.
+            If specified, will only return the dataset defined in this artifact.
+
+    Returns:
+        Dictionary where keys are the artifacts, and the values are the dataset stored in the artifact.
     """
     return datasources.get_from_mlflow(run, artifact_name)
 

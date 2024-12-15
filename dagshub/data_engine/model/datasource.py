@@ -995,6 +995,8 @@ class Datasource:
         """
 
         state = DatasourceSerializedState.from_dict(state_dict)
+        # The json_dataclasses.from_dict() doesn't respect the default value hints, so we fill it out for it
+        state.query._fill_out_defaults()
 
         ds_state = DatasourceState(repo=state.repo, name=state.datasource_name, id=state.datasource_id)
         ds_state.get_from_dagshub()
@@ -1003,6 +1005,9 @@ class Datasource:
 
         if state.dataset_id is not None:
             ds.load_from_dataset(state.dataset_id, state.dataset_name, change_query=False)
+
+        if state.timestamp is not None:
+            ds = ds.as_of(datetime.datetime.fromtimestamp(state.timestamp, tz=datetime.timezone.utc))
 
         return ds
 
@@ -1908,6 +1913,10 @@ class DatasourceQuery(DataClassJsonMixin):
     order_by: Optional[List] = field(
         default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
     )
+
+    def _fill_out_defaults(self):
+        """For functions that don't utilize the default hints of the dataclass"""
+        self.filter = QueryFilterTree()
 
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
