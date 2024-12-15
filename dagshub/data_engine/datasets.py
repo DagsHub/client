@@ -66,7 +66,7 @@ def get_from_mlflow(run=None, artifact_name: Optional[str] = None) -> Datasource
     Load a dataset from an MLflow run.
 
     To save a datasource to MLflow, use
-    :func:`Datasource.log_to_mlflow()<dagshub.data_engine.model.datasource.Datasource.log_to_mlflow>`.
+    :func:`QueryResult.log_to_mlflow()<dagshub.data_engine.model.query_result.QueryResult.log_to_mlflow>`.
 
     This is a copy of :func:`datasources.get_from_mlflow()<dagshub.data_engine.datasources.get_from_mlflow>`
 

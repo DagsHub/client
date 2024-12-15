@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     import datasets as hf_ds
     import tensorflow as tf
     import mlflow
+    import mlflow.entities
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
@@ -942,3 +943,21 @@ class QueryResult:
 
         if annotations:
             self.get_annotations()
+
+    def log_to_mlflow(self, run: Optional["mlflow.entities.Run"] = None) -> "mlflow.entities.Run":
+        """
+        Logs the query result information to MLflow as an artifact.
+        The artifact will be saved at the root of the run with the name in the format of
+        ``log_{datasource_name}_{query_time}_{random_chunk}.dagshub.dataset.json``.
+
+        You can later load the dataset back from MLflow using :func:`dagshub.data_engine.datasources.get_from_mlflow`.
+
+        Args:
+            run: MLflow run to save to. If ``None``, uses the active MLflow run or creates a new run.
+
+        Returns:
+            Run to which the artifact was logged.
+        """
+        assert self.query_data_time is not None
+        artifact_name = self.datasource._get_mlflow_artifact_name("log", self.query_data_time)
+        return self.datasource._log_to_mlflow(artifact_name, run, self.query_data_time)

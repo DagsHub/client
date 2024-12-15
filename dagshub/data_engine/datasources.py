@@ -175,7 +175,7 @@ def get_from_mlflow(
     Load a datasource from an MLflow run.
 
     To save a datasource to MLflow, use
-    :func:`Datasource.log_to_mlflow()<dagshub.data_engine.model.datasource.Datasource.log_to_mlflow>`.
+    :func:`QueryResult.log_to_mlflow()<dagshub.data_engine.model.query_result.QueryResult.log_to_mlflow>`.
 
     Args:
         run: MLflow Run or its ID to load the datasource from.
