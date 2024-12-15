@@ -1070,8 +1070,12 @@ class Datasource:
         """
         Returns a query that is parseable by the frontend.
         It has to be a JSON of the GraphQL query, encoded into b64
+
+        This also omits any null values to make the resulting URL shorter
         """
-        params = self._query.to_json()
+        params_dict = self._query.to_dict()
+        params_dict = {k: v for k, v in params_dict.items() if v is not None}
+        params = json.dumps(params_dict)
         params_encoded = base64.urlsafe_b64encode(params.encode("utf-8")).decode("utf-8")
         return f"query={params_encoded}"
 
