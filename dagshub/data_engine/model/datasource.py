@@ -844,7 +844,7 @@ class Datasource:
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
 
-    @deprecated("Either use autologging, or QueryResult.log_to_mlflow() if there autologging is turned off")
+    @deprecated("Either use autologging, or QueryResult.log_to_mlflow() if autologging is turned off")
     def log_to_mlflow(
         self,
         artifact_name: Optional[str] = None,
