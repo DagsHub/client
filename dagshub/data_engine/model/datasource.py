@@ -28,7 +28,7 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.common.environment import is_mlflow_installed
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none
+from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none, deprecated
 from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationType, AnnotationLocation
 from dagshub.data_engine.client.models import (
     PreprocessingStatus,
@@ -77,7 +77,6 @@ else:
 logger = logging.getLogger(__name__)
 
 LS_ORCHESTRATOR_URL = "http://127.0.0.1"
-DEFAULT_MLFLOW_ARTIFACT_NAME = "datasource.dagshub.json"
 MLFLOW_DATASOURCE_TAG_NAME = "dagshub.datasets.datasource_id"
 MLFLOW_DATASET_TAG_NAME = "dagshub.datasets.dataset_id"
 
@@ -870,32 +869,20 @@ class Datasource:
         copy_with_ds_assigned.load_from_dataset(dataset_name=name, change_query=False)
         return copy_with_ds_assigned
 
-    def _autolog_mlflow(self, qr: "QueryResult"):
-        if not is_mlflow_installed:
-            return
-        # Run ONLY if there's an active run going on
-        active_run = mlflow.active_run()
-        if active_run is None:
-            return
-        source_name = self.source.name
-
-        now_time = qr.query_data_time.strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
-        uuid_chunk = str(uuid.uuid4())[-4:]
-
-        artifact_name = f"autolog_{source_name}_{now_time}_{uuid_chunk}.dagshub.json"
-        threading.Thread(
-            target=self.log_to_mlflow,
-            kwargs={"artifact_name": artifact_name, "run": active_run, "as_of": qr.query_data_time},
-        ).start()
-
+    @deprecated("Either use autologging, or QueryResult.log_to_mlflow() if autologging is turned off")
     def log_to_mlflow(
         self,
-        artifact_name=DEFAULT_MLFLOW_ARTIFACT_NAME,
+        artifact_name: Optional[str] = None,
         run: Optional["mlflow.entities.Run"] = None,
         as_of: Optional[datetime.datetime] = None,
     ) -> "mlflow.Entities.Run":
         """
         Logs the current datasource state to MLflow as an artifact.
+
+        .. warning::
+            This function is deprecated. Use autologging or
+            :func:`QueryResult.log_to_mlflow() <dagshub.data_engine.model.query_result.QueryResult.log_to_mlflow>`
+            instead.
 
         Args:
             artifact_name: Name of the artifact that will be stored in the MLflow run.
@@ -909,6 +896,35 @@ class Datasource:
         Returns:
             Run to which the artifact was logged.
         """
+        if artifact_name is None:
+            as_of = as_of or (self._query.as_of or datetime.datetime.now())
+            artifact_name = self._get_mlflow_artifact_name("log", as_of)
+        elif not artifact_name.endswith(".dagshub.dataset.json"):
+            artifact_name += ".dagshub.dataset.json"
+
+        return self._log_to_mlflow(artifact_name, run, as_of)
+
+    def _autolog_mlflow(self, qr: "QueryResult"):
+        if not is_mlflow_installed:
+            return
+        # Run ONLY if there's an active run going on
+        active_run = mlflow.active_run()
+        if active_run is None:
+            return
+
+        artifact_name = self._get_mlflow_artifact_name("autolog", qr.query_data_time)
+
+        threading.Thread(
+            target=self._log_to_mlflow,
+            kwargs={"artifact_name": artifact_name, "run": active_run, "as_of": qr.query_data_time},
+        ).start()
+
+    def _log_to_mlflow(
+        self,
+        artifact_name,
+        run: Optional["mlflow.entities.Run"] = None,
+        as_of: Optional[datetime.datetime] = None,
+    ) -> "mlflow.Entities.Run":
         if run is None:
             run = mlflow.active_run()
             if run is None:
@@ -920,6 +936,11 @@ class Datasource:
         client.log_dict(run.info.run_id, self._to_dict(as_of), artifact_name)
         log_message(f'Saved the datasource state to MLflow (run "{run.info.run_name}") as "{artifact_name}"')
         return run
+
+    def _get_mlflow_artifact_name(self, prefix: str, as_of: datetime.datetime) -> str:
+        now_time = as_of.strftime("%Y-%m-%dT%H-%M-%S")  # Not ISO format to make it a valid filename
+        uuid_chunk = str(uuid.uuid4())[-4:]
+        return f"{prefix}_{self.source.name}_{now_time}_{uuid_chunk}.dagshub.dataset.json"
 
     def save_to_file(self, path: Union[str, PathLike] = ".") -> Path:
         """
@@ -999,6 +1020,8 @@ class Datasource:
         """
 
         state = DatasourceSerializedState.from_dict(state_dict)
+        # The json_dataclasses.from_dict() doesn't respect the default value hints, so we fill it out for it
+        state.query._fill_out_defaults()
 
         ds_state = DatasourceState(repo=state.repo, name=state.datasource_name, id=state.datasource_id)
         ds_state.get_from_dagshub()
@@ -1007,6 +1030,9 @@ class Datasource:
 
         if state.dataset_id is not None:
             ds.load_from_dataset(state.dataset_id, state.dataset_name, change_query=False)
+
+        if state.timestamp is not None:
+            ds = ds.as_of(datetime.datetime.fromtimestamp(state.timestamp, tz=datetime.timezone.utc))
 
         return ds
 
@@ -1916,6 +1942,10 @@ class DatasourceQuery(DataClassJsonMixin):
     order_by: Optional[List] = field(
         default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
     )
+
+    def _fill_out_defaults(self):
+        """For functions that don't utilize the default hints of the dataclass"""
+        self.filter = QueryFilterTree()
 
     def __deepcopy__(self, memodict={}):
         other = DatasourceQuery(
