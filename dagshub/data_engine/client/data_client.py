@@ -1,3 +1,4 @@
+import datetime
 import logging
 from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
 
@@ -17,6 +18,7 @@ from dagshub.data_engine.client.models import (
     DatasourceResult,
     DatasetResult,
     MetadataFieldSchema,
+    DatapointHistoryResult,
 )
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
@@ -36,6 +38,7 @@ if TYPE_CHECKING:
         DatapointDeleteMetadataEntry,
         DatapointDeleteEntry,
     )
+    from dagshub.data_engine.model.datapoint import Datapoint
 
 logger = logging.getLogger(__name__)
 
@@ -369,3 +372,22 @@ class DataClient:
             return []
 
         return [dacite.from_dict(DatasetResult, val, config=dacite_config) for val in res]
+
+    def get_datapoint_history(
+        self,
+        datapoints: List["Datapoint"],
+        fields: Optional[List[str]],
+        from_time: Optional[datetime.datetime],
+        to_time: Optional[datetime.datetime],
+    ) -> List[DatapointHistoryResult]:
+        ds_id = datapoints[0].datasource.source.id
+        assert ds_id is not None
+
+        q = GqlQueries.datapoint_history().generate()
+        params = GqlQueries.datapoint_history_params(ds_id, [dp.path for dp in datapoints], fields, from_time, to_time)
+
+        res = self._exec(q, params)["datapointHistory"]
+        if res is None:
+            return []
+
+        return [dacite.from_dict(DatapointHistoryResult, val, config=dacite_config) for val in res]
