@@ -1,3 +1,4 @@
+import datetime
 import enum
 import logging
 from dataclasses import dataclass, field
@@ -117,3 +118,9 @@ class DatasetResult:
     name: str
     datasource: DatasourceResult
     datasetQuery: str
+
+
+@dataclass
+class DatapointHistoryResult:
+    timestamp: datetime.datetime
+    """Time of the version change for this datapoint. The timezone is always UTC."""

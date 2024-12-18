@@ -1,5 +1,6 @@
+import datetime
 import functools
-from typing import Optional, Any, Dict, Union
+from typing import Optional, Any, Dict, Union, List
 
 from dagshub.data_engine.client.gql_introspections import Validators, TypesIntrospection
 from dagshub.data_engine.client.query_builder import GqlQuery
@@ -122,4 +123,46 @@ class GqlQueries:
         return {
             "id": id,
             "name": name,
+        }
+
+    @staticmethod
+    @functools.lru_cache()
+    def datapoint_history() -> GqlQuery:
+        q = (
+            GqlQuery()
+            .operation(
+                "query",
+                name="datapointHistory",
+                input={
+                    "$datasource": "ID!",
+                    "$opts": "DatapointHistoryInput!",
+                },
+            )
+            .query(
+                "datapointHistory",
+                input={
+                    "datasource": "$datasource",
+                    "opts": "$opts",
+                },
+            )
+            .fields(["timestamp"])
+        )
+        return q
+
+    @staticmethod
+    def datapoint_history_params(
+        datasource_id: Union[int, str],
+        datapoints: List[str],
+        fields: Optional[List[str]],
+        from_time: Optional[datetime.datetime],
+        to_time: Optional[datetime.datetime],
+    ) -> Dict[str, Any]:
+        return {
+            "datasource": datasource_id,
+            "opts": {
+                "datapoints": datapoints,
+                "fields": fields,
+                "fromTime": int(from_time.timestamp()) if from_time else None,
+                "toTime": int(to_time.timestamp()) if to_time else None,
+            },
         }
