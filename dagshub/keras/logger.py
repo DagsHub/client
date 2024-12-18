@@ -16,7 +16,7 @@ class ignore_exceptions:
 
 class DAGsHubLogger(Callback):
     """
-    First, install the DAGsHub logger with
+    First, install the DagsHub logger with
     `pip install dagshub`
 
     Example of Usage:

@@ -43,7 +43,7 @@ if __name__ == "__main__":
         max_epochs=hparams.max_nb_epochs,
         gpus=hparams.gpus,
         val_check_interval=0.2,
-        logger=DAGsHubLogger(),  # This is the main point - use the DAGsHub logger!
+        logger=DAGsHubLogger(),  # This is the main point - use the DagsHub logger!
         default_root_dir="lightning_logs",
     )
     trainer.fit(model)
