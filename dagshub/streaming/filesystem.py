@@ -300,7 +300,7 @@ class DagsHubFilesystem:
         Get the list of DagsHub remotes from the Git configuration.
 
         Returns:
-            List[str]: A list of DAGsHub remote URLs.
+            List[str]: A list of DagsHub remote URLs.
 
         :meta private:
         """
