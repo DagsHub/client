@@ -19,8 +19,10 @@ metadataTypeLookupReverse: Dict[str, Type] = {}
 for k, v in metadataTypeLookup.items():
     metadataTypeLookupReverse[v.value] = k
 
+
 def timestamp_to_datetime(timestamp: int) -> datetime.datetime:
     return datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
+
 
 dacite_config = dacite.Config(
     cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType, Set],
