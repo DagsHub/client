@@ -80,7 +80,7 @@ def check_and_provide_install_script(quiet=False):
 
 def rclone_init(repo_owner: str, conf_path: Optional[Path] = None, update=False, quiet=False) -> Tuple[str, Path]:
     """
-    Initializes or updates the Rclone configuration for a DAGsHub repository.
+    Initializes or updates the Rclone configuration for a DagsHub repository.
 
     :param repo_owner: The owner of the repository. This is used to create a unique section in the Rclone configuration.
     :param conf_path: Optional. The path to the Rclone configuration file. If not provided, the default path is used.
@@ -137,10 +137,10 @@ def rclone_init(repo_owner: str, conf_path: Optional[Path] = None, update=False,
 
 def sync(repo: str, local_path: Union[str, os.PathLike], remote_path: Union[str, os.PathLike]):
     """
-    Synchronizes the contents of a local directory with a specified remote directory in a DAGsHub repository using
+    Synchronizes the contents of a local directory with a specified remote directory in a DagsHub repository using
     Rclone.
 
-    :param repo: A string in the ``<repo_owner>/<repo_name>`` format representing the target DAGsHub repository.
+    :param repo: A string in the ``<repo_owner>/<repo_name>`` format representing the target DagsHub repository.
     :param local_path: A Path object or string pointing to the local directory to be synchronized.
     :param remote_path: A Path object or string representing the remote directory path relative to the DagsHub Storage
         bucket root.
@@ -183,7 +183,7 @@ def sync(repo: str, local_path: Union[str, os.PathLike], remote_path: Union[str,
 
 def mount(repo: str, cache: bool = False, path: Path = None) -> os.PathLike:
     """
-    Mounts a DAGsHub repository bucket to a local directory.
+    Mounts a DagsHub repository bucket to a local directory.
 
     .. warning::
         This function is only supported on Linux machines and on macOS via FUSE for macOS (FUSE-T or macFUSE).
@@ -257,7 +257,7 @@ def mount(repo: str, cache: bool = False, path: Path = None) -> os.PathLike:
 
 def unmount(repo, path=None):
     """
-    Unmounts a previously mounted DAGsHub repository bucket from the local file system.
+    Unmounts a previously mounted DagsHub repository bucket from the local file system.
 
     :param repo: The name of the repository. Used to determine the default mount point if a custom path is
         not provided.

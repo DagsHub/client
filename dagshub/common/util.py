@@ -1,4 +1,5 @@
 import datetime
+import functools
 import types
 import logging
 import importlib
@@ -27,6 +28,12 @@ def to_timestamp(ts: Union[float, int, datetime.datetime]) -> int:
         return int(ts.timestamp())
     else:
         return int(ts)
+
+
+def removeprefix(val: str, prefix: str) -> str:
+    if val.startswith(prefix):
+        return val[len(prefix) :]
+    return val
 
 
 def lazy_load(module_name, source_package=None, callback=None):
@@ -94,3 +101,24 @@ class LazyModule(types.ModuleType):
         # Update this object's dict so that attribute references are efficient
         # (__getattr__ is only called on lookups that fail)
         self.__dict__.update(module.__dict__)
+
+
+def deprecated(additional_message=""):
+    """
+    Decorator to mark functions as deprecated. It will print a warning
+    message when the function is called.
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            additional = "\n" + additional_message if additional_message else ""
+            logger.warning(
+                f"DagsHub Deprecation Warning: "
+                f"{func.__name__} is deprecated and may be removed in future versions.{additional}",
+            )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

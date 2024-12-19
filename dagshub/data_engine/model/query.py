@@ -151,8 +151,15 @@ class QueryFilterTree:
                 # Negation in the operation - prepend a not node before the current node
                 tree = self._operand_tree
                 parent_id = tree.parent(node.identifier)
-                not_node = tree.create_node("not", parent=parent_id)
-                tree.move_node(node.identifier, not_node.identifier)
+                if parent_id is None:
+                    # Root node - need to recreate a new tree with the not node as the top node
+                    new_tree = Tree()
+                    not_node = new_tree.create_node("not")
+                    new_tree.paste(not_node.identifier, self._operand_tree)
+                    self._operand_tree = new_tree
+                else:
+                    not_node = tree.create_node("not", parent=parent_id)
+                    tree.move_node(node.identifier, not_node.identifier)
                 op = op[1:]
             node.tag = op
             node.data.update({"value": other})
