@@ -10,7 +10,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential, before_slee
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
 from dagshub.data_engine.annotation import MetadataAnnotations
-from dagshub.data_engine.client.models import MetadataSelectFieldSchema
+from dagshub.data_engine.client.models import MetadataSelectFieldSchema, DatapointHistoryResult
 from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
@@ -241,6 +241,26 @@ class Datapoint:
 
     def blob_url(self, sha):
         return self.datasource.source.blob_path(sha)
+
+    def get_version_timestamps(
+        self,
+        fields: Optional[List[str]] = None,
+        from_time: Optional[datetime.datetime] = None,
+        to_time: Optional[datetime.datetime] = None,
+    ) -> List[DatapointHistoryResult]:
+        """
+        Get the timestamps of all versions of this datapoint, where the specified fields have changed.
+
+        Args:
+            fields: List of fields to check for changes. If None, all fields are checked.
+            from_time: Only search versions since this time. If None, the start time is unbounded
+            to_time: Only search versions until this time. If None, the end time is unbounded
+
+        Returns:
+            List of objects with information about the versions.
+        """
+        history = self.datasource.source.client.get_datapoint_history([self], fields, from_time, to_time)
+        return history.get(self.path, [])
 
 
 def _get_blob(

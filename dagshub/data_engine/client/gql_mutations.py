@@ -19,7 +19,6 @@ class GqlMutations:
             )
             .query("createDatasource", input={"name": "$name", "url": "$url", "dsType": "$dsType"})
             .fields(["id", "name", "rootUrl", "integrationStatus", "preprocessingStatus", "type"])
-            .generate()
         )
         return q
 
@@ -43,7 +42,6 @@ class GqlMutations:
                     "path",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -63,7 +61,6 @@ class GqlMutations:
                     "path",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -83,7 +80,6 @@ class GqlMutations:
                     "path",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -106,7 +102,6 @@ class GqlMutations:
                     "tags",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -131,6 +126,7 @@ class GqlMutations:
             "datapoints": datapoints,
         }
 
+    @staticmethod
     def update_metadata_fields_params(datasource_id: Union[int, str], metadata_field_props: List[Dict[str, Any]]):
         return {"datasource": datasource_id, "props": metadata_field_props}
 
@@ -162,7 +158,6 @@ class GqlMutations:
                     "type",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -202,7 +197,6 @@ class GqlMutations:
                     "type",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -231,7 +225,6 @@ class GqlMutations:
                     "createdAt",
                 ]
             )
-            .generate()
         )
         return q
 
@@ -251,7 +244,6 @@ class GqlMutations:
             .operation("mutation", name="deleteDataset", input={"$id": "ID!"})
             .query("deleteDataset", input={"id": "$id"})
             .fields(["id"])
-            .generate()
         )
         return q
 

@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 import functools
 from typing import Any, Dict, List
-from dagshub.data_engine.client.query_builder import GqlQuery
+from dagshub.data_engine.client.query_builder import GqlQuery, ParamValidator
 
 
 class GqlIntrospections:
     @staticmethod
     @functools.lru_cache()
-    def obj_fields() -> str:
+    def obj_fields() -> GqlQuery:
         q = (
             GqlQuery()
             .operation("query", name="introspection")
@@ -36,7 +36,6 @@ class GqlIntrospections:
                     .generate()
                 ]
             )
-            .generate()
         )
         return q
 
@@ -102,3 +101,13 @@ class Validators:
         root_fields = [f.split(" ")[0] for f in fields]
         supported_fields = Validators.get_fields(introspection, response_obj_name)
         return [fields[i] for i, rf in enumerate(root_fields) if rf in supported_fields]
+
+    @staticmethod
+    def has_type_validator(type_name: str) -> "ParamValidator":
+        def validator(_: Dict[str, Any], introspection: TypesIntrospection):
+            if type_name not in [t.name for t in introspection.types]:
+                raise ValueError(
+                    f"{type_name} is not available on the backend. Make sure your DagsHub instance is up to date"
+                )
+
+        return validator
