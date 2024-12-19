@@ -107,7 +107,7 @@ class Validators:
         def validator(_: Dict[str, Any], introspection: TypesIntrospection):
             if type_name not in [t.name for t in introspection.types]:
                 raise ValueError(
-                    f"{type_name} is not allowed on the backend. Make sure your DagsHub instance is up to date"
+                    f"{type_name} is not available on the backend. Make sure your DagsHub instance is up to date"
                 )
 
         return validator
