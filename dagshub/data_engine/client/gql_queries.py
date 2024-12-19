@@ -128,6 +128,7 @@ class GqlQueries:
     @staticmethod
     @functools.lru_cache()
     def datapoint_history() -> GqlQuery:
+        # TODO: introspect and check if the query is available
         q = (
             GqlQuery()
             .operation(
@@ -145,7 +146,12 @@ class GqlQueries:
                     "opts": "$opts",
                 },
             )
-            .fields(["timestamp"])
+            .fields(
+                [
+                    "edges { node { path history { timestamp } } }",
+                    "pageInfo { hasNextPage endCursor }",
+                ]
+            )
         )
         return q
 
@@ -156,6 +162,8 @@ class GqlQueries:
         fields: Optional[List[str]],
         from_time: Optional[datetime.datetime],
         to_time: Optional[datetime.datetime],
+        after: Optional[str],
+        first: Optional[int],
     ) -> Dict[str, Any]:
         return {
             "datasource": datasource_id,
@@ -164,5 +172,7 @@ class GqlQueries:
                 "fields": fields,
                 "fromTime": int(from_time.timestamp()) if from_time else None,
                 "toTime": int(to_time.timestamp()) if to_time else None,
+                "after": after if after else None,
+                "first": first if first else None,
             },
         }

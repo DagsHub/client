@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING
+from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Tuple
 
 import dacite
 import gql
@@ -26,7 +26,6 @@ from dagshub.data_engine.client.gql_queries import GqlQueries
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
-from functools import cached_property
 
 from dagshub.data_engine.model.schema_util import dacite_config
 
@@ -46,6 +45,10 @@ logger = logging.getLogger(__name__)
 class DataClient:
     HEAD_QUERY_SIZE = 100
     FULL_LIST_PAGE_SIZE = 5000
+    DATAPOINT_HISTORY_PAGE_SIZE = 5000
+
+    _known_introspections: Dict[str, TypesIntrospection] = {}
+    """GraphQL schema for each host"""
 
     def __init__(self, repo: str):
         self.repo = repo
@@ -195,11 +198,15 @@ class DataClient:
         q.validate_params(params, self.query_introspection)
         return self._exec(q.generate(), params)["datasourceQuery"]
 
-    @cached_property
+    @property
     def query_introspection(self) -> TypesIntrospection:
-        introspection = GqlIntrospections.obj_fields()
-        introspection_dict = self._exec(introspection)
-        return dacite.from_dict(data_class=TypesIntrospection, data=introspection_dict["__schema"])
+        if self.host not in self._known_introspections:
+            introspection = GqlIntrospections.obj_fields()
+            introspection_dict = self._exec(introspection)
+            self._known_introspections[self.host] = dacite.from_dict(
+                data_class=TypesIntrospection, data=introspection_dict["__schema"]
+            )
+        return self._known_introspections[self.host]
 
     def update_metadata(self, datasource: "Datasource", entries: List["DatapointMetadataUpdateEntry"]):
         """
@@ -379,15 +386,56 @@ class DataClient:
         fields: Optional[List[str]],
         from_time: Optional[datetime.datetime],
         to_time: Optional[datetime.datetime],
-    ) -> List[DatapointHistoryResult]:
+    ) -> Dict[str, List[DatapointHistoryResult]]:
         ds_id = datapoints[0].datasource.source.id
         assert ds_id is not None
 
+        after = None
+        hasNextPage = True
+
         q = GqlQueries.datapoint_history().generate()
-        params = GqlQueries.datapoint_history_params(ds_id, [dp.path for dp in datapoints], fields, from_time, to_time)
 
-        res = self._exec(q, params)["datapointHistory"]
-        if res is None:
-            return []
+        res: Dict[str, List[DatapointHistoryResult]] = {}
 
-        return [dacite.from_dict(DatapointHistoryResult, val, config=dacite_config) for val in res]
+        while hasNextPage:
+            params = GqlQueries.datapoint_history_params(
+                ds_id,
+                [dp.path for dp in datapoints],
+                fields,
+                from_time,
+                to_time,
+                after,
+                self.DATAPOINT_HISTORY_PAGE_SIZE,
+            )
+            page, after = self._get_datapoint_history(q, params)
+            hasNextPage = after is not None
+            for dp_path, history in page.items():
+                if dp_path not in res:
+                    res[dp_path] = []
+                res[dp_path].extend(history)
+
+        return res
+
+    def _get_datapoint_history(
+        self,
+        query: str,
+        params: Dict[str, Any],
+    ) -> Tuple[Dict[str, List[DatapointHistoryResult]], Optional[str]]:
+        queryRes = self._exec(query, params)["datapointHistory"]
+        if queryRes is None or queryRes.get("edges") is None:
+            return {}, None
+
+        res: Dict[str, List[DatapointHistoryResult]] = {}
+        for val in queryRes["edges"]:
+            dpPath = val["node"]["path"]
+            history = [
+                dacite.from_dict(DatapointHistoryResult, v, config=dacite_config) for v in val["node"]["history"]
+            ]
+            res[dpPath] = history
+
+        cursor = queryRes["pageInfo"]["endCursor"]
+        hasNextPage = queryRes["pageInfo"]["hasNextPage"]
+
+        cursor = cursor if hasNextPage else None
+
+        return res, cursor

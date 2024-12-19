@@ -259,7 +259,8 @@ class Datapoint:
         Returns:
             List of objects with information about the versions.
         """
-        return self.datasource.source.client.get_datapoint_history([self], fields, from_time, to_time)
+        history = self.datasource.source.client.get_datapoint_history([self], fields, from_time, to_time)
+        return history.get(self.path, [])
 
 
 def _get_blob(

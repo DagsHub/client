@@ -123,4 +123,4 @@ class DatasetResult:
 @dataclass
 class DatapointHistoryResult:
     timestamp: datetime.datetime
-    """Time of the version change for this datapoint. The timezone is always UTC."""
+    """Times of the version changes for this datapoint. The timezone is always UTC."""
