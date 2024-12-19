@@ -446,6 +446,14 @@ def test_isnull_deserialization(ds):
     assert queried.get_query().filter.serialize() == deserialized.serialize()
 
 
+def test_is_not_null_serialization(ds):
+    add_string_fields(ds, "col1")
+    queried = ds["col1"].is_not_null()
+    expected = {"filter": {"key": "col1", "value": "", "valueType": "STRING", "comparator": "IS_NULL"}, "not": True}
+
+    assert queried.get_query().filter.serialize() == expected
+
+
 def test_isnull_raises_not_on_field(ds):
     with pytest.raises(RuntimeError):
         ds.is_null()
