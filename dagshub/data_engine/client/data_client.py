@@ -23,6 +23,7 @@ from dagshub.data_engine.client.models import (
 from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
+from dagshub.data_engine.client.query_builder import GqlQuery
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
 
@@ -171,11 +172,18 @@ class DataClient:
 
         return res
 
-    def _exec(self, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _exec(
+        self,
+        query: GqlQuery,
+        params: Optional[Dict[str, Any]] = None,
+        validate=True,
+    ) -> Dict[str, Any]:
         logger.debug(f"Executing query: {query}")
         if params is not None:
             logger.debug(f"Params: {params}")
-        q = gql.gql(query)
+        if validate:
+            query.validate_params(params if params else {}, self.query_introspection)
+        q = gql.gql(query.generate())
         try:
             resp = self.client.execute(q, variable_values=params)
         except TransportQueryError as e:
@@ -195,14 +203,14 @@ class DataClient:
             first=limit,
             after=after,
         )
-        q.validate_params(params, self.query_introspection)
-        return self._exec(q.generate(), params)["datasourceQuery"]
+        return self._exec(q, params)["datasourceQuery"]
 
     @property
     def query_introspection(self) -> TypesIntrospection:
         if self.host not in self._known_introspections:
             introspection = GqlIntrospections.obj_fields()
-            introspection_dict = self._exec(introspection)
+            # Keep validate = False otherwise you get into an infinite loop
+            introspection_dict = self._exec(introspection, validate=False)
             self._known_introspections[self.host] = dacite.from_dict(
                 data_class=TypesIntrospection, data=introspection_dict["__schema"]
             )
@@ -293,7 +301,7 @@ class DataClient:
         Returns:
             List[DatasourceResult]: A list of datasources that match the filtering criteria.
         """
-        q = GqlQueries.datasource().generate()
+        q = GqlQueries.datasource()
         params = GqlQueries.datasource_params(id=id, name=name)
 
         res = self._exec(q, params)["datasource"]
@@ -371,7 +379,7 @@ class DataClient:
         Returns:
             List[DatasetResult]: A list of datasets that match the filtering criteria.
         """
-        q = GqlQueries.dataset().generate()
+        q = GqlQueries.dataset()
         params = GqlQueries.dataset_params(id=id, name=name)
 
         res = self._exec(q, params)["dataset"]
@@ -393,7 +401,7 @@ class DataClient:
         after = None
         hasNextPage = True
 
-        q = GqlQueries.datapoint_history().generate()
+        q = GqlQueries.datapoint_history()
 
         res: Dict[str, List[DatapointHistoryResult]] = {}
 
@@ -418,7 +426,7 @@ class DataClient:
 
     def _get_datapoint_history(
         self,
-        query: str,
+        query: GqlQuery,
         params: Dict[str, Any],
     ) -> Tuple[Dict[str, List[DatapointHistoryResult]], Optional[str]]:
         queryRes = self._exec(query, params)["datapointHistory"]

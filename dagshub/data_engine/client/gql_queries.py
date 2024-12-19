@@ -153,6 +153,7 @@ class GqlQueries:
                 ]
             )
         )
+        q.param_validator(Validators.has_type_validator("DatapointHistory"))
         return q
 
     @staticmethod
