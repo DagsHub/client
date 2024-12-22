@@ -33,6 +33,8 @@ run ``pip install dagshub[jupyter]`` to install additional dependencies to enhan
     reference/mlflow_util
     reference/troubleshooting
 
+    reference/cli
+
 ..  Files after this one are hidden and aren't exposed (not exposing them to the user due to deprecation)
     reference/metric_logging
     reference/index

@@ -25,7 +25,11 @@ _dagshub_bucket_doc_link = "https://dagshub.com/docs/feature_guide/dagshub_stora
 
 
 @click.group()
-@click.option("--host", default=config.host, help="Hostname of DagsHub instance")
+@click.option(
+    "--host",
+    default=config.host,
+    help="Hostname of DagsHub instance. Can also be set by 'DAGSHUB_CLIENT_HOST' environment variable",
+)
 @click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
 @click.pass_context
 def cli(ctx, host, quiet):
@@ -33,7 +37,7 @@ def cli(ctx, host, quiet):
     ctx.obj = {"host": host.strip("/"), "quiet": quiet or config.quiet}
 
 
-@cli.command()
+@cli.command(hidden=True)
 @click.argument("project_root", default=".")
 @click.option("--repo_url", help="URL of the repo hosted on DagsHub")
 @click.option("--branch", help="Repository's branch")
@@ -44,6 +48,9 @@ def cli(ctx, host, quiet):
 def mount(ctx, verbose, quiet, **kwargs):
     """
     Mount a DagsHub Storage folder via FUSE
+
+    Warning: this function is deprecated!
+    Use the Rclone-based streaming of a DagsHub Storage bucket instead.
     """
     # Since pyfuse can crash on init-time, import it here instead of up top
     from dagshub.streaming import mount
@@ -134,8 +141,11 @@ def to_log_level(verbosity):
 
 
 KEEP_PREFIX_HELP = """ Whether to keep the path of the folder in the download path or not.
+
 Example: Given remote_path "src/data" and file "test/file.txt"
+
 if True: will download to "<local_path>/src/data/test/file.txt"
+
 if False: will download to "<local_path>/test/file.txt"
 """
 
