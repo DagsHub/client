@@ -25,6 +25,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx_copybutton",
     "sphinx_sitemap",
+    "sphinx_click",
 ]
 
 templates_path = ["_templates"]
