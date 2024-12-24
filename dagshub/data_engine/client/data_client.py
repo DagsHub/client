@@ -397,6 +397,7 @@ class DataClient:
     ) -> Dict[str, List[DatapointHistoryResult]]:
         ds_id = datapoints[0].datasource.source.id
         assert ds_id is not None
+        assert len(datapoints) > 0
 
         after = None
         hasNextPage = True
