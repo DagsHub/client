@@ -495,26 +495,11 @@ class QueryResult:
             pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
             post_hook: (optional, default: identity function) function that converts mlflow model output
             to the desired format
-            batch_size: (optional, default: 1) function that sets batch_size
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
             If None, just returns predictions.
             (in addition to logging to a field, iff that parameter is set)
         """
-
-        # to support depedency-free dataloading, `Batcher` is a barebones dataloader that sets up batched inference
-        class Batcher:
-            def __init__(self, dset, batch_size):
-                self.dset = dset
-                self.batch_size = batch_size
-
-            def __iter__(self):
-                self.curr_idx = 0
-                return self
-
-            def __next__(self):
-                self.curr_idx += self.batch_size
-                return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
-
         if not host:
             host = self.datasource.source.repoApi.host
         prev_uri = mlflow.get_tracking_uri()
@@ -534,7 +519,7 @@ class QueryResult:
         task = progress.add_task("Running inference...", total=len(dset))
         with progress:
             for idx, local_paths in enumerate(
-                Batcher(dset, batch_size) if batch_size != 1 else dset
+                _Batcher(dset, batch_size) if batch_size != 1 else dset
             ):  # encapsulates dataset with batcher if necessary and iterates over it
                 for prediction, remote_path in zip(
                     post_hook(model.predict(pre_hook(local_paths))),
@@ -550,7 +535,11 @@ class QueryResult:
             with self.datasource.metadata_context() as ctx:
                 for remote_path in predictions:
                     ctx.update_metadata(
-                        remote_path, {log_to_field: json.dumps(predictions[remote_path]).encode("utf-8")}
+                        remote_path,
+                        {
+                            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
+                            f"{log_to_field}_score": json.dumps(predictions[remote_path][1]).encode("utf-8"),
+                        },
                     )
         return predictions
 
@@ -856,6 +845,71 @@ class QueryResult:
 
             return sess
 
+    def predict_with_callable(
+        self,
+        generic: Callable,
+        batch_size: int = 1,
+        log_to_field: Optional[str] = None,
+    ) -> Optional[list]:
+        """
+        Sends all the datapoints returned in this QueryResult as prediction targets for
+        a generic object.
+
+        Args:
+            generic: function that returns predictions in the form of (prediction, prediction_score: Optional[float] = None)
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
+            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
+            If None, just returns predictions.
+            (in addition to logging to a field, iff that parameter is set)
+        """
+        dset = DagsHubDataset(self, tensorizers=[lambda x: x])
+
+        predictions = {}
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Running inference...", total=len(dset))
+        with progress:
+            for idx, local_paths in enumerate(
+                _Batcher(dset, batch_size) if batch_size != 1 else dset
+            ):  # encapsulates dataset with batcher if necessary and iterates over it
+                for prediction, remote_path in zip(
+                    generic(local_paths),
+                    [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
+                ):
+                    predictions[remote_path] = prediction
+                progress.update(task, advance=batch_size, refresh=True)
+
+        if log_to_field:
+            with self.datasource.metadata_context() as ctx:
+                for remote_path in predictions:
+                    ctx.update_metadata(
+                        remote_path,
+                        {
+                            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
+                            f"{log_to_field}_score": json.dumps(predictions[remote_path][1]).encode("utf-8"),
+                        },
+                    )
+        return predictions
+
+    def annotate_with_callable(self, generic, batch_size: int = 1, log_to_field: str = "annotation"):
+        """
+        Sends all the datapoints returned in this QueryResult as prediction targets for
+        a generic object.
+
+        Args:
+            generic: function that returns (annotation, prediction_score)
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
+            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
+        """
+        if log_to_field is None:
+            raise ValueError("`log_to_field` == None, there is nothing to do!")
+
+        self.predict_with_callable(
+            generic,
+            batch_size=batch_size,
+            log_to_field=log_to_field,
+        )
+        self.datasource.metadata_field(log_to_field).set_annotation().apply()
+
     def annotate_with_mlflow_model(
         self,
         repo: str,
@@ -880,6 +934,9 @@ class QueryResult:
             mlflow model output converts to labelstudio format
             batch_size: (optional, default: 1) batched annotation size
         """
+        if log_to_field is None:
+            raise ValueError("`log_to_field` == None, there is nothing to do!")
+
         self.predict_with_mlflow_model(
             repo,
             name,
@@ -961,3 +1018,18 @@ class QueryResult:
         assert self.query_data_time is not None
         artifact_name = self.datasource._get_mlflow_artifact_name("log", self.query_data_time)
         return self.datasource._log_to_mlflow(artifact_name, run, self.query_data_time)
+
+
+# to support depedency-free dataloading, `_Batcher` is a barebones dataloader that sets up batched inference
+class _Batcher:
+    def __init__(self, dset, batch_size):
+        self.dset = dset
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        self.curr_idx = 0
+        return self
+
+    def __next__(self):
+        self.curr_idx += self.batch_size
+        return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
