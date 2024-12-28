@@ -538,7 +538,11 @@ class QueryResult:
                         remote_path,
                         {
                             log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
-                            f"{log_to_field}_score": json.dumps(predictions[remote_path][1]).encode("utf-8"),
+                            f"{log_to_field}_score": (
+                                None
+                                if len(predictions[remote_path]) == 1
+                                else json.dumps(predictions[remote_path][1]).encode("utf-8")
+                            ),
                         },
                     )
         return predictions
@@ -856,7 +860,7 @@ class QueryResult:
         a generic object.
 
         Args:
-            generic: function that returns predictions in the form of (prediction, prediction_score: Optional[float] = None)
+            generic: function that handles batched input and returns predictions in the form of (prediction, prediction_score: Optional[float] = None)
             batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
             If None, just returns predictions.
@@ -885,7 +889,11 @@ class QueryResult:
                         remote_path,
                         {
                             log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
-                            f"{log_to_field}_score": json.dumps(predictions[remote_path][1]).encode("utf-8"),
+                            f"{log_to_field}_score": (
+                                None
+                                if len(predictions[remote_path]) == 1
+                                else json.dumps(predictions[remote_path][1]).encode("utf-8")
+                            ),
                         },
                     )
         return predictions
@@ -896,7 +904,7 @@ class QueryResult:
         a generic object.
 
         Args:
-            generic: function that returns (annotation, prediction_score)
+            generic: function that handles batched input and returns predictions in the form of (prediction, prediction_score: Optional[float] = None)
             batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
         """
