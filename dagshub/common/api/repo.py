@@ -2,6 +2,7 @@ import logging
 from os import PathLike
 from pathlib import Path, PurePosixPath
 import rich.progress
+import json
 
 from dagshub.common.api.responses import (
     RepoAPIResponse,
@@ -11,14 +12,17 @@ from dagshub.common.api.responses import (
     ContentAPIEntry,
     StorageContentAPIResult,
 )
+from dagshub.data_engine.model.errors import LSInitializingError
 from dagshub.common.download import download_files
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import multi_urljoin
 from functools import partial
 
+from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
+
 from functools import cached_property
 
-from typing import Optional, Tuple, Any, List, Union
+from typing import Optional, Tuple, Any, List, Union, Dict
 
 import dacite
 
@@ -67,6 +71,15 @@ class RepoAPI:
             self.auth = dagshub.auth.get_authenticator(host=host)
         else:
             self.auth = auth
+
+    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
+    def _tenacious_http_request(self, *args, **kwargs):
+        res = self._http_request(*args, **kwargs)
+        if res.text.startswith("<!DOCTYPE html>"):
+            raise LSInitializingError()
+        elif res.status_code // 100 != 2:
+            raise ValueError(f"Process failed! Server Response: {res.text}")
+        return res
 
     def _http_request(self, method, url, **kwargs):
         if "auth" not in kwargs:
@@ -141,6 +154,58 @@ class RepoAPI:
             raise RuntimeError(error_msg)
 
         return [dacite.from_dict(StorageAPIEntry, storage_entry) for storage_entry in res.json()]
+
+    def list_annotation_projects(self) -> Dict[str, str]:
+        """
+        Get annotation projects that are associated with the repository
+        """
+        res = self._tenacious_http_request("GET",
+            multi_urljoin(self.label_studio_api_url(), 'projects'),
+            headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
+        )
+        return {project["title"]: str(project["id"]) for project in res.json()["results"]}
+
+    def add_annotation_project(self, project_name: str, config: Optional[str] = None) -> None:
+        """
+        Add an annotation project to the repository
+        """
+        if project_name in self.list_annotation_projects().keys(): raise ValueError(f"{project_name} already exists!")
+
+        self._tenacious_http_request("POST",
+            multi_urljoin(self.label_studio_api_url(), 'projects'),
+            headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
+            data=json.dumps({"title": project_name, "label_config": config} if config is not None else {"title": project_name})
+        )
+
+    def update_label_studio_project_config(self, project_name: str, config: str) -> None:
+        """
+        Update the labelling config of an annotation project
+        """
+        projects = self.list_annotation_projects()
+        if project_name not in projcets.keys():
+            raise ValueError(f"{project_name} doesn't exist!")
+
+        self._tenacious_http_request("PATCH",
+            multi_urljoin(self.label_studio_api_url(), 'projects', projects[project_name]),
+            headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
+            data=json.dumps({"title": project_name, "label_config": config})
+        )
+
+    def add_autolabelling_endpoint(self, project_name: str, endpoint: str) -> None:
+        """
+        Add an endpoint serving MLBackend for auto-labelling
+        """
+        projects = self.list_annotation_projects()
+        if project_name not in projects:
+            raise ValueError(
+                f"{project_name} not in projects. Available project names: {list(projects.keys())}"
+            )
+
+        self._tenacious_http_request("POST",
+                                     multi_urljoin(self.label_studio_api_url(), "ml"),
+                                     headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
+                                     data=json.dumps({"url": endpoint, "project": projects[project_name]})
+        )
 
     def list_path(self, path: str, revision: Optional[str] = None, include_size: bool = False) -> List[ContentAPIEntry]:
         """
@@ -549,6 +614,15 @@ class RepoAPI:
         :meta private:
         """
         return multi_urljoin(self.repo_api_url, "storage")
+
+    def label_studio_api_url(self) -> str:
+        """
+        URL for getting label studio api
+        Format: https://dagshub.com/<repo-owner>/<repo-name>/annotations/de/api/
+
+        :meta private:
+        """
+        return multi_urljoin(self.host, self.full_name, "annotations/de/api/")
 
     def repo_bucket_api_url(self) -> str:
         """
