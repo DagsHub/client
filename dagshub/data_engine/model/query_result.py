@@ -6,7 +6,7 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable, Protocol
 import json
 import os
 import os.path
@@ -56,6 +56,10 @@ else:
     mlflow = lazy_load("mlflow")
 
 logger = logging.getLogger(__name__)
+
+
+class CustomPredictor(Protocol):
+    def __call__(self, local_paths: List[str]) -> List[Tuple[Any, Optional[float]]]: ...
 
 
 class VisualizeError(Exception):
@@ -495,26 +499,11 @@ class QueryResult:
             pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
             post_hook: (optional, default: identity function) function that converts mlflow model output
             to the desired format
-            batch_size: (optional, default: 1) function that sets batch_size
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
             If None, just returns predictions.
             (in addition to logging to a field, iff that parameter is set)
         """
-
-        # to support depedency-free dataloading, `Batcher` is a barebones dataloader that sets up batched inference
-        class Batcher:
-            def __init__(self, dset, batch_size):
-                self.dset = dset
-                self.batch_size = batch_size
-
-            def __iter__(self):
-                self.curr_idx = 0
-                return self
-
-            def __next__(self):
-                self.curr_idx += self.batch_size
-                return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
-
         if not host:
             host = self.datasource.source.repoApi.host
         prev_uri = mlflow.get_tracking_uri()
@@ -527,32 +516,7 @@ class QueryResult:
         finally:
             os.environ["MLFLOW_TRACKING_URI"] = prev_uri
 
-        dset = DagsHubDataset(self, tensorizers=[lambda x: x])
-
-        predictions = {}
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        task = progress.add_task("Running inference...", total=len(dset))
-        with progress:
-            for idx, local_paths in enumerate(
-                Batcher(dset, batch_size) if batch_size != 1 else dset
-            ):  # encapsulates dataset with batcher if necessary and iterates over it
-                for prediction, remote_path in zip(
-                    post_hook(model.predict(pre_hook(local_paths))),
-                    [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
-                ):
-                    predictions[remote_path] = {
-                        "data": {"image": multi_urljoin(self.datasource.source.root_raw_path, remote_path)},
-                        "annotations": [prediction],
-                    }
-                progress.update(task, advance=batch_size, refresh=True)
-
-        if log_to_field:
-            with self.datasource.metadata_context() as ctx:
-                for remote_path in predictions:
-                    ctx.update_metadata(
-                        remote_path, {log_to_field: json.dumps(predictions[remote_path]).encode("utf-8")}
-                    )
-        return predictions
+        return self.generate_predictions(lambda x: post_hook(model.predict(pre_hook(x))), batch_size, log_to_field)
 
     def get_annotations(self, **kwargs) -> "QueryResult":
         """
@@ -856,6 +820,70 @@ class QueryResult:
 
             return sess
 
+    def generate_predictions(
+        self,
+        predict_fn: CustomPredictor,
+        batch_size: int = 1,
+        log_to_field: Optional[str] = None,
+    ) -> Dict[str, Tuple[str, Optional[float]]]:
+        """
+        Sends all the datapoints returned in this QueryResult as prediction targets for
+        a generic object.
+
+        Args:
+            predict_fn: function that handles batched input and returns predictions with an optional prediction score.
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
+            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
+            If None, just returns predictions.
+            (in addition to logging to a field, iff that parameter is set)
+        """
+        dset = DagsHubDataset(self, tensorizers=[lambda x: x])
+
+        predictions = {}
+        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
+        task = progress.add_task("Running inference...", total=len(dset))
+        with progress:
+            for idx, local_paths in enumerate(
+                _Batcher(dset, batch_size) if batch_size != 1 else dset
+            ):  # encapsulates dataset with batcher if necessary and iterates over it
+                for prediction, remote_path in zip(
+                    predict_fn(local_paths),
+                    [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
+                ):
+                    predictions[remote_path] = prediction
+                progress.update(task, advance=batch_size, refresh=True)
+
+        if log_to_field:
+            with self.datasource.metadata_context() as ctx:
+                for remote_path in predictions:
+                    ctx.update_metadata(
+                        remote_path,
+                        {
+                            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
+                            f"{log_to_field}_score": (
+                                0.0 if len(predictions[remote_path]) == 1 else predictions[remote_path][1]
+                            ),
+                        },
+                    )
+        return predictions
+
+    def generate_annotations(self, predict_fn: CustomPredictor, batch_size: int = 1, log_to_field: str = "annotation"):
+        """
+        Sends all the datapoints returned in this QueryResult as prediction targets for
+        a generic object.
+
+        Args:
+            predict_fn: function that handles batched input and returns predictions with an optional prediction score.
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously.
+            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
+        """
+        self.generate_predictions(
+            predict_fn,
+            batch_size=batch_size,
+            log_to_field=log_to_field,
+        )
+        self.datasource.metadata_field(log_to_field).set_annotation().apply()
+
     def annotate_with_mlflow_model(
         self,
         repo: str,
@@ -961,3 +989,18 @@ class QueryResult:
         assert self.query_data_time is not None
         artifact_name = self.datasource._get_mlflow_artifact_name("log", self.query_data_time)
         return self.datasource._log_to_mlflow(artifact_name, run, self.query_data_time)
+
+
+# to support depedency-free dataloading, `_Batcher` is a barebones dataloader that sets up batched inference
+class _Batcher:
+    def __init__(self, dset, batch_size):
+        self.dset = dset
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        self.curr_idx = 0
+        return self
+
+    def __next__(self):
+        self.curr_idx += self.batch_size
+        return [self.dset[idx] for idx in range(self.curr_idx - self.batch_size, self.curr_idx)]
