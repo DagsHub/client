@@ -8,6 +8,7 @@ from json import JSONDecodeError
 
 from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
 
+
 @retry(retry=retry_if_exception_type(JSONDecodeError), wait=wait_fixed(3), stop=stop_after_attempt(5))
 def get_label_studio_client(repo: str, legacy_client: bool = False, token: Optional[str] = None):
     """
@@ -15,12 +16,16 @@ def get_label_studio_client(repo: str, legacy_client: bool = False, token: Optio
         <https://labelstud.io/guide/sdk>`.\
     object to interact with the label studio instance associated with the repository.
     """
-    if legacy_client: from label_studio_sdk import Client as LabelStudio
-    else: from label_studio_sdk.client import LabelStudio
+    if legacy_client:
+        from label_studio_sdk import Client as LabelStudio
+    else:
+        from label_studio_sdk.client import LabelStudio
 
     repo_api = RepoAPI(repo)
-    kwargs = {'url' if legacy_client else 'base_url': repo_api.label_studio_api_url(),
-              'api_key': token if token is not None else get_token()}
+    kwargs = {
+        "url" if legacy_client else "base_url": repo_api.label_studio_api_url(),
+        "api_key": token if token is not None else get_token(),
+    }
 
     return LabelStudio(**kwargs)
 

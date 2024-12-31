@@ -1121,8 +1121,10 @@ class Datasource:
         """
         projects = self.source.repoApi.list_annotation_projects()
 
-        if project_name not in projects: self.source.repoApi.add_annotation_project(project_name, config.pop("label_config"))
-        else: self.source.repoApi.update_label_studio_project_config(project_name, config.pop("label_config"))
+        if project_name not in projects:
+            self.source.repoApi.add_annotation_project(project_name, config.pop("label_config"))
+        else:
+            self.source.repoApi.update_label_studio_project_config(project_name, config.pop("label_config"))
 
         await self.add_annotation_model(**config, port=port, project_name=project_name, ngrok_authtoken=ngrok_authtoken)
 
@@ -1159,7 +1161,8 @@ class Datasource:
             raise ValueError("As `ngrok_authtoken` is not specified, project will have to be added manually.")
         with get_rich_progress() as progress:
             task = progress.add_task("Initializing LS Model...", total=1)
-            res = http_request("POST",
+            res = http_request(
+                "POST",
                 f"{LS_ORCHESTRATOR_URL}:{port}/configure",
                 headers={"Content-Type": "application/json"},
                 json=json.dumps(

@@ -159,8 +159,9 @@ class RepoAPI:
         """
         Get annotation projects that are associated with the repository
         """
-        res = self._tenacious_http_request("GET",
-            multi_urljoin(self.label_studio_api_url(), 'projects'),
+        res = self._tenacious_http_request(
+            "GET",
+            multi_urljoin(self.label_studio_api_url(), "projects"),
             headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
         )
         return {project["title"]: str(project["id"]) for project in res.json()["results"]}
@@ -169,12 +170,16 @@ class RepoAPI:
         """
         Add an annotation project to the repository
         """
-        if project_name in self.list_annotation_projects().keys(): raise ValueError(f"{project_name} already exists!")
+        if project_name in self.list_annotation_projects().keys():
+            raise ValueError(f"{project_name} already exists!")
 
-        self._tenacious_http_request("POST",
-            multi_urljoin(self.label_studio_api_url(), 'projects'),
+        self._tenacious_http_request(
+            "POST",
+            multi_urljoin(self.label_studio_api_url(), "projects"),
             headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
-            data=json.dumps({"title": project_name, "label_config": config} if config is not None else {"title": project_name})
+            data=json.dumps(
+                {"title": project_name, "label_config": config} if config is not None else {"title": project_name}
+            ),
         )
 
     def update_label_studio_project_config(self, project_name: str, config: str) -> None:
@@ -185,10 +190,11 @@ class RepoAPI:
         if project_name not in projcets.keys():
             raise ValueError(f"{project_name} doesn't exist!")
 
-        self._tenacious_http_request("PATCH",
-            multi_urljoin(self.label_studio_api_url(), 'projects', projects[project_name]),
+        self._tenacious_http_request(
+            "PATCH",
+            multi_urljoin(self.label_studio_api_url(), "projects", projects[project_name]),
             headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
-            data=json.dumps({"title": project_name, "label_config": config})
+            data=json.dumps({"title": project_name, "label_config": config}),
         )
 
     def add_autolabelling_endpoint(self, project_name: str, endpoint: str) -> None:
@@ -197,14 +203,13 @@ class RepoAPI:
         """
         projects = self.list_annotation_projects()
         if project_name not in projects:
-            raise ValueError(
-                f"{project_name} not in projects. Available project names: {list(projects.keys())}"
-            )
+            raise ValueError(f"{project_name} not in projects. Available project names: {list(projects.keys())}")
 
-        self._tenacious_http_request("POST",
-                                     multi_urljoin(self.label_studio_api_url(), "ml"),
-                                     headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
-                                     data=json.dumps({"url": endpoint, "project": projects[project_name]})
+        self._tenacious_http_request(
+            "POST",
+            multi_urljoin(self.label_studio_api_url(), "ml"),
+            headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
+            data=json.dumps({"url": endpoint, "project": projects[project_name]}),
         )
 
     def list_path(self, path: str, revision: Optional[str] = None, include_size: bool = False) -> List[ContentAPIEntry]:
