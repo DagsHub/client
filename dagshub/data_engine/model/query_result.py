@@ -6,7 +6,7 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable, Protocol
 import json
 import os
 import os.path
@@ -56,6 +56,10 @@ else:
     mlflow = lazy_load("mlflow")
 
 logger = logging.getLogger(__name__)
+
+
+class CustomPredictor(Protocol):
+    def __call__(self, local_paths: List[str]) -> List[Tuple[Any, Optional[float]]]: ...
 
 
 class VisualizeError(Exception):
@@ -512,40 +516,7 @@ class QueryResult:
         finally:
             os.environ["MLFLOW_TRACKING_URI"] = prev_uri
 
-        dset = DagsHubDataset(self, tensorizers=[lambda x: x])
-
-        predictions = {}
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        task = progress.add_task("Running inference...", total=len(dset))
-        with progress:
-            for idx, local_paths in enumerate(
-                _Batcher(dset, batch_size) if batch_size != 1 else dset
-            ):  # encapsulates dataset with batcher if necessary and iterates over it
-                for prediction, remote_path in zip(
-                    post_hook(model.predict(pre_hook(local_paths))),
-                    [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
-                ):
-                    predictions[remote_path] = {
-                        "data": {"image": multi_urljoin(self.datasource.source.root_raw_path, remote_path)},
-                        "annotations": [prediction],
-                    }
-                progress.update(task, advance=batch_size, refresh=True)
-
-        if log_to_field:
-            with self.datasource.metadata_context() as ctx:
-                for remote_path in predictions:
-                    ctx.update_metadata(
-                        remote_path,
-                        {
-                            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
-                            f"{log_to_field}_score": (
-                                None
-                                if len(predictions[remote_path]) == 1
-                                else json.dumps(predictions[remote_path][1]).encode("utf-8")
-                            ),
-                        },
-                    )
-        return predictions
+        return self.generate_predictions(lambda x: post_hook(model.predict(pre_hook(x))), batch_size, log_to_field)
 
     def get_annotations(self, **kwargs) -> "QueryResult":
         """
@@ -849,18 +820,18 @@ class QueryResult:
 
             return sess
 
-    def predict_with_callable(
+    def generate_predictions(
         self,
-        generic: Callable,
+        predict_fn: CustomPredictor,
         batch_size: int = 1,
         log_to_field: Optional[str] = None,
-    ) -> Optional[list]:
+    ) -> Dict[str, Tuple[str, Optional[float]]]:
         """
         Sends all the datapoints returned in this QueryResult as prediction targets for
         a generic object.
 
         Args:
-            generic: function that handles batched input and returns predictions in the form of (prediction, prediction_score: Optional[float] = None)
+            predict_fn: function that handles batched input and returns predictions with an optional prediction score.
             batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
             If None, just returns predictions.
@@ -876,7 +847,7 @@ class QueryResult:
                 _Batcher(dset, batch_size) if batch_size != 1 else dset
             ):  # encapsulates dataset with batcher if necessary and iterates over it
                 for prediction, remote_path in zip(
-                    generic(local_paths),
+                    predict_fn(local_paths),
                     [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
                 ):
                     predictions[remote_path] = prediction
@@ -890,29 +861,24 @@ class QueryResult:
                         {
                             log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
                             f"{log_to_field}_score": (
-                                None
-                                if len(predictions[remote_path]) == 1
-                                else json.dumps(predictions[remote_path][1]).encode("utf-8")
+                                0.0 if len(predictions[remote_path]) == 1 else predictions[remote_path][1]
                             ),
                         },
                     )
         return predictions
 
-    def annotate_with_callable(self, generic, batch_size: int = 1, log_to_field: str = "annotation"):
+    def generate_annotations(self, predict_fn: CustomPredictor, batch_size: int = 1, log_to_field: str = "annotation"):
         """
         Sends all the datapoints returned in this QueryResult as prediction targets for
         a generic object.
 
         Args:
-            generic: function that handles batched input and returns predictions in the form of (prediction, prediction_score: Optional[float] = None)
-            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously
+            predict_fn: function that handles batched input and returns predictions with an optional prediction score.
+            batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously.
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
         """
-        if log_to_field is None:
-            raise ValueError("`log_to_field` == None, there is nothing to do!")
-
-        self.predict_with_callable(
-            generic,
+        self.generate_predictions(
+            predict_fn,
             batch_size=batch_size,
             log_to_field=log_to_field,
         )
@@ -942,9 +908,6 @@ class QueryResult:
             mlflow model output converts to labelstudio format
             batch_size: (optional, default: 1) batched annotation size
         """
-        if log_to_field is None:
-            raise ValueError("`log_to_field` == None, there is nothing to do!")
-
         self.predict_with_mlflow_model(
             repo,
             name,

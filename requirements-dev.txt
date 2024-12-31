@@ -7,4 +7,3 @@ pytest-mock==3.14.0
 fiftyone==0.23.8
 datasets==2.19.1
 ultralytics==8.3.47
-dagshub-annotation-converter>=0.1.0
