@@ -491,7 +491,9 @@ class QueryResult:
 
         Args:
             repo: repository to extract the model from
-            name: name of the model in the mlflow registry
+            name: name of the model in the mlflow registry. \
+                    Supported model flavors: `torch`, `tensorflow`, `pyfunc`, `scikit-learn`. \
+                    Any model that uses the `self.predict` API is also supported. \
             version: (optional, default: 'latest') version of the model in the mlflow registry
             pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
             post_hook: (optional, default: identity function) function that converts mlflow model output
@@ -527,11 +529,16 @@ class QueryResult:
         model_uri = f"models:/{name}/{version}"
 
         try:
-            model_flavor = mlflow.models.get_model_info(model_uri).flavors["python_function"]["loader_module"]
-            loader = importlib.import_module(model_flavor[: len(model_flavor) - model_flavor[::-1].index(".") - 1])
+            model_flavor = ".".join(
+                mlflow.models.get_model_info(model_uri).flavors["python_function"]["loader_module"].split(".")[:2]
+            )
+            loader = mlflow.pyfunc if "pyfunc" in model_flavor else importlib.import_module(model_flavor)
             model = loader.load_model(model_uri)
         finally:
             os.environ["MLFLOW_TRACKING_URI"] = prev_uri
+
+        if "torch" in model_flavor:
+            model.predict = model.__call__
 
         dset = DagsHubDataset(self, tensorizers=[lambda x: x])
 
