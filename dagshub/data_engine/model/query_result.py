@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Liter
 import json
 import os
 import os.path
+import importlib
 
 import dacite
 import dagshub_annotation_converter.converters.yolo
@@ -517,13 +518,18 @@ class QueryResult:
 
         if not host:
             host = self.datasource.source.repoApi.host
+
         prev_uri = mlflow.get_tracking_uri()
         os.environ["MLFLOW_TRACKING_URI"] = multi_urljoin(host, f"{repo}.mlflow")
         token = get_token()
         os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token).username
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
+        model_uri = f"models:/{name}/{version}"
+
         try:
-            model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
+            model_flavor = mlflow.models.get_model_info(model_uri).flavors["python_function"]["loader_module"]
+            loader = importlib.import_module(model_flavor[: len(model_flavor) - model_flavor[::-1].index(".") - 1])
+            model = loader.load_model(model_uri)
         finally:
             os.environ["MLFLOW_TRACKING_URI"] = prev_uri
 
