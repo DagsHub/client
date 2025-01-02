@@ -26,6 +26,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_sitemap",
     "sphinx_click",
+    "sphinx_autodoc_typehints",
 ]
 
 templates_path = ["_templates"]
@@ -65,5 +66,6 @@ html_js_files = [
 napoleon_include_init_with_doc = True
 autodoc_member_order = "bysource"
 autodoc_default_flags = ["inherited-members"]
+typehints_use_signature_return = True
 
 sitemap_url_scheme = "{link}"
