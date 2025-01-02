@@ -7,9 +7,10 @@ import time
 import urllib
 from http import HTTPStatus
 from io import IOBase
-from pathlib import Path
-from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List
+from pathlib import Path, PurePosixPath
+from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List, cast
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urljoin
 
 import httpx
 import rich.progress
@@ -157,10 +158,10 @@ def create_repo(
             orgname=org_name,
         )
 
-    res = s.post(urllib.parse.urljoin(host, url), data=data, auth=auth)
+    res = s.post(urljoin(host, url), data=data, auth=auth)
 
     if res.status_code != HTTPStatus.CREATED:
-        logger.error(f"Response ({res.status_code}):\n" f"{res.content}")
+        logger.error(f"Response ({res.status_code}):\n" f"{res.content.decode()}")
         if res.status_code == HTTPStatus.UNPROCESSABLE_ENTITY:
             raise RuntimeError("Repository name is invalid or it already exists.")
         else:
@@ -186,9 +187,9 @@ def validate_owner_repo(owner_repo: str) -> Tuple[str, str]:
 
 def upload_files(
     repo: str,
-    local_path: Union[str, IOBase],
+    local_path: Union[str, os.PathLike],
     commit_message=DEFAULT_COMMIT_MESSAGE,
-    remote_path: str = None,
+    remote_path: Optional[str] = None,
     bucket: bool = False,
     **kwargs,
 ):
@@ -206,8 +207,8 @@ def upload_files(
     For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
     """
     owner, repo = validate_owner_repo(repo)
-    repo = Repo(owner, repo)
-    repo.upload(local_path, commit_message=commit_message, remote_path=remote_path, bucket=bucket, **kwargs)
+    repo_obj = Repo(owner, repo)
+    repo_obj.upload(local_path, commit_message=commit_message, remote_path=remote_path, bucket=bucket, **kwargs)
 
 
 def upload_file_to_s3(s3_client, local_path, bucket_name, remote_path, progress=None, task=None):
@@ -281,9 +282,9 @@ class Repo:
 
     def upload(
         self,
-        local_path: Union[str, IOBase],
+        local_path: Union[str, os.PathLike],
         commit_message=DEFAULT_COMMIT_MESSAGE,
-        remote_path: str = None,
+        remote_path: Optional[str] = None,
         bucket: bool = False,
         **kwargs,
     ):
@@ -303,15 +304,17 @@ class Repo:
         """
         if commit_message is None:
             commit_message = DEFAULT_COMMIT_MESSAGE
-        local_path = Path(local_path).resolve()
+        local_path = cast(Path, Path(local_path).resolve())
+
+        if not remote_path:
+            try:
+                remote_path = str(local_path.relative_to(Path.cwd().resolve()))
+            except ValueError:
+                # local_path is outside cwd, use only its basename
+                remote_path = local_path.name
+        remote_path = cast(str, Path(remote_path).as_posix())
+
         if local_path.is_dir():
-            if remote_path is None:
-                try:
-                    remote_path = local_path.relative_to(Path.cwd().resolve())
-                except ValueError:
-                    # local_path is outside cwd, use only its basename
-                    remote_path = local_path.name
-            remote_path = Path(remote_path).as_posix()
             if bucket:
                 self.upload_files_to_bucket(local_path, remote_path, **kwargs)
             else:
@@ -321,7 +324,7 @@ class Repo:
             if bucket:
                 self.upload_files_to_bucket(local_path, remote_path, **kwargs)
             else:
-                file_to_upload = DataSet.get_file(str(local_path), remote_path)
+                file_to_upload = DataSet.get_file(str(local_path), PurePosixPath(remote_path))
                 self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
     @retry(retry=retry_if_exception_type(InternalServerErrorError), wait=wait_fixed(3), stop=stop_after_attempt(5))
@@ -331,8 +334,8 @@ class Repo:
         directory_path: str = "",
         commit_message: Optional[str] = DEFAULT_COMMIT_MESSAGE,
         versioning: str = "auto",
-        new_branch: str = None,
-        last_commit: str = None,
+        new_branch: Optional[str] = None,
+        last_commit: Optional[str] = None,
         force: bool = False,
         quiet: bool = False,
     ):
@@ -575,7 +578,7 @@ class Repo:
     def get_repo_url(self, url_format, directory, branch=None):
         if branch is None:
             branch = self.branch
-        return urllib.parse.urljoin(
+        return urljoin(
             self.host,
             url_format.format(
                 owner=self.owner,
@@ -585,7 +588,9 @@ class Repo:
             ),
         )
 
-    def upload_files_to_bucket(self, local_path, remote_path, max_workers=config.upload_threads, **kwargs):
+    def upload_files_to_bucket(
+        self, local_path: Path, remote_path: Optional[str], max_workers: int = config.upload_threads, **kwargs
+    ):
         """
         Upload a file or directory to an S3 bucket, preserving the directory structure.
 
@@ -595,9 +600,12 @@ class Repo:
         """
 
         s3 = get_repo_bucket_client(self._api.full_name)
-        if remote_path.split("/")[0] == self.name:
-            remote_path = remote_path.split("/", 1)[1]
+        if remote_path:
+            # Get rid of the repo name at the beginning of the path
+            if remote_path.split("/")[0] == self.name:
+                remote_path = remote_path.split("/", 1)[1]
         if local_path.is_file():
+            remote_path = PurePosixPath(remote_path) / local_path.name
             upload_file_to_s3(s3_client=s3, local_path=local_path, bucket_name=self.name, remote_path=remote_path)
         else:
             upload_tasks = []
@@ -772,7 +780,7 @@ class DataSet:
         return posixpath.normpath(directory)
 
     @staticmethod
-    def get_file(file: Union[str, IOBase], path: os.PathLike = None) -> FileUploadStruct:
+    def get_file(file: Union[str, IOBase], path: Optional[os.PathLike] = None) -> FileUploadStruct:
         """
         The get_file function is a helper function that takes in either a string or an IOBase object and returns
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of

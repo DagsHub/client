@@ -11,6 +11,8 @@ import tarfile
 from http import HTTPStatus
 from urllib.parse import urlparse
 
+from click import Context
+
 import dagshub.auth
 import dagshub.common.logging_util
 from dagshub import init, __version__
@@ -24,7 +26,20 @@ from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
 _dagshub_bucket_doc_link = "https://dagshub.com/docs/feature_guide/dagshub_storage/"
 
 
-@click.group()
+def validate_repo(ctx, param, value):
+    parts = value.split("/")
+    if len(parts) != 2:
+        raise click.BadParameter("repo needs to be in the format <repo-owner>/<repo-name>")
+    return tuple(parts)
+
+
+class OrderOfAppearanceGroup(click.Group):
+    # Make the commands appear in the order they are defined in the file
+    def list_commands(self, ctx: Context):
+        return list(self.commands.keys())
+
+
+@click.group(cls=OrderOfAppearanceGroup)
 @click.option(
     "--host",
     default=config.host,
@@ -35,109 +50,6 @@ _dagshub_bucket_doc_link = "https://dagshub.com/docs/feature_guide/dagshub_stora
 def cli(ctx, host, quiet):
     dagshub.common.logging_util.init_logger()
     ctx.obj = {"host": host.strip("/"), "quiet": quiet or config.quiet}
-
-
-@cli.command(hidden=True)
-@click.argument("project_root", default=".")
-@click.option("--repo_url", help="URL of the repo hosted on DagsHub")
-@click.option("--branch", help="Repository's branch")
-@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
-@click.option("--debug", default=False, type=bool, help="Run fuse in foreground")
-@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
-@click.pass_context
-def mount(ctx, verbose, quiet, **kwargs):
-    """
-    Mount a DagsHub Storage folder via FUSE
-
-    Warning: this function is deprecated!
-    Use the Rclone-based streaming of a DagsHub Storage bucket instead.
-    """
-    # Since pyfuse can crash on init-time, import it here instead of up top
-    from dagshub.streaming import mount
-
-    config.quiet = ctx.obj["quiet"] or quiet
-
-    logger = logging.getLogger()
-    logger.setLevel(to_log_level(verbose))
-
-    if not kwargs["debug"]:
-        # Hide tracebacks of errors, display only error message
-        sys.tracebacklimit = 0
-    mount(**kwargs)
-
-
-@cli.group()
-@click.pass_context
-def setup(ctx):
-    """
-    Initialize additional functionality in the current repository
-    """
-    pass
-
-
-@setup.command("dvc")
-@click.option("--repo_name", help="The repository name to set up")
-@click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
-@click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
-@click.option(
-    "--host",
-    default=config.DEFAULT_HOST,
-    help="DagsHub instance to which you want to login",
-)
-@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
-@click.pass_context
-def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
-    """
-    Initialize dvc
-    """
-    host = host or ctx.obj["host"]
-    config.quiet = quiet or ctx.obj["quiet"]
-    init(
-        repo_name=repo_name,
-        repo_owner=repo_owner,
-        url=url,
-        root=None,
-        host=host,
-        mlflow=False,
-        dvc=True,
-    )
-
-
-@cli.command()
-@click.option("--token", help="Login using a specified token")
-@click.option("--host", help="DagsHub instance to which you want to login")
-@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
-@click.pass_context
-def login(ctx, token, host, quiet):
-    """
-    Initiate an Oauth authentication process. This process will generate and cache a short-lived token in your
-    local machine, to allow you to perform actions that require authentication. After running `dagshub login` you can
-    use data streaming and upload files without providing authentication info.
-    """
-    host = host or ctx.obj["host"]
-    config.quiet = quiet or ctx.obj["quiet"]
-    if token is not None:
-        dagshub.auth.add_app_token(token, host)
-        rich_console.print(":white_check_mark: Token added successfully")
-    else:
-        dagshub.auth.add_oauth_token(host)
-        rich_console.print(":white_check_mark: OAuth token added")
-
-
-def validate_repo(ctx, param, value):
-    parts = value.split("/")
-    if len(parts) != 2:
-        raise click.BadParameter("repo needs to be in the format <repo-owner>/<repo-name>")
-    return tuple(parts)
-
-
-def to_log_level(verbosity):
-    if verbosity == 0:
-        return logging.WARN
-    elif verbosity == 1:
-        return logging.INFO
-    elif verbosity >= 2:
-        return logging.DEBUG
 
 
 KEEP_PREFIX_HELP = """ Whether to keep the path of the folder in the download path or not.
@@ -303,6 +215,102 @@ def upload(
         )
 
 
+@cli.command(hidden=True)
+@click.argument("project_root", default=".")
+@click.option("--repo_url", help="URL of the repo hosted on DagsHub")
+@click.option("--branch", help="Repository's branch")
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+@click.option("--debug", default=False, type=bool, help="Run fuse in foreground")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.pass_context
+def mount(ctx, verbose, quiet, **kwargs):
+    """
+    Mount a DagsHub Storage folder via FUSE
+
+    Warning: this function is deprecated!
+    Use the Rclone-based streaming of a DagsHub Storage bucket instead.
+    """
+    # Since pyfuse can crash on init-time, import it here instead of up top
+    from dagshub.streaming import mount
+
+    config.quiet = ctx.obj["quiet"] or quiet
+
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
+
+    if not kwargs["debug"]:
+        # Hide tracebacks of errors, display only error message
+        sys.tracebacklimit = 0
+    mount(**kwargs)
+
+
+@cli.group()
+@click.pass_context
+def setup(ctx):
+    """
+    Initialize additional functionality in the current repository
+    """
+    pass
+
+
+@setup.command("dvc")
+@click.option("--repo_name", help="The repository name to set up")
+@click.option("--repo_owner", help="Owner of the repository in use (user or organization)")
+@click.option("--url", help="DagsHub remote url; either provide --url or repo_name and repo_owner")
+@click.option(
+    "--host",
+    default=config.DEFAULT_HOST,
+    help="DagsHub instance to which you want to login",
+)
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.pass_context
+def setup_dvc(ctx, quiet, repo_name, repo_owner, url, host):
+    """
+    Initialize dvc
+    """
+    host = host or ctx.obj["host"]
+    config.quiet = quiet or ctx.obj["quiet"]
+    init(
+        repo_name=repo_name,
+        repo_owner=repo_owner,
+        url=url,
+        root=None,
+        host=host,
+        mlflow=False,
+        dvc=True,
+    )
+
+
+@cli.command()
+@click.option("--token", help="Login using a specified token")
+@click.option("--host", help="DagsHub instance to which you want to login")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.pass_context
+def login(ctx, token, host, quiet):
+    """
+    Initiate an Oauth authentication process. This process will generate and cache a short-lived token in your
+    local machine, to allow you to perform actions that require authentication. After running `dagshub login` you can
+    use data streaming and upload files without providing authentication info.
+    """
+    host = host or ctx.obj["host"]
+    config.quiet = quiet or ctx.obj["quiet"]
+    if token is not None:
+        dagshub.auth.add_app_token(token, host)
+        rich_console.print(":white_check_mark: Token added successfully")
+    else:
+        dagshub.auth.add_oauth_token(host)
+        rich_console.print(":white_check_mark: OAuth token added")
+
+
+def to_log_level(verbosity):
+    if verbosity == 0:
+        return logging.WARN
+    elif verbosity == 1:
+        return logging.INFO
+    elif verbosity >= 2:
+        return logging.DEBUG
+
+
 @cli.command()
 def version():
     """
@@ -328,11 +336,15 @@ def repo():
 @click.pass_context
 def create(ctx, repo_name, upload_data, clone, verbose, quiet):
     """
-    create a repo and:\n
-    optional- upload files to 'data' dir,
-     .zip and .tar files are extracted, other formats copied as is.
-    optional- clone repo locally.\n
-    example 1:  dagshub repo create mytutorial -u "http://example.com/data.csv" --clone\n
+    create a repo and optionally:
+
+    - upload files to 'data' from a URL dir using `-u` flag. .zip and .tar files are extracted,
+    other formats copied as is.
+
+    - clone the repo locally using `--clone` flag
+
+    example 1:  dagshub repo create mytutorial -u "http://example.com/data.csv" --clone
+
     example 2:  dagshub --host "https://www.dagshub.com"
                     repo create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
     """
