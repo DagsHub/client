@@ -187,7 +187,7 @@ class RepoAPI:
         Update the labelling config of an annotation project
         """
         projects = self.list_annotation_projects()
-        if project_name not in projcets.keys():
+        if project_name not in projects.keys():
             raise ValueError(f"{project_name} doesn't exist!")
 
         self._tenacious_http_request(

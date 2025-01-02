@@ -8,7 +8,6 @@ import os.path
 import threading
 import time
 import uuid
-import requests
 import webbrowser
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -44,7 +43,6 @@ from dagshub.data_engine.model.errors import (
     DatasetFieldComparisonError,
     FieldNotFoundError,
     DatasetNotFoundError,
-    LSInitializingError,
 )
 from dagshub.data_engine.model.metadata import (
     validate_uploading_metadata,
