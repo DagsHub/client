@@ -484,8 +484,8 @@ class QueryResult:
         name: str,
         host: Optional[str] = None,
         version: str = "latest",
-        pre_hook: Callable = identity_func,
-        post_hook: Callable = identity_func,
+        pre_hook: Callable[[List[str]], Any] = identity_func,
+        post_hook: Callable[[Any], Any] = identity_func,
         batch_size: int = 1,
         log_to_field: str = "annotation",
     ) -> Dict[str, Any]:
