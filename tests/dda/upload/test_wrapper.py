@@ -57,25 +57,25 @@ def test_upload_dataset_closes_files(mock_api: MockApi, upload_repo: Repo, test_
 
 
 def test_upload_folder_preserves_relative_path(mock_api: MockApi, upload_repo: Repo, test_dirs: str):
-    do_upload_folder_test(mock_api, test_dirs, "nested/folder", upload_repo)
+    do_upload_folder_test(mock_api, upload_repo, test_dirs, "nested/folder")
 
 
 def test_upload_folder_absolute_path_can_be_relative(mock_api: MockApi, upload_repo: Repo, test_dirs: str):
     abspath = os.path.abspath(test_dirs)
-    do_upload_folder_test(mock_api, abspath, "nested/folder", upload_repo)
+    do_upload_folder_test(mock_api, upload_repo, abspath, "nested/folder")
 
 
 def test_upload_folder_absolute_path_outside_cwd(mock_api: MockApi, upload_repo: Repo, temp_dir: str):
-    do_upload_folder_test(mock_api, temp_dir, "foldername", upload_repo)
+    do_upload_folder_test(mock_api, upload_repo, temp_dir, "foldername")
 
 
 def test_upload_folder_relative_path_outside_cwd(mock_api: MockApi, upload_repo: Repo, temp_dir: str):
     relpath = os.path.relpath(temp_dir, os.getcwd())
     assert relpath.startswith("..")
-    do_upload_folder_test(mock_api, relpath, "foldername", upload_repo)
+    do_upload_folder_test(mock_api, upload_repo, relpath, "foldername")
 
 
-def do_upload_folder_test(mock_api: MockApi, src_dirs: str, dst_dirs: str, upload_repo: Repo):
+def do_upload_folder_test(mock_api: MockApi, upload_repo: Repo, src_dirs: str, dst_dirs: str):
     upload_repo.upload(local_path=src_dirs)
     upload_route = mock_api.routes["upload"]
     upload_route.calls.assert_called_once()
@@ -84,3 +84,31 @@ def do_upload_folder_test(mock_api: MockApi, src_dirs: str, dst_dirs: str, uploa
     assert call.request.method == "PUT"
     expected = f"/api/v1/repos/{upload_repo.owner}/{upload_repo.name}/content/{upload_repo.branch}/{dst_dirs}"
     assert call.request.url.path == expected
+
+
+@pytest.mark.parametrize("remote_path", [None, "", "new_data/"])
+def test_bucket_upload(upload_repo, reponame, mock_api, mock_s3, test_dirs, remote_path):
+    # Assuming that test_dirs is in the CWD, so the relative component should be included
+    if remote_path:
+        expected_paths = set([f"{reponame}/{remote_path}{p}" for p in os.listdir(test_dirs)])
+    else:
+        relpath = os.path.relpath(test_dirs, os.getcwd())
+        expected_paths = set([f"{reponame}/{relpath}/{p}" for p in os.listdir(test_dirs)])
+    print(expected_paths)
+    upload_repo.upload(local_path=test_dirs, remote_path=remote_path, bucket=True)
+    actual_paths = set([p[0] for p in mock_s3.uploaded_files])
+    assert actual_paths == expected_paths
+
+
+@pytest.mark.parametrize("remote_path", [None, "", "new_data"])
+def test_bucket_upload_single_file(upload_repo, reponame, mock_api, mock_s3, test_file, remote_path):
+    filename = os.path.basename(test_file)
+    if remote_path:
+        expected_paths = {f"{reponame}/{remote_path}/{filename}"}
+    else:
+        relpath = os.path.relpath(test_file, os.getcwd())
+        expected_paths = {f"{reponame}/{relpath}/{filename}"}
+    print(expected_paths)
+    upload_repo.upload(local_path=test_file, remote_path=remote_path, bucket=True)
+    actual_paths = set([p[0] for p in mock_s3.uploaded_files])
+    assert actual_paths == expected_paths
