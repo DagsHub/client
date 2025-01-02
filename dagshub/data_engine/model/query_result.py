@@ -491,6 +491,7 @@ class QueryResult:
     ) -> Dict[str, Any]:
         """
         Fetch an MLflow model from a specific repository and use it to annotate the datapoints in this QueryResult.
+        The resulting annotations are then stored in the field specified by ``log_to_field``.
 
         Any MLflow model that has a ``model.predict`` endpoint is supported.
         This includes, but is not limited to the following flavors:
