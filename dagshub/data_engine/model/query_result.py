@@ -758,6 +758,13 @@ class QueryResult:
         ds.merge_samples(samples)
         return ds
 
+    @staticmethod
+    def _get_predict_dict(predictions, remote_path, log_to_field):
+        return {
+            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
+            f"{log_to_field}_score": (0.0 if len(predictions[remote_path]) == 1 else predictions[remote_path][1]),
+        }
+
     def _check_downloaded_dataset_size(self):
         download_size_prompt_threshold = 100 * (2**20)  # 100 Megabytes
         dp_size = self._calculate_datapoint_size()
@@ -856,15 +863,7 @@ class QueryResult:
         if log_to_field:
             with self.datasource.metadata_context() as ctx:
                 for remote_path in predictions:
-                    ctx.update_metadata(
-                        remote_path,
-                        {
-                            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
-                            f"{log_to_field}_score": (
-                                0.0 if len(predictions[remote_path]) == 1 else predictions[remote_path][1]
-                            ),
-                        },
-                    )
+                    ctx.update_metadata(remote_path, self._get_predict_dict(predictions, remote_path, log_to_field))
         return predictions
 
     def generate_annotations(self, predict_fn: CustomPredictor, batch_size: int = 1, log_to_field: str = "annotation"):
