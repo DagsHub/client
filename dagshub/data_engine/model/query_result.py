@@ -58,7 +58,12 @@ else:
 
 logger = logging.getLogger(__name__)
 
-CustomPredictor = Callable[List[str], List[Tuple[Any, Optional[float]]]]
+CustomPredictor = Callable[
+    [
+        List[str],
+    ],
+    List[Tuple[Any, Optional[float]]],
+]
 
 
 class VisualizeError(Exception):
