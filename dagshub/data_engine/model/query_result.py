@@ -563,6 +563,7 @@ class QueryResult:
 
         Args:
             repo: repository to extract the model from
+            name: name of the model in the repository's MLflow registry.
             host: address of the DagsHub instance with the repo to load the model from.
                  Set it if the model is hosted on a different DagsHub instance than the datasource.
             version: version of the model in the mlflow registry.
