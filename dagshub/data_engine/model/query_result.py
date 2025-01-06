@@ -964,42 +964,6 @@ class QueryResult:
         )
         self.datasource.metadata_field(log_to_field).set_annotation().apply()
 
-    def annotate_with_mlflow_model(
-        self,
-        repo: str,
-        name: str,
-        post_hook: Callable = lambda x: x,
-        pre_hook: Callable = lambda x: x,
-        host: Optional[str] = None,
-        version: str = "latest",
-        batch_size: int = 1,
-        log_to_field: str = "annotation",
-    ) -> Optional[str]:
-        """
-        Sends all the datapoints returned in this QueryResult to an MLFlow model which automatically labels datapoints.
-
-        Args:
-            repo: repository to extract the model from
-            name: name of the model in the mlflow registry
-            version: (optional, default: 'latest') version of the model in the mlflow registry
-            pre_hook: (optional, default: identity function) function that runs
-            before the datapoint is sent to the model
-            post_hook: (optional, default: identity function) function that converts
-            mlflow model output converts to labelstudio format
-            batch_size: (optional, default: 1) batched annotation size
-        """
-        self.predict_with_mlflow_model(
-            repo,
-            name,
-            host=host,
-            version=version,
-            pre_hook=pre_hook,
-            post_hook=post_hook,
-            batch_size=batch_size,
-            log_to_field=log_to_field,
-        )
-        self.datasource.metadata_field(log_to_field).set_annotation().apply()
-
     def annotate(
         self,
         open_project: bool = True,
