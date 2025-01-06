@@ -6,7 +6,7 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 from dataclasses import field, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable, Protocol
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
 import json
 import os
 import os.path
@@ -58,9 +58,7 @@ else:
 
 logger = logging.getLogger(__name__)
 
-
-class CustomPredictor(Protocol):
-    def __call__(self, local_paths: List[str]) -> List[Tuple[Any, Optional[float]]]: ...
+CustomPredictor = Callable[List[str], List[Tuple[Any, Optional[float]]]]
 
 
 class VisualizeError(Exception):
@@ -842,10 +840,11 @@ class QueryResult:
 
     @staticmethod
     def _get_predict_dict(predictions, remote_path, log_to_field):
-        return {
-            log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8"),
-            f"{log_to_field}_score": (0.0 if len(predictions[remote_path]) == 1 else predictions[remote_path][1]),
-        }
+        res = {log_to_field: json.dumps(predictions[remote_path][0]).encode("utf-8")}
+        if len(predictions[remote_path]) == 2:
+            res[f"{log_to_field}_score"] = predictions[remote_path][1]
+
+        return res
 
     def _check_downloaded_dataset_size(self):
         download_size_prompt_threshold = 100 * (2**20)  # 100 Megabytes
