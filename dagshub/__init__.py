@@ -3,7 +3,8 @@ from .logger import DAGsHubLogger, dagshub_logger
 from .common.init import init
 from .upload.wrapper import upload_files
 from . import notebook
-from .repo_bucket import get_repo_bucket_client, get_label_studio_client
+from .repo_bucket import get_repo_bucket_client
+from .ls_client import get_label_studio_client
 from . import storage
 
 __all__ = [

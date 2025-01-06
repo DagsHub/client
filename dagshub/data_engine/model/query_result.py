@@ -491,6 +491,7 @@ class QueryResult:
         Args:
             repo: repository to extract the model from
             name: name of the model in the mlflow registry
+            host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
             version: (optional, default: 'latest') version of the model in the mlflow registry
             pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
             post_hook: (optional, default: identity function) function that converts mlflow model output
@@ -873,6 +874,7 @@ class QueryResult:
         Args:
             repo: repository to extract the model from
             name: name of the model in the mlflow registry
+            host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
             version: (optional, default: 'latest') version of the model in the mlflow registry
             pre_hook: (optional, default: identity function) function that runs
             before the datapoint is sent to the model

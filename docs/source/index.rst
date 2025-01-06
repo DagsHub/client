@@ -27,6 +27,7 @@ run ``pip install dagshub[jupyter]`` to install additional dependencies to enhan
     reference/file_downloading
     reference/file_uploading
     reference/repo_bucket
+    reference/ls_client
     reference/loading_models
     reference/repo_api
     reference/notebook
