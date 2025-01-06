@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Liter
 import json
 import os
 import os.path
+import importlib
 
 import dacite
 import dagshub_annotation_converter.converters.yolo
@@ -62,6 +63,10 @@ class VisualizeError(Exception):
     """:meta private:"""
 
     pass
+
+
+def identity_func(x):
+    return x
 
 
 @dataclass
@@ -473,33 +478,98 @@ class QueryResult:
             num_proc=num_proc,
         )
 
+    def annotate_with_mlflow_model(
+        self,
+        repo: str,
+        name: str,
+        host: Optional[str] = None,
+        version: str = "latest",
+        pre_hook: Callable[[List[str]], Any] = identity_func,
+        post_hook: Callable[[Any], Any] = identity_func,
+        batch_size: int = 1,
+        log_to_field: str = "annotation",
+    ) -> Dict[str, Any]:
+        """
+        Fetch an MLflow model from a specific repository and use it to annotate the datapoints in this QueryResult.
+        The resulting annotations are then stored in the field specified by ``log_to_field``.
+
+        Any MLflow model that has a ``model.predict`` endpoint is supported.
+        This includes, but is not limited to the following flavors:
+
+        * ``torch``
+        * ``tensorflow``
+        * ``pyfunc``
+        * ``scikit-learn``
+
+        Keep in mind that by default ``mlflow.predict()`` will receive the list of downloaded datapoint paths as input,
+        so additional "massaging" of the data might be required for prediction to work.
+        Use the ``pre_hook`` function to do so.
+
+        Args:
+            repo: repository to extract the model from
+            name: name of the model in the repository's MLflow registry.
+            host: address of the DagsHub instance with the repo to load the model from.
+                 Set it if the model is hosted on a different DagsHub instance than the datasource.
+            version: version of the model in the mlflow registry.
+            pre_hook: function that runs before datapoints are sent to ``model.predict()``.
+                The input argument is the list of paths to datapoint files in the current batch.
+            post_hook: function that converts the model output to the desired format.
+            batch_size: Size of the file batches that are sent to ``model.predict()``.
+                Default batch size is 1, but it is still being sent as a list for consistency.
+            log_to_field: Field to store the resulting annotations in.
+        """
+        res = self.predict_with_mlflow_model(
+            repo,
+            name,
+            host=host,
+            version=version,
+            pre_hook=pre_hook,
+            post_hook=post_hook,
+            batch_size=batch_size,
+            log_to_field=log_to_field,
+        )
+        self.datasource.metadata_field(log_to_field).set_annotation().apply()
+        return res
+
     def predict_with_mlflow_model(
         self,
         repo: str,
         name: str,
         host: Optional[str] = None,
         version: str = "latest",
-        pre_hook: Callable[[Any], Any] = lambda x: x,
-        post_hook: Callable[[Any], Any] = lambda x: x,
+        pre_hook: Callable[[List[str]], Any] = identity_func,
+        post_hook: Callable[[Any], Any] = identity_func,
         batch_size: int = 1,
         log_to_field: Optional[str] = None,
-    ) -> Optional[list]:
+    ) -> Dict[str, Any]:
         """
-        Sends all the datapoints returned in this QueryResult as prediction targets for
-        an MLFlow model registered on DagsHub.
+        Fetch an MLflow model from a specific repository and use it to predict on the datapoints in this QueryResult.
+
+        Any MLflow model that has a ``model.predict`` endpoint is supported.
+        This includes, but is not limited to the following flavors:
+
+        * ``torch``
+        * ``tensorflow``
+        * ``pyfunc``
+        * ``scikit-learn``
+
+        Keep in mind that by default ``mlflow.predict()`` will receive the list of downloaded datapoint paths as input,
+        so additional "massaging" of the data might be required for prediction to work.
+        Use the ``pre_hook`` function to do so.
 
         Args:
             repo: repository to extract the model from
-            name: name of the model in the mlflow registry
-            host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
-            version: (optional, default: 'latest') version of the model in the mlflow registry
-            pre_hook: (optional, default: identity function) function that runs before datapoint is sent to the model
-            post_hook: (optional, default: identity function) function that converts mlflow model output
-            to the desired format
-            batch_size: (optional, default: 1) function that sets batch_size
-            log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
-            If None, just returns predictions.
-            (in addition to logging to a field, iff that parameter is set)
+
+            name: name of the model in the repository's MLflow registry.
+            host: address of the DagsHub instance with the repo to load the model from.
+                 Set it if the model is hosted on a different DagsHub instance than the datasource.
+            version: version of the model in the mlflow registry.
+            pre_hook: function that runs before datapoints are sent to ``model.predict()``.
+                The input argument is the list of paths to datapoint files in the current batch.
+            post_hook: function that converts the model output to the desired format.
+            batch_size: Size of the file batches that are sent to ``model.predict()``.
+                Default batch size is 1, but it is still being sent as a list for consistency.
+            log_to_field: If set, writes prediction results to this metadata field in the datasource.
         """
 
         # to support depedency-free dataloading, `Batcher` is a barebones dataloader that sets up batched inference
@@ -518,15 +588,27 @@ class QueryResult:
 
         if not host:
             host = self.datasource.source.repoApi.host
+
         prev_uri = mlflow.get_tracking_uri()
-        os.environ["MLFLOW_TRACKING_URI"] = multi_urljoin(host, f"{repo}.mlflow")
-        token = get_token()
-        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token).username
+        mlflow.set_tracking_uri(multi_urljoin(host, f"{repo}.mlflow"))
+        token = get_token(host=host)
+        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token, host=host).username
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
+        model_uri = f"models:/{name}/{version}"
+
         try:
-            model = mlflow.pyfunc.load_model(f"models:/{name}/{version}")
+            loader_module = mlflow.models.get_model_info(model_uri).flavors["python_function"]["loader_module"]
+            loader_module_elems = loader_module.split(".")
+            if loader_module_elems[-1] == "model":
+                loader_module_elems.pop()
+            loader_module = ".".join(loader_module_elems)
+            loader = mlflow.pyfunc if "pyfunc" in loader_module_elems else importlib.import_module(loader_module)
+            model = loader.load_model(model_uri)
         finally:
-            os.environ["MLFLOW_TRACKING_URI"] = prev_uri
+            mlflow.set_tracking_uri(prev_uri)
+
+        if "torch" in loader_module:
+            model.predict = model.__call__
 
         dset = DagsHubDataset(self, tensorizers=[lambda x: x])
 
@@ -856,43 +938,6 @@ class QueryResult:
             plugin_server_module.run_plugin_server(sess, self.datasource, self.datasource.source.revision)
 
             return sess
-
-    def annotate_with_mlflow_model(
-        self,
-        repo: str,
-        name: str,
-        post_hook: Callable = lambda x: x,
-        pre_hook: Callable = lambda x: x,
-        host: Optional[str] = None,
-        version: str = "latest",
-        batch_size: int = 1,
-        log_to_field: str = "annotation",
-    ) -> Optional[str]:
-        """
-        Sends all the datapoints returned in this QueryResult to an MLFlow model which automatically labels datapoints.
-
-        Args:
-            repo: repository to extract the model from
-            name: name of the model in the mlflow registry
-            host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
-            version: (optional, default: 'latest') version of the model in the mlflow registry
-            pre_hook: (optional, default: identity function) function that runs
-            before the datapoint is sent to the model
-            post_hook: (optional, default: identity function) function that converts
-            mlflow model output converts to labelstudio format
-            batch_size: (optional, default: 1) batched annotation size
-        """
-        self.predict_with_mlflow_model(
-            repo,
-            name,
-            host=host,
-            version=version,
-            pre_hook=pre_hook,
-            post_hook=post_hook,
-            batch_size=batch_size,
-            log_to_field=log_to_field,
-        )
-        self.datasource.metadata_field(log_to_field).set_annotation().apply()
 
     def annotate(
         self,

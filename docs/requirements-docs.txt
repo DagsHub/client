@@ -4,3 +4,4 @@ sphinx-autobuild==2024.4.16
 sphinx-copybutton==0.5.2
 sphinx-sitemap==2.6.0
 sphinx-click==5.0.1
+sphinx-autodoc-typehints==2.3.0
