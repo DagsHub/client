@@ -8,14 +8,12 @@ import os.path
 import threading
 import time
 import uuid
-import requests
 import webbrowser
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
-from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
 
 
 import rich.progress
@@ -45,7 +43,6 @@ from dagshub.data_engine.model.errors import (
     DatasetFieldComparisonError,
     FieldNotFoundError,
     DatasetNotFoundError,
-    LSInitializingError,
 )
 from dagshub.data_engine.model.metadata import (
     validate_uploading_metadata,
@@ -1109,7 +1106,6 @@ class Datasource:
     def fields(self) -> List[MetadataFieldSchema]:
         return self.source.metadata_fields
 
-    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     async def add_annotation_model_from_config(self, config, project_name, ngrok_authtoken, port=9090):
         """
         Initialize a LS backend for ML annotation using a preset configuration.
@@ -1121,38 +1117,15 @@ class Datasource:
             ngrok_authtoken: uses ngrok to forward local connection
             port: (optional, default: 9090) port on which orchestrator is hosted
         """
-        ls_api_endpoint = multi_urljoin(self.source.repoApi.host, self.source.repo, "annotations/de/api/projects")
-
-        res = requests.get(
-            ls_api_endpoint,
-            headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
-        )
-        if res.text.startswith("<!DOCTYPE html>"):
-            raise LSInitializingError()
-        elif res.status_code // 100 != 2:
-            raise ValueError(f"Adding backend failed! Response: {res.text}")
-        projects = {project["title"]: str(project["id"]) for project in res.json()["results"]}
+        projects = self.source.repoApi.list_annotation_projects()
 
         if project_name not in projects:
-            res = requests.post(
-                ls_api_endpoint,
-                headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
-                data=json.dumps({"title": project_name, "label_config": config.pop("label_config")}),
-            )
-            if res.status_code // 100 != 2:
-                raise ValueError(f"Adding backend failed! Response: {res.text}")
+            self.source.repoApi.add_annotation_project(project_name, config.pop("label_config"))
         else:
-            res = requests.patch(
-                multi_urljoin(ls_api_endpoint, projects[project_name]),
-                headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
-                data=json.dumps({"label_config": config.pop("label_config")}),
-            )
-            if res.status_code // 100 != 2:
-                raise ValueError(f"Adding backend failed! Response: {res.text}")
+            self.source.repoApi.update_label_studio_project_config(project_name, config.pop("label_config"))
 
         await self.add_annotation_model(**config, port=port, project_name=project_name, ngrok_authtoken=ngrok_authtoken)
 
-    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     async def add_annotation_model(
         self,
         repo: str,
@@ -1186,7 +1159,8 @@ class Datasource:
             raise ValueError("As `ngrok_authtoken` is not specified, project will have to be added manually.")
         with get_rich_progress() as progress:
             task = progress.add_task("Initializing LS Model...", total=1)
-            res = requests.post(
+            res = http_request(
+                "POST",
                 f"{LS_ORCHESTRATOR_URL}:{port}/configure",
                 headers={"Content-Type": "application/json"},
                 json=json.dumps(
@@ -1217,32 +1191,7 @@ class Datasource:
             progress.update(task, advance=1, description="Configured any necessary forwarding")
 
             if project_name:
-                ls_api_endpoint = multi_urljoin(self.source.repoApi.host, self.source.repo, "annotations/de/api")
-                res = requests.get(
-                    multi_urljoin(ls_api_endpoint, "projects"),
-                    headers={"Authorization": f"Bearer {dagshub.auth.get_token()}"},
-                )
-                if res.text.startswith("<!DOCTYPE html>"):
-                    raise LSInitializingError()
-                elif res.status_code // 100 != 2:
-                    raise ValueError(f"Adding backend failed! Response: {res.text}")
-                projects = {project["title"]: str(project["id"]) for project in res.json()["results"]}
-
-                if project_name not in projects:
-                    raise ValueError(
-                        f"{project_name} not in projects. Available project names: {list(projects.keys())}"
-                    )
-
-                res = requests.post(
-                    multi_urljoin(ls_api_endpoint, "ml"),
-                    headers={"Authorization": f"Bearer {dagshub.auth.get_token()}", "Content-Type": "application/json"},
-                    data=json.dumps({"url": endpoint, "project": projects[project_name]}),
-                )
-                if res.status_code // 100 == 2:
-                    progress.update(task, advance=1, description="Added model to LS backend")
-                    print("Backend added successfully!")
-                else:
-                    raise ValueError(f"Adding backend failed! Response: {res.text}")
+                self.source.repoApi.add_autolabelling_endpoint(project_name, endpoint)
             else:
                 progress.update(task, advance=1, description="Added model to LS backend")
                 print(f"Connection Established! Add LS endpoint: {endpoint} to your project.")

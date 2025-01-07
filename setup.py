@@ -40,6 +40,7 @@ install_requires = [
     "pathvalidate>=3.0.0",
     "python-dateutil",
     "boto3",
+    "semver",
     "dagshub-annotation-converter>=0.1.0",
 ]
 
