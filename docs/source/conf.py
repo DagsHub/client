@@ -66,6 +66,17 @@ html_js_files = [
 napoleon_include_init_with_doc = True
 autodoc_member_order = "bysource"
 autodoc_default_flags = ["inherited-members"]
+autodoc_mock_imports = [
+    "fiftyone",
+    "mlflow",
+    "datasets",
+    "ultralytics",
+    "cloudpickle",
+    "hypercorn",
+    "ngrok",
+    "tensorflow",
+    "IPython",
+]
 typehints_use_signature_return = True
 
 sitemap_url_scheme = "{link}"

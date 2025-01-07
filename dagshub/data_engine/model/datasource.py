@@ -872,7 +872,7 @@ class Datasource:
         artifact_name: Optional[str] = None,
         run: Optional["mlflow.entities.Run"] = None,
         as_of: Optional[datetime.datetime] = None,
-    ) -> "mlflow.Entities.Run":
+    ) -> "mlflow.entities.Run":
         """
         Logs the current datasource state to MLflow as an artifact.
 
