@@ -1,4 +1,4 @@
-LS Client Documentation
+LabelStudio Client
 =======================
 
 .. automodule:: dagshub.ls_client
