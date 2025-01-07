@@ -26,17 +26,16 @@ def get_label_studio_client(
     repo: str, legacy_client: Optional[bool] = None, host: Optional[str] = None, token: Optional[str] = None
 ):
     """
-    Creates a `label_studio_sdk.Client / label_studio_sdk.client.LabelStudio \
-            <https://labelstud.io/guide/sdk> / \
-            https://api.labelstud.io/api-reference/introduction/getting-started`.\
-    object to interact with the label studio instance associated with the repository.
+    Creates a
+    `label_studio_sdk.client.LabelStudio <https://api.labelstud.io/api-reference/introduction/getting-started>`_ /
+    `label_studio_sdk.Client (legacy) <https://labelstud.io/guide/sdk>`_
+    object to interact with the LabelStudio instance associated with the repository.
 
     Args:
         repo: Name of the repo in the format of ``username/reponame``
         legacy_client: if True, returns the older legacy LabelStudio Client.
         host: URL of the hosted DagsHub instance. default is ``https://dagshub.com``.
-        token: (optional, default: None) uses programmatically specified token, \
-                if not provided either uses cached token or requests oauth interactively.
+        token: (optional, default: None) use this token for LS requests. By default, will use current user's token.
 
     Returns:
         `label_studio_sdk.Client` / `label_studio_sdk.client.LabelStudio` object
