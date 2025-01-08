@@ -1,4 +1,4 @@
-from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type, Retrying
+from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
 from dagshub.data_engine.model.errors import LSInitializingError
 from contextlib import _GeneratorContextManager
 from dagshub.common.util import lazy_load
