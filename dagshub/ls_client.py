@@ -1,26 +1,48 @@
-from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
+from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type, Retrying
 from dagshub.data_engine.model.errors import LSInitializingError
+from contextlib import _GeneratorContextManager
+from dagshub.common.util import lazy_load
 from json import JSONDecodeError
 from typing import Optional
+from itertools import tee
 import importlib.util
 import semver
+import types
 
 from dagshub.common.api.repo import RepoAPI
 from dagshub.auth import get_token
 from dagshub.common import config
 
 
+ls_sdk = lazy_load("label_studio_sdk")
+
+
 class _TenaciousLSCLientWrapper:
     def __init__(self, func):
         self.func = func
 
-    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
+    @retry(
+        retry=retry_if_exception_type((LSInitializingError, JSONDecodeError, ls_sdk.core.ApiError)),
+        wait=wait_fixed(3),
+        stop=stop_after_attempt(5),
+    )
     def wrapped_func(self, *args, **kwargs):
         res = self.func(*args, **kwargs)
-        if res.text.startswith("<!DOCTYPE html>"):
-            raise LSInitializingError()
-        elif res.status_code // 100 != 2:
-            raise RuntimeError(f"Process failed! Server Response: {res.text}")
+
+        if isinstance(res, types.GeneratorType):
+            proxy, res = tee(res)
+            if next(proxy).startswith(b"<!DOCTYPE html>"):
+                raise LSInitializingError()
+        elif isinstance(res, _GeneratorContextManager):
+            return res
+        elif isinstance(res, bytes):
+            if res.startswith("<!DOCTYPE html>"):
+                raise LSInitializingError()
+        else:
+            if res.text.startswith("<!DOCTYPE html>"):
+                raise LSInitializingError()
+            elif res.status_code // 100 != 2:
+                raise RuntimeError(f"Process failed! Server Response: {res.text}")
         return res
 
 
@@ -83,8 +105,8 @@ def get_label_studio_client(
         ls_client._client_wrapper.httpx_client.request = _TenaciousLSCLientWrapper(
             ls_client._client_wrapper.httpx_client.request
         ).wrapped_func
-        ls_client._client_wrapper.httpx_client.stream = _TenaciousLSCLientWrapper(
-            ls_client._client_wrapper.httpx_client.stream
+        ls_client.projects.exports.create_export = _TenaciousLSCLientWrapper(
+            ls_client.projects.exports.create_export
         ).wrapped_func
 
     return ls_client
