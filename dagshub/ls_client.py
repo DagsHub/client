@@ -80,7 +80,11 @@ def get_label_studio_client(
     if legacy_client:
         ls_client.make_request = _TenaciousLSCLientWrapper(ls_client.make_request).wrapped_func
     else:
-        ls_client._client_wrapper.httpx_client.request = _TenaciousLSCLientWrapper(ls_client._client_wrapper.httpx_client.request).wrapped_func
-        ls_client._client_wrapper.httpx_client.stream = _TenaciousLSCLientWrapper(ls_client._client_wrapper.httpx_client.stream).wrapped_func
+        ls_client._client_wrapper.httpx_client.request = _TenaciousLSCLientWrapper(
+            ls_client._client_wrapper.httpx_client.request
+        ).wrapped_func
+        ls_client._client_wrapper.httpx_client.stream = _TenaciousLSCLientWrapper(
+            ls_client._client_wrapper.httpx_client.stream
+        ).wrapped_func
 
     return ls_client
