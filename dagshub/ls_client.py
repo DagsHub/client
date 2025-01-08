@@ -1,4 +1,5 @@
 from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception_type
+from dagshub.data_engine.model.errors import LSInitializingError
 from json import JSONDecodeError
 from typing import Optional
 import importlib.util
@@ -7,6 +8,20 @@ import semver
 from dagshub.common.api.repo import RepoAPI
 from dagshub.auth import get_token
 from dagshub.common import config
+
+
+class _TenaciousLSCLientWrapper:
+    def __init__(self, func):
+        self.func = func
+
+    @retry(retry=retry_if_exception_type(LSInitializingError), wait=wait_fixed(3), stop=stop_after_attempt(5))
+    def wrapped_func(self, *args, **kwargs):
+        res = self.func(*args, **kwargs)
+        if res.text.startswith("<!DOCTYPE html>"):
+            raise LSInitializingError()
+        elif res.status_code // 100 != 2:
+            raise RuntimeError(f"Process failed! Server Response: {res.text}")
+        return res
 
 
 def _use_legacy_client():
@@ -61,4 +76,11 @@ def get_label_studio_client(
         "api_key": token if token is not None else get_token(host=host),
     }
 
-    return LabelStudio(**kwargs)
+    ls_client = LabelStudio(**kwargs)
+    if legacy_client:
+        ls_client.make_request = _TenaciousLSCLientWrapper(ls_client.make_request).wrapped_func
+    else:
+        ls_client._client_wrapper.httpx_client.request = _TenaciousLSCLientWrapper(ls_client._client_wrapper.httpx_client.request).wrapped_func
+        ls_client._client_wrapper.httpx_client.stream = _TenaciousLSCLientWrapper(ls_client._client_wrapper.httpx_client.stream).wrapped_func
+
+    return ls_client
