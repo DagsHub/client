@@ -752,8 +752,6 @@ class QueryResult:
 
         # If there's no folder "images" in the datasource, prepend it to the path
         if not any("images/" in ann.filename for ann in annotations):
-            for ann in annotations:
-                ann.filename = os.path.join("images", ann.filename)
             image_download_path = Path(download_dir) / "images"
 
         context = YoloContext(annotation_type=annotation_type, categories=categories)
