@@ -41,7 +41,7 @@ install_requires = [
     "python-dateutil",
     "boto3",
     "semver",
-    "dagshub-annotation-converter>=0.1.0",
+    "dagshub-annotation-converter>=0.1.3",
 ]
 
 extras_require = {
