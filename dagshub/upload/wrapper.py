@@ -6,7 +6,6 @@ import posixpath
 import time
 import urllib
 from http import HTTPStatus
-from io import IOBase
 from pathlib import Path, PurePosixPath, PurePath
 from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List, cast
 from concurrent.futures import ThreadPoolExecutor
@@ -42,7 +41,7 @@ s.timeout = config.http_timeout
 s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
-FileUploadStruct = Tuple[os.PathLike, BinaryIO]
+FileUploadStruct = Tuple[str, BinaryIO]
 
 
 def create_dataset(repo_name: str, local_path: str, glob_exclude: str = "", org_name: str = "", private=False):
@@ -316,6 +315,8 @@ class Repo:
         if not remote_path:
             try:
                 remote_path = str(local_path.relative_to(Path.cwd().resolve()))
+                if remote_path == ".":
+                    remote_path = local_path.name
             except ValueError:
                 # local_path is outside cwd, use only its basename
                 remote_path = local_path.name
@@ -650,11 +651,11 @@ class DataSet:
     """
 
     def __init__(self, repo: Repo, directory: str):
-        self.files: Dict[os.PathLike, Tuple[os.PathLike, BinaryIO]] = {}
+        self.files: Dict[str, FileUploadStruct] = {}
         self.repo = repo
         self.directory = self._clean_directory_name(directory)
 
-    def add(self, file: Union[str, IOBase], path=None):
+    def add(self, file: Union[str, BinaryIO], path: Optional[Union[str, Path]] = None):
         """
         Add a file to upload. The file will not be uploaded unless you call :func:`commit`
 
@@ -783,7 +784,7 @@ class DataSet:
         return posixpath.normpath(directory)
 
     @staticmethod
-    def get_file(file: Union[str, IOBase], path: Optional[os.PathLike] = None) -> FileUploadStruct:
+    def get_file(file: Union[str, BinaryIO], path: Optional[Union[str, PurePath]] = None) -> FileUploadStruct:
         """
         The get_file function is a helper function that takes in either a string or an IOBase object and returns
         a tuple containing the file's name and the file itself. If no path is provided, it will default to the name of
@@ -797,23 +798,25 @@ class DataSet:
         """
 
         try:
+            str_path: str
             # if path is not provided, fall back to the file name
             if path is None:
-                try:
-                    path = posixpath.basename(posixpath.normpath(file if type(file) is str else file.name))
-                except Exception:
-                    raise RuntimeError(
+                if not isinstance(file, str):
+                    raise ValueError(
                         "Could not interpret your file's name. Please specify it in the keyword parameter 'path'."
                     )
+                str_path = PurePosixPath(file).name
+            else:
+                str_path = PurePosixPath(path).as_posix()
 
-            if type(file) is str:
+            if isinstance(file, str):
                 try:
                     f = open(file, "rb")
-                    return path, f
+                    return str_path, f
                 except IsADirectoryError:
                     raise IsADirectoryError("'file' must describe a file, not a directory.")
 
-            return path, file
+            return str_path, file
 
         except Exception as e:
             logger.error(e)
