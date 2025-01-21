@@ -7,7 +7,7 @@ import time
 import urllib
 from http import HTTPStatus
 from io import IOBase
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PurePath
 from typing import Union, Tuple, BinaryIO, Dict, Optional, Any, List, cast
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urljoin
@@ -211,7 +211,14 @@ def upload_files(
     repo_obj.upload(local_path, commit_message=commit_message, remote_path=remote_path, bucket=bucket, **kwargs)
 
 
-def upload_file_to_s3(s3_client, local_path, bucket_name, remote_path, progress=None, task=None):
+def upload_file_to_s3(
+    s3_client,
+    local_path: Union[PurePath, str],
+    bucket_name: str,
+    remote_path: Union[PurePath, str],
+    progress=None,
+    task=None,
+):
     """
     Upload a single file to S3.
 
@@ -224,7 +231,7 @@ def upload_file_to_s3(s3_client, local_path, bucket_name, remote_path, progress=
     :param task: The task ID associated with this upload task in the Rich Progress instance.
     Required if `progress` is provided. Default is None.
     """
-    s3_client.upload_file(local_path, bucket_name, remote_path)
+    s3_client.upload_file(str(local_path), bucket_name, str(remote_path))
     if progress is not None and task is not None:
         progress.update(task, advance=1)
     else:
@@ -314,15 +321,12 @@ class Repo:
                 remote_path = local_path.name
         remote_path = cast(str, Path(remote_path).as_posix())
 
-        if local_path.is_dir():
-            if bucket:
-                self.upload_files_to_bucket(local_path, remote_path, **kwargs)
-            else:
+        if bucket:
+            self.upload_files_to_bucket(local_path, remote_path, **kwargs)
+        else:
+            if local_path.is_dir():
                 dir_to_upload = self.directory(remote_path)
                 dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
-        else:
-            if bucket:
-                self.upload_files_to_bucket(local_path, remote_path, **kwargs)
             else:
                 file_to_upload = DataSet.get_file(str(local_path), PurePosixPath(remote_path))
                 self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
@@ -589,23 +593,22 @@ class Repo:
         )
 
     def upload_files_to_bucket(
-        self, local_path: Path, remote_path: Optional[str], max_workers: int = config.upload_threads, **kwargs
+        self, local_path: Path, remote_path: str, max_workers: int = config.upload_threads, **kwargs
     ):
         """
         Upload a file or directory to an S3 bucket, preserving the directory structure.
 
-        :param local_path: Path to the local directory to upload
+        :param local_path: Path to the local directory or file to upload
         :param remote_path: The directory path within the S3 bucket
         :param max_workers: The maximum number of threads to use
         """
 
         s3 = get_repo_bucket_client(self._api.full_name)
-        if remote_path:
-            # Get rid of the repo name at the beginning of the path
-            if remote_path.split("/")[0] == self.name:
-                remote_path = remote_path.split("/", 1)[1]
+        assert len(remote_path) > 0
+        # Get rid of the repo name at the beginning of the path
+        if remote_path.split("/")[0] == self.name:
+            remote_path = remote_path.split("/", 1)[1]
         if local_path.is_file():
-            remote_path = PurePosixPath(remote_path) / local_path.name
             upload_file_to_s3(s3_client=s3, local_path=local_path, bucket_name=self.name, remote_path=remote_path)
         else:
             upload_tasks = []

@@ -100,15 +100,14 @@ def test_bucket_upload(upload_repo, reponame, mock_api, mock_s3, test_dirs, remo
     assert actual_paths == expected_paths
 
 
-@pytest.mark.parametrize("remote_path", [None, "", "new_data"])
+@pytest.mark.parametrize("remote_path", [None, "", "new_data/a.txt"])
 def test_bucket_upload_single_file(upload_repo, reponame, mock_api, mock_s3, test_file, remote_path):
     filename = os.path.basename(test_file)
     if remote_path:
-        expected_paths = {f"{reponame}/{remote_path}/{filename}"}
+        expected_path = f"{reponame}/{remote_path}"
     else:
-        relpath = os.path.relpath(test_file, os.getcwd())
-        expected_paths = {f"{reponame}/{relpath}/{filename}"}
-    print(expected_paths)
+        dirpath = Path(test_file).parent.resolve().relative_to(os.getcwd())
+        expected_path = str(reponame / dirpath / filename)
     upload_repo.upload(local_path=test_file, remote_path=remote_path, bucket=True)
-    actual_paths = set([p[0] for p in mock_s3.uploaded_files])
-    assert actual_paths == expected_paths
+    actual_paths = [p[0] for p in mock_s3.uploaded_files]
+    assert actual_paths == [expected_path]
