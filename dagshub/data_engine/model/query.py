@@ -7,7 +7,7 @@ import pytz
 from treelib import Tree, Node
 
 from dagshub.data_engine.model.errors import WrongOperatorError
-from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
+from dagshub.data_engine.model.schema_util import metadata_type_lookup, metadata_type_lookup_reverse
 from dagshub.data_engine.dtypes import MetadataFieldType
 
 logger = logging.getLogger(__name__)
@@ -228,7 +228,7 @@ class QueryFilterTree:
             value = node.data["value"]
             as_of = node.data.get("as_of")
 
-            value_type = metadataTypeLookup[type(value)].value if type(value) in metadataTypeLookup else None
+            value_type = metadata_type_lookup[type(value)].value if type(value) in metadata_type_lookup else None
 
             # if one of basic value types:
             if value_type:
@@ -244,7 +244,7 @@ class QueryFilterTree:
             if value_type is None and query_op not in dt_range_ops:
                 raise RuntimeError(
                     f"Value type {value_type} is not supported for querying.\r\n"
-                    f"Supported types: {list(metadataTypeLookup.keys())}"
+                    f"Supported types: {list(metadata_type_lookup.keys())}"
                 )
             res = {
                 "filter": {
@@ -317,7 +317,7 @@ class QueryFilterTree:
                 # timeFilter replaced comparator in query, so now the reverse action
                 comparator = val["timeFilter"].lower()
             else:
-                value_type = metadataTypeLookupReverse[val["valueType"]]
+                value_type = metadata_type_lookup_reverse[val["valueType"]]
                 converter = _metadataTypeCustomConverters.get(value_type, lambda x: value_type(x))
                 value = converter(val["value"])
             as_of = val.get("asOf")
