@@ -675,3 +675,13 @@ def test_periodic_datetime_timeofday(ds):
     }
 
     assert ds2.serialize_gql_query_input() == expected_serialized
+
+
+def test_datetime_is_null(ds):
+    add_datetime_fields(ds, "x")
+    q = ds["x"].is_null()
+    print(q.get_query().filter.tree_to_dict())
+
+    expected = {"query": {"filter": {"comparator": "IS_NULL", "key": "x", "value": "0", "valueType": "DATETIME"}}}
+
+    assert q.serialize_gql_query_input() == expected

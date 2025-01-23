@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Type, Union, Set, Optional, Literal
 
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import DagshubDataType, MetadataFieldType, ReservedTags, ThumbnailType
-from dagshub.data_engine.model.schema_util import metadataTypeLookup
+from dagshub.data_engine.model.schema_util import metadata_type_lookup
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -174,9 +174,9 @@ class MetadataFieldBuilder:
             return t.backing_field_type
 
         if type(t) is type:
-            if t not in metadataTypeLookup.keys():
+            if t not in metadata_type_lookup.keys():
                 raise ValueError(f"Primitive type {type(t)} is not supported")
-            return metadataTypeLookup[t]
+            return metadata_type_lookup[t]
 
         raise ValueError(f"{t} of type ({type(t)}) is not a valid primitive type or DagshubDataType")
 

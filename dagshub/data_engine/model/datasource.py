@@ -52,7 +52,10 @@ from dagshub.data_engine.model.metadata import (
 from dagshub.data_engine.model.metadata import wrap_bytes
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
 from dagshub.data_engine.model.query import QueryFilterTree
-from dagshub.data_engine.model.schema_util import metadataTypeLookup, metadataTypeLookupReverse
+from dagshub.data_engine.model.schema_util import (
+    metadata_type_lookup,
+    default_metadata_type_value,
+)
 from dagshub.data_engine.model.datasource_state import DatasourceState
 
 if TYPE_CHECKING:
@@ -647,7 +650,7 @@ class Datasource:
                         value_type = field_value_types.get(key)
                         time_zone = None
                         if value_type is None:
-                            value_type = metadataTypeLookup[type(sub_val)]
+                            value_type = metadata_type_lookup[type(sub_val)]
                             field_value_types[key] = value_type
                         # Don't override bytes if they're not bytes - probably just undownloaded values
                         if value_type == MetadataFieldType.BLOB and not isinstance(sub_val, bytes):
@@ -676,7 +679,7 @@ class Datasource:
                 else:
                     value_type = field_value_types.get(key)
                     if value_type is None:
-                        value_type = metadataTypeLookup[type(val)]
+                        value_type = metadata_type_lookup[type(val)]
                         field_value_types[key] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
                     if value_type == MetadataFieldType.BLOB and not isinstance(val, bytes):
@@ -1555,8 +1558,8 @@ class Datasource:
         :meta private:
         """
         field = self._get_filtering_field()
-        value_type = metadataTypeLookupReverse[field.valueType.value]
-        return self.add_query_op("isnull", value_type())
+        val = default_metadata_type_value(field.valueType)
+        return self.add_query_op("isnull", val)
 
     def is_not_null(self):
         """
@@ -1565,8 +1568,8 @@ class Datasource:
         :meta private:
         """
         field = self._get_filtering_field()
-        value_type = metadataTypeLookupReverse[field.valueType.value]
-        return self.add_query_op("!isnull", value_type())
+        val = default_metadata_type_value(field.valueType)
+        return self.add_query_op("!isnull", val)
 
     def _get_filtering_field(self) -> MetadataFieldSchema:
         field_name = self.get_query().filter.column_filter
@@ -1791,7 +1794,7 @@ class MetadataContextManager:
                         time_zone = None
                         value_type = field_value_types.get(k)
                         if value_type is None:
-                            value_type = metadataTypeLookup[type(sub_val)]
+                            value_type = metadata_type_lookup[type(sub_val)]
                             field_value_types[k] = value_type
                         # Don't override bytes if they're not bytes and not documents
                         # - probably just undownloaded values
@@ -1820,7 +1823,7 @@ class MetadataContextManager:
                 else:
                     value_type = field_value_types.get(k)
                     if value_type is None:
-                        value_type = metadataTypeLookup[type(v)]
+                        value_type = metadata_type_lookup[type(v)]
                         field_value_types[k] = value_type
                     # Don't override bytes if they're not bytes - probably just undownloaded values
                     if value_type == MetadataFieldType.BLOB and not isinstance(v, bytes):
