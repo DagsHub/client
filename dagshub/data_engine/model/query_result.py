@@ -692,6 +692,9 @@ class QueryResult:
         annotations = []
         for dp in self.entries:
             if annotation_field in dp.metadata:
+                if not hasattr(dp.metadata[annotation_field], "annotations"):
+                    print(f"Skipping datapoint {dp.path} since it doesn't have correct annotations")
+                    continue
                 annotations.extend(dp.metadata[annotation_field].annotations)
         return annotations
 
@@ -700,6 +703,7 @@ class QueryResult:
         download_dir: Optional[Union[str, Path]] = None,
         annotation_field: Optional[str] = None,
         annotation_type: Optional[Literal["bbox", "segmentation", "pose"]] = None,
+        classes: Optional[Dict[int, str]] = None,
     ) -> Path:
         """
         Downloads the files and annotations in a way that can be used to train with YOLO immediately.
@@ -710,15 +714,20 @@ class QueryResult:
             annotation_type: Type of YOLO annotations to export.
                 Possible values: "bbox", "segmentation", "pose".
                 If None, returns based on the most common annotation type.
+            classes: Classes and indices for the YOLO dataset.
+                If ``None``, the classes will be inferred from the annotations.
+                Any class in the annotations that doesn't exist in the dictionary
+                will be added at the end of the classes.
+                The dictionary has to be in the format ``{index: class_name}``.
 
         Returns:
             The path to the YAML file with the metadata. Pass this path to ``YOLO.train()`` to train a model.
         """
         if annotation_field is None:
-            annotation_field = sorted([f.name for f in self.fields if f.is_annotation()])
-            if len(annotation_field) == 0:
+            annotation_fields = sorted([f.name for f in self.fields if f.is_annotation()])
+            if len(annotation_fields) == 0:
                 raise ValueError("No annotation fields found in the datasource")
-            annotation_field = annotation_field[0]
+            annotation_field = annotation_fields[0]
             log_message(f"Using annotations from field {annotation_field}")
 
         if download_dir is None:
@@ -728,6 +737,9 @@ class QueryResult:
         annotations = self._get_all_annotations(annotation_field)
 
         categories = Categories()
+        if classes is not None:
+            for idx, cls in classes.items():
+                categories.add(cls, idx)
         ann_types: dict[type, int] = {}
 
         for ann in annotations:
@@ -741,7 +753,12 @@ class QueryResult:
             annotation_types = [type(ann) for ann in annotations]
             counter = Counter(annotation_types)
             most_common = counter.most_common(1)
-            annotation_type = ir_mapping[most_common[0][0]]
+            if not most_common:
+                raise RuntimeError("No annotations found")
+            most_common_type = most_common[0][0]
+            annotation_type = ir_mapping.get(most_common_type)
+            if annotation_type is None:
+                raise RuntimeError(f"Don't know how to export annotations of type {most_common_type} to YOLO")
             log_message(f"Importing annotations of type {annotation_type} (most common type of annotation).")
 
         image_download_path = Path(download_dir)
