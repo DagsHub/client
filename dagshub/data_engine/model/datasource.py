@@ -26,7 +26,14 @@ from dagshub.common.analytics import send_analytics_event
 from dagshub.common.environment import is_mlflow_installed
 from dagshub.common.helpers import prompt_user, http_request, log_message
 from dagshub.common.rich_util import get_rich_progress
-from dagshub.common.util import lazy_load, multi_urljoin, to_timestamp, exclude_if_none, deprecated
+from dagshub.common.util import (
+    lazy_load,
+    multi_urljoin,
+    to_timestamp,
+    exclude_if_none,
+    deprecated,
+    exclude_if_all_fields_are_none,
+)
 from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationType, AnnotationLocation
 from dagshub.data_engine.client.models import (
     PreprocessingStatus,
@@ -51,7 +58,7 @@ from dagshub.data_engine.model.metadata import (
 )
 from dagshub.data_engine.model.metadata import wrap_bytes
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
-from dagshub.data_engine.model.query import QueryFilterTree
+from dagshub.data_engine.model.query import QueryFilterTree, QueryLimitOptions
 from dagshub.data_engine.model.schema_util import (
     metadata_type_lookup,
     default_metadata_type_value,
@@ -277,9 +284,34 @@ class Datasource:
         res._load_autoload_fields()
         return res
 
+    def fetch(self, load_documents=True, load_annotations=True) -> "QueryResult":
+        """
+        Executes the query and returns a :class:`.QueryResult` object containing returned datapoints.
+
+        If there's an active MLflow run, logs an artifact with information about the query to the run.
+
+        This function respects the limit set on the query with :func:`limit()`.
+
+        Args:
+            load_documents: Automatically download all document blob fields
+            load_annotations: Automatically download all annotation blob fields
+        """
+        self._check_preprocess()
+        res = self._source.client.get_datapoints(self)
+        self._autolog_mlflow(res)
+        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
+
+        return res
+
     def head(self, size=100, load_documents=True, load_annotations=True) -> "QueryResult":
         """
         Executes the query and returns a :class:`.QueryResult` object containing first ``size`` datapoints
+
+        .. note::
+            This function is intended for quick checks and debugging your queries.
+            As a result of that, this function does not log an artifact to MLflow.
+            If you want to limit the number of datapoints returned by the query as part of the training workflow,
+            use :func:`limit()` instead. That will save the limit as part of the query.
 
         Args:
             size: how many datapoints to get. Default is 100
@@ -294,20 +326,27 @@ class Datasource:
 
     def all(self, load_documents=True, load_annotations=True) -> "QueryResult":
         """
-        Executes the query and returns a :class:`.QueryResult` object containing all datapoints
+        Executes the query and returns a :class:`.QueryResult` object containing **all** datapoints
 
         If there's an active MLflow run, logs an artifact with information about the query to the run.
+
+        .. warning::
+            Unlike :func:`fetch()`, this function will override any limits set on the query.
+            If you have set any limits on the query with :func:`limit()`, use :func:`fetch()` instead.
 
         Args:
             load_documents: Automatically download all document blob fields
             load_annotations: Automatically download all annotation blob fields
         """
-        self._check_preprocess()
-        res = self._source.client.get_datapoints(self)
-        self._autolog_mlflow(res)
-        res._load_autoload_fields(documents=load_documents, annotations=load_annotations)
-
-        return res
+        if self._query.sample_options is not None:
+            if self._query.sample_options.limit > 0:
+                log_message(
+                    "Calling all() on a datasource with a limited query.\n"
+                    "This will override the limiting and get ALL datapoints in the current query.\n"
+                    "Use fetch() instead if you want to keep the datapoint limit.",
+                    logger,
+                )
+        return self.limit(None).fetch()
 
     def select(self, *selected: Union[str, Field]) -> "Datasource":
         """
@@ -435,6 +474,23 @@ class Datasource:
                     raise RuntimeError(f"Invalid sort argument {arg}, second value must be 'asc'|'desc'|True|False")
                 orders.append({"field": arg[0], "order": order})
         new_ds.get_query().order_by = orders
+        return new_ds
+
+    def limit(self, size: Optional[int]) -> "Datasource":
+        """
+        Limit the number of datapoints returned by the query.
+        Use ``None`` to remove the limit.
+        This argument is only respected when using :func:`fetch()`.
+
+        Args:
+            size: Number of datapoints to return. If ``None``, no limit is applied and all datapoints will be fetched.
+
+        Example::
+
+            ds.limit(10).fetch()
+        """
+        new_ds = self.__deepcopy__()
+        new_ds._query.sample_options.limit = size
         return new_ds
 
     def _check_preprocess(self):
@@ -1888,11 +1944,15 @@ class DatasourceQuery(DataClassJsonMixin):
     )
     select: Optional[List[Dict]] = field(default=None, metadata=config(exclude=exclude_if_none))
     filter: "QueryFilterTree" = field(
-        default=QueryFilterTree(),
+        default_factory=QueryFilterTree,
         metadata=config(field_name="query", encoder=QueryFilterTree.serialize, decoder=QueryFilterTree.deserialize),
     )
     order_by: Optional[List] = field(
         default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
+    )
+    sample_options: Optional[QueryLimitOptions] = field(
+        default_factory=QueryLimitOptions,
+        metadata=config(field_name="sampleOpts", exclude=exclude_if_all_fields_are_none),
     )
 
     def _fill_out_defaults(self):
@@ -1905,6 +1965,7 @@ class DatasourceQuery(DataClassJsonMixin):
             time_zone=self.time_zone,
             filter=self.filter.__deepcopy__(),
         )
+        other.sample_options.limit = self.sample_options.limit
         if self.select is not None:
             other.select = self.select.copy()
         if self.order_by is not None:
