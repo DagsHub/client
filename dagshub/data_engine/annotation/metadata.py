@@ -43,7 +43,7 @@ class MetadataAnnotations:
 
     Example of adding bounding boxes::
 
-        dp = ds.all()[0]
+        dp = ds.fetch()[0]
         anns: MetadataAnnotations = dp["exported_annotations"]
         anns.add_image_bbox("person", 0.1, 0.1, 0.1, 0.1)
         anns.add_image_bbox("cat", 0.2, 0.2, 0.1, 0.1)

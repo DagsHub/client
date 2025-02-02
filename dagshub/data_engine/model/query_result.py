@@ -911,7 +911,7 @@ class QueryResult:
         Returns the session object that you can ``wait()`` if you are using it\
         outside a notebook and need to not close the script immediately::
 
-            session = ds.all().visualize()
+            session = ds.fetch().visualize()
             session.wait(-1)
         """
         if visualizer == "dagshub":
