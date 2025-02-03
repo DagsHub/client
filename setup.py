@@ -39,7 +39,7 @@ install_requires = [
     "treelib>=1.6.4",
     "pathvalidate>=3.0.0",
     "python-dateutil",
-    "boto3",
+    "boto3<1.36.0",
     "semver",
     "dagshub-annotation-converter>=0.1.3",
 ]
