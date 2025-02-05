@@ -38,6 +38,10 @@ jobs:
 #          name: docs
 #          path: docs/build
 
+      # For LLM consumption
+      - name: Pydoc plaintext
+        run: python gen-pydoc.py > build/html/plaintext-pydoc.txt
+
       - name: Authenticate with Google
         uses: "google-github-actions/auth@v2"
         with:
