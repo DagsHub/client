@@ -41,8 +41,8 @@ jobs:
       # For LLM consumption
       - name: Pydoc plaintext
         run: | 
-          python gen-pydoc.py -o build/html/dagshub-pydoc.txt -p build/html/dagshub-pydoc dagshub
-          python gen-pydoc.py -o build/html/dagshub-annotation-converter-pydoc.txt -p build/html/dagshub-annotation-converter-pydoc dagshub-annotation-converter
+          python docs/gen-pydoc.py -o build/html/dagshub-pydoc.txt -p build/html/dagshub-pydoc dagshub
+          python docs/gen-pydoc.py -o build/html/dagshub-annotation-converter-pydoc.txt -p build/html/dagshub-annotation-converter-pydoc dagshub-annotation-converter
           
 
       - name: Authenticate with Google
