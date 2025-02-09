@@ -4,7 +4,7 @@ import types
 import logging
 import importlib
 from pathlib import PurePath
-from typing import Union, TypeVar
+from typing import Union, TypeVar, Dict, Optional
 from urllib.parse import urljoin, quote
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,12 @@ def multi_urljoin(*parts):
 def exclude_if_none(value):
     """For skipping serializing None values in dataclasses_json"""
     return value is None
+
+
+def exclude_if_all_fields_are_none(dataclass_dict: Optional[Dict]):
+    if dataclass_dict is None:
+        return True
+    return all(value is None for value in dataclass_dict.values())
 
 
 def to_timestamp(ts: Union[float, int, datetime.datetime]) -> int:

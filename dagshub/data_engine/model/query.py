@@ -276,7 +276,9 @@ class QueryFilterTree:
             return res
 
     @staticmethod
-    def deserialize(serialized_query: Dict) -> "QueryFilterTree":
+    def deserialize(serialized_query: Union["QueryFilterTree", Dict]) -> "QueryFilterTree":
+        if isinstance(serialized_query, QueryFilterTree):
+            return serialized_query
         q = QueryFilterTree()
         op_tree = Tree()
         QueryFilterTree._deserialize_node(serialized_query, op_tree)
