@@ -68,18 +68,23 @@ class TypesIntrospection:
 
 class Validators:
     @staticmethod
-    def query_input_validator(params: Dict[str, Any], query_input_introspection: TypesIntrospection):
-        introspect_query_input_fields = Validators.get_fields(query_input_introspection, "QueryInput", "inputFields")
+    def query_input_validator(queryInputField: str):
+        def validator(params: Dict[str, Any], query_input_introspection: TypesIntrospection):
+            introspect_query_input_fields = Validators.get_fields(
+                query_input_introspection, "QueryInput", "inputFields"
+            )
 
-        # Get sent fields
-        query_input = params.get("queryInput")
-        if query_input is None:
-            return
-        sent_fields = query_input.keys()
-        # Check serialized query input fields exist in introspection
-        if not all([f in introspect_query_input_fields for f in sent_fields]):
-            unsupported_fields = [f for f in sent_fields if f not in introspect_query_input_fields]
-            raise ValueError(f"QueryInput fields are not supported: {unsupported_fields}")
+            # Get sent fields
+            query_input = params.get(queryInputField)
+            if query_input is None:
+                return
+            sent_fields = query_input.keys()
+            # Check serialized query input fields exist in introspection
+            if not all([f in introspect_query_input_fields for f in sent_fields]):
+                unsupported_fields = [f for f in sent_fields if f not in introspect_query_input_fields]
+                raise ValueError(f"QueryInput fields are not supported: {unsupported_fields}")
+
+        return validator
 
     @staticmethod
     def get_fields(
@@ -91,8 +96,7 @@ class Validators:
         datapoints_connection_fields = getattr(datapoints_connection_fields[0], attr)
         if datapoints_connection_fields is None:
             raise ValueError(f"{type_name} is not defined")
-        datapoints_connection_fields = [f.name for f in datapoints_connection_fields]
-        return datapoints_connection_fields
+        return [f.name for f in datapoints_connection_fields]
 
     @staticmethod
     def filter_supported_fields(

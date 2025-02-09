@@ -1,14 +1,11 @@
 import datetime
 import enum
 import logging
-from dataclasses import dataclass, field
 from typing import Optional, Union, Dict
 
 import pytz
-from dataclasses_json import config
 from treelib import Tree, Node
 
-from dagshub.common.util import exclude_if_none
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadata_type_lookup, metadata_type_lookup_reverse
 from dagshub.data_engine.dtypes import MetadataFieldType
@@ -347,8 +344,3 @@ class QueryFilterTree:
     @property
     def is_empty(self):
         return self._operand_tree.root is None or self._column_filter_node is not None
-
-
-@dataclass
-class QueryLimitOptions:
-    limit: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none))

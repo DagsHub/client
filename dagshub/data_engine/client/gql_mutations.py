@@ -1,6 +1,7 @@
 import functools
 from typing import Any, Dict, List, Union, Optional
 
+from dagshub.data_engine.client.gql_introspections import Validators
 from dagshub.data_engine.client.query_builder import GqlQuery
 
 from dagshub.data_engine.client.models import DatasourceType, ScanOption
@@ -226,6 +227,8 @@ class GqlMutations:
                 ]
             )
         )
+
+        q = q.param_validator(Validators.query_input_validator("filter"))
         return q
 
     @staticmethod

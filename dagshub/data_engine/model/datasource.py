@@ -32,7 +32,6 @@ from dagshub.common.util import (
     to_timestamp,
     exclude_if_none,
     deprecated,
-    exclude_if_all_fields_are_none,
 )
 from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationType, AnnotationLocation
 from dagshub.data_engine.client.models import (
@@ -58,7 +57,7 @@ from dagshub.data_engine.model.metadata import (
 )
 from dagshub.data_engine.model.metadata import wrap_bytes
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
-from dagshub.data_engine.model.query import QueryFilterTree, QueryLimitOptions
+from dagshub.data_engine.model.query import QueryFilterTree
 from dagshub.data_engine.model.schema_util import (
     metadata_type_lookup,
     default_metadata_type_value,
@@ -338,14 +337,13 @@ class Datasource:
             load_documents: Automatically download all document blob fields
             load_annotations: Automatically download all annotation blob fields
         """
-        if self._query.sample_options is not None:
-            if self._query.sample_options.limit > 0:
-                log_message(
-                    "Calling all() on a datasource with a limited query.\n"
-                    "This will override the limiting and get ALL datapoints in the current query.\n"
-                    "Use fetch() instead if you want to keep the datapoint limit.",
-                    logger,
-                )
+        if self._query.limit:
+            log_message(
+                "Calling all() on a datasource with a limited query.\n"
+                "This will override the limiting and get ALL datapoints in the current query.\n"
+                "Use fetch() instead if you want to keep the datapoint limit.",
+                logger,
+            )
         return self.limit(None).fetch()
 
     def select(self, *selected: Union[str, Field]) -> "Datasource":
@@ -490,7 +488,7 @@ class Datasource:
             ds.limit(10).fetch()
         """
         new_ds = self.__deepcopy__()
-        new_ds._query.sample_options.limit = size
+        new_ds._query.limit = size
         return new_ds
 
     def _check_preprocess(self):
@@ -1950,10 +1948,7 @@ class DatasourceQuery(DataClassJsonMixin):
     order_by: Optional[List] = field(
         default=None, metadata=config(exclude=exclude_if_none, letter_case=LetterCase.CAMEL)
     )
-    sample_options: Optional[QueryLimitOptions] = field(
-        default_factory=QueryLimitOptions,
-        metadata=config(field_name="sampleOpts", exclude=exclude_if_all_fields_are_none),
-    )
+    limit: Optional[int] = field(default=None, metadata=config(exclude=exclude_if_none))
 
     def _fill_out_defaults(self):
         """For functions that don't utilize the default hints of the dataclass"""
@@ -1964,8 +1959,8 @@ class DatasourceQuery(DataClassJsonMixin):
             as_of=self.as_of,
             time_zone=self.time_zone,
             filter=self.filter.__deepcopy__(),
+            limit=self.limit,
         )
-        other.sample_options.limit = self.sample_options.limit
         if self.select is not None:
             other.select = self.select.copy()
         if self.order_by is not None:
