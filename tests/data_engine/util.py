@@ -39,6 +39,10 @@ def add_datetime_fields(ds: Datasource, *names: str):
     for name in names:
         add_metadata_field(ds, name, MetadataFieldType.DATETIME)
 
+def add_annotation_fields(ds: Datasource, *names: str):
+    for name in names:
+        add_metadata_field(ds, name, MetadataFieldType.BLOB, tags={ReservedTags.ANNOTATION.value})
+
 
 def add_metadata_field(
     ds: Datasource,

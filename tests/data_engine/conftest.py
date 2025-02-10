@@ -2,6 +2,8 @@ import datetime
 
 import pytest
 
+from dagshub.common.api import UserAPI
+from dagshub.common.api.responses import UserAPIResponse
 from dagshub.data_engine import datasources
 from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.model.datapoint import Datapoint
@@ -13,12 +15,23 @@ from tests.mocks.repo_api import MockRepoAPI
 
 
 @pytest.fixture
-def ds(mocker, mock_get_username_of_token) -> Datasource:
-    ds_state = datasources.DatasourceState(id=1, name="test-dataset", repo="kirill/repo")
+def ds(mocker, mock_dagshub_auth) -> Datasource:
+    return _create_mock_datasource(mocker, 1, "test-dataset")
+
+
+@pytest.fixture
+def other_ds(mocker, mock_dagshub_auth) -> Datasource:
+    return _create_mock_datasource(mocker, 2, "other-dataset")
+
+
+def _create_mock_datasource(mocker, id, name) -> Datasource:
+    ds_state = datasources.DatasourceState(id=id, name=name, repo="kirill/repo")
     ds_state.path = "repo://kirill/repo/data/"
     mocker.patch.object(ds_state, "client")
     # Stub out get_from_dagshub, because it doesn't need to be done in tests
     mocker.patch.object(ds_state, "get_from_dagshub")
+    # Stub out
+    mocker.patch.object(ds_state, "_root_path", return_value="http://example.com")
     ds_state.repoApi = MockRepoAPI("kirill/repo")
     return Datasource(ds_state)
 
@@ -80,8 +93,25 @@ def query_result(ds, some_datapoints):
 
 
 @pytest.fixture
-def mock_get_username_of_token(mocker):
+def mock_dagshub_auth(mocker):
+    mock_user = UserAPIResponse(
+        id=0,
+        login="test_user",
+        full_name="test_user_name",
+        username="test_login",
+        avatar_url=None,
+        public_email=None,
+        website=None,
+        company=None,
+        description=None,
+    )
+
     mocker.patch(
         "dagshub.auth.tokens.TokenStorage.get_username_of_token",
-        return_value={"username": "testuser", "login": "testlogin"},
+        return_value={"username": mock_user.username, "login": mock_user.login},
+    )
+
+    mocker.patch(
+        "dagshub.common.api.user.UserAPI.get_current_user",
+        return_value=UserAPI(mock_user),
     )

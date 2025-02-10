@@ -4,11 +4,14 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
+from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
+from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, MetadataContextManager
 from dagshub.data_engine.model.metadata import wrap_bytes, MultipleDataTypesUploadedError, StringFieldValueTooLongError
-from tests.data_engine.util import add_string_fields, add_document_fields
+from dagshub.data_engine.model.query_result import QueryResult
+from tests.data_engine.util import add_string_fields, add_document_fields, add_annotation_fields
 
 
 @pytest.fixture
@@ -146,7 +149,7 @@ def test_pandas_timestamp(ds):
 
     df["key1"] = pd.to_datetime(df["key1"])
 
-    actual = Datasource._df_to_metadata(ds, df)
+    actual = ds._df_to_metadata(df)
 
     expected = [
         DatapointMetadataUpdateEntry(
@@ -158,3 +161,41 @@ def test_pandas_timestamp(ds):
     ]
 
     assert expected == actual
+
+
+def _test_dataframe_annotation_addition(source_ds: Datasource, target_ds: Datasource):
+    dp_path = "test1"
+    annotation_field = "annotation"
+
+    add_annotation_fields(source_ds, annotation_field)
+
+    dp = Datapoint(datapoint_id=0, path=dp_path, metadata={"width": 100, "height": 100}, datasource=source_ds)
+
+    ann = MetadataAnnotations(dp, annotation_field)
+    ann.add_image_bbox("cat", 0.1, 0.1, 0.1, 0.1)
+    dp.metadata[annotation_field] = ann
+
+    qr = QueryResult([dp], datasource=source_ds, fields=[])
+    df = qr.dataframe
+
+    ls_task_bytes = ann.to_ls_task()
+    assert ls_task_bytes is not None
+
+    expected = [
+        DatapointMetadataUpdateEntry(dp_path, annotation_field, wrap_bytes(ls_task_bytes), MetadataFieldType.BLOB)
+    ]
+
+    actual = target_ds._df_to_metadata(df)
+
+    print(df)
+    print(actual)
+
+    assert expected == actual
+
+
+# def test_annotation_in_dataframe(ds):
+#     _test_dataframe_annotation_addition(ds, ds)
+#
+#
+# def test_annotation_in_dataframe_to_new_datasource(ds, other_ds):
+#     _test_dataframe_annotation_addition(ds, other_ds)
