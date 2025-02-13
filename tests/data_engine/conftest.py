@@ -30,7 +30,7 @@ def _create_mock_datasource(mocker, id, name) -> Datasource:
     mocker.patch.object(ds_state, "client")
     # Stub out get_from_dagshub, because it doesn't need to be done in tests
     mocker.patch.object(ds_state, "get_from_dagshub")
-    # Stub out
+    # Stub out root path so all the content_path/etc work without also mocking out RepoAPI
     mocker.patch.object(ds_state, "_root_path", return_value="http://example.com")
     ds_state.repoApi = MockRepoAPI("kirill/repo")
     return Datasource(ds_state)
