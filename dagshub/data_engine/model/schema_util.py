@@ -1,10 +1,12 @@
 import datetime
-from typing import Type, Dict, Set, Any
+from typing import Type, Dict, Set, Any, Callable, Tuple, Optional
 
 import dacite
 
+from dagshub.common.util import wrap_bytes
 from dagshub.data_engine.client.models import IntegrationStatus, DatasourceType, PreprocessingStatus
 from dagshub.data_engine.dtypes import MetadataFieldType
+from dagshub.data_engine.annotation import MetadataAnnotations
 
 metadata_type_lookup = {
     int: MetadataFieldType.INTEGER,
@@ -14,6 +16,7 @@ metadata_type_lookup = {
     bytes: MetadataFieldType.BLOB,
     datetime.datetime: MetadataFieldType.DATETIME,
 }
+
 
 metadata_type_lookup_reverse: Dict[str, Type] = {}
 for k, v in metadata_type_lookup.items():
@@ -35,3 +38,16 @@ dacite_config = dacite.Config(
     cast=[IntegrationStatus, DatasourceType, PreprocessingStatus, MetadataFieldType, Set],
     type_hooks={datetime.datetime: timestamp_to_datetime},
 )
+
+
+# Special handling of metadata conversion for certain classes
+def _convert_annotation_metadata(annotation: MetadataAnnotations) -> Tuple[Optional[str], MetadataFieldType]:
+    blob_value = annotation.to_ls_task()
+    if blob_value is None:
+        return None, MetadataFieldType.BLOB
+    return wrap_bytes(blob_value), MetadataFieldType.BLOB
+
+
+special_metadata_handlers: Dict[Type[Any], Callable[[Any], Tuple[Optional[str], MetadataFieldType]]] = {
+    MetadataAnnotations: _convert_annotation_metadata,
+}
