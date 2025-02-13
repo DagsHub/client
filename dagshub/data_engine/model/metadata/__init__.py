@@ -5,7 +5,6 @@ from .validation import (
     MultipleDataTypesUploadedError,
     StringFieldValueTooLongError,
 )
-from .util import wrap_bytes
 
 __all__ = [
     run_preupload_transforms.__name__,
@@ -13,5 +12,4 @@ __all__ = [
     precalculate_metadata_info.__name__,
     MultipleDataTypesUploadedError.__name__,
     StringFieldValueTooLongError.__name__,
-    wrap_bytes.__name__,
 ]
