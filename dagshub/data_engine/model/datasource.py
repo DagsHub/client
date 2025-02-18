@@ -1324,9 +1324,19 @@ class Datasource:
         """
         Checks if a metadata field ``field_name`` exists in the datasource.
         """
-        reserved_searchable_fields = ["path"]
-        fields = (f.name for f in self.fields)
-        return field_name in reserved_searchable_fields or field_name in fields
+
+        def _check():
+            reserved_searchable_fields = ["path"]
+            fields = (f.name for f in self.fields)
+            return field_name in reserved_searchable_fields or field_name in fields
+
+        res = _check()
+        # Refetch fields once - maybe things got updated
+        if not res:
+            self.source.get_from_dagshub()
+            res = _check()
+
+        return res
 
     def __repr__(self):
         res = f"Datasource {self.source.name}"
