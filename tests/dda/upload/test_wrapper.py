@@ -92,7 +92,7 @@ def test_bucket_upload(upload_repo, reponame, mock_api, mock_s3, test_dirs, remo
     if remote_path:
         expected_paths = set([f"{reponame}/{remote_path}{p}" for p in os.listdir(test_dirs)])
     else:
-        relpath = os.path.relpath(test_dirs, os.getcwd())
+        relpath = Path(test_dirs).relative_to(Path(".")).as_posix()
         expected_paths = set([f"{reponame}/{relpath}/{p}" for p in os.listdir(test_dirs)])
     print(expected_paths)
     upload_repo.upload(local_path=test_dirs, remote_path=remote_path, bucket=True)
@@ -107,7 +107,7 @@ def test_bucket_upload_single_file(upload_repo, reponame, mock_api, mock_s3, tes
         expected_path = f"{reponame}/{remote_path}"
     else:
         dirpath = Path(test_file).parent.resolve().relative_to(os.getcwd())
-        expected_path = str(reponame / dirpath / filename)
+        expected_path = (reponame / dirpath / filename).as_posix()
     upload_repo.upload(local_path=test_file, remote_path=remote_path, bucket=True)
     actual_paths = [p[0] for p in mock_s3.uploaded_files]
     assert actual_paths == [expected_path]
