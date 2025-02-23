@@ -1,4 +1,4 @@
-from pathlib import PosixPath
+from pathlib import PurePosixPath
 
 import pytest
 
@@ -55,7 +55,7 @@ def test_found_when_passed_path(repo_mock):
     locator = ModelLocator(repo_mock, path=dir_path)
     loader = locator.find_model()
     assert isinstance(loader, RepoModelLoader)
-    assert loader.path == PosixPath(dir_path)
+    assert loader.path == PurePosixPath(dir_path)
 
 
 def test_found_when_passed_bucket_root_as_path(repo_mock):
@@ -65,7 +65,7 @@ def test_found_when_passed_bucket_root_as_path(repo_mock):
     locator = ModelLocator(repo_mock, path=bucket_name)
     loader = locator.find_model()
     assert isinstance(loader, BucketModelLoader)
-    assert loader.path == PosixPath(f"s3/{bucket_name}")
+    assert loader.path == PurePosixPath(f"s3/{bucket_name}")
 
 
 def test_found_in_repo_when_bucket_name_is_longer(repo_mock):
@@ -76,7 +76,7 @@ def test_found_in_repo_when_bucket_name_is_longer(repo_mock):
     locator = ModelLocator(repo_mock, path="some-bucket/random/prefixasdf")
     loader = locator.find_model()
     assert isinstance(loader, RepoModelLoader)
-    assert loader.path == PosixPath("some-bucket/random/prefixasdf")
+    assert loader.path == PurePosixPath("some-bucket/random/prefixasdf")
 
 
 def test_not_found_when_path_is_longer_than_bucket(repo_mock):
