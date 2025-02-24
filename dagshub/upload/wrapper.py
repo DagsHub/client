@@ -670,7 +670,7 @@ class DataSet:
                 log_message(f'File already staged for upload on path "{path}". Overwriting', logger)
             self.files[path] = (path, file)
 
-    def add_dir(self, local_path, glob_exclude="", commit_message=None, **upload_kwargs):
+    def add_dir(self, local_path: str, glob_exclude="", commit_message=None, **upload_kwargs):
         """
         Add *and upload* an entire directory to the DagsHub repository.
 
@@ -690,8 +690,8 @@ class DataSet:
         total_num_files = 0
         for root, dirs, files in os.walk(local_path):
             for filename in files:
-                rel_file_path = posixpath.join(root, filename)
-                if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
+                filepath = Path(root) / filename
+                if glob_exclude == "" or fnmatch.fnmatch(filepath.as_posix(), glob_exclude) is False:
                     total_num_files += 1
 
         progress = rich.progress.Progress(
@@ -724,15 +724,15 @@ class DataSet:
                     if "commit_message" in upload_kwargs:
                         del upload_kwargs["commit_message"]
 
-                    file_batches = []
-                    current_file_batch = []
+                    file_batches: List[List[Path]] = []
+                    current_file_batch: List[Path] = []
                     current_batch_file_size = 0
 
                     for filename in files:
-                        rel_file_path = posixpath.join(root, filename)
-                        if glob_exclude == "" or fnmatch.fnmatch(rel_file_path, glob_exclude) is False:
-                            current_file_batch.append(rel_file_path)
-                            current_batch_file_size += os.path.getsize(rel_file_path)
+                        filepath = Path(root) / filename
+                        if glob_exclude == "" or fnmatch.fnmatch(filepath.as_posix(), glob_exclude) is False:
+                            current_file_batch.append(filepath)
+                            current_batch_file_size += os.path.getsize(filepath)
 
                             if (
                                 len(current_file_batch) >= upload_file_number
@@ -746,9 +746,9 @@ class DataSet:
                         file_batches.append(current_file_batch)
 
                     for batch in file_batches:
-                        for rel_file_path in batch:
-                            rel_remote_file_path = rel_file_path.replace(local_path, "")
-                            self.add(file=rel_file_path, path=rel_remote_file_path)
+                        for filepath in batch:
+                            path_in_remote = filepath.relative_to(local_path).as_posix()
+                            self.add(file=str(filepath), path=path_in_remote)
 
                         file_counter += len(self.files)
                         self.commit(commit_message, **upload_kwargs)
