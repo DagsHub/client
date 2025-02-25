@@ -332,7 +332,7 @@ class Datasource:
                 logger,
             )
             ds = self.limit(None)
-        return ds.fetch()
+        return ds.fetch(load_documents=load_documents, load_annotations=load_annotations)
 
     def select(self, *selected: Union[str, Field]) -> "Datasource":
         """
