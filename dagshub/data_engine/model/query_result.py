@@ -866,7 +866,7 @@ class QueryResult:
     @staticmethod
     def _get_predict_dict(predictions, remote_path, log_to_field, is_prediction=False):
         ls_json_key = "annotations" if not is_prediction else "predictions"
-        res = {log_to_field: json.dumps({ls_json_key: predictions[remote_path][0]}).encode("utf-8")}
+        res = {log_to_field: json.dumps({ls_json_key: [predictions[remote_path][0]]}).encode("utf-8")}
         if len(predictions[remote_path]) == 2:
             res[f"{log_to_field}_score"] = predictions[remote_path][1]
 
