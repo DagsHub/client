@@ -963,7 +963,7 @@ class QueryResult:
                 _Batcher(dset, batch_size) if batch_size != 1 else dset
             ):  # encapsulates dataset with batcher if necessary and iterates over it
                 for prediction, remote_path in zip(
-                    predict_fn(local_paths),
+                    [predict_fn(local_paths)],
                     [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
                 ):
                     predictions[remote_path] = prediction
