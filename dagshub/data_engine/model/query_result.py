@@ -525,7 +525,7 @@ class QueryResult:
                 Default batch size is 1, but it is still being sent as a list for consistency.
             log_to_field: Field to store the resulting annotations in.
         """
-        res = self.predict_with_mlflow_model(
+        res = self._infer_with_mlflow_on_files(
             repo,
             name,
             host=host,
@@ -549,7 +549,60 @@ class QueryResult:
         post_hook: Callable[[Any], Any] = identity_func,
         batch_size: int = 1,
         log_to_field: Optional[str] = None,
-        is_prediction: Optional[bool] = True
+    ) -> Dict[str, Any]:
+        """
+        Fetch an MLflow model from a specific repository and use it to predict on the datapoints in this QueryResult.
+
+        Any MLflow model that has a ``model.predict`` endpoint is supported.
+        This includes, but is not limited to the following flavors:
+
+        * ``torch``
+        * ``tensorflow``
+        * ``pyfunc``
+        * ``scikit-learn``
+
+        Keep in mind that by default ``mlflow.predict()`` will receive the list of downloaded datapoint paths as input,
+        so additional "massaging" of the data might be required for prediction to work.
+        Use the ``pre_hook`` function to do so.
+
+        Args:
+            repo: repository to extract the model from
+
+            name: name of the model in the repository's MLflow registry.
+            host: address of the DagsHub instance with the repo to load the model from.
+                 Set it if the model is hosted on a different DagsHub instance than the datasource.
+            version: version of the model in the mlflow registry.
+            pre_hook: function that runs before datapoints are sent to ``model.predict()``.
+                The input argument is the list of paths to datapoint files in the current batch.
+            post_hook: function that converts the model output to the desired format.
+            batch_size: Size of the file batches that are sent to ``model.predict()``.
+                Default batch size is 1, but it is still being sent as a list for consistency.
+            log_to_field: If set, writes prediction results to this metadata field in the datasource.
+        """
+        res = self._infer_with_mlflow_on_files(
+            repo,
+            name,
+            host=host,
+            version=version,
+            pre_hook=pre_hook,
+            post_hook=post_hook,
+            batch_size=batch_size,
+            log_to_field=log_to_field,
+            is_prediction=True,
+        )
+        return res
+
+    def _infer_with_mlflow_on_files(
+        self,
+        repo: str,
+        name: str,
+        host: Optional[str] = None,
+        version: str = "latest",
+        pre_hook: Callable[[List[str]], Any] = identity_func,
+        post_hook: Callable[[Any], Any] = identity_func,
+        batch_size: int = 1,
+        log_to_field: Optional[str] = None,
+        is_prediction: bool = True,
     ) -> Dict[str, Any]:
         """
         Fetch an MLflow model from a specific repository and use it to predict on the datapoints in this QueryResult.
@@ -606,7 +659,9 @@ class QueryResult:
         if "torch" in loader_module:
             model.predict = model.__call__
 
-        return self.generate_predictions(lambda x: post_hook(model.predict(pre_hook(x))), batch_size, log_to_field, is_prediction)
+        return self.generate_predictions(
+            lambda x: post_hook(model.predict(pre_hook(x))), batch_size, log_to_field, is_prediction
+        )
 
     def get_annotations(self, **kwargs) -> "QueryResult":
         """
@@ -962,8 +1017,12 @@ class QueryResult:
             for idx, local_paths in enumerate(
                 _Batcher(dset, batch_size) if batch_size != 1 else dset
             ):  # encapsulates dataset with batcher if necessary and iterates over it
+                prediction_result = predict_fn(local_paths)
+                # for single batches the result is for one datapoint, so it needs to be wrapped in a list
+                if batch_size == 1:
+                    prediction_result = [prediction_result]
                 for prediction, remote_path in zip(
-                    [predict_fn(local_paths)],
+                    prediction_result,
                     [result.path for result in self[idx * batch_size : (idx + 1) * batch_size]],
                 ):
                     predictions[remote_path] = prediction
@@ -972,7 +1031,9 @@ class QueryResult:
         if log_to_field:
             with self.datasource.metadata_context() as ctx:
                 for remote_path in predictions:
-                    ctx.update_metadata(remote_path, self._get_predict_dict(predictions, remote_path, log_to_field, is_prediction))
+                    ctx.update_metadata(
+                        remote_path, self._get_predict_dict(predictions, remote_path, log_to_field, is_prediction)
+                    )
         return predictions
 
     def generate_annotations(self, predict_fn: CustomPredictor, batch_size: int = 1, log_to_field: str = "annotation"):
@@ -985,12 +1046,7 @@ class QueryResult:
             batch_size: (optional, default: 1) number of datapoints to run inference on simultaneously.
             log_to_field: (optional, default: 'prediction') write prediction results to metadata logged in data engine.
         """
-        self.generate_predictions(
-            predict_fn,
-            batch_size=batch_size,
-            log_to_field=log_to_field,
-            is_prediction=False
-        )
+        self.generate_predictions(predict_fn, batch_size=batch_size, log_to_field=log_to_field, is_prediction=False)
         self.datasource.metadata_field(log_to_field).set_annotation().apply()
 
     def annotate(
