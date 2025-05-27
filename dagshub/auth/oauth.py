@@ -50,6 +50,7 @@ def oauth_flow(host: str, client_id: Optional[str] = None, referrer: Optional[st
 
 class OAuthFlowData(NamedTuple):
     """Data object containing all necessary information for OAuth flow."""
+
     auth_link: str
     """
     The link the user needs to visit to confirm the OAuth flow.
@@ -62,7 +63,7 @@ class OAuthFlowData(NamedTuple):
     state: uuid.UUID
 
 
-def oauth_flow_url(host: str, client_id: str, referrer: str) -> OAuthFlowData:
+def oauth_flow_url(host: str, client_id: Optional[str], referrer: Optional[str]) -> OAuthFlowData:
     """
     Generate OAuth flow URL and required data for the authentication flow.
     You can use this together with :func:`oauth_flow_post` to complete the full flow manually in custom UIs.
@@ -91,7 +92,7 @@ def oauth_flow_url(host: str, client_id: str, referrer: str) -> OAuthFlowData:
         client_id=client_id,
         oauth_url=oauth_url,
         middle_man_request_id=middle_man_request_id,
-        state=state
+        state=state,
     )
 
 
@@ -107,22 +108,16 @@ def oauth_flow_post(flow_data: OAuthFlowData, quiet: bool = False) -> OAuthDagsh
         OAuthDagshubToken: The authenticated token.
         :param quiet: Use True to suppress print output
     """
-    with (rich_console.status("Waiting for authorization") if not quiet else nullcontext()):
+    with rich_console.status("Waiting for authorization") if not quiet else nullcontext():
         res = httpx.post(
-            f"{flow_data.oauth_url}/middleman",
-            data={"request_id": flow_data.middle_man_request_id},
-            timeout=None
+            f"{flow_data.oauth_url}/middleman", data={"request_id": flow_data.middle_man_request_id}, timeout=None
         )
     if res.status_code != 200:
         raise Exception(f"Error while getting OAuth code: HTTP {res.status_code}, Body: {res.json()}")
     code = res.json()
     res = httpx.post(
         f"{flow_data.oauth_url}/access_token",
-        data={
-            "client_id": flow_data.client_id,
-            "code": code,
-            "state": str(flow_data.state)
-        }
+        data={"client_id": flow_data.client_id, "code": code, "state": str(flow_data.state)},
     )
     if res.status_code != 200:
         raise Exception(f"Error while getting OAuth token: HTTP {res.status_code}, Body: {res.json()}")
