@@ -685,3 +685,40 @@ def test_datetime_is_null(ds):
     expected = {"query": {"filter": {"comparator": "IS_NULL", "key": "x", "value": "0", "valueType": "DATETIME"}}}
 
     assert q.serialize_gql_query_input() == expected
+
+
+def test_duplicate_subquery(ds):
+    add_int_fields(ds, "x")
+    add_int_fields(ds, "y")
+    ds2 = ds["x"] > 5
+
+    ds3 = (ds2["y"] < 10) | (ds2["y"] > 20)
+
+    expected = {
+        "or": {
+            "children": [
+                {
+                    "and": {
+                        "children": [
+                            {"gt": {"data": {"field": "x", "value": 5}}},
+                            {"lt": {"data": {"field": "y", "value": 10}}},
+                        ],
+                        "data": None,
+                    }
+                },
+                {
+                    "and": {
+                        "children": [
+                            {"gt": {"data": {"field": "x", "value": 5}}},
+                            {"gt": {"data": {"field": "y", "value": 20}}},
+                        ],
+                        "data": None,
+                    }
+                },
+            ],
+            "data": None,
+        }
+    }
+
+    actual = ds3.get_query().filter.tree_to_dict()
+    assert actual == expected
