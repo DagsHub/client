@@ -42,9 +42,6 @@ install_requires = [
     "boto3",
     "semver",
     "dagshub-annotation-converter>=0.1.5",
-    # Lock version of mypy_extensions, which is a transitive dependency of dataclasses-json
-    # Version 1.1.0 and up don't get its license parsed correctly by pip-license
-    "mypy_extensions==1.0.0",
 ]
 
 extras_require = {
