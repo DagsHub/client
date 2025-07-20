@@ -27,7 +27,7 @@ By default, `DAGsHubLogger` will save the following two files:
 
 ## Examples
 
-- [examples/keras/mnist.py](https://github.com/dagshub/client/blob/master/examples/keras/mnist.py)
+- [examples/keras/mnist.py](https://github.com/dagshub/client/blob/main/examples/keras/mnist.py)
 
   Basic smoke-test to demonstrate that the `DAGsHubLogger` callback works and is usable from a run-of-the-mill Keras model.
 

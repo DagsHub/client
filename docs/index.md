@@ -237,14 +237,14 @@ logger.close()
 ```
 
 #### Autologging integrations with ML frameworks
-The [basic DagsHub logger](https://github.com/DagsHub/client/blob/master/dagshub/logger.py) is just plain Python, and requires no specific framework.
+The [basic DagsHub logger](https://github.com/DagsHub/client/blob/main/dagshub/logger.py) is just plain Python, and requires no specific framework.
 
 However, for convenience, we include some integrations with common ML frameworks, which can __just work__ right out of the box,
 without having to write any logging code on your own:
 
-* [pytorch-lightning](https://github.com/DagsHub/client/tree/master/dagshub/pytorch_lightning) – supports version 1.4.0 or higher
-* [fastai v2](https://github.com/DagsHub/client/tree/master/dagshub/fastai)
-* [keras](https://github.com/DagsHub/client/tree/master/dagshub/keras)
+* [pytorch-lightning](https://github.com/DagsHub/client/tree/main/dagshub/pytorch_lightning) – supports version 1.4.0 or higher
+* [fastai v2](https://github.com/DagsHub/client/tree/main/dagshub/fastai)
+* [keras](https://github.com/DagsHub/client/tree/main/dagshub/keras)
 * If you want support for another framework - [please open an issue](https://github.com/DagsHub/client/issues/new).
 
 ### MLflow Tracking on DagsHub
