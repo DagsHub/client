@@ -1,8 +1,8 @@
-[![DagsHub Client](https://github.com/DagsHub/client/raw/master/dagshub_github.png)](https://dagshub.com)
+[![DagsHub Client](https://github.com/DagsHub/client/raw/main/dagshub_github.png)](https://dagshub.com)
 
 <br/>
 
-[![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=master)](https://github.com/DAGsHub/client/actions/workflows/python-package.yml)
+[![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/DAGsHub/client/actions/workflows/python-package.yml)
 [![pip](https://img.shields.io/pypi/v/dagshub.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/dagshub)
 [![License](https://img.shields.io/pypi/l/dagshub)](/LICENSE)
 ![Python Version](https://img.shields.io/badge/3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
@@ -41,12 +41,12 @@ __This client library is meant to help you get started quickly with DagsHub__. I
 Direct Data Access (DDA), a component to let you stream and upload your data.
 
 For more details on the different functions of the client, check out the docs segments:
-1. [Installation & Setup](https://github.com/DagsHub/client/blob/master/docs/index.md#installation-and-setup)
-2. [Data Streaming](https://github.com/DagsHub/client/blob/master/docs/index.md#data-streaming)
-3. [Data Upload](https://github.com/DagsHub/client/blob/master/docs/index.md#data-upload)
-4. [Experiment Tracking](https://github.com/DagsHub/client/blob/master/docs/index.md#experiment-tracking-logger)
-    1. [Autologging](https://github.com/DagsHub/client/blob/master/docs/index.md#autologging-integrations-with-ml-frameworks)
-5. [Data Engine](https://github.com/DagsHub/client/blob/master/docs/data_engine.md)
+1. [Installation & Setup](https://github.com/DagsHub/client/blob/main/docs/index.md#installation-and-setup)
+2. [Data Streaming](https://github.com/DagsHub/client/blob/main/docs/index.md#data-streaming)
+3. [Data Upload](https://github.com/DagsHub/client/blob/main/docs/index.md#data-upload)
+4. [Experiment Tracking](https://github.com/DagsHub/client/blob/main/docs/index.md#experiment-tracking-logger)
+    1. [Autologging](https://github.com/DagsHub/client/blob/main/docs/index.md#autologging-integrations-with-ml-frameworks)
+5. [Data Engine](https://github.com/DagsHub/client/blob/main/docs/data_engine.md)
 
 Some functionality is supported only in Python.
 
