@@ -1,5 +1,5 @@
 from difflib import SequenceMatcher
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PurePath
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Literal, Optional, Union, Sequence, Mapping, Callable, List
 
@@ -138,7 +138,7 @@ class AnnotationImporter:
         """
         if remap_func is None:
             first_ann = list(annotations.keys())[0]
-            first_ann_filename = PurePosixPath(first_ann).name
+            first_ann_filename = Path(first_ann).name
             queried = self.ds["path"].endswith(first_ann_filename).select("size").all()
             dp_paths = [dp.path for dp in queried]
             remap_func = self.guess_annotation_filename_remapping(first_ann, dp_paths)
@@ -185,7 +185,8 @@ class AnnotationImporter:
 
     @staticmethod
     def generate_path_map_func(ann_path: str, dp_path: str) -> Callable[[str], Optional[str]]:
-        ann_path_posix = PurePosixPath(ann_path)
+        # PurePath should be used for local paths, PurePosixPath for dataengine paths
+        ann_path_posix = PurePath(ann_path)
         dp_path_posix = PurePosixPath(dp_path)
 
         matcher = SequenceMatcher(
@@ -234,10 +235,10 @@ class AnnotationImporter:
         else:
             # Remove the prefix
             def remove_prefix(x: str) -> Optional[str]:
-                p = PurePosixPath(x)
+                p = PurePath(x)
                 if len(p.parts) <= match.a:
                     return None
-                return PurePosixPath(*p.parts[match.a :]).as_posix()
+                return PurePath(*p.parts[match.a :]).as_posix()
 
             return remove_prefix
 
