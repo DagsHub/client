@@ -185,13 +185,14 @@ class AnnotationImporter:
 
     @staticmethod
     def generate_path_map_func(ann_path: str, dp_path: str) -> Callable[[str], Optional[str]]:
-        # PurePath should be used for local paths, PurePosixPath for dataengine paths
-        ann_path_posix = PurePath(ann_path)
+        # Using os-dependent path for ann_path because we're getting it from the importer,
+        # which will return os-dependent paths
+        ann_path_obj = PurePath(ann_path)
         dp_path_posix = PurePosixPath(dp_path)
 
         matcher = SequenceMatcher(
             None,
-            ann_path_posix.parts,
+            ann_path_obj.parts,
             dp_path_posix.parts,
         )
         diff = matcher.get_matching_blocks()
@@ -205,7 +206,7 @@ class AnnotationImporter:
 
         match = diff[0]
         # Make sure that the match goes until the end
-        if match.a + match.size != len(ann_path_posix.parts) or match.b + match.size != len(dp_path_posix.parts):
+        if match.a + match.size != len(ann_path_obj.parts) or match.b + match.size != len(dp_path_posix.parts):
             raise CannotRemapPathError(ann_path, dp_path)
         # ONE of the paths need to go until the start
         if match.a != 0 and match.b != 0:
@@ -215,6 +216,7 @@ class AnnotationImporter:
         if match.a == 0 and match.b == 0:
 
             def identity_func(x: str) -> str:
+                # Do a replace because we might be going from a windows path to a posix path
                 return x.replace(ann_path, dp_path)
 
             return identity_func
@@ -228,7 +230,7 @@ class AnnotationImporter:
             prefix = dp_path_posix.parts[match.a : match.b]
 
             def add_prefix(x: str) -> Optional[str]:
-                return PurePosixPath(*prefix, x).as_posix()
+                return PurePath(*prefix, x).as_posix()
 
             return add_prefix
 
