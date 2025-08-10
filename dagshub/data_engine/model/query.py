@@ -1,6 +1,7 @@
 import datetime
 import enum
 import logging
+import uuid
 from typing import Optional, Union, Dict
 
 import pytz
@@ -190,9 +191,25 @@ class QueryFilterTree:
                 return
             composite_tree = Tree()
             root_node = composite_tree.create_node(op)
-            composite_tree.paste(root_node.identifier, self._operand_tree)
-            composite_tree.paste(root_node.identifier, other._operand_tree)
+
+            # Use deep clones to avoid potentially composing two of the same tree together
+            # and hitting duplicate identifiers
+            composite_tree.paste(root_node.identifier, self._clone_operand_tree())
+            composite_tree.paste(root_node.identifier, other._clone_operand_tree())
             self._operand_tree = composite_tree
+
+    def _clone_operand_tree(self) -> Tree:
+        """
+        Returns a deep copy of the operand tree, also changing all node identifiers.
+        This allows to compose two of the same tree together.
+        """
+        if self._operand_tree.root is None:
+            return Tree()
+        new_tree = Tree(self._operand_tree.subtree(self._operand_tree.root), deep=True)
+        node_ids = [node.identifier for node in new_tree.all_nodes_itr()]
+        for node_id in node_ids:
+            new_tree.update_node(node_id, identifier=str(uuid.uuid4()))
+        return new_tree
 
     @property
     def _column_filter_node(self) -> Node:

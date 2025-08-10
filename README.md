@@ -1,11 +1,11 @@
-[![DagsHub Client](https://github.com/DagsHub/client/raw/master/dagshub_github.png)](https://dagshub.com)
+[![DagsHub Client](https://github.com/DagsHub/client/raw/main/dagshub_github.png)](https://dagshub.com)
 
 <br/>
 
-[![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=master)](https://github.com/DAGsHub/client/actions/workflows/python-package.yml)
+[![Tests](https://github.com/dagshub/client/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/DAGsHub/client/actions/workflows/python-package.yml)
 [![pip](https://img.shields.io/pypi/v/dagshub.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/dagshub)
 [![License](https://img.shields.io/pypi/l/dagshub)](/LICENSE)
-![Python Version](https://img.shields.io/badge/3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+![Python Version](https://img.shields.io/badge/3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)
 [![DagsHub Docs](https://img.shields.io/badge/Dagshub-Docs-%234ec72a?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAACXBIWXMAAACXAAAAlwHUBiyCAAACmUlEQVRIieVXsYoUQRB9nouY7QQGBoITGumYiCDimBiYuKZnMibG+wfOJ6z+wE2kmbbBgSa6CwoqCHtofnuIoTCbiUlJ6euz7O3p23U9LvBBM71d3fVqqqqrZo+JCI4CG0fCCqDHZwZgyPmY41CxYciUvAXgAIwOgXRAnp+6lTgnqSNxzuGN+ReoSPiIBhQQkVJExiJSyy9MRaQQkUZEZiJSiUimSfgXQ8+NqPOOiLTkKr2wJYFFRaMayusViD1hy/NXOW9pRN6je9Wt5wKXbgG4SzflDIWiBlBG3O8TMuN8ynMt530AEwDXAMx8VjckCLFl5BqbXQD3qWBGpRkJChJkfHp9augFzr/wLKxrvBtiKLhvEMTbmb0au3t0sZcXga6HXm7josTbHcRNRyzrYF8oD19km8b/Ubk0hvOIuyemuKSwE5HZevAJwE2fC5a4oeCNWZsztu0SxLE9qvMB5+8APPP7LPGYG/u0DkyQZUhT0OT6DOCG9UDYJNSlHwAcB/DYXKF1oIY/AfDS9oBYd1Ky9wA2I7L8gN9dcOHZGHHBOxpbnzIcdi00KrzHiIVrlX5cMf4D00h07HH4hlKyYNibsEDcCxcS8IoaEtY0pG+OOK7fDnr6QkhWIQZdOGK99djhG6nbb3FMTA+A6cW/Eak2VaRSlWyRqYqWR+RaRs+zKuZWZ4w4J4kl7YIqHLImu449H0VkTj1JYpC4NPN14Tj2ObqyesQk0bidPSDurzhSyBc+oxJfEWNa2Sbe9rmZP03sdWHepD7oM1O7FRc518bxFsAJANeDM68BfAVwCsAVZvd3AJfCzE5dp5abh6Z4gM/TdN8LAN+4fhLAZSo/w7WCv0texX2s8xcmM1UMLLNu2W72n/13AvADffO77cDRF5EAAAAASUVORK5CYII=
 )](https://dagshub.com/docs)
 [![DagsHub Client Docs](https://img.shields.io/badge/Dagshub-Client_Docs-%234ec72a?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAACXBIWXMAAACXAAAAlwHUBiyCAAACmUlEQVRIieVXsYoUQRB9nouY7QQGBoITGumYiCDimBiYuKZnMibG+wfOJ6z+wE2kmbbBgSa6CwoqCHtofnuIoTCbiUlJ6euz7O3p23U9LvBBM71d3fVqqqqrZo+JCI4CG0fCCqDHZwZgyPmY41CxYciUvAXgAIwOgXRAnp+6lTgnqSNxzuGN+ReoSPiIBhQQkVJExiJSyy9MRaQQkUZEZiJSiUimSfgXQ8+NqPOOiLTkKr2wJYFFRaMayusViD1hy/NXOW9pRN6je9Wt5wKXbgG4SzflDIWiBlBG3O8TMuN8ynMt530AEwDXAMx8VjckCLFl5BqbXQD3qWBGpRkJChJkfHp9augFzr/wLKxrvBtiKLhvEMTbmb0au3t0sZcXga6HXm7josTbHcRNRyzrYF8oD19km8b/Ubk0hvOIuyemuKSwE5HZevAJwE2fC5a4oeCNWZsztu0SxLE9qvMB5+8APPP7LPGYG/u0DkyQZUhT0OT6DOCG9UDYJNSlHwAcB/DYXKF1oIY/AfDS9oBYd1Ky9wA2I7L8gN9dcOHZGHHBOxpbnzIcdi00KrzHiIVrlX5cMf4D00h07HH4hlKyYNibsEDcCxcS8IoaEtY0pG+OOK7fDnr6QkhWIQZdOGK99djhG6nbb3FMTA+A6cW/Eak2VaRSlWyRqYqWR+RaRs+zKuZWZ4w4J4kl7YIqHLImu449H0VkTj1JYpC4NPN14Tj2ObqyesQk0bidPSDurzhSyBc+oxJfEWNa2Sbe9rmZP03sdWHepD7oM1O7FRc518bxFsAJANeDM68BfAVwCsAVZvd3AJfCzE5dp5abh6Z4gM/TdN8LAN+4fhLAZSo/w7WCv0texX2s8xcmM1UMLLNu2W72n/13AvADffO77cDRF5EAAAAASUVORK5CYII=
@@ -41,12 +41,12 @@ __This client library is meant to help you get started quickly with DagsHub__. I
 Direct Data Access (DDA), a component to let you stream and upload your data.
 
 For more details on the different functions of the client, check out the docs segments:
-1. [Installation & Setup](https://github.com/DagsHub/client/blob/master/docs/index.md#installation-and-setup)
-2. [Data Streaming](https://github.com/DagsHub/client/blob/master/docs/index.md#data-streaming)
-3. [Data Upload](https://github.com/DagsHub/client/blob/master/docs/index.md#data-upload)
-4. [Experiment Tracking](https://github.com/DagsHub/client/blob/master/docs/index.md#experiment-tracking-logger)
-    1. [Autologging](https://github.com/DagsHub/client/blob/master/docs/index.md#autologging-integrations-with-ml-frameworks)
-5. [Data Engine](https://github.com/DagsHub/client/blob/master/docs/data_engine.md)
+1. [Installation & Setup](https://github.com/DagsHub/client/blob/main/docs/index.md#installation-and-setup)
+2. [Data Streaming](https://github.com/DagsHub/client/blob/main/docs/index.md#data-streaming)
+3. [Data Upload](https://github.com/DagsHub/client/blob/main/docs/index.md#data-upload)
+4. [Experiment Tracking](https://github.com/DagsHub/client/blob/main/docs/index.md#experiment-tracking-logger)
+    1. [Autologging](https://github.com/DagsHub/client/blob/main/docs/index.md#autologging-integrations-with-ml-frameworks)
+5. [Data Engine](https://github.com/DagsHub/client/blob/main/docs/data_engine.md)
 
 Some functionality is supported only in Python.
 

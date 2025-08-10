@@ -5,11 +5,11 @@ on:
   # but only for the main branch
   push:
     branches:
-      - master
+      - main
       - alpha
   pull_request:
     branches:
-      - master
+      - main
       - alpha
 
 jobs:
