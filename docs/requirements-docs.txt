@@ -3,5 +3,5 @@ furo==2025.9.25
 sphinx-autobuild==2025.8.25
 sphinx-copybutton==0.5.2
 sphinx-sitemap==2.9.0
-sphinx-click==5.0.1
+sphinx-click==6.1.0
 sphinx-autodoc-typehints==2.3.0
