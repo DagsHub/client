@@ -5,9 +5,9 @@ import pytest
 from dagshub.common.api import UserAPI
 from dagshub.common.api.responses import UserAPIResponse
 from dagshub.data_engine import datasources
-from dagshub.data_engine.client.models import MetadataSelectFieldSchema
+from dagshub.data_engine.client.models import MetadataSelectFieldSchema, PreprocessingStatus
 from dagshub.data_engine.model.datapoint import Datapoint
-from dagshub.data_engine.model.datasource import Datasource, DatasetState
+from dagshub.data_engine.model.datasource import DatasetState, Datasource
 from dagshub.data_engine.model.query_result import QueryResult
 from dagshub.data_engine.model.schema_util import metadata_type_lookup
 from tests.data_engine.util import add_string_fields
@@ -27,6 +27,7 @@ def other_ds(mocker, mock_dagshub_auth) -> Datasource:
 def _create_mock_datasource(mocker, id, name) -> Datasource:
     ds_state = datasources.DatasourceState(id=id, name=name, repo="kirill/repo")
     ds_state.path = "repo://kirill/repo/data/"
+    ds_state.preprocessing_status = PreprocessingStatus.READY
     mocker.patch.object(ds_state, "client")
     # Stub out get_from_dagshub, because it doesn't need to be done in tests
     mocker.patch.object(ds_state, "get_from_dagshub")

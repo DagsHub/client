@@ -1,16 +1,16 @@
 import datetime
+import importlib
 import inspect
-import logging
-from collections import Counter, defaultdict
-from concurrent.futures import as_completed, ThreadPoolExecutor
-from dataclasses import field, dataclass
-from os import PathLike
-from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Union, Tuple, Literal, Callable
 import json
+import logging
 import os
 import os.path
-import importlib
+from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from os import PathLike
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import dacite
 import dagshub_annotation_converter.converters.yolo
@@ -26,29 +26,30 @@ from dagshub.common import config
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api import UserAPI
 from dagshub.common.download import download_files
-from dagshub.common.helpers import sizeof_fmt, prompt_user, log_message
+from dagshub.common.helpers import log_message, prompt_user, sizeof_fmt
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
-    add_voxel_annotations,
     add_ls_annotations,
+    add_voxel_annotations,
 )
-from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema
-from dagshub.data_engine.model.datapoint import Datapoint, _get_blob, _generated_fields
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
+from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema
+from dagshub.data_engine.dtypes import MetadataFieldType
+from dagshub.data_engine.model.datapoint import Datapoint, _generated_fields, _get_blob
 from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
-from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.datasource import Datasource
-    import fiftyone as fo
-    import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
     import datasets as hf_ds
-    import tensorflow as tf
+    import fiftyone as fo
     import mlflow
     import mlflow.entities
+    import tensorflow as tf
+
+    import dagshub.data_engine.voxel_plugin_server.server as plugin_server_module
+    from dagshub.data_engine.model.datasource import Datasource
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
@@ -418,6 +419,8 @@ class QueryResult:
 
         # Convert any downloaded document fields
         document_fields = [f for f in fields if f in self.document_fields]
+        # Exclude any annotation fields, because they are already converted above
+        document_fields = [f for f in document_fields if f not in self.annotation_fields]
         if document_fields:
             for dp in self:
                 for fld in document_fields:
