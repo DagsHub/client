@@ -55,7 +55,9 @@ def check_and_provide_install_script(quiet=False):
                 for package, cmd in missing_packages:
                     log_message(f"Installing {package}...")
                     try:
-                        subprocess.run(cmd, shell=True, check=True)
+                        # Split the command into a list of arguments
+                        cmd_list = cmd.split()
+                        subprocess.run(cmd_list, check=True)
                         log_message(f"{package} installed successfully.")
                     except subprocess.CalledProcessError as e:
                         logger.error(f"Failed to install {package}: {e}")
