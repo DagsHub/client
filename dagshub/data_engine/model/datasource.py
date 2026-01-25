@@ -2,8 +2,8 @@ import base64
 import datetime
 import json
 import logging
-import tempfile
 import os.path
+import tempfile
 import threading
 import time
 import uuid
@@ -12,65 +12,65 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union, Set, ContextManager, Tuple, Literal, Callable
-
+from typing import TYPE_CHECKING, Any, Callable, ContextManager, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import rich.progress
-from dataclasses_json import config, LetterCase, DataClassJsonMixin
+from dataclasses_json import DataClassJsonMixin, LetterCase, config
 from pathvalidate import sanitize_filepath
 
 import dagshub.common.config
 from dagshub.common import rich_console
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.environment import is_mlflow_installed
-from dagshub.common.helpers import prompt_user, http_request, log_message
+from dagshub.common.helpers import http_request, log_message, prompt_user
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import (
+    deprecated,
+    exclude_if_none,
     lazy_load,
     multi_urljoin,
     to_timestamp,
-    exclude_if_none,
-    deprecated,
 )
-from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationType, AnnotationLocation
+from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationLocation, AnnotationType
 from dagshub.data_engine.client.models import (
-    PreprocessingStatus,
-    MetadataFieldSchema,
-    ScanOption,
     DatasetResult,
+    MetadataFieldSchema,
+    PreprocessingStatus,
+    ScanOption,
 )
 from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datapoint import Datapoint
+from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import (
+    DatasetFieldComparisonError,
+    DatasetNotFoundError,
+    FieldNotFoundError,
     WrongOperatorError,
     WrongOrderError,
-    DatasetFieldComparisonError,
-    FieldNotFoundError,
-    DatasetNotFoundError,
 )
 from dagshub.data_engine.model.metadata import (
-    validate_uploading_metadata,
-    run_preupload_transforms,
     precalculate_metadata_info,
+    run_preupload_transforms,
+    validate_uploading_metadata,
 )
-from dagshub.data_engine.model.metadata.transforms import DatasourceFieldInfo, _add_metadata
 from dagshub.data_engine.model.metadata.dtypes import DatapointMetadataUpdateEntry
+from dagshub.data_engine.model.metadata.transforms import DatasourceFieldInfo, _add_metadata
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
 from dagshub.data_engine.model.query import QueryFilterTree
 from dagshub.data_engine.model.schema_util import (
     default_metadata_type_value,
 )
-from dagshub.data_engine.model.datasource_state import DatasourceState
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.query_result import QueryResult
+    import cloudpickle
     import fiftyone as fo
-    import pandas
     import mlflow
     import mlflow.entities
-    import cloudpickle
-    import ngrok
     import mlflow.exceptions as mlflow_exceptions
+    import ngrok
+    import pandas
+
+    from dagshub.data_engine.model.query_result import QueryResult
 else:
     plugin_server_module = lazy_load("dagshub.data_engine.voxel_plugin_server.server")
     fo = lazy_load("fiftyone")
@@ -663,7 +663,7 @@ class Datasource:
             path_column = df.columns[path_column]
 
         # objects are actually mixed and not guaranteed to be string, but this should cover most use cases
-        if df.dtypes[path_column] != "object":
+        if not pandas.api.types.is_string_dtype(df.dtypes[path_column]):
             raise ValueError(f"Path column {path_column} must contain strings")
 
         field_info = self._generate_metadata_cache_info()
