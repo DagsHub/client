@@ -185,7 +185,7 @@ class DataClient:
         if validate:
             query.validate_params(params if params else {}, self.query_introspection)
         q = gql.gql(query.generate())
-        headers = config.requests_headers
+        headers = dict(config.requests_headers)
         traceparent = None
         if not config.disable_traceparent:
             traceparent = build_traceparent()
