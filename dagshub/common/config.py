@@ -20,6 +20,7 @@ DAGSHUB_USERNAME_KEY = "DAGSHUB_USERNAME"
 DAGSHUB_PASSWORD_KEY = "DAGSHUB_PASSWORD"
 HTTP_TIMEOUT_KEY = "DAGSHUB_HTTP_TIMEOUT"
 DAGSHUB_QUIET_KEY = "DAGSHUB_QUIET"
+DISABLE_TRACEPARENT_KEY = "DAGSHUB_DISABLE_TRACEPARENT"
 
 
 def set_host(new_host: str):
@@ -47,6 +48,8 @@ http_timeout = os.environ.get(HTTP_TIMEOUT_KEY, 30)
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 
 quiet = bool(os.environ.get(DAGSHUB_QUIET_KEY, False))
+
+disable_traceparent = bool(os.environ.get(DISABLE_TRACEPARENT_KEY, False))
 
 # DVC config templates
 CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"

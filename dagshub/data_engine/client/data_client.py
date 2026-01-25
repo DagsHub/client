@@ -5,12 +5,13 @@ from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Tuple
 import dacite
 import gql
 import rich.progress
-from gql.transport.exceptions import TransportQueryError
+from gql.transport.exceptions import TransportQueryError, TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
 
 import dagshub.auth
 import dagshub.common.config
 from dagshub.common import config
+from dagshub.common.tracing import build_traceparent
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.data_engine.client.gql_introspections import GqlIntrospections, TypesIntrospection
@@ -184,10 +185,18 @@ class DataClient:
         if validate:
             query.validate_params(params if params else {}, self.query_introspection)
         q = gql.gql(query.generate())
+        headers = config.requests_headers
+        traceparent = None
+        if not config.disable_traceparent:
+            traceparent = build_traceparent()
+            headers["traceparent"] = traceparent
         try:
-            resp = self.client.execute(q, variable_values=params)
-        except TransportQueryError as e:
-            raise DataEngineGqlError(e, self.client.transport.response_headers.get("X-DagsHub-Support-Id"))
+            resp = self.client.execute(q, variable_values=params, extra_args={'headers': headers})
+        except (TransportQueryError, TransportServerError) as e:
+            support_id = self.client.transport.response_headers.get("X-DagsHub-Support-Id")
+            if support_id is None:
+                support_id = traceparent
+            raise DataEngineGqlError(e, support_id)
         return resp
 
     def _datasource_query(
