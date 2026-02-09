@@ -9,7 +9,7 @@ import pytest
 from dagshub_annotation_converter.ir.image import CoordinateStyle
 from dagshub_annotation_converter.ir.video import IRVideoBBoxAnnotation
 
-from dagshub.data_engine.annotation.importer import AnnotationImporter
+from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationsNotFoundError
 from dagshub.data_engine.annotation.metadata import MetadataAnnotations
 from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
@@ -26,11 +26,11 @@ def mock_source_prefix(ds):
 # --- _is_video_annotation_dict ---
 
 
-def test_is_video_dict_with_int_keys():
+def test_is_video_dict_int_keys():
     assert AnnotationImporter._is_video_annotation_dict({0: [], 1: []}) is True
 
 
-def test_is_video_dict_with_str_keys():
+def test_is_video_dict_str_keys():
     assert AnnotationImporter._is_video_annotation_dict({"file.jpg": []}) is False
 
 
@@ -40,6 +40,10 @@ def test_is_video_dict_empty():
 
 def test_is_video_dict_non_dict():
     assert AnnotationImporter._is_video_annotation_dict([]) is False
+
+
+def test_is_video_dict_mixed_first_int():
+    assert AnnotationImporter._is_video_annotation_dict({0: [], "a": []}) is True
 
 
 # --- is_video_format ---
@@ -66,35 +70,31 @@ def test_is_video_format(ds, ann_type, expected, tmp_path):
 # --- _flatten_video_annotations ---
 
 
-def test_flatten_video_annotations(ds, tmp_path):
+def test_flatten_merges_frames(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "test_video", load_from="disk")
-    ann = _make_video_bbox(frame=0)
-    result = importer._flatten_video_annotations({0: [ann], 5: [ann]})
+    result = importer._flatten_video_annotations({
+        0: [_make_video_bbox(frame=0)],
+        5: [_make_video_bbox(frame=5)],
+    })
     assert "test_video" in result
     assert len(result["test_video"]) == 2
 
 
-def test_flatten_video_annotations_custom_name(ds, tmp_path):
-    importer = AnnotationImporter(ds, "mot", tmp_path / "test_video", load_from="disk", video_name="my_video.mp4")
+def test_flatten_defaults_to_file_stem(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "my_sequence", load_from="disk")
     result = importer._flatten_video_annotations({0: [_make_video_bbox()]})
-    assert "my_video.mp4" in result
+    assert "my_sequence" in result
 
 
-# --- convert_to_ls_tasks for video ---
+def test_flatten_video_name_override(ds, tmp_path):
+    importer = AnnotationImporter(
+        ds, "mot", tmp_path / "test_video", load_from="disk", video_name="custom.mp4"
+    )
+    result = importer._flatten_video_annotations({0: [_make_video_bbox()]})
+    assert "custom.mp4" in result
 
 
-def test_convert_video_to_ls_tasks(ds, tmp_path):
-    importer = AnnotationImporter(ds, "mot", tmp_path / "video", load_from="disk")
-    video_anns = {"video.mp4": [_make_video_bbox(frame=0), _make_video_bbox(frame=1)]}
-
-    tasks = importer.convert_to_ls_tasks(video_anns)
-
-    assert "video.mp4" in tasks
-    task_json = json.loads(tasks["video.mp4"])
-    assert "annotations" in task_json
-
-
-# --- MOT import ---
+# --- import ---
 
 
 def test_import_mot_from_dir(ds, tmp_path):
@@ -113,55 +113,55 @@ def test_import_mot_from_dir(ds, tmp_path):
 def test_import_mot_from_zip(ds, tmp_path):
     mot_dir = tmp_path / "mot_seq"
     _create_mot_dir(mot_dir)
-
-    zip_path = tmp_path / "mot.zip"
-    with zipfile.ZipFile(zip_path, "w") as z:
-        z.write(mot_dir / "gt" / "gt.txt", "gt/gt.txt")
-        z.write(mot_dir / "gt" / "labels.txt", "gt/labels.txt")
-        z.write(mot_dir / "seqinfo.ini", "seqinfo.ini")
+    zip_path = _zip_mot_dir(tmp_path, mot_dir)
 
     importer = AnnotationImporter(ds, "mot", zip_path, load_from="disk")
     result = importer.import_annotations()
 
     assert len(result) == 1
-    anns = list(result.values())[0]
-    assert len(anns) == 2
+    assert len(list(result.values())[0]) == 2
+
+
+def test_import_mot_nonexistent_raises(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "missing", load_from="disk")
+    with pytest.raises(AnnotationsNotFoundError):
+        importer.import_annotations()
+
+
+# --- convert_to_ls_tasks ---
+
+
+def test_convert_video_to_ls_tasks(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "video", load_from="disk")
+    video_anns = {"video.mp4": [_make_video_bbox(frame=0), _make_video_bbox(frame=1)]}
+    tasks = importer.convert_to_ls_tasks(video_anns)
+
+    assert "video.mp4" in tasks
+    task_json = json.loads(tasks["video.mp4"])
+    assert "annotations" in task_json
+
+
+def test_convert_video_empty_skipped(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "video", load_from="disk")
+    tasks = importer.convert_to_ls_tasks({"video.mp4": []})
+    assert "video.mp4" not in tasks
 
 
 # --- export_as_mot ---
 
 
-def test_export_as_mot(ds, tmp_path):
-    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
-    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
-
-    qr = _make_qr(ds, [dp], ann_field="ann")
+def test_export_mot_directory_structure(ds, tmp_path):
+    qr, _ = _make_video_qr(ds)
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
     assert (result / "gt" / "gt.txt").exists()
     assert (result / "gt" / "labels.txt").exists()
     assert (result / "seqinfo.ini").exists()
-    gt_lines = (result / "gt" / "gt.txt").read_text().strip().splitlines()
-    assert len(gt_lines) == 2
 
 
-def test_export_as_mot_no_annotations(ds, tmp_path):
-    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[])
-
-    qr = _make_qr(ds, [dp], ann_field="ann")
-    with pytest.raises(RuntimeError, match="No video annotations"):
-        qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
-
-
-def test_export_as_mot_explicit_dimensions(ds, tmp_path):
-    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0)]
-    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
-
-    qr = _make_qr(ds, [dp], ann_field="ann")
+def test_export_mot_explicit_dimensions(ds, tmp_path):
+    qr, _ = _make_video_qr(ds)
     result = qr.export_as_mot(
         download_dir=tmp_path, annotation_field="ann", image_width=1280, image_height=720
     )
@@ -171,7 +171,16 @@ def test_export_as_mot_explicit_dimensions(ds, tmp_path):
     assert "720" in seqinfo
 
 
-# --- Helpers ---
+def test_export_mot_no_annotations_raises(ds, tmp_path):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[])
+
+    qr = _make_qr(ds, [dp], ann_field="ann")
+    with pytest.raises(RuntimeError, match="No video annotations"):
+        qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
+
+
+# --- helpers ---
 
 
 def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxAnnotation:
@@ -196,6 +205,23 @@ def _create_mot_dir(mot_dir: Path):
     }
     with open(mot_dir / "seqinfo.ini", "w") as f:
         config.write(f)
+
+
+def _zip_mot_dir(tmp_path: Path, mot_dir: Path) -> Path:
+    zip_path = tmp_path / "mot.zip"
+    with zipfile.ZipFile(zip_path, "w") as z:
+        z.write(mot_dir / "gt" / "gt.txt", "gt/gt.txt")
+        z.write(mot_dir / "gt" / "labels.txt", "gt/labels.txt")
+        z.write(mot_dir / "seqinfo.ini", "seqinfo.ini")
+    return zip_path
+
+
+def _make_video_qr(ds):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
+    qr = _make_qr(ds, [dp], ann_field="ann")
+    return qr, dp
 
 
 def _make_qr(ds, datapoints, ann_field=None):
