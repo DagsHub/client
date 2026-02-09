@@ -946,11 +946,11 @@ class QueryResult:
         context = MOTContext()
         if image_width is not None:
             context.image_width = image_width
-        elif video_annotations:
+        else:
             context.image_width = video_annotations[0].image_width
         if image_height is not None:
             context.image_height = image_height
-        elif video_annotations:
+        else:
             context.image_height = video_annotations[0].image_height
 
         log_message("Exporting MOT annotations...")

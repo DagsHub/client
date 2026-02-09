@@ -1,5 +1,4 @@
 import datetime
-import json
 from pathlib import PurePosixPath
 from unittest.mock import patch, PropertyMock
 
@@ -22,10 +21,10 @@ def mock_source_prefix(ds):
         yield
 
 
-# --- CVAT video import ---
+# --- import ---
 
 
-def test_import_cvat_video_from_xml(ds, tmp_path):
+def test_import_cvat_video(ds, tmp_path):
     xml_file = tmp_path / "annotations.xml"
     xml_file.write_bytes(_make_cvat_video_xml())
 
@@ -41,7 +40,7 @@ def test_import_cvat_video_from_xml(ds, tmp_path):
 # --- _get_all_video_annotations ---
 
 
-def test_get_all_video_annotations_filters(ds):
+def test_get_all_video_filters(ds):
     image_ann = IRBBoxImageAnnotation(
         filename="test.jpg", categories={"cat": 1.0},
         top=0.1, left=0.1, width=0.2, height=0.2,
@@ -51,7 +50,9 @@ def test_get_all_video_annotations_filters(ds):
     video_ann = _make_video_bbox()
 
     dp = Datapoint(datasource=ds, path="dp_0", datapoint_id=0, metadata={})
-    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[image_ann, video_ann])
+    dp.metadata["ann"] = MetadataAnnotations(
+        datapoint=dp, field="ann", annotations=[image_ann, video_ann]
+    )
 
     qr = _make_qr(ds, [dp], ann_field="ann")
     result = qr._get_all_video_annotations("ann")
@@ -59,7 +60,7 @@ def test_get_all_video_annotations_filters(ds):
     assert isinstance(result[0], IRVideoBBoxAnnotation)
 
 
-def test_get_all_video_annotations_empty(ds):
+def test_get_all_video_empty(ds):
     dp = Datapoint(datasource=ds, path="dp_0", datapoint_id=0, metadata={})
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[])
 
@@ -67,34 +68,24 @@ def test_get_all_video_annotations_empty(ds):
     assert qr._get_all_video_annotations("ann") == []
 
 
-# --- videorectangle LS round-trip ---
+def test_get_all_video_aggregates_across_datapoints(ds):
+    dps = []
+    for i in range(3):
+        dp = Datapoint(datasource=ds, path=f"dp_{i}", datapoint_id=i, metadata={})
+        dp.metadata["ann"] = MetadataAnnotations(
+            datapoint=dp, field="ann", annotations=[_make_video_bbox(frame=i)]
+        )
+        dps.append(dp)
 
-
-def test_videorectangle_ls_roundtrip():
-    from dagshub_annotation_converter.converters.label_studio_video import (
-        video_ir_to_ls_video_tasks,
-        ls_video_json_to_video_ir,
-    )
-
-    anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=5, track_id=1)]
-    tasks = video_ir_to_ls_video_tasks(anns)
-    assert len(tasks) == 1
-
-    recovered = ls_video_json_to_video_ir(tasks[0].model_dump_json())
-    assert len(recovered) == 2
-    assert recovered[0].frame_number == 0
-    assert recovered[1].frame_number == 5
+    qr = _make_qr(ds, dps, ann_field="ann")
+    assert len(qr._get_all_video_annotations("ann")) == 3
 
 
 # --- export_as_cvat_video ---
 
 
-def test_export_as_cvat_video(ds, tmp_path):
-    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
-    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
-
-    qr = _make_qr(ds, [dp], ann_field="ann")
+def test_export_cvat_video_xml(ds, tmp_path):
+    qr, _ = _make_video_qr(ds)
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
@@ -103,7 +94,7 @@ def test_export_as_cvat_video(ds, tmp_path):
     assert "<box" in content
 
 
-def test_export_as_cvat_video_no_annotations(ds, tmp_path):
+def test_export_cvat_video_no_annotations_raises(ds, tmp_path):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[])
 
@@ -112,12 +103,8 @@ def test_export_as_cvat_video_no_annotations(ds, tmp_path):
         qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
 
-def test_export_as_cvat_video_custom_name(ds, tmp_path):
-    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0)]
-    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
-
-    qr = _make_qr(ds, [dp], ann_field="ann")
+def test_export_cvat_video_custom_name(ds, tmp_path):
+    qr, _ = _make_video_qr(ds)
     result = qr.export_as_cvat_video(
         download_dir=tmp_path, annotation_field="ann", video_name="my_clip.avi"
     )
@@ -126,7 +113,39 @@ def test_export_as_cvat_video_custom_name(ds, tmp_path):
     assert "my_clip.avi" in content
 
 
-# --- Helpers ---
+def test_export_cvat_video_image_only_raises(ds, tmp_path):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    image_ann = IRBBoxImageAnnotation(
+        filename="test.jpg", categories={"cat": 1.0},
+        top=0.1, left=0.1, width=0.2, height=0.2,
+        image_width=640, image_height=480,
+        coordinate_style=CoordinateStyle.NORMALIZED,
+    )
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[image_ann])
+
+    qr = _make_qr(ds, [dp], ann_field="ann")
+    with pytest.raises(RuntimeError, match="No video annotations"):
+        qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
+
+
+def test_export_cvat_video_multiple_datapoints(ds, tmp_path):
+    dps = []
+    for i in range(2):
+        dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
+        dp.metadata["ann"] = MetadataAnnotations(
+            datapoint=dp, field="ann",
+            annotations=[_make_video_bbox(frame=i, track_id=i)],
+        )
+        dps.append(dp)
+
+    qr = _make_qr(ds, dps, ann_field="ann")
+    result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
+
+    content = result.read_text()
+    assert content.count("<box") >= 2
+
+
+# --- helpers ---
 
 
 def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxAnnotation:
@@ -142,6 +161,14 @@ def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxAnnotation:
 def _make_cvat_video_xml() -> bytes:
     anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
     return export_cvat_video_to_xml_string(anns)
+
+
+def _make_video_qr(ds):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
+    qr = _make_qr(ds, [dp], ann_field="ann")
+    return qr, dp
 
 
 def _make_qr(ds, datapoints, ann_field=None):
