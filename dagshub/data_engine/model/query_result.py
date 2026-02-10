@@ -411,7 +411,6 @@ class QueryResult:
                 blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory, path_format)
             except Exception as e:
                 logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}: {e}")
-                dp.metadata.pop(field, None)
                 return
             dp.metadata[field] = blob_or_path
 
@@ -434,6 +433,8 @@ class QueryResult:
             for dp in self:
                 for fld in document_fields:
                     if fld in dp.metadata:
+                        if isinstance(dp.metadata[fld], str):
+                            continue
                         # Override the load_into_memory flag, because we need the contents
                         if not load_into_memory:
                             dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
@@ -454,6 +455,10 @@ class QueryResult:
                     if fld in dp.metadata:
                         # Already loaded - skip
                         if isinstance(dp.metadata[fld], MetadataAnnotations):
+                            continue
+                        # Still a str means blob download failed - skip
+                        if isinstance(dp.metadata[fld], str):
+                            bad_annotations[fld].append(dp.path)
                             continue
                         # Override the load_into_memory flag, because we need the contents
                         if not load_into_memory:
