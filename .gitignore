@@ -141,3 +141,4 @@ params.yml
 !dagshub/data_engine/voxel_plugin_server/plugins/dagshub/dist/
 scratchpad.ipynb
 scratchpad/
+my_test.py
