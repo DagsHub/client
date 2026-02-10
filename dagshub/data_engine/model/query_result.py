@@ -407,9 +407,12 @@ class QueryResult:
         auth = self.datasource.source.repoApi.auth
 
         def _get_blob_fn(dp: Datapoint, field: str, url: str, blob_path: Path):
-            blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory, path_format)
-            if isinstance(blob_or_path, str) and path_format != "str":
-                logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}:{blob_or_path}")
+            try:
+                blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory, path_format)
+            except Exception as e:
+                logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}: {e}")
+                dp.metadata.pop(field, None)
+                return
             dp.metadata[field] = blob_or_path
 
         with progress:
