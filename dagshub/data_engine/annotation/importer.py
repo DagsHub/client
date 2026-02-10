@@ -108,6 +108,8 @@ class AnnotationImporter:
                     mot_kwargs["image_width"] = self.additional_args["image_width"]
                 if "image_height" in self.additional_args:
                     mot_kwargs["image_height"] = self.additional_args["image_height"]
+                if "video_name" in self.additional_args:
+                    mot_kwargs["video_file"] = self.additional_args["video_name"]
                 if annotations_file.suffix == ".zip":
                     video_anns, _ = load_mot_from_zip(annotations_file, **mot_kwargs)
                 else:
@@ -217,8 +219,11 @@ class AnnotationImporter:
                 )
                 continue
             for ann in anns:
-                assert ann.filename is not None
-                ann.filename = remap_func(ann.filename)
+                if ann.filename is not None:
+                    ann.filename = remap_func(ann.filename)
+                else:
+                    assert self.is_video_format, f"Non-video annotation has no filename: {ann}"
+                    ann.filename = new_filename
             remapped[new_filename] = anns
 
         return remapped
