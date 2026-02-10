@@ -222,7 +222,8 @@ class AnnotationImporter:
                 if ann.filename is not None:
                     ann.filename = remap_func(ann.filename)
                 else:
-                    assert self.is_video_format, f"Non-video annotation has no filename: {ann}"
+                    if not self.is_video_format:
+                        raise ValueError(f"Non-video annotation has no filename: {ann}")
                     ann.filename = new_filename
             remapped[new_filename] = anns
 
