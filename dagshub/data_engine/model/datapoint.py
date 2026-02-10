@@ -183,8 +183,6 @@ class Datapoint:
                 self.blob_cache_location.mkdir(parents=True, exist_ok=True)
 
             content = _get_blob(blob_url, blob_location, self.datasource.source.repoApi.auth, cache_on_disk, True)
-            if type(content) is str:
-                raise RuntimeError(f"Error while downloading blob: {content}")
 
             if store_value:
                 self.metadata[column] = content
