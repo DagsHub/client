@@ -303,17 +303,14 @@ def _get_blob(
         else:
             raise Exception(f"Non-retrying status code {resp.status_code} returned")
 
-    try:
-        for attempt in Retrying(
-            retry=retry_if_exception_type(RuntimeError),
-            stop=stop_after_attempt(5),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
-            before_sleep=before_sleep_log(logger, logging.WARNING),
-        ):
-            with attempt:
-                content = get()
-    except Exception as e:
-        return f"Error while downloading binary blob: {e}"
+    for attempt in Retrying(
+        retry=retry_if_exception_type(RuntimeError),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    ):
+        with attempt:
+            content = get()
 
     if cache_on_disk:
         with cache_path.open("wb") as f:
