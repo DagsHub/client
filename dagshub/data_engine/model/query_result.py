@@ -30,6 +30,7 @@ from dagshub.common.helpers import log_message, prompt_user, sizeof_fmt
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation import MetadataAnnotations
+from dagshub.data_engine.annotation.metadata import UnsupportedMetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_ls_annotations,
     add_voxel_annotations,
@@ -425,8 +426,11 @@ class QueryResult:
             for dp in self:
                 for fld in document_fields:
                     if fld in dp.metadata:
-                        # Override the load_into_memory flag, because we need the contents
-                        if not load_into_memory:
+                        # Defensive check to not mangle annotation fields by accident
+                        if isinstance(dp.metadata[fld], MetadataAnnotations):
+                            continue
+                        # Force load the content into memory, even if load_into_memory was set to False
+                        if not load_into_memory or isinstance(dp.metadata[fld], Path):
                             dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
                         dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
 
@@ -446,26 +450,30 @@ class QueryResult:
                         # Already loaded - skip
                         if isinstance(dp.metadata[fld], MetadataAnnotations):
                             continue
-                        # Override the load_into_memory flag, because we need the contents
-                        if not load_into_memory:
+                        # Force load the content into memory, even if load_into_memory was set to False
+                        if not load_into_memory or isinstance(dp.metadata[fld], Path):
                             dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
                         try:
                             dp.metadata[fld] = MetadataAnnotations.from_ls_task(
                                 datapoint=dp, field=fld, ls_task=dp.metadata[fld]
                             )
                         except ValidationError:
+                            dp.metadata[fld] = UnsupportedMetadataAnnotations(
+                                datapoint=dp, field=fld, original_value=dp.metadata[fld]
+                            )
                             bad_annotations[fld].append(dp.path)
                     else:
+                        # Empty annotation container
                         dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
 
         if bad_annotations:
             log_message(
-                "Warning: The following datapoints had invalid annotations, "
+                "Warning: The following datapoints had unsupported or invalid annotations, "
                 "any annotation-related operations will not work on these:"
             )
             err_msg = ""
             for fld, dps in bad_annotations.items():
-                err_msg += f'Field "{fld}" in datapoints:\n\t'
+                err_msg += f'\nField "{fld}" in datapoints:\n\t'
                 err_msg += "\n\t".join(dps)
             log_message(err_msg)
 
