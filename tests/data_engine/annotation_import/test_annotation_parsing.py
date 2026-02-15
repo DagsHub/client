@@ -58,11 +58,11 @@ def mock_annotation_query_result(
 def mock_get_blob(*args, **kwargs) -> Union[bytes, PathLike]:
     download_url: str = args[0]
     blob_hash = download_url.split("/")[-1]
+    load_into_memory = args[4]
     blob_path = _res_folder / f"{blob_hash}.json"
 
     if not blob_path.exists():
         raise FileNotFoundError(f"Mock blob file not found: {blob_path}")
-    load_into_memory = kwargs.get("load_into_memory", False)
     if load_into_memory:
         return blob_path.read_bytes()
     else:
