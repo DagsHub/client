@@ -13,6 +13,7 @@ from dagshub.data_engine.annotation.metadata import UnsupportedMetadataAnnotatio
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model import query_result
 from dagshub.data_engine.model.datasource import Datasource
+from dagshub.data_engine.model.query_result import QueryResult
 from tests.data_engine.util import add_metadata_field
 
 _annotation_field_name = "annotation"
@@ -97,6 +98,16 @@ def ds_with_unsupported_annotation(ds, monkeypatch):
 
 def test_annotation_with_document_are_parsed_as_annotation(ds_with_document_annotation):
     qr = ds_with_document_annotation.all()
+    _test_annotation(qr)
+
+
+def test_double_loading_annotation_works(ds_with_document_annotation):
+    qr = ds_with_document_annotation.all()
+    qr.get_blob_fields(_annotation_field_name)
+    _test_annotation(qr)
+
+
+def _test_annotation(qr: QueryResult):
     annotation: MetadataAnnotations = qr[0].metadata[_annotation_field_name]
     assert isinstance(annotation, MetadataAnnotations)
     # Check that the annotation got parsed correctly, the JSON should have one segmentation annotation in it
