@@ -1,6 +1,6 @@
 class NotImplementedMeta(type):
     """
-    A metaclass that replaces all parent class method and properties that aren't overridden in the subclass
+    A metaclass that replaces all parent class methods and properties that aren't overridden in the subclass
     with NotImplementedError.
     """
 

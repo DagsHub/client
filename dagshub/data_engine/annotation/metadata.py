@@ -336,4 +336,4 @@ class UnsupportedMetadataAnnotations(MetadataAnnotations, metaclass=NotImplement
         return self._original_value
 
     def __repr__(self):
-        return f"Unsupported LS annotations with original value: {self._original_value}"
+        return "Unsupported LS annotations"
