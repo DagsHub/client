@@ -469,7 +469,7 @@ class QueryResult:
                         bad_annotations[fld].append(dp.path)
                     except ValidationError:
                         dp.metadata[fld] = UnsupportedMetadataAnnotations(
-                            datapoint=dp, field=fld, original_value=metadata_value
+                            datapoint=dp, field=fld, original_value=annotation_content
                         )
                         bad_annotations[fld].append(dp.path)
 
