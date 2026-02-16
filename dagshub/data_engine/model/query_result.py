@@ -30,7 +30,7 @@ from dagshub.common.helpers import log_message, prompt_user, sizeof_fmt
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation import MetadataAnnotations
-from dagshub.data_engine.annotation.metadata import UnsupportedMetadataAnnotations
+from dagshub.data_engine.annotation.metadata import ErrorMetadataAnnotations, UnsupportedMetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_ls_annotations,
     add_voxel_annotations,
@@ -38,7 +38,13 @@ from dagshub.data_engine.annotation.voxel_conversion import (
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType
-from dagshub.data_engine.model.datapoint import Datapoint, _generated_fields, _get_blob
+from dagshub.data_engine.model.datapoint import (
+    BlobDownloadError,
+    BlobHashMetadata,
+    Datapoint,
+    _generated_fields,
+    _get_blob,
+)
 from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 
@@ -390,10 +396,9 @@ class QueryResult:
         for dp in self.entries:
             for fld in fields:
                 field_value = dp.metadata.get(fld)
-                # If field_value is a blob or a path, then ignore, means it's already been downloaded
-                if not isinstance(field_value, str):
+                if not isinstance(field_value, BlobHashMetadata):
                     continue
-                download_task = (dp, fld, dp.blob_url(field_value), dp.blob_cache_location / field_value)
+                download_task = (dp, fld, dp.blob_url(field_value.hash), dp.blob_cache_location / field_value.hash)
                 to_download.append(download_task)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
@@ -403,8 +408,6 @@ class QueryResult:
 
         def _get_blob_fn(dp: Datapoint, field: str, url: str, blob_path: Path):
             blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory, path_format)
-            if isinstance(blob_or_path, str) and path_format != "str":
-                logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}:{blob_or_path}")
             dp.metadata[field] = blob_or_path
 
         with progress:
@@ -416,7 +419,7 @@ class QueryResult:
                         logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
                     progress.update(task, advance=1)
 
-        self._convert_annotation_fields(*fields, load_into_memory=load_into_memory)
+        self._convert_annotation_fields(*fields)
 
         # Convert any downloaded document fields
         document_fields = [f for f in fields if f in self.document_fields]
@@ -425,18 +428,14 @@ class QueryResult:
         if document_fields:
             for dp in self:
                 for fld in document_fields:
-                    if fld in dp.metadata:
-                        # Defensive check to not mangle annotation fields by accident
-                        if isinstance(dp.metadata[fld], MetadataAnnotations):
-                            continue
-                        # Force load the content into memory, even if load_into_memory was set to False
-                        if not load_into_memory or isinstance(dp.metadata[fld], Path):
-                            dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
-                        dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
+                    if fld not in dp.metadata:
+                        continue
+                    content = dp.get_blob(fld)
+                    dp.metadata[fld] = content.decode("utf-8")
 
         return self
 
-    def _convert_annotation_fields(self, *fields, load_into_memory):
+    def _convert_annotation_fields(self, *fields):
         # Convert any downloaded annotation column
         annotation_fields = [f for f in fields if f in self.annotation_fields]
         if not annotation_fields:
@@ -457,13 +456,14 @@ class QueryResult:
                     continue
                 # Parse annotation from the content of the field
                 else:
-                    # Force load the content into memory, even if load_into_memory was set to False
-                    if not load_into_memory or isinstance(dp.metadata[fld], Path):
-                        metadata_value = Path(metadata_value).read_bytes()
                     try:
+                        annotation_content = dp.get_blob(fld)
                         dp.metadata[fld] = MetadataAnnotations.from_ls_task(
-                            datapoint=dp, field=fld, ls_task=metadata_value
+                            datapoint=dp, field=fld, ls_task=annotation_content
                         )
+                    except BlobDownloadError as e:
+                        dp.metadata[fld] = ErrorMetadataAnnotations(datapoint=dp, field=fld, error_message=e.message)
+                        bad_annotations[fld].append(dp.path)
                     except ValidationError:
                         dp.metadata[fld] = UnsupportedMetadataAnnotations(
                             datapoint=dp, field=fld, original_value=metadata_value
