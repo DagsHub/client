@@ -473,12 +473,15 @@ class QueryResult:
         if bad_annotations:
             log_message(
                 "Warning: The following datapoints had unsupported or invalid annotations, "
-                "any annotation-related operations will not work on these:"
+                "convenience functions like `add_bounding_box` won't work on these:"
             )
             err_msg = ""
             for fld, dps in bad_annotations.items():
                 err_msg += f'\nField "{fld}" in datapoints:\n\t'
-                err_msg += "\n\t".join(dps)
+                if len(dps) > 10:
+                    err_msg += "\n\t".join(dps[:10]) + f"\n\t... and {len(dps) - 10} more"
+                else:
+                    err_msg += "\n\t".join(dps)
             log_message(err_msg)
 
     def download_binary_columns(
