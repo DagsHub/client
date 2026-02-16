@@ -336,4 +336,4 @@ class UnsupportedMetadataAnnotations(MetadataAnnotations, metaclass=NotImplement
         return self._original_value
 
     def __repr__(self):
-        return "Unsupported LS annotations"
+        return "Label Studio annotations of unrecognized type"
