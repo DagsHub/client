@@ -447,7 +447,7 @@ class QueryResult:
         for dp in self:
             for fld in annotation_fields:
                 metadata_value = dp.metadata.get(fld)
-                # No value - create ampty annotation container
+                # No value - create empty annotation container
                 if metadata_value is None:
                     dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
                     continue
