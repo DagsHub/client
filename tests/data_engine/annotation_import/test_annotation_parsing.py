@@ -151,7 +151,7 @@ def test_nonexistent_annotation(ds_with_nonexistent_annotation):
     annotation: MetadataAnnotations = qr[0].metadata[_annotation_field_name]
 
     assert isinstance(annotation, ErrorMetadataAnnotations)
-    # Unsupported annotation is still a subclass of regular annotation
+    # Error annotation is still a subclass of regular annotation
     # This is crucial for logic that checks if annotation metadata was parsed already,
     # so if this starts failing, that logic will need to be changed too
     assert isinstance(annotation, MetadataAnnotations)
