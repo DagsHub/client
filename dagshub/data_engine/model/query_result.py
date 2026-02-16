@@ -430,8 +430,11 @@ class QueryResult:
                 for fld in document_fields:
                     if fld not in dp.metadata:
                         continue
-                    content = dp.get_blob(fld)
-                    dp.metadata[fld] = content.decode("utf-8")
+                    try:
+                        content = dp.get_blob(fld)
+                        dp.metadata[fld] = content.decode("utf-8")
+                    except BlobDownloadError as e:
+                        logger.warning(f"Failed to download document field '{fld}' for datapoint '{dp.path}': {e}")
 
         return self
 

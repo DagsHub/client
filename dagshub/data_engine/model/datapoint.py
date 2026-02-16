@@ -211,7 +211,10 @@ class Datapoint:
 
             return content
         elif isinstance(current_value, MetadataAnnotations):
-            return current_value.to_ls_task()
+            ls_task = current_value.to_ls_task()
+            if ls_task is None:
+                return b""
+            return ls_task
         else:
             raise ValueError(f"Can't extract blob metadata from value {current_value} of type {type(current_value)}")
 
