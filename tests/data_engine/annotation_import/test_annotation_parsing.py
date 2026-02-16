@@ -1,19 +1,23 @@
 import json
+from os import PathLike
 from pathlib import Path
+from typing import Union
 from unittest.mock import MagicMock
 
 import pytest
 from dagshub_annotation_converter.ir.image import IRSegmentationImageAnnotation
+from pytest import MonkeyPatch
 
 from dagshub.data_engine.annotation import MetadataAnnotations
+from dagshub.data_engine.annotation.metadata import UnsupportedMetadataAnnotations
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model import query_result
 from dagshub.data_engine.model.datasource import Datasource
+from dagshub.data_engine.model.query_result import QueryResult
 from tests.data_engine.util import add_metadata_field
 
 _annotation_field_name = "annotation"
 _dp_path = "data/sample_datapoint.jpg"
-_annotation_hash = "annotation1"  # Corresponds to a resource JSON
 _res_folder = Path(__file__).parent / "res"
 
 
@@ -51,17 +55,21 @@ def mock_annotation_query_result(
     return query_result.QueryResult.from_gql_query(data_dict, ds)
 
 
-def mock_get_blob(*args, **kwargs) -> bytes:
+def mock_get_blob(*args, **kwargs) -> Union[bytes, PathLike]:
     download_url: str = args[0]
     blob_hash = download_url.split("/")[-1]
+    load_into_memory = args[4]
     blob_path = _res_folder / f"{blob_hash}.json"
+
     if not blob_path.exists():
         raise FileNotFoundError(f"Mock blob file not found: {blob_path}")
-    return blob_path.read_bytes()
+    if load_into_memory:
+        return blob_path.read_bytes()
+    else:
+        return blob_path
 
 
-@pytest.fixture
-def ds_with_document_annotation(ds, monkeypatch):
+def _ds_with_annotation(ds: "Datasource", monkeypatch: MonkeyPatch, annotation_hash: str):
     add_metadata_field(
         ds,
         _annotation_field_name,
@@ -70,18 +78,57 @@ def ds_with_document_annotation(ds, monkeypatch):
     )
 
     ds.source.client.get_datapoints = MagicMock(
-        return_value=mock_annotation_query_result(ds, _annotation_field_name, _dp_path, _annotation_hash)
+        return_value=mock_annotation_query_result(ds, _annotation_field_name, _dp_path, annotation_hash)
     )
 
     monkeypatch.setattr(query_result, "_get_blob", mock_get_blob)
 
-    yield ds
+    return ds
+
+
+@pytest.fixture
+def ds_with_document_annotation(ds, monkeypatch):
+    yield _ds_with_annotation(ds, monkeypatch, "annotation1")
+
+
+@pytest.fixture
+def ds_with_unsupported_annotation(ds, monkeypatch):
+    yield _ds_with_annotation(ds, monkeypatch, "audio_annotation")
 
 
 def test_annotation_with_document_are_parsed_as_annotation(ds_with_document_annotation):
     qr = ds_with_document_annotation.all()
+    _test_annotation(qr)
+
+
+def test_double_loading_annotation_works(ds_with_document_annotation):
+    qr = ds_with_document_annotation.all()
+    qr.get_blob_fields(_annotation_field_name)
+    _test_annotation(qr)
+
+
+def _test_annotation(qr: QueryResult):
     annotation: MetadataAnnotations = qr[0].metadata[_annotation_field_name]
     assert isinstance(annotation, MetadataAnnotations)
     # Check that the annotation got parsed correctly, the JSON should have one segmentation annotation in it
     assert len(annotation.annotations) == 1
     assert isinstance(annotation.annotations[0], IRSegmentationImageAnnotation)
+
+
+def test_handling_unsupported_annotation(ds_with_unsupported_annotation):
+    qr = ds_with_unsupported_annotation.all()
+
+    annotation: MetadataAnnotations = qr[0].metadata[_annotation_field_name]
+
+    assert isinstance(annotation, UnsupportedMetadataAnnotations)
+    # Unsupported annotation is still a subclass of regular annotation
+    # This is crucial for logic that checks if annotation metadata was parsed already,
+    # so if this starts failing, that logic will need to be changed too
+    assert isinstance(annotation, MetadataAnnotations)
+
+    with pytest.raises(NotImplementedError):
+        annotation.add_image_bbox("cat", 0, 0, 10, 10, 1920, 1080)
+
+    expected_content = (_res_folder / "audio_annotation.json").read_bytes()
+    assert annotation.value == expected_content
+    assert annotation.to_ls_task() == expected_content

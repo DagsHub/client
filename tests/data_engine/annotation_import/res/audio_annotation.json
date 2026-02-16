@@ -1,0 +1,82 @@
+{
+  "id": 41,
+  "data": {
+    "audio": "https://example.com/some-non-existent-file.mp3",
+    "media type": "audio/mpeg",
+    "size": 111699
+  },
+  "meta": {
+    "datapoint_id": 12345678,
+    "datasource_id": 6565
+  },
+  "created_at": "2025-12-20T13:44:02.316027Z",
+  "updated_at": "2026-01-26T15:00:13.046967Z",
+  "is_labeled": true,
+  "project": 1,
+  "annotations": [
+    {
+      "completed_by": 1,
+      "result": [
+        {
+          "type": "choices",
+          "value": {
+            "choices": [
+              "true"
+            ]
+          },
+          "origin": "manual",
+          "to_name": "audio",
+          "from_name": "further_utterance",
+          "id": "deadbeef1"
+        },
+        {
+          "type": "rating",
+          "value": {
+            "rating": 1
+          },
+          "origin": "manual",
+          "to_name": "audio",
+          "from_name": "difficulty",
+          "id": "deadbeef1"
+        },
+        {
+          "type": "textarea",
+          "value": {
+            "text": [
+              "kirill@dagshub.com"
+            ]
+          },
+          "origin": "manual",
+          "to_name": "audio",
+          "from_name": "email_address",
+          "id": "deadbeef1"
+        },
+        {
+          "to_name": "audio",
+          "from_name": "first_name",
+          "id": "Qzu1dR2RQ8",
+          "type": "textarea",
+          "value": {
+            "text": [
+              "Kirill"
+            ]
+          },
+          "origin": "manual"
+        },
+        {
+          "type": "textarea",
+          "value": {
+            "text": [
+              "Bolashev"
+            ]
+          },
+          "origin": "manual",
+          "to_name": "audio",
+          "from_name": "last_name",
+          "id": "deadbeef1"
+        }
+      ],
+      "ground_truth": false
+    }
+  ]
+}
