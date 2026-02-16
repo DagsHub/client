@@ -439,32 +439,36 @@ class QueryResult:
     def _convert_annotation_fields(self, *fields, load_into_memory):
         # Convert any downloaded annotation column
         annotation_fields = [f for f in fields if f in self.annotation_fields]
+        if not annotation_fields:
+            return
 
+        # List of datapoints with annotations that couldn't be parsed
         bad_annotations = defaultdict(list)
 
-        if annotation_fields:
-            # Convert them
-            for dp in self:
-                for fld in annotation_fields:
-                    if fld in dp.metadata:
-                        # Already loaded - skip
-                        if isinstance(dp.metadata[fld], MetadataAnnotations):
-                            continue
-                        # Force load the content into memory, even if load_into_memory was set to False
-                        if not load_into_memory or isinstance(dp.metadata[fld], Path):
-                            dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
-                        try:
-                            dp.metadata[fld] = MetadataAnnotations.from_ls_task(
-                                datapoint=dp, field=fld, ls_task=dp.metadata[fld]
-                            )
-                        except ValidationError:
-                            dp.metadata[fld] = UnsupportedMetadataAnnotations(
-                                datapoint=dp, field=fld, original_value=dp.metadata[fld]
-                            )
-                            bad_annotations[fld].append(dp.path)
-                    else:
-                        # Empty annotation container
-                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+        for dp in self:
+            for fld in annotation_fields:
+                metadata_value = dp.metadata.get(fld)
+                # No value - create ampty annotation container
+                if metadata_value is None:
+                    dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+                    continue
+                # Already loaded - skip
+                elif isinstance(metadata_value, MetadataAnnotations):
+                    continue
+                # Parse annotation from the content of the field
+                else:
+                    # Force load the content into memory, even if load_into_memory was set to False
+                    if not load_into_memory or isinstance(dp.metadata[fld], Path):
+                        metadata_value = Path(metadata_value).read_bytes()
+                    try:
+                        dp.metadata[fld] = MetadataAnnotations.from_ls_task(
+                            datapoint=dp, field=fld, ls_task=metadata_value
+                        )
+                    except ValidationError:
+                        dp.metadata[fld] = UnsupportedMetadataAnnotations(
+                            datapoint=dp, field=fld, original_value=metadata_value
+                        )
+                        bad_annotations[fld].append(dp.path)
 
         if bad_annotations:
             log_message(
