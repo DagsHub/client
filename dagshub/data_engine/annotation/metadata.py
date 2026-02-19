@@ -337,3 +337,24 @@ class UnsupportedMetadataAnnotations(MetadataAnnotations, metaclass=NotImplement
 
     def __repr__(self):
         return "Label Studio annotations of unrecognized type"
+
+
+class ErrorMetadataAnnotations(MetadataAnnotations, metaclass=NotImplementedMeta):
+    def __init__(
+        self,
+        datapoint: "Datapoint",
+        field: str,
+        error_message: str,
+    ):
+        super().__init__(datapoint, field, None, None, None)
+        self._error_message = error_message
+
+    @property
+    def value(self) -> Optional[bytes]:
+        raise ValueError(self._error_message)
+
+    def to_ls_task(self) -> Optional[bytes]:
+        raise ValueError(self._error_message)
+
+    def __repr__(self):
+        return f"Label Studio annotation download error: {self._error_message}"
