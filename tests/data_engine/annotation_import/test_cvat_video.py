@@ -38,6 +38,22 @@ def test_import_cvat_video(ds, tmp_path):
     assert all(isinstance(a, IRVideoBBoxAnnotation) for a in anns)
 
 
+def test_import_cvat_video_from_fs_directory(ds, tmp_path):
+    first = tmp_path / "video_a.xml"
+    second = tmp_path / "nested" / "video_b.xml"
+    second.parent.mkdir(parents=True)
+    first.write_bytes(_make_cvat_video_xml())
+    second.write_bytes(_make_cvat_video_xml())
+
+    importer = AnnotationImporter(ds, "cvat_video", tmp_path, load_from="disk")
+    result = importer.import_annotations()
+
+    assert "video_a" in result
+    assert "video_b" in result
+    assert len(result["video_a"]) == 2
+    assert len(result["video_b"]) == 2
+
+
 # --- _get_all_video_annotations ---
 
 

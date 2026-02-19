@@ -122,6 +122,21 @@ def test_import_mot_from_zip(ds, tmp_path):
     assert len(list(result.values())[0]) == 2
 
 
+def test_import_mot_from_fs_directory(ds, tmp_path):
+    seq_a = tmp_path / "seq_a"
+    seq_b = tmp_path / "nested" / "seq_b"
+    _create_mot_dir(seq_a)
+    _create_mot_dir(seq_b)
+
+    importer = AnnotationImporter(ds, "mot", tmp_path, load_from="disk")
+    result = importer.import_annotations()
+
+    assert "seq_a" in result
+    assert "seq_b" in result
+    assert len(result["seq_a"]) == 2
+    assert len(result["seq_b"]) == 2
+
+
 def test_import_mot_nonexistent_raises(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "missing", load_from="disk")
     with pytest.raises(AnnotationsNotFoundError):
@@ -155,11 +170,10 @@ def test_export_mot_directory_structure(ds, tmp_path):
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
-    assert result == tmp_path / "labels" / "video.zip"
-    with zipfile.ZipFile(result, "r") as z:
-        assert "gt/gt.txt" in z.namelist()
-        assert "gt/labels.txt" in z.namelist()
-        assert "seqinfo.ini" in z.namelist()
+    assert result == tmp_path / "labels" / "video"
+    assert (result / "gt" / "gt.txt").exists()
+    assert (result / "gt" / "labels.txt").exists()
+    assert (result / "seqinfo.ini").exists()
 
 
 def test_export_mot_explicit_dimensions(ds, tmp_path):
@@ -168,8 +182,7 @@ def test_export_mot_explicit_dimensions(ds, tmp_path):
         download_dir=tmp_path, annotation_field="ann", image_width=1280, image_height=720
     )
 
-    with zipfile.ZipFile(result, "r") as z:
-        seqinfo = z.read("seqinfo.ini").decode("utf-8")
+    seqinfo = (result / "seqinfo.ini").read_text()
     assert "1280" in seqinfo
     assert "720" in seqinfo
 
@@ -196,8 +209,8 @@ def test_export_mot_multiple_videos(ds, tmp_path):
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result == tmp_path / "labels"
-    assert (result / "video_0.zip").exists()
-    assert (result / "video_1.zip").exists()
+    assert (result / "video_0" / "gt" / "gt.txt").exists()
+    assert (result / "video_1" / "gt" / "gt.txt").exists()
 
 
 def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):

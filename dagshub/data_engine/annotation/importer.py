@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Dict, Literal, Optional, Union, Sequence, Mapp
 
 from dagshub_annotation_converter.converters.coco import load_coco_from_file
 from dagshub_annotation_converter.converters.cvat import (
+    load_cvat_from_fs,
     load_cvat_from_zip,
     load_cvat_from_xml_file,
 )
-from dagshub_annotation_converter.converters.mot import load_mot_from_dir, load_mot_from_zip
+from dagshub_annotation_converter.converters.mot import load_mot_from_dir, load_mot_from_fs, load_mot_from_zip
 from dagshub_annotation_converter.converters.yolo import load_yolo_from_fs
 from dagshub_annotation_converter.converters.label_studio_video import video_ir_to_ls_video_tasks
 from dagshub_annotation_converter.formats.label_studio.task import LabelStudioTask
@@ -95,11 +96,14 @@ class AnnotationImporter:
                     annotation_type=self.additional_args["yolo_type"], meta_file=annotations_file
                 )
             elif self.annotations_type == "cvat":
-                result = load_cvat_from_zip(annotations_file)
-                if self._is_video_annotation_dict(result):
-                    annotation_dict = self._flatten_video_annotations(result)
+                if annotations_file.is_dir():
+                    annotation_dict = self._flatten_cvat_fs_annotations(load_cvat_from_fs(annotations_file))
                 else:
-                    annotation_dict = result
+                    result = load_cvat_from_zip(annotations_file)
+                    if self._is_video_annotation_dict(result):
+                        annotation_dict = self._flatten_video_annotations(result)
+                    else:
+                        annotation_dict = result
             elif self.annotations_type == "coco":
                 annotation_dict, _ = load_coco_from_file(annotations_file)
             elif self.annotations_type == "mot":
@@ -110,25 +114,41 @@ class AnnotationImporter:
                     mot_kwargs["image_height"] = self.additional_args["image_height"]
                 if "video_name" in self.additional_args:
                     mot_kwargs["video_file"] = self.additional_args["video_name"]
-                if annotations_file.suffix == ".zip":
+                if annotations_file.is_dir():
+                    video_files = self.additional_args.get("video_files")
+                    mot_results = load_mot_from_fs(
+                        annotations_file,
+                        image_width=mot_kwargs.get("image_width"),
+                        image_height=mot_kwargs.get("image_height"),
+                        video_files=video_files,
+                    )
+                    annotation_dict = self._flatten_mot_fs_annotations(mot_results)
+                elif annotations_file.suffix == ".zip":
                     video_anns, _ = load_mot_from_zip(annotations_file, **mot_kwargs)
+                    annotation_dict = self._flatten_video_annotations(video_anns)
                 else:
                     video_anns, _ = load_mot_from_dir(annotations_file, **mot_kwargs)
-                annotation_dict = self._flatten_video_annotations(video_anns)
+                    annotation_dict = self._flatten_video_annotations(video_anns)
             elif self.annotations_type == "cvat_video":
                 cvat_kwargs = {}
                 if "image_width" in self.additional_args:
                     cvat_kwargs["image_width"] = self.additional_args["image_width"]
                 if "image_height" in self.additional_args:
                     cvat_kwargs["image_height"] = self.additional_args["image_height"]
-                if annotations_file.suffix == ".zip":
+                if annotations_file.is_dir():
+                    annotation_dict = self._flatten_cvat_fs_annotations(load_cvat_from_fs(annotations_file, **cvat_kwargs))
+                elif annotations_file.suffix == ".zip":
                     result = load_cvat_from_zip(annotations_file, **cvat_kwargs)
+                    if self._is_video_annotation_dict(result):
+                        annotation_dict = self._flatten_video_annotations(result)
+                    else:
+                        annotation_dict = result
                 else:
                     result = load_cvat_from_xml_file(annotations_file, **cvat_kwargs)
-                if self._is_video_annotation_dict(result):
-                    annotation_dict = self._flatten_video_annotations(result)
-                else:
-                    annotation_dict = result
+                    if self._is_video_annotation_dict(result):
+                        annotation_dict = self._flatten_video_annotations(result)
+                    else:
+                        annotation_dict = result
             else:
                 raise ValueError(f"Unsupported annotation type: {self.annotations_type}")
 
@@ -152,6 +172,39 @@ class AnnotationImporter:
         for frame_anns in frame_annotations.values():
             all_anns.extend(frame_anns)
         return {video_name: all_anns}
+
+    def _flatten_cvat_fs_annotations(self, fs_annotations: Mapping[str, object]) -> Dict[str, Sequence[IRAnnotationBase]]:
+        flattened: Dict[str, List[IRAnnotationBase]] = {}
+        for rel_path, result in fs_annotations.items():
+            if not isinstance(result, dict):
+                continue
+            if self._is_video_annotation_dict(result):
+                video_key = Path(rel_path).stem
+                flattened.setdefault(video_key, [])
+                for frame_anns in result.values():
+                    flattened[video_key].extend(frame_anns)
+            else:
+                for filename, anns in result.items():
+                    flattened.setdefault(filename, [])
+                    flattened[filename].extend(anns)
+        return flattened
+
+    def _flatten_mot_fs_annotations(
+        self,
+        fs_annotations: Mapping[str, object],
+    ) -> Dict[str, Sequence[IRAnnotationBase]]:
+        flattened: Dict[str, List[IRAnnotationBase]] = {}
+        for rel_path, result in fs_annotations.items():
+            if not isinstance(result, tuple) or len(result) != 2:
+                continue
+            frame_annotations = result[0]
+            if not isinstance(frame_annotations, dict):
+                continue
+            sequence_name = Path(rel_path).stem if rel_path not in (".", "") else self.annotations_file.stem
+            flattened.setdefault(sequence_name, [])
+            for frame_anns in frame_annotations.values():
+                flattened[sequence_name].extend(frame_anns)
+        return flattened
 
     def download_annotations(self, dest_dir: Path):
         log_message("Downloading annotations from repository")
