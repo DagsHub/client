@@ -16,7 +16,7 @@ import dacite
 import dagshub_annotation_converter.converters.yolo
 import rich.progress
 from dagshub_annotation_converter.converters.coco import export_to_coco_file
-from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_file
+from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_zip
 from dagshub_annotation_converter.converters.mot import export_mot_to_dir
 from dagshub_annotation_converter.formats.coco import CocoContext
 from dagshub_annotation_converter.formats.mot import MOTContext
@@ -788,6 +788,21 @@ class QueryResult:
         all_anns = self._get_all_annotations(annotation_field)
         return [a for a in all_anns if isinstance(a, IRVideoBBoxAnnotation)]
 
+    def _prepare_video_file_for_export(
+        self,
+        local_root: Path,
+        repo_relative_filename: str,
+    ) -> Optional[Path]:
+        ann_path = Path(repo_relative_filename)
+        primary = local_root / ann_path
+        if primary.exists():
+            return primary
+        source_prefix = Path(self.datasource.source.source_prefix)
+        with_prefix = local_root / source_prefix / ann_path
+        if with_prefix.exists():
+            return with_prefix
+        return None
+
     def _resolve_annotation_field(self, annotation_field: Optional[str]) -> str:
         if annotation_field is not None:
             return annotation_field
@@ -901,6 +916,7 @@ class QueryResult:
         if download_dir is None:
             download_dir = Path("dagshub_export")
         download_dir = Path(download_dir)
+        data_dir = download_dir / "data"
 
         annotations = self._get_all_annotations(annotation_field)
         if not annotations:
@@ -961,18 +977,17 @@ class QueryResult:
         if not video_annotations:
             raise RuntimeError("No video annotations found to export")
 
+        video_file: Optional[Path] = None
+        if image_width is None or image_height is None:
+            log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
+            video_file = self._prepare_video_file_for_export(download_dir.parent / "data", video_annotations)
+
         context = MOTContext()
-        if image_width is not None:
-            context.image_width = image_width
-        else:
-            context.image_width = video_annotations[0].image_width
-        if image_height is not None:
-            context.image_height = image_height
-        else:
-            context.image_height = video_annotations[0].image_height
+        context.image_width = image_width
+        context.image_height = image_height
 
         log_message("Exporting MOT annotations...")
-        result_path = export_mot_to_dir(video_annotations, context, download_dir)
+        result_path = export_mot_to_dir(video_annotations, context, download_dir, video_file=video_file)
         log_message(f"Done! Saved MOT annotations to {result_path.absolute()}")
         return result_path
 
@@ -985,7 +1000,7 @@ class QueryResult:
         image_height: Optional[int] = None,
     ) -> Path:
         """
-        Exports video annotations in CVAT video XML format.
+        Exports video annotations in CVAT video ZIP format.
 
         Args:
             download_dir: Where to export. Defaults to ``./dagshub_export``
@@ -995,7 +1010,8 @@ class QueryResult:
             image_height: Frame height. If None, inferred from annotations.
 
         Returns:
-            Path to the exported CVAT video XML file.
+            Path to the exported CVAT video ZIP file for single-video exports,
+            or output directory for multi-video exports.
         """
         annotation_field = self._resolve_annotation_field(annotation_field)
 
@@ -1007,15 +1023,83 @@ class QueryResult:
         if not video_annotations:
             raise RuntimeError("No video annotations found to export")
 
-        output_path = download_dir / "annotations.xml"
-        log_message("Exporting CVAT video annotations...")
-        result_path = export_cvat_video_to_file(
-            video_annotations,
-            output_path,
-            video_name=video_name,
-            image_width=image_width,
-            image_height=image_height,
+        source_names = sorted(
+            {
+                Path(ann.filename).name
+                for ann in video_annotations
+                if ann.filename is not None and ann.filename != ""
+            }
         )
+        has_multiple_sources = len(source_names) > 1
+
+        log_message("Exporting CVAT video annotations...")
+        local_download_root: Optional[Path] = None
+        if image_width is None or image_height is None:
+            log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
+            local_download_root = self.download_files(download_dir, keep_source_prefix=True)
+
+        if has_multiple_sources:
+            grouped: Dict[str, List[IRVideoBBoxAnnotation]] = {}
+            for ann in video_annotations:
+                group_key = Path(ann.filename).name if ann.filename else video_name
+                grouped.setdefault(group_key, []).append(ann)
+
+            output_dir = download_dir / "labels"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            for group_video_name, group_annotations in sorted(grouped.items()):
+                group_video_file: Optional[Path] = None
+                if local_download_root is not None:
+                    ref_filename = next((a.filename for a in group_annotations if a.filename), None)
+                    if ref_filename is None:
+                        raise FileNotFoundError(
+                            f"Missing annotation filename for video group '{group_video_name}'."
+                        )
+                    group_video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+                    if group_video_file is None:
+                        raise FileNotFoundError(
+                            f"Could not find local downloaded video file for '{group_video_name}' "
+                            f"under '{local_download_root}'."
+                        )
+
+                output_path = output_dir / f"{Path(group_video_name).stem}.zip"
+                export_cvat_video_to_zip(
+                    group_annotations,
+                    output_path,
+                    video_name=group_video_name,
+                    image_width=image_width,
+                    image_height=image_height,
+                    video_file=group_video_file,
+                )
+            result_path = output_dir
+        else:
+            single_video_file: Optional[Path] = None
+            if local_download_root is not None:
+                ref_filename = next((a.filename for a in video_annotations if a.filename), None)
+                if ref_filename is None:
+                    raise FileNotFoundError("Missing annotation filename for single-video CVAT export.")
+                single_video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+                if single_video_file is None:
+                    raise FileNotFoundError(
+                        f"Could not find local downloaded video file for '{ref_filename}' "
+                        f"under '{local_download_root}'."
+                    )
+
+            labels_dir = download_dir / "labels"
+            labels_dir.mkdir(parents=True, exist_ok=True)
+            if source_names:
+                output_name = f"{Path(source_names[0]).stem}.zip"
+            else:
+                output_name = "annotations.zip"
+            output_path = labels_dir / output_name
+            result_path = export_cvat_video_to_zip(
+                video_annotations,
+                output_path,
+                video_name=video_name,
+                image_width=image_width,
+                image_height=image_height,
+                video_file=single_video_file,
+            )
         log_message(f"Done! Saved CVAT video annotations to {result_path.absolute()}")
         return result_path
 
