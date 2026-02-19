@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import os.path
+from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -803,6 +805,15 @@ class QueryResult:
             return with_prefix
         return None
 
+    @staticmethod
+    def _zip_directory(src_dir: Path, output_zip: Path) -> Path:
+        output_zip.parent.mkdir(parents=True, exist_ok=True)
+        with ZipFile(output_zip, "w") as z:
+            for file_path in src_dir.rglob("*"):
+                if file_path.is_file():
+                    z.write(file_path, file_path.relative_to(src_dir))
+        return output_zip
+
     def _resolve_annotation_field(self, annotation_field: Optional[str]) -> str:
         if annotation_field is not None:
             return annotation_field
@@ -971,23 +982,81 @@ class QueryResult:
 
         if download_dir is None:
             download_dir = Path("dagshub_export")
-        download_dir = Path(download_dir) / "mot"
+        download_dir = Path(download_dir)
+        labels_dir = download_dir / "labels"
+        labels_dir.mkdir(parents=True, exist_ok=True)
 
         video_annotations = self._get_all_video_annotations(annotation_field)
         if not video_annotations:
             raise RuntimeError("No video annotations found to export")
 
-        video_file: Optional[Path] = None
+        source_names = sorted(
+            {
+                Path(ann.filename).name
+                for ann in video_annotations
+                if ann.filename is not None and ann.filename != ""
+            }
+        )
+        has_multiple_sources = len(source_names) > 1
+
+        local_download_root: Optional[Path] = None
         if image_width is None or image_height is None:
             log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
-            video_file = self._prepare_video_file_for_export(download_dir.parent / "data", video_annotations)
-
-        context = MOTContext()
-        context.image_width = image_width
-        context.image_height = image_height
+            local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
 
         log_message("Exporting MOT annotations...")
-        result_path = export_mot_to_dir(video_annotations, context, download_dir, video_file=video_file)
+        if has_multiple_sources:
+            grouped: Dict[str, List[IRVideoBBoxAnnotation]] = {}
+            for ann in video_annotations:
+                group_key = Path(ann.filename).name if ann.filename else "video.mp4"
+                grouped.setdefault(group_key, []).append(ann)
+
+            for group_video_name, group_annotations in sorted(grouped.items()):
+                group_video_file: Optional[Path] = None
+                if local_download_root is not None:
+                    ref_filename = next((a.filename for a in group_annotations if a.filename), None)
+                    if ref_filename is None:
+                        raise FileNotFoundError(
+                            f"Missing annotation filename for MOT group '{group_video_name}'."
+                        )
+                    group_video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+                    if group_video_file is None:
+                        raise FileNotFoundError(
+                            f"Could not find local downloaded video file for '{group_video_name}' "
+                            f"under '{local_download_root}'."
+                        )
+
+                context = MOTContext()
+                context.image_width = image_width
+                context.image_height = image_height
+                zip_path = labels_dir / f"{Path(group_video_name).stem}.zip"
+                with TemporaryDirectory() as tmp_dir:
+                    output_dir = Path(tmp_dir) / Path(group_video_name).stem
+                    export_mot_to_dir(group_annotations, context, output_dir, video_file=group_video_file)
+                    self._zip_directory(output_dir, zip_path)
+            result_path = labels_dir
+        else:
+            video_file: Optional[Path] = None
+            if local_download_root is not None:
+                ref_filename = next((a.filename for a in video_annotations if a.filename), None)
+                if ref_filename is None:
+                    raise FileNotFoundError("Missing annotation filename for MOT export.")
+                video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+                if video_file is None:
+                    raise FileNotFoundError(
+                        f"Could not find local downloaded video file for '{ref_filename}' under '{local_download_root}'."
+                    )
+
+            context = MOTContext()
+            context.image_width = image_width
+            context.image_height = image_height
+            single_name = Path(source_names[0]).stem if source_names else "annotations"
+            zip_path = labels_dir / f"{single_name}.zip"
+            with TemporaryDirectory() as tmp_dir:
+                output_dir = Path(tmp_dir) / single_name
+                export_mot_to_dir(video_annotations, context, output_dir, video_file=video_file)
+                result_path = self._zip_directory(output_dir, zip_path)
+
         log_message(f"Done! Saved MOT annotations to {result_path.absolute()}")
         return result_path
 

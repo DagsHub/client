@@ -155,9 +155,11 @@ def test_export_mot_directory_structure(ds, tmp_path):
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
-    assert (result / "gt" / "gt.txt").exists()
-    assert (result / "gt" / "labels.txt").exists()
-    assert (result / "seqinfo.ini").exists()
+    assert result == tmp_path / "labels" / "video.zip"
+    with zipfile.ZipFile(result, "r") as z:
+        assert "gt/gt.txt" in z.namelist()
+        assert "gt/labels.txt" in z.namelist()
+        assert "seqinfo.ini" in z.namelist()
 
 
 def test_export_mot_explicit_dimensions(ds, tmp_path):
@@ -166,7 +168,8 @@ def test_export_mot_explicit_dimensions(ds, tmp_path):
         download_dir=tmp_path, annotation_field="ann", image_width=1280, image_height=720
     )
 
-    seqinfo = (result / "seqinfo.ini").read_text()
+    with zipfile.ZipFile(result, "r") as z:
+        seqinfo = z.read("seqinfo.ini").decode("utf-8")
     assert "1280" in seqinfo
     assert "720" in seqinfo
 
@@ -178,6 +181,23 @@ def test_export_mot_no_annotations_raises(ds, tmp_path):
     qr = _make_qr(ds, [dp], ann_field="ann")
     with pytest.raises(RuntimeError, match="No video annotations"):
         qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
+
+
+def test_export_mot_multiple_videos(ds, tmp_path):
+    dps = []
+    for i in range(2):
+        dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
+        ann = _make_video_bbox(frame=i, track_id=i)
+        ann.filename = dp.path
+        dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[ann])
+        dps.append(dp)
+
+    qr = _make_qr(ds, dps, ann_field="ann")
+    result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
+
+    assert result == tmp_path / "labels"
+    assert (result / "video_0.zip").exists()
+    assert (result / "video_1.zip").exists()
 
 
 def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):
