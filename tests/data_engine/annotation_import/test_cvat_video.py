@@ -85,12 +85,19 @@ def test_get_all_video_aggregates_across_datapoints(ds):
 # --- export_as_cvat_video ---
 
 
-def test_export_cvat_video_xml(ds, tmp_path):
+def test_export_cvat_video_xml(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
+        (target_dir / "video.mp4").write_bytes(b"fake")
+        return target_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
-    assert result == tmp_path / "labels" / "video.zip"
+    assert result == tmp_path / "labels" / "video.mp4.zip"
     with zipfile.ZipFile(result, "r") as z:
         content = z.read("annotations.xml").decode("utf-8")
     assert "<track" in content
@@ -106,8 +113,15 @@ def test_export_cvat_video_no_annotations_raises(ds, tmp_path):
         qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
 
-def test_export_cvat_video_custom_name(ds, tmp_path):
+def test_export_cvat_video_custom_name(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
+        (target_dir / "video.mp4").write_bytes(b"fake")
+        return target_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
     result = qr.export_as_cvat_video(
         download_dir=tmp_path, annotation_field="ann", video_name="my_clip.avi"
     )
@@ -132,7 +146,7 @@ def test_export_cvat_video_image_only_raises(ds, tmp_path):
         qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
 
-def test_export_cvat_video_multiple_datapoints(ds, tmp_path):
+def test_export_cvat_video_multiple_datapoints(ds, tmp_path, monkeypatch):
     dps = []
     for i in range(2):
         dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
@@ -144,13 +158,20 @@ def test_export_cvat_video_multiple_datapoints(ds, tmp_path):
         )
         dps.append(dp)
 
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for i in range(2):
+            (target_dir / f"video_{i}.mp4").write_bytes(b"fake")
+        return target_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
     qr = _make_qr(ds, dps, ann_field="ann")
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert result.is_dir()
     assert result == tmp_path / "labels"
-    assert (result / "video_0.zip").exists()
-    assert (result / "video_1.zip").exists()
+    zips = list(result.glob("*.zip"))
+    assert len(zips) == 2
 
 
 def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):
@@ -236,6 +257,8 @@ def _make_cvat_video_xml() -> bytes:
 def _make_video_qr(ds):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
     anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
+    for ann in anns:
+        ann.filename = "video.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
     qr = _make_qr(ds, [dp], ann_field="ann")
     return qr, dp

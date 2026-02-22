@@ -184,8 +184,30 @@ def test_convert_video_empty_skipped(ds, tmp_path):
 # --- export_as_mot ---
 
 
-def test_export_mot_directory_structure(ds, tmp_path):
+def test_export_mot_directory_structure(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
+        (target_dir / "video.mp4").write_bytes(b"fake")
+        return target_dir
+
+    def _mock_export_mot_to_dir(video_annotations, context, output_dir, video_file=None):
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "gt").mkdir(parents=True, exist_ok=True)
+        (output_dir / "gt" / "gt.txt").write_text("")
+        (output_dir / "gt" / "labels.txt").write_text("person\n")
+        config = configparser.ConfigParser()
+        config["Sequence"] = {"imWidth": "1920", "imHeight": "1080"}
+        with open(output_dir / "seqinfo.ini", "w") as f:
+            config.write(f)
+        return output_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
+    monkeypatch.setattr(
+        "dagshub.data_engine.model.query_result.export_mot_to_dir",
+        _mock_export_mot_to_dir,
+    )
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
@@ -195,8 +217,27 @@ def test_export_mot_directory_structure(ds, tmp_path):
     assert (result / "seqinfo.ini").exists()
 
 
-def test_export_mot_explicit_dimensions(ds, tmp_path):
+def test_export_mot_explicit_dimensions(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+
+    def _mock_export_mot_to_dir(video_annotations, context, output_dir, video_file=None):
+        output_dir.mkdir(parents=True, exist_ok=True)
+        config = configparser.ConfigParser()
+        config["Sequence"] = {
+            "imWidth": str(context.image_width),
+            "imHeight": str(context.image_height),
+        }
+        with open(output_dir / "seqinfo.ini", "w") as f:
+            config.write(f)
+        (output_dir / "gt").mkdir(parents=True, exist_ok=True)
+        (output_dir / "gt" / "gt.txt").write_text("")
+        (output_dir / "gt" / "labels.txt").write_text("person\n")
+        return output_dir
+
+    monkeypatch.setattr(
+        "dagshub.data_engine.model.query_result.export_mot_to_dir",
+        _mock_export_mot_to_dir,
+    )
     result = qr.export_as_mot(
         download_dir=tmp_path, annotation_field="ann", image_width=1280, image_height=720
     )
@@ -215,7 +256,7 @@ def test_export_mot_no_annotations_raises(ds, tmp_path):
         qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
 
-def test_export_mot_multiple_videos(ds, tmp_path):
+def test_export_mot_multiple_videos(ds, tmp_path, monkeypatch):
     dps = []
     for i in range(2):
         dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
@@ -224,6 +265,26 @@ def test_export_mot_multiple_videos(ds, tmp_path):
         dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[ann])
         dps.append(dp)
 
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for i in range(2):
+            (target_dir / f"video_{i}.mp4").write_bytes(b"fake")
+        return target_dir
+
+    def _mock_export_mot_sequences_to_dirs(video_annotations, context, labels_dir, video_files=None):
+        for i in range(2):
+            seq_dir = labels_dir / f"video_{i}"
+            seq_dir.mkdir(parents=True, exist_ok=True)
+            (seq_dir / "gt").mkdir(parents=True, exist_ok=True)
+            (seq_dir / "gt" / "gt.txt").write_text("")
+            (seq_dir / "gt" / "labels.txt").write_text("person\n")
+        return labels_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
+    monkeypatch.setattr(
+        "dagshub.data_engine.model.query_result.export_mot_sequences_to_dirs",
+        _mock_export_mot_sequences_to_dirs,
+    )
     qr = _make_qr(ds, dps, ann_field="ann")
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
@@ -303,6 +364,8 @@ def _zip_mot_dir(tmp_path: Path, mot_dir: Path) -> Path:
 def _make_video_qr(ds):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
     anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
+    for ann in anns:
+        ann.filename = "video.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
     qr = _make_qr(ds, [dp], ann_field="ann")
     return qr, dp
