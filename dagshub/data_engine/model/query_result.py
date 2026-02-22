@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import os.path
-from tempfile import TemporaryDirectory
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -926,7 +925,6 @@ class QueryResult:
         if download_dir is None:
             download_dir = Path("dagshub_export")
         download_dir = Path(download_dir)
-        data_dir = download_dir / "data"
 
         annotations = self._get_all_annotations(annotation_field)
         if not annotations:
@@ -1037,7 +1035,8 @@ class QueryResult:
                 video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
                 if video_file is None:
                     raise FileNotFoundError(
-                        f"Could not find local downloaded video file for '{ref_filename}' under '{local_download_root}'."
+                        f"Could not find local downloaded video file for '{ref_filename}' "
+                        f"under '{local_download_root}'."
                     )
 
             context = MOTContext()

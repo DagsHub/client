@@ -143,7 +143,8 @@ class AnnotationImporter:
                 if "image_height" in self.additional_args:
                     cvat_kwargs["image_height"] = self.additional_args["image_height"]
                 if annotations_file.is_dir():
-                    annotation_dict = self._flatten_cvat_fs_annotations(load_cvat_from_fs(annotations_file, **cvat_kwargs))
+                    raw = load_cvat_from_fs(annotations_file, **cvat_kwargs)
+                    annotation_dict = self._flatten_cvat_fs_annotations(raw)
                 elif annotations_file.suffix == ".zip":
                     result = load_cvat_from_zip(annotations_file, **cvat_kwargs)
                     if self._is_video_annotation_dict(result):
@@ -180,7 +181,9 @@ class AnnotationImporter:
             all_anns.extend(frame_anns)
         return {video_name: all_anns}
 
-    def _flatten_cvat_fs_annotations(self, fs_annotations: Mapping[str, object]) -> Dict[str, Sequence[IRAnnotationBase]]:
+    def _flatten_cvat_fs_annotations(
+        self, fs_annotations: Mapping[str, object]
+    ) -> Dict[str, Sequence[IRAnnotationBase]]:
         flattened: Dict[str, List[IRAnnotationBase]] = {}
         for rel_path, result in fs_annotations.items():
             if not isinstance(result, dict):

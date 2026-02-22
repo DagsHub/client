@@ -185,7 +185,10 @@ def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_pat
         return output_path
 
     monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
-    monkeypatch.setattr("dagshub.data_engine.model.query_result.export_cvat_video_to_zip", _mock_export_cvat_video_to_zip)
+    monkeypatch.setattr(
+        "dagshub.data_engine.model.query_result.export_cvat_video_to_zip",
+        _mock_export_cvat_video_to_zip,
+    )
 
     qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 

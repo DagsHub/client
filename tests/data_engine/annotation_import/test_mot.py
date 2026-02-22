@@ -135,7 +135,9 @@ def test_import_mot_from_fs_passes_datasource_path_from_source_prefix(ds, tmp_pa
 
     monkeypatch.setattr("dagshub.data_engine.annotation.importer.load_mot_from_fs", _mock_load_mot_from_fs)
 
-    with patch.object(type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("data/videos")):
+    with patch.object(
+        type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("data/videos")
+    ):
         importer = AnnotationImporter(
             ds,
             "mot",
