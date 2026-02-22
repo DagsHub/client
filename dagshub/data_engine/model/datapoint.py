@@ -3,14 +3,14 @@ import logging
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Any, Callable, TYPE_CHECKING, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Sequence, Union
 
-from tenacity import Retrying, stop_after_attempt, wait_exponential, before_sleep_log, retry_if_exception_type
+from tenacity import Retrying, before_sleep_log, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from dagshub.common.download import download_files
 from dagshub.common.helpers import http_request
 from dagshub.data_engine.annotation import MetadataAnnotations
-from dagshub.data_engine.client.models import MetadataSelectFieldSchema, DatapointHistoryResult
+from dagshub.data_engine.client.models import DatapointHistoryResult, MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType
 
 if TYPE_CHECKING:
@@ -23,6 +23,23 @@ _generated_fields: Dict[str, Callable[["Datapoint"], Any]] = {
 }
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BlobHashMetadata:
+    hash: str
+
+    def __str__(self) -> str:
+        return self.hash
+
+    def __repr__(self) -> str:
+        return f"BlobHashMetadata(hash={self.hash!r})"
+
+
+class BlobDownloadError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
 
 
 @dataclass
@@ -128,6 +145,7 @@ class Datapoint:
 
         float_fields = {f.name for f in fields if f.valueType == MetadataFieldType.FLOAT}
         date_fields = {f.name for f in fields if f.valueType == MetadataFieldType.DATETIME}
+        blob_fields = {f.name for f in fields if f.valueType == MetadataFieldType.BLOB}
 
         for meta_dict in edge["node"]["metadata"]:
             key = meta_dict["key"]
@@ -138,6 +156,8 @@ class Datapoint:
                 if key in date_fields:
                     timezone = meta_dict.get("timeZone")
                     value = _datetime_from_timestamp(value / 1000, timezone or "+00:00")
+                elif key in blob_fields and isinstance(value, str):
+                    value = BlobHashMetadata(value)
             res.metadata[key] = value
         return res
 
@@ -164,7 +184,7 @@ class Datapoint:
         if type(current_value) is bytes:
             # Bytes - it's already there!
             return current_value
-        if isinstance(current_value, Path):
+        elif isinstance(current_value, Path):
             # Path - assume the path exists and is already downloaded,
             #   because it's unlikely that the user has set it themselves
             with current_value.open("rb") as f:
@@ -173,10 +193,10 @@ class Datapoint:
                 self.metadata[column] = content
             return content
 
-        elif type(current_value) is str:
-            # String - This is probably the hash of the blob, get that from dagshub
-            blob_url = self.blob_url(current_value)
-            blob_location = self.blob_cache_location / current_value
+        elif isinstance(current_value, BlobHashMetadata):
+            # Blob hash metadata - download blob from DagsHub
+            blob_url = self.blob_url(current_value.hash)
+            blob_location = self.blob_cache_location / current_value.hash
 
             # Make sure that the cache location exists
             if cache_on_disk:
@@ -190,6 +210,11 @@ class Datapoint:
                 self.metadata[column] = blob_location
 
             return content
+        elif isinstance(current_value, MetadataAnnotations):
+            ls_task = current_value.to_ls_task()
+            if ls_task is None:
+                return b""
+            return ls_task
         else:
             raise ValueError(f"Can't extract blob metadata from value {current_value} of type {type(current_value)}")
 
@@ -272,10 +297,17 @@ def _get_blob(
     """
     Args:
         url: url to download the blob from
-        cache_path: where the cache for the blob is (laods from it if exists, stores there if it doesn't)
+        cache_path: where the cache for the blob is (loads from it if exists, stores there if it doesn't)
         auth: auth to use for getting the blob
         cache_on_disk: whether to store the downloaded blob on disk. If False we also turn off the cache checking
         return_blob: if True returns the blob of the downloaded data, if False returns the path to the file with it
+        path_format: if return_blob is False, controls path representation. "path" returns Path, "str" returns str
+
+    Returns:
+        bytes, Path, or str path on success.
+
+    Raises:
+        BlobDownloadError on download failure.
     """
     if url is None:
         return None
@@ -301,14 +333,17 @@ def _get_blob(
         else:
             raise Exception(f"Non-retrying status code {resp.status_code} returned")
 
-    for attempt in Retrying(
-        retry=retry_if_exception_type(RuntimeError),
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    ):
-        with attempt:
-            content = get()
+    try:
+        for attempt in Retrying(
+            retry=retry_if_exception_type(RuntimeError),
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=1, min=4, max=10),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+        ):
+            with attempt:
+                content = get()
+    except Exception as e:
+        raise BlobDownloadError(str(e)) from e
 
     if cache_on_disk:
         with cache_path.open("wb") as f:

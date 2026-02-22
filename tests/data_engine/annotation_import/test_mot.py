@@ -122,6 +122,38 @@ def test_import_mot_from_zip(ds, tmp_path):
     assert len(list(result.values())[0]) == 2
 
 
+def test_import_mot_from_fs_passes_datasource_path_from_source_prefix(ds, tmp_path, monkeypatch):
+    captured = {}
+
+    def _mock_load_mot_from_fs(import_dir, image_width=None, image_height=None, video_files=None, datasource_path=""):
+        captured["import_dir"] = import_dir
+        captured["image_width"] = image_width
+        captured["image_height"] = image_height
+        captured["video_files"] = video_files
+        captured["datasource_path"] = datasource_path
+        return {"seq_a": ({0: [_make_video_bbox(frame=0)]}, object())}
+
+    monkeypatch.setattr("dagshub.data_engine.annotation.importer.load_mot_from_fs", _mock_load_mot_from_fs)
+
+    with patch.object(type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("data/videos")):
+        importer = AnnotationImporter(
+            ds,
+            "mot",
+            tmp_path,
+            load_from="disk",
+            image_width=1280,
+            image_height=720,
+            video_files={"seq_a": "dummy.mp4"},
+        )
+        result = importer.import_annotations()
+
+    assert captured["datasource_path"] == "data/videos"
+    assert captured["video_files"] == {"seq_a": "dummy.mp4"}
+    assert captured["image_width"] == 1280
+    assert captured["image_height"] == 720
+    assert "seq_a" in result
+
+
 def test_import_mot_nonexistent_raises(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "missing", load_from="disk")
     with pytest.raises(AnnotationsNotFoundError):
@@ -155,6 +187,7 @@ def test_export_mot_directory_structure(ds, tmp_path):
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
+    assert result == tmp_path / "labels" / "video"
     assert (result / "gt" / "gt.txt").exists()
     assert (result / "gt" / "labels.txt").exists()
     assert (result / "seqinfo.ini").exists()
@@ -178,6 +211,55 @@ def test_export_mot_no_annotations_raises(ds, tmp_path):
     qr = _make_qr(ds, [dp], ann_field="ann")
     with pytest.raises(RuntimeError, match="No video annotations"):
         qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
+
+
+def test_export_mot_multiple_videos(ds, tmp_path):
+    dps = []
+    for i in range(2):
+        dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
+        ann = _make_video_bbox(frame=i, track_id=i)
+        ann.filename = dp.path
+        dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[ann])
+        dps.append(dp)
+
+    qr = _make_qr(ds, dps, ann_field="ann")
+    result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
+
+    assert result == tmp_path / "labels"
+    assert (result / "video_0" / "gt" / "gt.txt").exists()
+    assert (result / "video_1" / "gt" / "gt.txt").exists()
+
+
+def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
+    for ann in anns:
+        ann.image_width = 0
+        ann.image_height = 0
+        ann.filename = "video.mp4"
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
+    qr = _make_qr(ds, [dp], ann_field="ann")
+
+    captured = {}
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        video_path = target_dir / "video.mp4"
+        video_path.parent.mkdir(parents=True, exist_ok=True)
+        video_path.write_bytes(b"video")
+        return target_dir
+
+    def _mock_export_mot_to_dir(video_annotations, context, output_dir, video_file=None):
+        captured["video_file"] = str(video_file) if video_file is not None else None
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
+    monkeypatch.setattr("dagshub.data_engine.model.query_result.export_mot_to_dir", _mock_export_mot_to_dir)
+
+    qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
+
+    assert captured["video_file"] is not None
+    assert captured["video_file"].endswith("video.mp4")
 
 
 # --- helpers ---

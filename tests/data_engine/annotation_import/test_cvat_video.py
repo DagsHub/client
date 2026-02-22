@@ -1,4 +1,5 @@
 import datetime
+import zipfile
 from pathlib import PurePosixPath
 from unittest.mock import patch, PropertyMock
 
@@ -89,7 +90,9 @@ def test_export_cvat_video_xml(ds, tmp_path):
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
-    content = result.read_text()
+    assert result == tmp_path / "labels" / "video.zip"
+    with zipfile.ZipFile(result, "r") as z:
+        content = z.read("annotations.xml").decode("utf-8")
     assert "<track" in content
     assert "<box" in content
 
@@ -109,7 +112,8 @@ def test_export_cvat_video_custom_name(ds, tmp_path):
         download_dir=tmp_path, annotation_field="ann", video_name="my_clip.avi"
     )
 
-    content = result.read_text()
+    with zipfile.ZipFile(result, "r") as z:
+        content = z.read("annotations.xml").decode("utf-8")
     assert "my_clip.avi" in content
 
 
@@ -132,17 +136,80 @@ def test_export_cvat_video_multiple_datapoints(ds, tmp_path):
     dps = []
     for i in range(2):
         dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
+        ann = _make_video_bbox(frame=i, track_id=i)
+        ann.filename = dp.path
         dp.metadata["ann"] = MetadataAnnotations(
             datapoint=dp, field="ann",
-            annotations=[_make_video_bbox(frame=i, track_id=i)],
+            annotations=[ann],
         )
         dps.append(dp)
 
     qr = _make_qr(ds, dps, ann_field="ann")
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
-    content = result.read_text()
-    assert content.count("<box") >= 2
+    assert result.is_dir()
+    assert result == tmp_path / "labels"
+    assert (result / "video_0.zip").exists()
+    assert (result / "video_1.zip").exists()
+
+
+def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
+    for ann in anns:
+        ann.image_width = 0
+        ann.image_height = 0
+        ann.filename = "video.mp4"
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
+    qr = _make_qr(ds, [dp], ann_field="ann")
+
+    captured = {}
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        video_path = target_dir / "video.mp4"
+        video_path.parent.mkdir(parents=True, exist_ok=True)
+        video_path.write_bytes(b"video")
+        return target_dir
+
+    def _mock_export_cvat_video_to_zip(
+        video_annotations,
+        output_path,
+        video_name,
+        image_width,
+        image_height,
+        video_file=None,
+    ):
+        captured["video_file"] = str(video_file) if video_file is not None else None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("<annotations/>")
+        return output_path
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
+    monkeypatch.setattr("dagshub.data_engine.model.query_result.export_cvat_video_to_zip", _mock_export_cvat_video_to_zip)
+
+    qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
+
+    assert captured["video_file"] is not None
+    assert captured["video_file"].endswith("video.mp4")
+
+
+def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
+    dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
+    ann = _make_video_bbox(frame=0, track_id=0)
+    ann.image_width = 0
+    ann.image_height = 0
+    ann.filename = "missing.mp4"
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[ann])
+    qr = _make_qr(ds, [dp], ann_field="ann")
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        target_dir.mkdir(parents=True, exist_ok=True)
+        return target_dir
+
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
+
+    with pytest.raises(FileNotFoundError, match="missing.mp4"):
+        qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
 
 # --- helpers ---
