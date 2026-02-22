@@ -137,6 +137,38 @@ def test_import_mot_from_fs_directory(ds, tmp_path):
     assert len(result["seq_b"]) == 2
 
 
+def test_import_mot_from_fs_passes_datasource_path_from_source_prefix(ds, tmp_path, monkeypatch):
+    captured = {}
+
+    def _mock_load_mot_from_fs(import_dir, image_width=None, image_height=None, video_files=None, datasource_path=""):
+        captured["import_dir"] = import_dir
+        captured["image_width"] = image_width
+        captured["image_height"] = image_height
+        captured["video_files"] = video_files
+        captured["datasource_path"] = datasource_path
+        return {"seq_a": ({0: [_make_video_bbox(frame=0)]}, object())}
+
+    monkeypatch.setattr("dagshub.data_engine.annotation.importer.load_mot_from_fs", _mock_load_mot_from_fs)
+
+    with patch.object(type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("data/videos")):
+        importer = AnnotationImporter(
+            ds,
+            "mot",
+            tmp_path,
+            load_from="disk",
+            image_width=1280,
+            image_height=720,
+            video_files={"seq_a": "dummy.mp4"},
+        )
+        result = importer.import_annotations()
+
+    assert captured["datasource_path"] == "data/videos"
+    assert captured["video_files"] == {"seq_a": "dummy.mp4"}
+    assert captured["image_width"] == 1280
+    assert captured["image_height"] == 720
+    assert "seq_a" in result
+
+
 def test_import_mot_nonexistent_raises(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "missing", load_from="disk")
     with pytest.raises(AnnotationsNotFoundError):

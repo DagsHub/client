@@ -116,11 +116,18 @@ class AnnotationImporter:
                     mot_kwargs["video_file"] = self.additional_args["video_name"]
                 if annotations_file.is_dir():
                     video_files = self.additional_args.get("video_files")
+                    raw_datasource_path = self.additional_args.get("datasource_path")
+                    if raw_datasource_path is None:
+                        raw_datasource_path = self.ds.source.source_prefix
+                    datasource_path = PurePosixPath(raw_datasource_path).as_posix().lstrip("/")
+                    if datasource_path == ".":
+                        datasource_path = ""
                     mot_results = load_mot_from_fs(
                         annotations_file,
                         image_width=mot_kwargs.get("image_width"),
                         image_height=mot_kwargs.get("image_height"),
                         video_files=video_files,
+                        datasource_path=datasource_path,
                     )
                     annotation_dict = self._flatten_mot_fs_annotations(mot_results)
                 elif annotations_file.suffix == ".zip":
