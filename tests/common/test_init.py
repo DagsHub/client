@@ -67,4 +67,20 @@ def test_init_creates_repo_under_current_user_from_url(
 ):
     dagshub.init(url="https://dagshub.com/testuser/my-repo", mlflow=False, dvc=False)
 
+    mock_user_api.get_current_user.assert_called_once()
     mock_create_repo.assert_called_once_with("my-repo", host="https://dagshub.com")
+    mock_log_message.assert_any_call(
+        "Repository my-repo doesn't exist, creating it under current user."
+    )
+
+
+def test_init_creates_repo_under_org_from_url(
+    mock_repo_api, mock_user_api, mock_create_repo, mock_get_token, mock_log_message
+):
+    dagshub.init(url="https://dagshub.com/my-org/my-repo", mlflow=False, dvc=False)
+
+    mock_user_api.get_current_user.assert_called_once()
+    mock_create_repo.assert_called_once_with("my-repo", org_name="my-org", host="https://dagshub.com")
+    mock_log_message.assert_any_call(
+        'Repository my-repo doesn\'t exist, creating it under organization "my-org".'
+    )
