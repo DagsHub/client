@@ -755,16 +755,104 @@ class Datasource:
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
-        upload_batch_size = dagshub.common.config.dataengine_metadata_upload_batch_size
+        max_batch_size = max(1, dagshub.common.config.dataengine_metadata_upload_batch_size)
+        min_batch_size = max(
+            1,
+            min(dagshub.common.config.dataengine_metadata_upload_batch_size_min, max_batch_size),
+        )
+        current_batch_size = max(
+            min_batch_size,
+            min(dagshub.common.config.dataengine_metadata_upload_batch_size_initial, max_batch_size),
+        )
+        target_batch_time = max(dagshub.common.config.dataengine_metadata_upload_target_batch_time, 0.01)
+
+        def _next_batch_after_success(batch_size: int, bad_batch_size: Optional[int]) -> int:
+            # Keep expanding quickly until we find an upper bound, then binary-search between good and bad.
+            if bad_batch_size is not None and batch_size < bad_batch_size:
+                next_batch_size = batch_size + max(1, (bad_batch_size - batch_size) // 2)
+            else:
+                next_batch_size = batch_size * 2
+
+            next_batch_size = min(max_batch_size, next_batch_size)
+            if next_batch_size <= batch_size and batch_size < max_batch_size:
+                next_batch_size = batch_size + 1
+            return max(min_batch_size, next_batch_size)
+
+        def _next_batch_after_bad(
+            batch_size: int,
+            good_batch_size: Optional[int],
+            bad_batch_size: Optional[int],
+        ) -> int:
+            upper_bound = bad_batch_size if bad_batch_size is not None else batch_size
+
+            if good_batch_size is not None and good_batch_size < upper_bound:
+                next_batch_size = good_batch_size + max(1, (upper_bound - good_batch_size) // 2)
+            else:
+                next_batch_size = upper_bound // 2
+
+            next_batch_size = max(min_batch_size, min(max_batch_size, next_batch_size))
+            if next_batch_size >= batch_size:
+                next_batch_size = max(min_batch_size, batch_size - 1)
+            return next_batch_size
+
         total_entries = len(metadata_entries)
-        total_task = progress.add_task(f"Uploading metadata (batch size {upload_batch_size})...", total=total_entries)
+        total_task = progress.add_task(
+            f"Uploading metadata (adaptive batch {current_batch_size}-{max_batch_size})...",
+            total=total_entries,
+        )
+
+        last_good_batch_size: Optional[int] = None
+        last_bad_batch_size: Optional[int] = None
 
         with progress:
-            for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start : start + upload_batch_size]
-                logger.debug(f"Uploading {len(entries)} metadata entries...")
-                self.source.client.update_metadata(self, entries)
-                progress.update(total_task, advance=upload_batch_size)
+            start = 0
+            while start < total_entries:
+                entries_left = total_entries - start
+                batch_size = min(current_batch_size, entries_left)
+                entries = metadata_entries[start : start + batch_size]
+
+                progress.update(
+                    total_task,
+                    description=f"Uploading metadata (batch size {batch_size})...",
+                )
+                logger.debug(f"Uploading {batch_size} metadata entries...")
+
+                start_time = time.monotonic()
+                try:
+                    self.source.client.update_metadata(self, entries)
+                except Exception as exc:
+                    if batch_size <= min_batch_size:
+                        logger.error(
+                            f"Metadata upload failed at minimum batch size ({min_batch_size}); aborting.",
+                            exc_info=True,
+                        )
+                        raise
+
+                    last_bad_batch_size = (
+                        batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
+                    )
+                    current_batch_size = _next_batch_after_bad(batch_size, last_good_batch_size, last_bad_batch_size)
+                    logger.warning(
+                        f"Metadata upload failed for batch size {batch_size} "
+                        f"({exc.__class__.__name__}: {exc}). Retrying with batch size {current_batch_size}."
+                    )
+                    continue
+
+                elapsed = time.monotonic() - start_time
+                start += batch_size
+                progress.update(total_task, advance=batch_size)
+
+                if elapsed <= target_batch_time:
+                    last_good_batch_size = (
+                        batch_size if last_good_batch_size is None else max(last_good_batch_size, batch_size)
+                    )
+                    current_batch_size = _next_batch_after_success(batch_size, last_bad_batch_size)
+                else:
+                    last_bad_batch_size = (
+                        batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
+                    )
+                    current_batch_size = _next_batch_after_bad(batch_size, last_good_batch_size, last_bad_batch_size)
+
             progress.update(total_task, completed=total_entries, refresh=True)
 
         # Update the status from dagshub, so we get back the new metadata columns

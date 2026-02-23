@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
+import dagshub.common.config
 from dagshub.common.util import wrap_bytes
 from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.client.models import MetadataFieldSchema
@@ -17,6 +18,10 @@ from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUp
 from dagshub.data_engine.model.metadata import MultipleDataTypesUploadedError, StringFieldValueTooLongError
 from dagshub.data_engine.model.query_result import QueryResult
 from tests.data_engine.util import add_string_fields, add_document_fields, add_annotation_fields
+
+
+def _uploaded_batch_sizes(ds: Datasource):
+    return [len(call.args[1]) for call in ds.source.client.update_metadata.call_args_list]
 
 
 @pytest.fixture
@@ -140,6 +145,46 @@ def test_uploading_to_document_turns_into_blob(ds):
         )
     ]
     client_mock.update_metadata.assert_called_with(ds, expected_data_upload)
+
+
+def test_upload_metadata_starts_small_and_grows(ds, mocker):
+    entries = [
+        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(14)
+    ]
+
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 16)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 2)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+
+    ds._upload_metadata(entries)
+
+    assert _uploaded_batch_sizes(ds) == [2, 4, 8]
+
+
+def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
+    entries = [
+        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
+    ]
+
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+
+    has_failed = {"value": False}
+
+    def _flaky_upload(_ds, upload_entries):
+        if len(upload_entries) == 8 and not has_failed["value"]:
+            has_failed["value"] = True
+            raise RuntimeError("simulated timeout")
+
+    ds.source.client.update_metadata.side_effect = _flaky_upload
+
+    ds._upload_metadata(entries)
+
+    assert has_failed["value"]
+    assert _uploaded_batch_sizes(ds) == [8, 4, 6]
 
 
 def test_pandas_timestamp(ds):
