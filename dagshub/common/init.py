@@ -107,7 +107,7 @@ def init(
     # Configure MLFlow
     if mlflow:
         os.environ["MLFLOW_TRACKING_URI"] = f"{url}.mlflow"
-        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token).username
+        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token, host=host).username
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
         log_message(f'Initialized MLflow to track repo "{repo_owner}/{repo_name}"')
