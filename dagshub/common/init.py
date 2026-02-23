@@ -87,12 +87,16 @@ def init(
     try:
         repo_api.get_repo_info()
     except RepoNotFoundError:
-        current_user = UserAPI.get_current_user(host=host)
-        if repo_owner and repo_owner != current_user.username:
-            log_message(
-                f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".'
-            )
-            create_repo(repo_name, org_name=repo_owner, host=host)
+        if repo_owner:
+            current_user = UserAPI.get_current_user(host=host)
+            if repo_owner != current_user.username:
+                log_message(
+                    f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".'
+                )
+                create_repo(repo_name, org_name=repo_owner, host=host)
+            else:
+                log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
+                create_repo(repo_name, host=host)
         else:
             log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
             create_repo(repo_name, host=host)
