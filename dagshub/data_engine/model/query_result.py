@@ -15,10 +15,16 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, 
 import dacite
 import dagshub_annotation_converter.converters.yolo
 import rich.progress
+from dagshub_annotation_converter.converters.coco import export_to_coco_file
+from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_zip, export_cvat_videos_to_zips
+from dagshub_annotation_converter.converters.mot import export_mot_sequences_to_dirs, export_mot_to_dir
+from dagshub_annotation_converter.formats.coco import CocoContext
+from dagshub_annotation_converter.formats.mot import MOTContext
 from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
 from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
+from dagshub_annotation_converter.ir.video import IRVideoBBoxAnnotation
 from pydantic import ValidationError
 
 from dagshub.auth import get_token
@@ -778,6 +784,44 @@ class QueryResult:
                 annotations.extend(dp.metadata[annotation_field].annotations)
         return annotations
 
+    def _get_all_video_annotations(self, annotation_field: str) -> List[IRVideoBBoxAnnotation]:
+        all_anns = self._get_all_annotations(annotation_field)
+        return [a for a in all_anns if isinstance(a, IRVideoBBoxAnnotation)]
+
+    def _prepare_video_file_for_export(self, local_root: Path, repo_relative_filename: str) -> Optional[Path]:
+        ann_path = Path(repo_relative_filename)
+        primary = local_root / ann_path
+        if primary.exists():
+            return primary
+        source_prefix = Path(self.datasource.source.source_prefix)
+        with_prefix = local_root / source_prefix / ann_path
+        if with_prefix.exists():
+            return with_prefix
+        return None
+
+    @staticmethod
+    def _get_annotation_filename(ann: IRVideoBBoxAnnotation) -> Optional[str]:
+        filename = ann.filename
+        if filename is None:
+            return None
+        if isinstance(filename, (list, tuple)):
+            if len(filename) == 0:
+                return None
+            if len(filename) > 1:
+                raise ValueError(f"Annotation has multiple filenames: {filename}")
+            filename = filename[0]
+        return str(filename)
+
+    def _resolve_annotation_field(self, annotation_field: Optional[str]) -> str:
+        if annotation_field is not None:
+            return annotation_field
+        annotation_fields = sorted([f.name for f in self.fields if f.is_annotation()])
+        if len(annotation_fields) == 0:
+            raise ValueError("No annotation fields found in the datasource")
+        annotation_field = annotation_fields[0]
+        log_message(f"Using annotations from field {annotation_field}")
+        return annotation_field
+
     def export_as_yolo(
         self,
         download_dir: Optional[Union[str, Path]] = None,
@@ -803,12 +847,7 @@ class QueryResult:
         Returns:
             The path to the YAML file with the metadata. Pass this path to ``YOLO.train()`` to train a model.
         """
-        if annotation_field is None:
-            annotation_fields = sorted([f.name for f in self.fields if f.is_annotation()])
-            if len(annotation_fields) == 0:
-                raise ValueError("No annotation fields found in the datasource")
-            annotation_field = annotation_fields[0]
-            log_message(f"Using annotations from field {annotation_field}")
+        annotation_field = self._resolve_annotation_field(annotation_field)
 
         if download_dir is None:
             download_dir = Path("dagshub_export")
@@ -860,6 +899,266 @@ class QueryResult:
         yaml_path = dagshub_annotation_converter.converters.yolo.export_to_fs(context, annotations)
         log_message(f"Done! Saved YOLO Dataset, YAML file is at {yaml_path.absolute()}")
         return yaml_path
+
+    def export_as_coco(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        output_filename: str = "annotations.json",
+        classes: Optional[Dict[int, str]] = None,
+    ) -> Path:
+        """
+        Downloads the files and exports annotations in COCO format.
+
+        Args:
+            download_dir: Where to download the files. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            output_filename: Name of the output COCO JSON file. Default is ``annotations.json``.
+            classes: Category mapping for the COCO dataset as ``{id: name}``.
+                If ``None``, categories will be inferred from the annotations.
+
+        Returns:
+            Path to the exported COCO JSON file.
+        """
+        annotation_field = self._resolve_annotation_field(annotation_field)
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir)
+
+        annotations = self._get_all_annotations(annotation_field)
+        if not annotations:
+            raise RuntimeError("No annotations found to export")
+
+        context = CocoContext()
+        if classes is not None:
+            context.categories = dict(classes)
+
+        # Add the source prefix to all annotations
+        for ann in annotations:
+            ann.filename = os.path.join(self.datasource.source.source_prefix, ann.filename)
+
+        image_download_path = download_dir / "data"
+        log_message("Downloading image files...")
+        self.download_files(image_download_path)
+
+        output_path = download_dir / output_filename
+        log_message("Exporting COCO annotations...")
+        result_path = export_to_coco_file(annotations, output_path, context=context)
+        log_message(f"Done! Saved COCO annotations to {result_path.absolute()}")
+        return result_path
+
+    def export_as_mot(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        image_width: Optional[int] = None,
+        image_height: Optional[int] = None,
+    ) -> Path:
+        """
+        Exports video annotations in MOT (Multiple Object Tracking) format.
+
+        The output follows the MOT Challenge directory structure::
+
+            output_dir/
+              gt/
+                gt.txt
+                labels.txt
+              seqinfo.ini
+
+        Args:
+            download_dir: Where to export. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            image_width: Frame width. If None, inferred from annotations.
+            image_height: Frame height. If None, inferred from annotations.
+
+        Returns:
+            Path to the exported MOT directory.
+        """
+        annotation_field = self._resolve_annotation_field(annotation_field)
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir)
+        labels_dir = download_dir / "labels"
+        labels_dir.mkdir(parents=True, exist_ok=True)
+
+        video_annotations = self._get_all_video_annotations(annotation_field)
+        if not video_annotations:
+            raise RuntimeError("No video annotations found to export")
+
+        source_names = sorted(
+            {
+                Path(ann_filename).name
+                for ann_filename in (self._get_annotation_filename(ann) for ann in video_annotations)
+                if ann_filename
+            }
+        )
+        has_multiple_sources = len(source_names) > 1
+
+        local_download_root: Optional[Path] = None
+        if image_width is None or image_height is None:
+            log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
+            local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
+
+        log_message("Exporting MOT annotations...")
+        if has_multiple_sources:
+            video_files: Optional[Dict[str, Union[str, Path]]] = None
+            if local_download_root is not None:
+                video_files = {}
+                for ann_filename in {
+                    self._get_annotation_filename(ann)
+                    for ann in video_annotations
+                    if self._get_annotation_filename(ann)
+                }:
+                    assert ann_filename is not None
+                    sequence_name = Path(ann_filename).stem
+                    local_video = self._prepare_video_file_for_export(local_download_root, ann_filename)
+                    if local_video is None:
+                        raise FileNotFoundError(
+                            f"Could not find local downloaded video file for '{ann_filename}' under "
+                            f"'{local_download_root}'."
+                        )
+                    video_files[sequence_name] = local_video
+
+            context = MOTContext()
+            context.image_width = image_width
+            context.image_height = image_height
+            export_mot_sequences_to_dirs(video_annotations, context, labels_dir, video_files=video_files)
+            result_path = labels_dir
+        else:
+            video_file: Optional[Path] = None
+            if local_download_root is not None:
+                ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
+                if ref_filename is None:
+                    raise FileNotFoundError("Missing annotation filename for MOT export.")
+                video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+                if video_file is None:
+                    raise FileNotFoundError(
+                        f"Could not find local downloaded video file for '{ref_filename}' "
+                        f"under '{local_download_root}'."
+                    )
+
+            context = MOTContext()
+            context.image_width = image_width
+            context.image_height = image_height
+            single_name = Path(source_names[0]).stem if source_names else "sequence"
+            output_dir = labels_dir / single_name
+            result_path = export_mot_to_dir(video_annotations, context, output_dir, video_file=video_file)
+
+        log_message(f"Done! Saved MOT annotations to {result_path.absolute()}")
+        return result_path
+
+    def export_as_cvat_video(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        video_name: str = "video.mp4",
+        image_width: Optional[int] = None,
+        image_height: Optional[int] = None,
+    ) -> Path:
+        """
+        Exports video annotations in CVAT video ZIP format.
+
+        Args:
+            download_dir: Where to export. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            video_name: Name of the source video to embed in the XML metadata.
+            image_width: Frame width. If None, inferred from annotations.
+            image_height: Frame height. If None, inferred from annotations.
+
+        Returns:
+            Path to the exported CVAT video ZIP file for single-video exports,
+            or output directory for multi-video exports.
+        """
+        annotation_field = self._resolve_annotation_field(annotation_field)
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir)
+
+        video_annotations = self._get_all_video_annotations(annotation_field)
+        if not video_annotations:
+            raise RuntimeError("No video annotations found to export")
+
+        source_names = sorted(
+            {
+                Path(ann_filename).name
+                for ann_filename in (self._get_annotation_filename(ann) for ann in video_annotations)
+                if ann_filename
+            }
+        )
+        has_multiple_sources = len(source_names) > 1
+
+        log_message("Exporting CVAT video annotations...")
+        local_download_root: Optional[Path] = None
+        if not has_multiple_sources and (image_width is None or image_height is None):
+            log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
+            local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
+
+        if has_multiple_sources:
+            video_files: Optional[Dict[str, Union[str, Path]]] = None
+            if image_width is None or image_height is None:
+                log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
+                local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
+                video_files = {}
+                for ann_filename in {
+                    self._get_annotation_filename(ann)
+                    for ann in video_annotations
+                    if self._get_annotation_filename(ann)
+                }:
+                    assert ann_filename is not None
+                    local_video = self._prepare_video_file_for_export(local_download_root, ann_filename)
+                    if local_video is None:
+                        raise FileNotFoundError(
+                            f"Could not find local downloaded video file for '{ann_filename}' "
+                            f"under '{local_download_root}'."
+                        )
+                    ann_path = Path(ann_filename)
+                    video_files[ann_filename] = local_video
+                    video_files[ann_path.name] = local_video
+                    video_files[ann_path.stem] = local_video
+
+            output_dir = download_dir / "labels"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            export_cvat_videos_to_zips(
+                video_annotations,
+                output_dir,
+                image_width=image_width,
+                image_height=image_height,
+                video_files=video_files if video_files else None,
+            )
+            result_path = output_dir
+        else:
+            single_video_file: Optional[Path] = None
+            if local_download_root is not None:
+                ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
+                if ref_filename is None:
+                    raise FileNotFoundError("Missing annotation filename for single-video CVAT export.")
+                single_video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+                if single_video_file is None:
+                    raise FileNotFoundError(
+                        f"Could not find local downloaded video file for '{ref_filename}' "
+                        f"under '{local_download_root}'."
+                    )
+
+            labels_dir = download_dir / "labels"
+            labels_dir.mkdir(parents=True, exist_ok=True)
+            if source_names:
+                output_name = f"{Path(source_names[0]).name}.zip"
+            else:
+                output_name = "annotations.zip"
+            output_path = labels_dir / output_name
+            result_path = export_cvat_video_to_zip(
+                video_annotations,
+                output_path,
+                video_name=video_name,
+                image_width=image_width,
+                image_height=image_height,
+                video_file=single_video_file,
+            )
+        log_message(f"Done! Saved CVAT video annotations to {result_path.absolute()}")
+        return result_path
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """
