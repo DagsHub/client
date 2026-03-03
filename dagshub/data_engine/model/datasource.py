@@ -16,7 +16,10 @@ from typing import TYPE_CHECKING, Any, Callable, ContextManager, Dict, List, Lit
 
 import rich.progress
 from dataclasses_json import DataClassJsonMixin, LetterCase, config
+from gql.transport.exceptions import TransportConnectionFailed, TransportServerError
 from pathvalidate import sanitize_filepath
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
 
 import dagshub.common.config
 from dagshub.common import rich_console
@@ -42,6 +45,7 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import (
+    DataEngineGqlError,
     DatasetFieldComparisonError,
     DatasetNotFoundError,
     FieldNotFoundError,
@@ -795,6 +799,21 @@ class Datasource:
                 next_batch_size = max(min_batch_size, batch_size - 1)
             return next_batch_size
 
+        def _is_retryable_upload_error(exc: Exception) -> bool:
+            if isinstance(exc, DataEngineGqlError):
+                return isinstance(exc.original_exception, (TransportServerError, TransportConnectionFailed))
+            return isinstance(
+                exc,
+                (
+                    TransportServerError,
+                    TransportConnectionFailed,
+                    TimeoutError,
+                    ConnectionError,
+                    RequestsConnectionError,
+                    RequestsTimeout,
+                ),
+            )
+
         total_entries = len(metadata_entries)
         total_task = progress.add_task(
             f"Uploading metadata (adaptive batch {current_batch_size}-{max_batch_size})...",
@@ -821,6 +840,10 @@ class Datasource:
                 try:
                     self.source.client.update_metadata(self, entries)
                 except Exception as exc:
+                    if not _is_retryable_upload_error(exc):
+                        logger.error("Metadata upload failed with a non-retryable error; aborting.", exc_info=True)
+                        raise
+
                     if batch_size <= min_batch_size:
                         logger.error(
                             f"Metadata upload failed at minimum batch size ({min_batch_size}); aborting.",

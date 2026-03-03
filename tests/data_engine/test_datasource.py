@@ -177,7 +177,7 @@ def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
     def _flaky_upload(_ds, upload_entries):
         if len(upload_entries) == 8 and not has_failed["value"]:
             has_failed["value"] = True
-            raise RuntimeError("simulated timeout")
+            raise TimeoutError("simulated timeout")
 
     ds.source.client.update_metadata.side_effect = _flaky_upload
 
@@ -185,6 +185,39 @@ def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
 
     assert has_failed["value"]
     assert _uploaded_batch_sizes(ds) == [8, 4, 6]
+
+
+def test_upload_metadata_slow_success_reduces_batch_size(ds, mocker):
+    entries = [
+        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(12)
+    ]
+
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1.0)
+    mocker.patch("dagshub.data_engine.model.datasource.time.monotonic", side_effect=[0.0, 2.0, 3.0, 3.1])
+
+    ds._upload_metadata(entries)
+
+    assert _uploaded_batch_sizes(ds) == [8, 4]
+
+
+def test_upload_metadata_non_retryable_error_does_not_retry(ds, mocker):
+    entries = [
+        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
+    ]
+
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+    ds.source.client.update_metadata.side_effect = ValueError("simulated validation error")
+
+    with pytest.raises(ValueError, match="simulated validation error"):
+        ds._upload_metadata(entries)
+
+    assert _uploaded_batch_sizes(ds) == [8]
 
 
 def test_pandas_timestamp(ds):
