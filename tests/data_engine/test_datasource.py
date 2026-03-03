@@ -171,6 +171,7 @@ def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+    mocker.patch("dagshub.data_engine.model.datasource.time.sleep", return_value=None)
 
     has_failed = {"value": False}
 
@@ -229,6 +230,7 @@ def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 4)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+    mocker.patch("dagshub.data_engine.model.datasource.time.sleep", return_value=None)
 
     has_failed = {"value": False}
 
