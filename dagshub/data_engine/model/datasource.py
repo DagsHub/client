@@ -789,7 +789,7 @@ class Datasource:
         ) -> int:
             # If we're already below the configured minimum (for example, last partial chunk),
             # keep shrinking until we reach 1.
-            if batch_size <= min_batch_size:
+            if batch_size < min_batch_size:
                 return max(1, batch_size - 1)
 
             upper_bound = bad_batch_size if bad_batch_size is not None else batch_size
@@ -801,7 +801,7 @@ class Datasource:
 
             next_batch_size = max(min_batch_size, min(max_batch_size, next_batch_size))
             if next_batch_size >= batch_size:
-                next_batch_size = max(1, batch_size - 1)
+                next_batch_size = max(min_batch_size, batch_size - 1)
             return next_batch_size
 
         def _is_retryable_upload_error(exc: Exception) -> bool:
@@ -850,9 +850,9 @@ class Datasource:
                         logger.error("Metadata upload failed with a non-retryable error; aborting.", exc_info=True)
                         raise
 
-                    if batch_size <= 1:
+                    if batch_size <= 1 or batch_size == min_batch_size:
                         logger.error(
-                            "Metadata upload failed at minimum possible batch size (1); aborting.",
+                            f"Metadata upload failed at minimum batch size ({batch_size}); aborting.",
                             exc_info=True,
                         )
                         raise
