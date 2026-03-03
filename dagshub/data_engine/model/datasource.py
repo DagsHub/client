@@ -827,6 +827,7 @@ class Datasource:
 
         last_good_batch_size: Optional[int] = None
         last_bad_batch_size: Optional[int] = None
+        consecutive_retryable_failures = 0
 
         with progress:
             start = 0
@@ -856,6 +857,10 @@ class Datasource:
                         )
                         raise
 
+                    consecutive_retryable_failures += 1
+                    retry_delay_sec = min(5.0, 0.25 * (2 ** min(consecutive_retryable_failures - 1, 4)))
+                    time.sleep(retry_delay_sec)
+
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
                     )
@@ -867,6 +872,7 @@ class Datasource:
                     continue
 
                 elapsed = time.monotonic() - start_time
+                consecutive_retryable_failures = 0
                 start += batch_size
                 progress.update(total_task, advance=batch_size)
 
