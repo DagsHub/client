@@ -220,6 +220,31 @@ def test_upload_metadata_non_retryable_error_does_not_retry(ds, mocker):
     assert _uploaded_batch_sizes(ds) == [8]
 
 
+def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
+    entries = [
+        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
+    ]
+
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 4)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+
+    has_failed = {"value": False}
+
+    def _flaky_upload(_ds, upload_entries):
+        if len(upload_entries) == 2 and not has_failed["value"]:
+            has_failed["value"] = True
+            raise TimeoutError("simulated timeout")
+
+    ds.source.client.update_metadata.side_effect = _flaky_upload
+
+    ds._upload_metadata(entries)
+
+    assert has_failed["value"]
+    assert _uploaded_batch_sizes(ds) == [8, 2, 1, 1]
+
+
 def test_pandas_timestamp(ds):
     data_dict = {
         "file": ["test1", "test2"],
