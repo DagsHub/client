@@ -778,8 +778,12 @@ class Datasource:
                 next_batch_size = batch_size * 2
 
             next_batch_size = min(max_batch_size, next_batch_size)
+            if bad_batch_size is not None and bad_batch_size > min_batch_size and next_batch_size >= bad_batch_size:
+                next_batch_size = bad_batch_size - 1
             if next_batch_size <= batch_size and batch_size < max_batch_size:
                 next_batch_size = batch_size + 1
+                if bad_batch_size is not None and bad_batch_size > min_batch_size and next_batch_size >= bad_batch_size:
+                    next_batch_size = bad_batch_size - 1
             return max(min_batch_size, next_batch_size)
 
         def _next_batch_after_bad(

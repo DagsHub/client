@@ -188,6 +188,32 @@ def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
     assert _uploaded_batch_sizes(ds) == [8, 4, 6]
 
 
+def test_upload_metadata_does_not_retry_known_bad_batch_size(ds, mocker):
+    entries = [
+        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(32)
+    ]
+
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 16)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time", 1000.0)
+    mocker.patch("dagshub.data_engine.model.datasource.time.sleep", return_value=None)
+
+    has_failed = {"value": False}
+
+    def _flaky_upload(_ds, upload_entries):
+        if len(upload_entries) == 8 and not has_failed["value"]:
+            has_failed["value"] = True
+            raise TimeoutError("simulated timeout")
+
+    ds.source.client.update_metadata.side_effect = _flaky_upload
+
+    ds._upload_metadata(entries)
+
+    assert has_failed["value"]
+    assert _uploaded_batch_sizes(ds) == [8, 4, 6, 7, 7, 7, 1]
+
+
 def test_upload_metadata_slow_success_reduces_batch_size(ds, mocker):
     entries = [
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(12)
