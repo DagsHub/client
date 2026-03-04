@@ -91,7 +91,7 @@ MLFLOW_DATASOURCE_TAG_NAME = "dagshub.datasets.datasource_id"
 MLFLOW_DATASET_TAG_NAME = "dagshub.datasets.dataset_id"
 
 METADATA_UPLOAD_RETRY_BACKOFF_BASE_SECONDS = 0.25
-METADATA_UPLOAD_RETRY_BACKOFF_MAX_SECONDS = 5.0
+METADATA_UPLOAD_RETRY_BACKOFF_MAX_SECONDS = 4.0
 METADATA_UPLOAD_RETRY_BACKOFF_EXPONENT_CAP = 4
 
 
@@ -866,7 +866,7 @@ class Datasource:
                         raise
 
                     consecutive_retryable_failures += 1
-                    # Bounded exponential backoff: 0.25s, 0.5s, 1s, 2s, 4s, then capped at 5s.
+                    # Bounded exponential backoff: 0.25s, 0.5s, 1s, 2s, then capped at 4s.
                     retry_delay_sec = min(
                         METADATA_UPLOAD_RETRY_BACKOFF_MAX_SECONDS,
                         METADATA_UPLOAD_RETRY_BACKOFF_BASE_SECONDS
