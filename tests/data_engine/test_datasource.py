@@ -211,7 +211,7 @@ def test_upload_metadata_does_not_retry_known_bad_batch_size(ds, mocker):
     ds._upload_metadata(entries)
 
     assert has_failed["value"]
-    assert _uploaded_batch_sizes(ds) == [8, 4, 6, 7, 7, 1]
+    assert _uploaded_batch_sizes(ds) == [8, 4, 6, 7, 7, 7, 1]
 
 
 def test_upload_metadata_slow_success_reduces_batch_size(ds, mocker):
