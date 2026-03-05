@@ -16,10 +16,7 @@ from typing import TYPE_CHECKING, Any, Callable, ContextManager, Dict, List, Lit
 
 import rich.progress
 from dataclasses_json import DataClassJsonMixin, LetterCase, config
-from gql.transport.exceptions import TransportConnectionFailed, TransportServerError
 from pathvalidate import sanitize_filepath
-from requests.exceptions import ConnectionError as RequestsConnectionError
-from requests.exceptions import Timeout as RequestsTimeout
 
 import dagshub.common.config
 from dagshub.common import rich_console
@@ -45,7 +42,6 @@ from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import (
-    DataEngineGqlError,
     DatasetFieldComparisonError,
     DatasetNotFoundError,
     FieldNotFoundError,
@@ -56,6 +52,13 @@ from dagshub.data_engine.model.metadata import (
     precalculate_metadata_info,
     run_preupload_transforms,
     validate_uploading_metadata,
+)
+from dagshub.data_engine.model.metadata.upload_batching import (
+    AdaptiveUploadBatchConfig,
+    get_retry_delay_seconds,
+    is_retryable_metadata_upload_error,
+    next_batch_after_retryable_failure,
+    next_batch_after_success,
 )
 from dagshub.data_engine.model.metadata.dtypes import DatapointMetadataUpdateEntry
 from dagshub.data_engine.model.metadata.transforms import DatasourceFieldInfo, _add_metadata
@@ -89,10 +92,6 @@ logger = logging.getLogger(__name__)
 LS_ORCHESTRATOR_URL = "http://127.0.0.1"
 MLFLOW_DATASOURCE_TAG_NAME = "dagshub.datasets.datasource_id"
 MLFLOW_DATASET_TAG_NAME = "dagshub.datasets.dataset_id"
-
-METADATA_UPLOAD_RETRY_BACKOFF_BASE_SECONDS = 0.25
-METADATA_UPLOAD_RETRY_BACKOFF_MAX_SECONDS = 4.0
-METADATA_UPLOAD_RETRY_BACKOFF_EXPONENT_CAP = 4
 
 
 @dataclass
@@ -763,73 +762,17 @@ class Datasource:
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
 
-        max_batch_size = max(1, dagshub.common.config.dataengine_metadata_upload_batch_size)
-        min_batch_size = max(
-            1,
-            min(dagshub.common.config.dataengine_metadata_upload_batch_size_min, max_batch_size),
+        batch_config = AdaptiveUploadBatchConfig.from_values(
+            max_batch_size=dagshub.common.config.dataengine_metadata_upload_batch_size,
+            min_batch_size=dagshub.common.config.dataengine_metadata_upload_batch_size_min,
+            initial_batch_size=dagshub.common.config.dataengine_metadata_upload_batch_size_initial,
+            target_batch_time_seconds=dagshub.common.config.dataengine_metadata_upload_target_batch_time_seconds,
         )
-        current_batch_size = max(
-            min_batch_size,
-            min(dagshub.common.config.dataengine_metadata_upload_batch_size_initial, max_batch_size),
-        )
-        target_batch_time = max(dagshub.common.config.dataengine_metadata_upload_target_batch_time, 0.01)
-
-        def _next_batch_after_success(batch_size: int, bad_batch_size: Optional[int]) -> int:
-            # Keep expanding quickly until we find an upper bound, then binary-search between good and bad.
-            if bad_batch_size is not None and batch_size < bad_batch_size:
-                next_batch_size = batch_size + max(1, (bad_batch_size - batch_size) // 2)
-            else:
-                next_batch_size = batch_size * 2
-
-            next_batch_size = min(max_batch_size, next_batch_size)
-            if bad_batch_size is not None and bad_batch_size > min_batch_size and next_batch_size >= bad_batch_size:
-                next_batch_size = bad_batch_size - 1
-            if next_batch_size <= batch_size and batch_size < max_batch_size:
-                next_batch_size = batch_size + 1
-                if bad_batch_size is not None and bad_batch_size > min_batch_size and next_batch_size >= bad_batch_size:
-                    next_batch_size = bad_batch_size - 1
-            return max(min_batch_size, next_batch_size)
-
-        def _next_batch_after_bad(
-            batch_size: int,
-            good_batch_size: Optional[int],
-            bad_batch_size: Optional[int],
-        ) -> int:
-            # If we're already below the configured minimum (for example, last partial chunk),
-            # keep shrinking until we reach 1.
-            if batch_size < min_batch_size:
-                return max(1, batch_size - 1)
-
-            upper_bound = bad_batch_size if bad_batch_size is not None else batch_size
-
-            if good_batch_size is not None and good_batch_size < upper_bound:
-                next_batch_size = good_batch_size + max(1, (upper_bound - good_batch_size) // 2)
-            else:
-                next_batch_size = upper_bound // 2
-
-            next_batch_size = max(min_batch_size, min(max_batch_size, next_batch_size))
-            if next_batch_size >= batch_size:
-                next_batch_size = max(min_batch_size, batch_size - 1)
-            return next_batch_size
-
-        def _is_retryable_upload_error(exc: Exception) -> bool:
-            if isinstance(exc, DataEngineGqlError):
-                return isinstance(exc.original_exception, (TransportServerError, TransportConnectionFailed))
-            return isinstance(
-                exc,
-                (
-                    TransportServerError,
-                    TransportConnectionFailed,
-                    TimeoutError,
-                    ConnectionError,
-                    RequestsConnectionError,
-                    RequestsTimeout,
-                ),
-            )
+        current_batch_size = batch_config.initial_batch_size
 
         total_entries = len(metadata_entries)
         total_task = progress.add_task(
-            f"Uploading metadata (adaptive batch {current_batch_size}-{max_batch_size})...",
+            f"Uploading metadata (adaptive batch {batch_config.min_batch_size}-{batch_config.max_batch_size})...",
             total=total_entries,
         )
 
@@ -854,11 +797,11 @@ class Datasource:
                 try:
                     self.source.client.update_metadata(self, entries)
                 except Exception as exc:
-                    if not _is_retryable_upload_error(exc):
+                    if not is_retryable_metadata_upload_error(exc):
                         logger.error("Metadata upload failed with a non-retryable error; aborting.", exc_info=True)
                         raise
 
-                    if batch_size <= 1 or batch_size == min_batch_size:
+                    if batch_size <= 1:
                         logger.error(
                             f"Metadata upload failed at minimum batch size ({batch_size}); aborting.",
                             exc_info=True,
@@ -866,18 +809,18 @@ class Datasource:
                         raise
 
                     consecutive_retryable_failures += 1
-                    # Bounded exponential backoff: 0.25s, 0.5s, 1s, 2s, then capped at 4s.
-                    retry_delay_sec = min(
-                        METADATA_UPLOAD_RETRY_BACKOFF_MAX_SECONDS,
-                        METADATA_UPLOAD_RETRY_BACKOFF_BASE_SECONDS
-                        * (2 ** min(consecutive_retryable_failures - 1, METADATA_UPLOAD_RETRY_BACKOFF_EXPONENT_CAP)),
-                    )
+                    retry_delay_sec = get_retry_delay_seconds(consecutive_retryable_failures)
                     time.sleep(retry_delay_sec)
 
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
                     )
-                    current_batch_size = _next_batch_after_bad(batch_size, last_good_batch_size, last_bad_batch_size)
+                    current_batch_size = next_batch_after_retryable_failure(
+                        batch_size,
+                        batch_config,
+                        last_good_batch_size,
+                        last_bad_batch_size,
+                    )
                     logger.warning(
                         f"Metadata upload failed for batch size {batch_size} "
                         f"({exc.__class__.__name__}: {exc}). Retrying with batch size {current_batch_size}."
@@ -889,16 +832,21 @@ class Datasource:
                 start += batch_size
                 progress.update(total_task, advance=batch_size)
 
-                if elapsed <= target_batch_time:
+                if elapsed <= batch_config.target_batch_time_seconds:
                     last_good_batch_size = (
                         batch_size if last_good_batch_size is None else max(last_good_batch_size, batch_size)
                     )
-                    current_batch_size = _next_batch_after_success(batch_size, last_bad_batch_size)
+                    current_batch_size = next_batch_after_success(batch_size, batch_config, last_bad_batch_size)
                 else:
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
                     )
-                    current_batch_size = _next_batch_after_bad(batch_size, last_good_batch_size, last_bad_batch_size)
+                    current_batch_size = next_batch_after_retryable_failure(
+                        batch_size,
+                        batch_config,
+                        last_good_batch_size,
+                        last_bad_batch_size,
+                    )
 
             progress.update(total_task, completed=total_entries, refresh=True)
 

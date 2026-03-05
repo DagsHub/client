@@ -58,10 +58,16 @@ RECOMMENDED_ANNOTATE_LIMIT_KEY = "RECOMMENDED_ANNOTATE_LIMIT"
 recommended_annotate_limit = int(os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 1e5))
 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE"
-dataengine_metadata_upload_batch_size = int(os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, 15000))
+DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE_MAX"
+dataengine_metadata_upload_batch_size = int(
+    os.environ.get(
+        DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX_KEY,
+        os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, 15000),
+    )
+)
 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MIN_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE_MIN"
-dataengine_metadata_upload_batch_size_min = int(os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MIN_KEY, 150))
+dataengine_metadata_upload_batch_size_min = int(os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MIN_KEY, 1))
 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_INITIAL_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE_INITIAL"
 dataengine_metadata_upload_batch_size_initial = int(
@@ -69,9 +75,15 @@ dataengine_metadata_upload_batch_size_initial = int(
 )
 
 DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_KEY = "DAGSHUB_DE_METADATA_UPLOAD_TARGET_BATCH_TIME"
-dataengine_metadata_upload_target_batch_time = float(
-    os.environ.get(DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_KEY, 5.0)
+DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS_KEY = "DAGSHUB_DE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS"
+dataengine_metadata_upload_target_batch_time_seconds = float(
+    os.environ.get(
+        DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS_KEY,
+        os.environ.get(DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_KEY, 5.0),
+    )
 )
+# Backwards compatibility for code that imports the old module attribute name.
+dataengine_metadata_upload_target_batch_time = dataengine_metadata_upload_target_batch_time_seconds
 
 DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
 disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ
