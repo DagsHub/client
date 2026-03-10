@@ -359,3 +359,30 @@ class TestAdaptiveBatcherRun:
         batcher.run(list(range(100)), lambda batch: batch_sizes.append(len(batch)))
         # Should grow from initial=2
         assert max(batch_sizes) > 2
+
+    @patch("dagshub.common.adaptive_batching.time")
+    def test_batch_size_shrinks_on_slow_success(self, mock_time):
+        # Make elapsed always > target (slow batches)
+        mock_time.monotonic.side_effect = [0.0, 100.0] * 100
+        mock_time.sleep = lambda _: None
+
+        batcher = self._make_batcher(
+            initial_batch_size=20,
+            min_batch_size=1,
+            max_batch_size=100,
+            target_batch_time_seconds=1.0,
+        )
+        received = []
+        batch_sizes = []
+
+        def op(batch):
+            batch_sizes.append(len(batch))
+            received.extend(batch)
+
+        items = list(range(50))
+        batcher.run(items, op)
+        # All items processed despite slow batches
+        assert sorted(received) == items
+        # Batch size should shrink from 20
+        assert batch_sizes[0] == 20
+        assert min(batch_sizes) < 20

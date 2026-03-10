@@ -219,6 +219,8 @@ class AdaptiveBatcher:
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
                     )
+                    if last_good_batch_size is not None and last_good_batch_size >= last_bad_batch_size:
+                        last_good_batch_size = None
                     current_batch_size = _next_batch_after_retryable_failure(
                         batch_size, config, last_good_batch_size, last_bad_batch_size
                     )
@@ -247,6 +249,8 @@ class AdaptiveBatcher:
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
                     )
+                    if last_good_batch_size is not None and last_good_batch_size >= last_bad_batch_size:
+                        last_good_batch_size = None
                     current_batch_size = _next_batch_after_retryable_failure(
                         batch_size, config, last_good_batch_size, last_bad_batch_size
                     )
