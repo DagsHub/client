@@ -26,8 +26,8 @@ def _get_datetime_utc_offset(t: datetime.datetime) -> Optional[str]:
 
 
 def is_retryable_metadata_upload_error(exc: Exception) -> bool:
-    if isinstance(exc, DataEngineGqlError):
-        return isinstance(exc.original_exception, (TransportServerError, TransportConnectionFailed))
+    if isinstance(exc, DataEngineGqlError) and isinstance(exc.original_exception, Exception):
+        return is_retryable_metadata_upload_error(exc.original_exception)
 
     return isinstance(
         exc,
