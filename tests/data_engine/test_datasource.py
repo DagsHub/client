@@ -248,8 +248,7 @@ def test_upload_metadata_non_retryable_error_does_not_retry(ds, mocker):
 
 
 def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
-    """A tail batch smaller than min_batch_size that fails is aborted immediately,
-    since shrinking further is impossible."""
+    """A short tail batch below min_batch_size gets one retry before aborting."""
     entries = [
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
     ]
@@ -258,7 +257,7 @@ def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 4)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
-    mocker.patch("dagshub.common.adaptive_batching.time.sleep", return_value=None)
+    sleep_mock = mocker.patch("dagshub.common.adaptive_batching.time.sleep")
 
     def _flaky_upload(_ds, upload_entries):
         if len(upload_entries) == 2:
@@ -269,7 +268,8 @@ def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
     with pytest.raises(TimeoutError, match="simulated timeout"):
         ds._upload_metadata(entries)
 
-    assert _uploaded_batch_sizes(ds) == [8, 2]
+    assert _uploaded_batch_sizes(ds) == [8, 2, 2]
+    assert [c.args[0] for c in sleep_mock.call_args_list] == [0.25]
 
 
 def test_upload_metadata_backoff_resets_after_success(ds, mocker):

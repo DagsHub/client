@@ -113,7 +113,8 @@ def _next_batch_after_retryable_failure(
     Strategy:
     - If we have a known-good lower bound, binary-search between it and the
       failing size.
-    - Otherwise, halve.
+    - Otherwise, probe the midpoint between config.min_batch_size and the
+      largest allowed size below the failing batch.
     - Must be strictly less than the current size (so we converge downward).
     """
     if batch_size <= config.min_batch_size:
@@ -207,7 +208,8 @@ class AdaptiveBatcher:
                         )
                         raise
 
-                    if batch_size <= config.min_batch_size:
+                    exhausted_shrink = batch_size <= config.min_batch_size and batch_size == current_batch_size
+                    if exhausted_shrink:
                         logger.error(
                             f"{self._progress_label} failed at minimum batch size ({batch_size}); aborting.",
                             exc_info=True,
@@ -222,9 +224,14 @@ class AdaptiveBatcher:
                     )
                     if last_good_batch_size is not None and last_good_batch_size >= last_bad_batch_size:
                         last_good_batch_size = None
-                    current_batch_size = _next_batch_after_retryable_failure(
-                        batch_size, config, last_good_batch_size, last_bad_batch_size
-                    )
+                    if batch_size < config.min_batch_size:
+                        # Tail batches below configured min cannot be split further.
+                        # Retry that exact size once before treating it as exhausted.
+                        current_batch_size = batch_size
+                    else:
+                        current_batch_size = _next_batch_after_retryable_failure(
+                            batch_size, config, last_good_batch_size, last_bad_batch_size
+                        )
                     logger.warning(
                         f"{self._progress_label} failed for batch size {batch_size} "
                         f"({exc.__class__.__name__}: {exc}). Retrying with batch size {current_batch_size}."
