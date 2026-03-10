@@ -97,8 +97,8 @@ def _next_batch_after_retryable_failure(
     good_batch_size: Optional[int],
     bad_batch_size: Optional[int],
 ) -> int:
-    if batch_size <= 1:
-        return 1
+    if batch_size <= config.min_batch_size:
+        return config.min_batch_size
 
     upper_bound = min(batch_size, bad_batch_size) if bad_batch_size is not None else batch_size
     if good_batch_size is not None and good_batch_size < upper_bound:
@@ -107,7 +107,7 @@ def _next_batch_after_retryable_failure(
         next_batch_size = batch_size // 2
 
     next_batch_size = min(next_batch_size, upper_bound - 1, batch_size - 1, config.max_batch_size)
-    return max(1, next_batch_size)
+    return max(config.min_batch_size, next_batch_size)
 
 
 def _get_retry_delay_seconds(consecutive_retryable_failures: int) -> float:
@@ -136,11 +136,12 @@ class AdaptiveBatcher:
         config = self._config
         current_batch_size = config.initial_batch_size
         it = iter(items)
+        pending: List[T] = []
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         total_task = progress.add_task(
             f"{self._progress_label} (adaptive batch {config.min_batch_size}-{config.max_batch_size})...",
-            total=total if total is not None else float("inf"),
+            total=total,
         )
 
         last_good_batch_size: Optional[int] = None
@@ -150,7 +151,11 @@ class AdaptiveBatcher:
 
         with progress:
             while True:
-                batch = list(itertools.islice(it, current_batch_size))
+                # Draw from pending (failed-batch leftovers) first, then the source iterator
+                batch = pending[:current_batch_size]
+                pending = pending[current_batch_size:]
+                if len(batch) < current_batch_size:
+                    batch.extend(itertools.islice(it, current_batch_size - len(batch)))
                 if not batch:
                     break
                 batch_size = len(batch)
@@ -172,7 +177,7 @@ class AdaptiveBatcher:
                         )
                         raise
 
-                    if batch_size <= 1:
+                    if batch_size <= config.min_batch_size:
                         logger.error(
                             f"{self._progress_label} failed at minimum batch size ({batch_size}); aborting.",
                             exc_info=True,
@@ -192,8 +197,8 @@ class AdaptiveBatcher:
                         f"{self._progress_label} failed for batch size {batch_size} "
                         f"({exc.__class__.__name__}: {exc}). Retrying with batch size {current_batch_size}."
                     )
-                    # Re-prepend the failed batch to the iterator for retry
-                    it = itertools.chain(batch, it)
+                    # Re-queue the failed batch items for retry with smaller batch size
+                    pending = batch + pending
                     continue
 
                 elapsed = time.monotonic() - start_time
