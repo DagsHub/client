@@ -5,8 +5,8 @@ import pytest
 from dagshub.common.adaptive_batching import (
     AdaptiveBatchConfig,
     AdaptiveBatcher,
+    _clamp,
     _get_retry_delay_seconds,
-    _midpoint,
     _next_batch_after_retryable_failure,
     _next_batch_after_success,
 )
@@ -81,19 +81,22 @@ class TestAdaptiveBatchConfigFromValues:
 
 
 # ---------------------------------------------------------------------------
-# _midpoint
+# _clamp
 # ---------------------------------------------------------------------------
 
 
-class TestMidpoint:
-    def test_basic(self):
-        assert _midpoint(10, 20) == 15
+class TestClamp:
+    def test_within_range(self):
+        assert _clamp(5, 1, 10) == 5
 
-    def test_adjacent_values_advance_by_at_least_1(self):
-        assert _midpoint(10, 11) == 11
+    def test_below_minimum(self):
+        assert _clamp(0, 3, 10) == 3
 
-    def test_equal_values_advance_by_1(self):
-        assert _midpoint(5, 5) == 6
+    def test_above_maximum(self):
+        assert _clamp(20, 1, 10) == 10
+
+    def test_equal_bounds(self):
+        assert _clamp(5, 7, 7) == 7
 
 
 # ---------------------------------------------------------------------------

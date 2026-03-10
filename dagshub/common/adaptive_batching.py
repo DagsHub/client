@@ -73,8 +73,8 @@ class AdaptiveBatchConfig:
         )
 
 
-def _midpoint(lower_bound: int, upper_bound: int) -> int:
-    return lower_bound + max(1, (upper_bound - lower_bound) // 2)
+def _clamp(value: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, value))
 
 
 def _next_batch_after_success(
@@ -82,18 +82,24 @@ def _next_batch_after_success(
     config: AdaptiveBatchConfig,
     bad_batch_size: Optional[int],
 ) -> int:
+    """Pick the next batch size after a successful (fast) batch.
+
+    Strategy:
+    - If we have a known-bad upper bound, binary-search toward it.
+    - Otherwise, multiply by the growth factor.
+    - Always guarantee at least +1 progress (so we never stall).
+    """
     if bad_batch_size is not None and batch_size < bad_batch_size:
-        next_batch_size = _midpoint(batch_size, bad_batch_size)
-        next_batch_size = min(next_batch_size, bad_batch_size - 1)
+        # Binary search: try the midpoint between current and bad
+        candidate = (batch_size + bad_batch_size) // 2
     else:
-        next_batch_size = batch_size * config.batch_growth_factor
+        # No upper bound (or we've already passed it): grow aggressively
+        candidate = batch_size * config.batch_growth_factor
 
-    next_batch_size = min(config.max_batch_size, next_batch_size)
-    if next_batch_size <= batch_size < config.max_batch_size:
-        # Guarantee forward progress: step up by 1, even past a stale bad_batch_size
-        next_batch_size = min(config.max_batch_size, batch_size + 1)
+    # Must advance by at least 1 to avoid stalling
+    candidate = max(candidate, batch_size + 1)
 
-    return max(config.min_batch_size, next_batch_size)
+    return _clamp(candidate, config.min_batch_size, config.max_batch_size)
 
 
 def _next_batch_after_retryable_failure(
@@ -102,17 +108,28 @@ def _next_batch_after_retryable_failure(
     good_batch_size: Optional[int],
     bad_batch_size: Optional[int],
 ) -> int:
+    """Pick the next batch size after a failed or slow batch.
+
+    Strategy:
+    - If we have a known-good lower bound, binary-search between it and the
+      failing size.
+    - Otherwise, halve.
+    - Must be strictly less than the current size (so we converge downward).
+    """
     if batch_size <= config.min_batch_size:
         return config.min_batch_size
 
-    upper_bound = min(batch_size, bad_batch_size) if bad_batch_size is not None else batch_size
-    if good_batch_size is not None and good_batch_size < upper_bound:
-        next_batch_size = _midpoint(good_batch_size, upper_bound)
-    else:
-        next_batch_size = batch_size // 2
+    ceiling = batch_size - 1  # must shrink
+    if bad_batch_size is not None:
+        ceiling = min(ceiling, bad_batch_size - 1)
 
-    next_batch_size = min(next_batch_size, upper_bound - 1, batch_size - 1, config.max_batch_size)
-    return max(config.min_batch_size, next_batch_size)
+    if good_batch_size is not None and good_batch_size < ceiling:
+        # Binary search: try the midpoint between good and failing
+        candidate = (good_batch_size + ceiling) // 2
+    else:
+        candidate = batch_size // 2
+
+    return _clamp(candidate, config.min_batch_size, ceiling)
 
 
 def _get_retry_delay_seconds(consecutive_retryable_failures: int, config: AdaptiveBatchConfig) -> float:
