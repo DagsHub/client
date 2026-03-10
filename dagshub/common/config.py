@@ -75,7 +75,9 @@ dataengine_metadata_upload_batch_size_initial = int(
 )
 
 DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS_KEY = "DAGSHUB_DE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS"
-dataengine_metadata_upload_target_batch_time_seconds = float(os.environ.get(DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS_KEY, 5.0))
+dataengine_metadata_upload_target_batch_time_seconds = float(
+    os.environ.get(DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS_KEY, 5.0)
+)
 
 DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
 disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ
