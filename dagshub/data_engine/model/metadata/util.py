@@ -1,5 +1,9 @@
 import datetime
+from gql.transport.exceptions import TransportServerError, TransportConnectionFailed
+from requests import ConnectionError as RequestsConnectionError, Timeout as RequestsTimeout
 from typing import Optional
+
+from dagshub.data_engine.model.errors import DataEngineGqlError
 
 
 def _get_datetime_utc_offset(t: datetime.datetime) -> Optional[str]:
@@ -19,3 +23,20 @@ def _get_datetime_utc_offset(t: datetime.datetime) -> Optional[str]:
     offset_minutes = int((offset.total_seconds() % 3600) // 60)
     offset_str = f"{offset_hours:+03d}:{offset_minutes:02d}"
     return offset_str
+
+
+def is_retryable_metadata_upload_error(exc: Exception) -> bool:
+    if isinstance(exc, DataEngineGqlError):
+        return isinstance(exc.original_exception, (TransportServerError, TransportConnectionFailed))
+
+    return isinstance(
+        exc,
+        (
+            TransportServerError,
+            TransportConnectionFailed,
+            TimeoutError,
+            ConnectionError,
+            RequestsConnectionError,
+            RequestsTimeout,
+        ),
+    )

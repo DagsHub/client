@@ -14,7 +14,6 @@ from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, ContextManager, Dict, List, Literal, Optional, Set, Tuple, Union
 
-import rich.progress
 from dataclasses_json import DataClassJsonMixin, LetterCase, config
 from pathvalidate import sanitize_filepath
 
@@ -53,13 +52,8 @@ from dagshub.data_engine.model.metadata import (
     run_preupload_transforms,
     validate_uploading_metadata,
 )
-from dagshub.data_engine.model.metadata.upload_batching import (
-    AdaptiveUploadBatchConfig,
-    get_retry_delay_seconds,
-    is_retryable_metadata_upload_error,
-    next_batch_after_retryable_failure,
-    next_batch_after_success,
-)
+from dagshub.common.adaptive_batching import AdaptiveBatcher
+from dagshub.data_engine.model.metadata.util import is_retryable_metadata_upload_error
 from dagshub.data_engine.model.metadata.dtypes import DatapointMetadataUpdateEntry
 from dagshub.data_engine.model.metadata.transforms import DatasourceFieldInfo, _add_metadata
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
@@ -760,95 +754,11 @@ class Datasource:
         validate_uploading_metadata(precalculated_info)
         run_preupload_transforms(self, metadata_entries, precalculated_info)
 
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-
-        batch_config = AdaptiveUploadBatchConfig.from_values(
-            max_batch_size=dagshub.common.config.dataengine_metadata_upload_batch_size,
-            min_batch_size=dagshub.common.config.dataengine_metadata_upload_batch_size_min,
-            initial_batch_size=dagshub.common.config.dataengine_metadata_upload_batch_size_initial,
-            target_batch_time_seconds=dagshub.common.config.dataengine_metadata_upload_target_batch_time_seconds,
+        batcher = AdaptiveBatcher(
+            is_retryable=is_retryable_metadata_upload_error,
+            progress_label="Uploading metadata",
         )
-        current_batch_size = batch_config.initial_batch_size
-
-        total_entries = len(metadata_entries)
-        total_task = progress.add_task(
-            f"Uploading metadata (adaptive batch {batch_config.min_batch_size}-{batch_config.max_batch_size})...",
-            total=total_entries,
-        )
-
-        last_good_batch_size: Optional[int] = None
-        last_bad_batch_size: Optional[int] = None
-        consecutive_retryable_failures = 0
-
-        with progress:
-            start = 0
-            while start < total_entries:
-                entries_left = total_entries - start
-                batch_size = min(current_batch_size, entries_left)
-                entries = metadata_entries[start : start + batch_size]
-
-                progress.update(
-                    total_task,
-                    description=f"Uploading metadata (batch size {batch_size})...",
-                )
-                logger.debug(f"Uploading {batch_size} metadata entries...")
-
-                start_time = time.monotonic()
-                try:
-                    self.source.client.update_metadata(self, entries)
-                except Exception as exc:
-                    if not is_retryable_metadata_upload_error(exc):
-                        logger.error("Metadata upload failed with a non-retryable error; aborting.", exc_info=True)
-                        raise
-
-                    if batch_size <= 1:
-                        logger.error(
-                            f"Metadata upload failed at minimum batch size ({batch_size}); aborting.",
-                            exc_info=True,
-                        )
-                        raise
-
-                    consecutive_retryable_failures += 1
-                    retry_delay_sec = get_retry_delay_seconds(consecutive_retryable_failures)
-                    time.sleep(retry_delay_sec)
-
-                    last_bad_batch_size = (
-                        batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
-                    )
-                    current_batch_size = next_batch_after_retryable_failure(
-                        batch_size,
-                        batch_config,
-                        last_good_batch_size,
-                        last_bad_batch_size,
-                    )
-                    logger.warning(
-                        f"Metadata upload failed for batch size {batch_size} "
-                        f"({exc.__class__.__name__}: {exc}). Retrying with batch size {current_batch_size}."
-                    )
-                    continue
-
-                elapsed = time.monotonic() - start_time
-                consecutive_retryable_failures = 0
-                start += batch_size
-                progress.update(total_task, advance=batch_size)
-
-                if elapsed <= batch_config.target_batch_time_seconds:
-                    last_good_batch_size = (
-                        batch_size if last_good_batch_size is None else max(last_good_batch_size, batch_size)
-                    )
-                    current_batch_size = next_batch_after_success(batch_size, batch_config, last_bad_batch_size)
-                else:
-                    last_bad_batch_size = (
-                        batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
-                    )
-                    current_batch_size = next_batch_after_retryable_failure(
-                        batch_size,
-                        batch_config,
-                        last_good_batch_size,
-                        last_bad_batch_size,
-                    )
-
-            progress.update(total_task, completed=total_entries, refresh=True)
+        batcher.run(metadata_entries, lambda batch: self.source.client.update_metadata(self, batch))
 
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()
