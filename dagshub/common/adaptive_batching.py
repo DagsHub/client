@@ -1,8 +1,8 @@
 import logging
 import time
 from dataclasses import dataclass
-from types import SimpleNamespace
 import itertools
+from types import SimpleNamespace
 from typing import Callable, Iterable, List, Optional, Sized, TypeVar
 
 import rich.progress
@@ -15,15 +15,6 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 MIN_TARGET_BATCH_TIME_SECONDS = 0.01
-BATCH_GROWTH_FACTOR = 10
-RETRY_BACKOFF_BASE_SECONDS = 0.25
-RETRY_BACKOFF_MAX_SECONDS = 4.0
-
-_retry_delay_strategy = wait_exponential(
-    multiplier=RETRY_BACKOFF_BASE_SECONDS,
-    min=RETRY_BACKOFF_BASE_SECONDS,
-    max=RETRY_BACKOFF_MAX_SECONDS,
-)
 
 
 @dataclass(frozen=True)
@@ -32,6 +23,9 @@ class AdaptiveBatchConfig:
     min_batch_size: int
     initial_batch_size: int
     target_batch_time_seconds: float
+    batch_growth_factor: int
+    retry_backoff_base_seconds: float
+    retry_backoff_max_seconds: float
 
     @classmethod
     def from_values(
@@ -40,6 +34,9 @@ class AdaptiveBatchConfig:
         min_batch_size: Optional[int] = None,
         initial_batch_size: Optional[int] = None,
         target_batch_time_seconds: Optional[float] = None,
+        batch_growth_factor: Optional[int] = None,
+        retry_backoff_base_seconds: Optional[float] = None,
+        retry_backoff_max_seconds: Optional[float] = None,
     ) -> "AdaptiveBatchConfig":
         import dagshub.common.config as dgs_config
 
@@ -51,6 +48,12 @@ class AdaptiveBatchConfig:
             initial_batch_size = dgs_config.dataengine_metadata_upload_batch_size_initial
         if target_batch_time_seconds is None:
             target_batch_time_seconds = dgs_config.dataengine_metadata_upload_target_batch_time_seconds
+        if batch_growth_factor is None:
+            batch_growth_factor = dgs_config.adaptive_batch_growth_factor
+        if retry_backoff_base_seconds is None:
+            retry_backoff_base_seconds = dgs_config.adaptive_batch_retry_backoff_base_seconds
+        if retry_backoff_max_seconds is None:
+            retry_backoff_max_seconds = dgs_config.adaptive_batch_retry_backoff_max_seconds
 
         normalized_max_batch_size = max(1, max_batch_size)
         normalized_min_batch_size = max(1, min(min_batch_size, normalized_max_batch_size))
@@ -64,6 +67,9 @@ class AdaptiveBatchConfig:
             min_batch_size=normalized_min_batch_size,
             initial_batch_size=normalized_initial_batch_size,
             target_batch_time_seconds=normalized_target_batch_time_seconds,
+            batch_growth_factor=max(2, batch_growth_factor),
+            retry_backoff_base_seconds=max(0.0, retry_backoff_base_seconds),
+            retry_backoff_max_seconds=max(0.0, retry_backoff_max_seconds),
         )
 
 
@@ -80,10 +86,10 @@ def _next_batch_after_success(
         next_batch_size = _midpoint(batch_size, bad_batch_size)
         next_batch_size = min(next_batch_size, bad_batch_size - 1)
     else:
-        next_batch_size = batch_size * BATCH_GROWTH_FACTOR
+        next_batch_size = batch_size * config.batch_growth_factor
 
     next_batch_size = min(config.max_batch_size, next_batch_size)
-    if next_batch_size <= batch_size and batch_size < config.max_batch_size:
+    if next_batch_size <= batch_size < config.max_batch_size:
         next_batch_size = min(config.max_batch_size, batch_size + 1)
         if bad_batch_size is not None:
             next_batch_size = min(next_batch_size, bad_batch_size - 1)
@@ -110,9 +116,16 @@ def _next_batch_after_retryable_failure(
     return max(config.min_batch_size, next_batch_size)
 
 
-def _get_retry_delay_seconds(consecutive_retryable_failures: int) -> float:
+def _get_retry_delay_seconds(consecutive_retryable_failures: int, config: AdaptiveBatchConfig) -> float:
+    # SimpleNamespace duck-types the .attempt_number attribute that tenacity's
+    # wait strategies read, avoiding the heavier RetryCallState constructor.
+    strategy = wait_exponential(
+        multiplier=config.retry_backoff_base_seconds,
+        min=config.retry_backoff_base_seconds,
+        max=config.retry_backoff_max_seconds,
+    )
     retry_state = SimpleNamespace(attempt_number=max(1, consecutive_retryable_failures))
-    return float(_retry_delay_strategy(retry_state))
+    return float(strategy(retry_state))  # type: ignore[arg-type]
 
 
 class AdaptiveBatcher:
@@ -185,7 +198,7 @@ class AdaptiveBatcher:
                         raise
 
                     consecutive_retryable_failures += 1
-                    time.sleep(_get_retry_delay_seconds(consecutive_retryable_failures))
+                    time.sleep(_get_retry_delay_seconds(consecutive_retryable_failures, config))
 
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
