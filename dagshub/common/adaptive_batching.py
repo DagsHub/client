@@ -2,7 +2,8 @@ import logging
 import time
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Callable, List, Optional, TypeVar
+import itertools
+from typing import Callable, Iterable, List, Optional, Sized, TypeVar
 
 import rich.progress
 from tenacity import wait_exponential
@@ -127,29 +128,32 @@ class AdaptiveBatcher:
         self._is_retryable = is_retryable
         self._progress_label = progress_label
 
-    def run(self, items: List[T], operation: Callable[[List[T]], None]) -> None:
-        total = len(items)
+    def run(self, items: Iterable[T], operation: Callable[[List[T]], None]) -> None:
+        total: Optional[int] = len(items) if isinstance(items, Sized) else None
         if total == 0:
             return
 
         config = self._config
         current_batch_size = config.initial_batch_size
+        it = iter(items)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
         total_task = progress.add_task(
             f"{self._progress_label} (adaptive batch {config.min_batch_size}-{config.max_batch_size})...",
-            total=total,
+            total=total if total is not None else float("inf"),
         )
 
         last_good_batch_size: Optional[int] = None
         last_bad_batch_size: Optional[int] = None
         consecutive_retryable_failures = 0
+        processed = 0
 
         with progress:
-            start = 0
-            while start < total:
-                batch_size = min(current_batch_size, total - start)
-                batch = items[start : start + batch_size]
+            while True:
+                batch = list(itertools.islice(it, current_batch_size))
+                if not batch:
+                    break
+                batch_size = len(batch)
 
                 progress.update(
                     total_task,
@@ -188,11 +192,13 @@ class AdaptiveBatcher:
                         f"{self._progress_label} failed for batch size {batch_size} "
                         f"({exc.__class__.__name__}: {exc}). Retrying with batch size {current_batch_size}."
                     )
+                    # Re-prepend the failed batch to the iterator for retry
+                    it = itertools.chain(batch, it)
                     continue
 
                 elapsed = time.monotonic() - start_time
                 consecutive_retryable_failures = 0
-                start += batch_size
+                processed += batch_size
                 progress.update(total_task, advance=batch_size)
 
                 if elapsed <= config.target_batch_time_seconds:
@@ -208,4 +214,4 @@ class AdaptiveBatcher:
                         batch_size, config, last_good_batch_size, last_bad_batch_size
                     )
 
-            progress.update(total_task, completed=total, refresh=True)
+            progress.update(total_task, completed=processed, total=processed, refresh=True)
