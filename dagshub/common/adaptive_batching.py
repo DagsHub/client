@@ -127,7 +127,8 @@ def _next_batch_after_retryable_failure(
         # Binary search: try the midpoint between good and failing
         candidate = (good_batch_size + ceiling) // 2
     else:
-        candidate = batch_size // 2
+        # No good lower bound — probe midpoint of the valid range
+        candidate = (config.min_batch_size + ceiling) // 2
 
     return _clamp(candidate, config.min_batch_size, ceiling)
 

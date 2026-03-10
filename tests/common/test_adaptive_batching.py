@@ -386,3 +386,26 @@ class TestAdaptiveBatcherRun:
         # Batch size should shrink from 20
         assert batch_sizes[0] == 20
         assert min(batch_sizes) < 20
+
+    def test_grows_past_cleared_bad_bound(self):
+        """After a transient failure, fast successes must clear the bad bound and grow past it."""
+        batcher = self._make_batcher(
+            initial_batch_size=10,
+            min_batch_size=1,
+            max_batch_size=1000,
+        )
+        fail_once = True
+        batch_sizes = []
+
+        def op(batch):
+            nonlocal fail_once
+            batch_sizes.append(len(batch))
+            if fail_once:
+                fail_once = False
+                raise ValueError("transient")
+
+        items = list(range(200))
+        batcher.run(items, op)
+        # First call at size 10 fails, shrinks, then should recover and grow past 10
+        assert batch_sizes[0] == 10
+        assert max(batch_sizes) > 10
