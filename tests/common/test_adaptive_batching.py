@@ -11,10 +11,10 @@ from dagshub.common.adaptive_batching import (
     _next_batch_after_success,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _cfg(
     max_batch_size=1000,
@@ -52,14 +52,10 @@ class TestAdaptiveBatchConfigFromValues:
         assert cfg.min_batch_size == 5
 
     def test_clamps_initial_between_min_and_max(self):
-        cfg = AdaptiveBatchConfig.from_values(
-            max_batch_size=100, min_batch_size=10, initial_batch_size=5
-        )
+        cfg = AdaptiveBatchConfig.from_values(max_batch_size=100, min_batch_size=10, initial_batch_size=5)
         assert cfg.initial_batch_size == 10
 
-        cfg2 = AdaptiveBatchConfig.from_values(
-            max_batch_size=100, min_batch_size=10, initial_batch_size=200
-        )
+        cfg2 = AdaptiveBatchConfig.from_values(max_batch_size=100, min_batch_size=10, initial_batch_size=200)
         assert cfg2.initial_batch_size == 100
 
     def test_batch_growth_factor_minimum_is_2(self):
@@ -67,11 +63,21 @@ class TestAdaptiveBatchConfigFromValues:
         assert cfg.batch_growth_factor == 2
 
     def test_backoff_seconds_non_negative(self):
-        cfg = AdaptiveBatchConfig.from_values(
-            retry_backoff_base_seconds=-1.0, retry_backoff_max_seconds=-5.0
-        )
+        cfg = AdaptiveBatchConfig.from_values(retry_backoff_base_seconds=-1.0, retry_backoff_max_seconds=-5.0)
         assert cfg.retry_backoff_base_seconds == 0.0
         assert cfg.retry_backoff_max_seconds == 0.0
+
+    def test_defaults_from_config(self):
+        cfg = AdaptiveBatchConfig.from_values()
+        assert cfg.max_batch_size >= 1
+        assert cfg.min_batch_size >= 1
+        assert cfg.min_batch_size <= cfg.max_batch_size
+        assert cfg.initial_batch_size >= cfg.min_batch_size
+        assert cfg.initial_batch_size <= cfg.max_batch_size
+        assert cfg.target_batch_time_seconds > 0
+        assert cfg.batch_growth_factor >= 2
+        assert cfg.retry_backoff_base_seconds >= 0
+        assert cfg.retry_backoff_max_seconds >= 0
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +124,23 @@ class TestNextBatchAfterSuccess:
         cfg = _cfg(min_batch_size=5, max_batch_size=10)
         result = _next_batch_after_success(1, cfg, bad_batch_size=None)
         assert result >= 5
+
+    def test_no_stall_at_bad_batch_size_minus_one(self):
+        """Regression: batch_size == bad_batch_size - 1 must still make progress."""
+        cfg = _cfg(max_batch_size=1000, batch_growth_factor=2)
+        result = _next_batch_after_success(9, cfg, bad_batch_size=10)
+        assert result > 9
+
+    def test_convergence_reaches_max(self):
+        """Iterating _next_batch_after_success must eventually reach max_batch_size."""
+        cfg = _cfg(max_batch_size=100, batch_growth_factor=2)
+        batch_size = 1
+        bad = 50  # initial bad bound
+        for _ in range(200):
+            batch_size = _next_batch_after_success(batch_size, cfg, bad_batch_size=bad)
+            if batch_size >= cfg.max_batch_size:
+                break
+        assert batch_size == cfg.max_batch_size
 
     def test_makes_progress_when_growth_factor_would_not_increase(self):
         cfg = _cfg(batch_growth_factor=2, max_batch_size=100)
@@ -198,14 +221,19 @@ class TestGetRetryDelaySeconds:
 class TestAdaptiveBatcherRun:
     @staticmethod
     def _make_batcher(**config_overrides):
-        cfg = _cfg(**{**dict(
-            initial_batch_size=3,
-            max_batch_size=100,
-            min_batch_size=1,
-            target_batch_time_seconds=999,  # fast enough to always grow
-            retry_backoff_base_seconds=0.0,
-            retry_backoff_max_seconds=0.0,
-        ), **config_overrides})
+        cfg = _cfg(
+            **{
+                **dict(
+                    initial_batch_size=3,
+                    max_batch_size=100,
+                    min_batch_size=1,
+                    target_batch_time_seconds=999,  # fast enough to always grow
+                    retry_backoff_base_seconds=0.0,
+                    retry_backoff_max_seconds=0.0,
+                ),
+                **config_overrides,
+            }
+        )
         return AdaptiveBatcher(
             is_retryable=lambda exc: isinstance(exc, ValueError),
             config=cfg,

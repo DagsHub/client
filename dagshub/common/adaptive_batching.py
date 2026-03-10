@@ -90,9 +90,8 @@ def _next_batch_after_success(
 
     next_batch_size = min(config.max_batch_size, next_batch_size)
     if next_batch_size <= batch_size < config.max_batch_size:
+        # Guarantee forward progress: step up by 1, even past a stale bad_batch_size
         next_batch_size = min(config.max_batch_size, batch_size + 1)
-        if bad_batch_size is not None:
-            next_batch_size = min(next_batch_size, bad_batch_size - 1)
 
     return max(config.min_batch_size, next_batch_size)
 
@@ -223,6 +222,9 @@ class AdaptiveBatcher:
                     last_good_batch_size = (
                         batch_size if last_good_batch_size is None else max(last_good_batch_size, batch_size)
                     )
+                    # Clear stale bad bound if we succeeded fast at or above it
+                    if last_bad_batch_size is not None and batch_size >= last_bad_batch_size:
+                        last_bad_batch_size = None
                     current_batch_size = _next_batch_after_success(batch_size, config, last_bad_batch_size)
                 else:
                     last_bad_batch_size = (
