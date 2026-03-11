@@ -41,7 +41,7 @@ class AdaptiveBatchConfig:
         import dagshub.common.config as dgs_config
 
         if max_batch_size is None:
-            max_batch_size = dgs_config.dataengine_metadata_upload_batch_size
+            max_batch_size = dgs_config.dataengine_metadata_upload_batch_size_max
         if min_batch_size is None:
             min_batch_size = dgs_config.dataengine_metadata_upload_batch_size_min
         if initial_batch_size is None:

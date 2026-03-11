@@ -152,7 +152,7 @@ def test_upload_metadata_starts_small_and_grows(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(14)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 16)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 16)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
@@ -167,7 +167,7 @@ def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
@@ -193,7 +193,7 @@ def test_upload_metadata_does_not_retry_known_bad_batch_size(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(32)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 16)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 16)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
@@ -219,7 +219,7 @@ def test_upload_metadata_slow_success_reduces_batch_size(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(12)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1.0)
@@ -235,7 +235,7 @@ def test_upload_metadata_non_retryable_error_does_not_retry(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
@@ -253,7 +253,7 @@ def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 4)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
@@ -277,7 +277,7 @@ def test_upload_metadata_backoff_resets_after_success(ds, mocker):
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(12)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
@@ -302,7 +302,7 @@ def test_upload_metadata_retries_below_configured_min_before_aborting(ds, mocker
         DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(6)
     ]
 
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size", 8)
+    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)

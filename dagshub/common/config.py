@@ -60,15 +60,14 @@ recommended_annotate_limit = int(os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE"
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE_MAX"
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_DEFAULT_MAX = 50000
+# Read from the explicit MAX key first; if unset, honor the legacy key so existing
+# env-based overrides keep working while config names are clarified.
 dataengine_metadata_upload_batch_size_max = int(
     os.environ.get(
         DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX_KEY,
         os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_DEFAULT_MAX),
     )
 )
-# Keep the runtime config name consumed by existing code/tests, while making the
-# source setting semantics explicit as a max bound.
-dataengine_metadata_upload_batch_size = dataengine_metadata_upload_batch_size_max
 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MIN_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE_MIN"
 dataengine_metadata_upload_batch_size_min = int(os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MIN_KEY, 1))
