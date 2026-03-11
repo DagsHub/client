@@ -1,9 +1,14 @@
 import datetime
-from gql.transport.exceptions import TransportServerError, TransportConnectionFailed
+from gql.transport import exceptions as gql_transport_exceptions
 from requests import ConnectionError as RequestsConnectionError, Timeout as RequestsTimeout
 from typing import Optional
 
 from dagshub.data_engine.model.errors import DataEngineGqlError
+
+TransportServerError = gql_transport_exceptions.TransportServerError
+# Some supported gql versions (e.g. 3.4.x) do not expose this symbol.
+# Fallback to an empty tuple so isinstance(...) still works without broad try/except imports.
+TransportConnectionFailed = getattr(gql_transport_exceptions, "TransportConnectionFailed", tuple())
 
 
 def _get_datetime_utc_offset(t: datetime.datetime) -> Optional[str]:
