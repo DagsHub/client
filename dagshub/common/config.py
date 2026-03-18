@@ -1,10 +1,11 @@
 import logging
-
-import appdirs
 import os
 from urllib.parse import urlparse
-from dagshub import __version__
+
+import appdirs
 from httpx._client import USER_AGENT
+
+from dagshub import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +60,12 @@ recommended_annotate_limit = int(os.environ.get(RECOMMENDED_ANNOTATE_LIMIT_KEY, 
 
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE"
 DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE_MAX"
-DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_DEFAULT_MAX = 50000
-# Read from the explicit MAX key first; if unset, honor the legacy key so existing
-# env-based overrides keep working while config names are clarified.
+DEFAULT_DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX = 50000
+# Fall back to the old `DAGSHUB_DE_METADATA_UPLOAD_BATCH_SIZE` env var for backwards compatibility.
 dataengine_metadata_upload_batch_size_max = int(
     os.environ.get(
         DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX_KEY,
-        os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_DEFAULT_MAX),
+        os.environ.get(DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_KEY, DEFAULT_DATAENGINE_METADATA_UPLOAD_BATCH_SIZE_MAX),
     )
 )
 
@@ -82,14 +82,32 @@ dataengine_metadata_upload_target_batch_time_seconds = float(
     os.environ.get(DATAENGINE_METADATA_UPLOAD_TARGET_BATCH_TIME_SECONDS_KEY, 5.0)
 )
 
-ADAPTIVE_BATCH_GROWTH_FACTOR_KEY = "DAGSHUB_ADAPTIVE_BATCH_GROWTH_FACTOR"
-adaptive_batch_growth_factor = int(os.environ.get(ADAPTIVE_BATCH_GROWTH_FACTOR_KEY, 10))
+DATAENGINE_METADATA_UPLOAD_BATCH_GROWTH_FACTOR_KEY = "DAGSHUB_DE_METADATA_UPLOAD_BATCH_GROWTH_FACTOR"
+LEGACY_ADAPTIVE_BATCH_GROWTH_FACTOR_KEY = "DAGSHUB_ADAPTIVE_BATCH_GROWTH_FACTOR"
+adaptive_batch_growth_factor = int(
+    os.environ.get(
+        DATAENGINE_METADATA_UPLOAD_BATCH_GROWTH_FACTOR_KEY,
+        os.environ.get(LEGACY_ADAPTIVE_BATCH_GROWTH_FACTOR_KEY, 10),
+    )
+)
 
-ADAPTIVE_BATCH_RETRY_BACKOFF_BASE_KEY = "DAGSHUB_ADAPTIVE_BATCH_RETRY_BACKOFF_BASE"
-adaptive_batch_retry_backoff_base_seconds = float(os.environ.get(ADAPTIVE_BATCH_RETRY_BACKOFF_BASE_KEY, 0.25))
+DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_BASE_KEY = "DAGSHUB_DE_METADATA_UPLOAD_RETRY_BACKOFF_BASE"
+LEGACY_ADAPTIVE_BATCH_RETRY_BACKOFF_BASE_KEY = "DAGSHUB_ADAPTIVE_BATCH_RETRY_BACKOFF_BASE"
+adaptive_batch_retry_backoff_base_seconds = float(
+    os.environ.get(
+        DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_BASE_KEY,
+        os.environ.get(LEGACY_ADAPTIVE_BATCH_RETRY_BACKOFF_BASE_KEY, 0.25),
+    )
+)
 
-ADAPTIVE_BATCH_RETRY_BACKOFF_MAX_KEY = "DAGSHUB_ADAPTIVE_BATCH_RETRY_BACKOFF_MAX"
-adaptive_batch_retry_backoff_max_seconds = float(os.environ.get(ADAPTIVE_BATCH_RETRY_BACKOFF_MAX_KEY, 4.0))
+DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_MAX_KEY = "DAGSHUB_DE_METADATA_UPLOAD_RETRY_BACKOFF_MAX"
+LEGACY_ADAPTIVE_BATCH_RETRY_BACKOFF_MAX_KEY = "DAGSHUB_ADAPTIVE_BATCH_RETRY_BACKOFF_MAX"
+adaptive_batch_retry_backoff_max_seconds = float(
+    os.environ.get(
+        DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_MAX_KEY,
+        os.environ.get(LEGACY_ADAPTIVE_BATCH_RETRY_BACKOFF_MAX_KEY, 4.0),
+    )
+)
 
 DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
 disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ

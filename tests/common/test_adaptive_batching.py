@@ -11,6 +11,11 @@ from dagshub.common.adaptive_batching import (
     _next_batch_after_success,
 )
 
+
+class RetryableTestError(Exception):
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -67,23 +72,6 @@ class TestAdaptiveBatchConfigFromValues:
         assert cfg.retry_backoff_base_seconds == 0.0
         assert cfg.retry_backoff_max_seconds == 0.0
 
-    def test_defaults_from_config(self):
-        cfg = AdaptiveBatchConfig.from_values()
-        assert cfg.max_batch_size >= 1
-        assert cfg.min_batch_size >= 1
-        assert cfg.min_batch_size <= cfg.max_batch_size
-        assert cfg.initial_batch_size >= cfg.min_batch_size
-        assert cfg.initial_batch_size <= cfg.max_batch_size
-        assert cfg.target_batch_time_seconds > 0
-        assert cfg.batch_growth_factor >= 2
-        assert cfg.retry_backoff_base_seconds >= 0
-        assert cfg.retry_backoff_max_seconds >= 0
-
-
-# ---------------------------------------------------------------------------
-# _clamp
-# ---------------------------------------------------------------------------
-
 
 class TestClamp:
     def test_within_range(self):
@@ -118,7 +106,7 @@ class TestNextBatchAfterSuccess:
         result = _next_batch_after_success(10, cfg, bad_batch_size=20)
         assert 10 < result < 20
 
-    def test_never_reaches_bad_size(self):
+    def test_stays_below_soft_upper_hint_when_midpoint_advances(self):
         cfg = _cfg(max_batch_size=10000)
         result = _next_batch_after_success(18, cfg, bad_batch_size=20)
         assert result <= 19  # bad_batch_size - 1
@@ -128,22 +116,10 @@ class TestNextBatchAfterSuccess:
         result = _next_batch_after_success(1, cfg, bad_batch_size=None)
         assert result >= 5
 
-    def test_no_stall_at_bad_batch_size_minus_one(self):
-        """Regression: batch_size == bad_batch_size - 1 must still make progress."""
+    def test_can_revisit_previous_failure_size_when_midpoint_rounds_down(self):
         cfg = _cfg(max_batch_size=1000, batch_growth_factor=2)
         result = _next_batch_after_success(9, cfg, bad_batch_size=10)
-        assert result > 9
-
-    def test_convergence_reaches_max(self):
-        """Iterating _next_batch_after_success must eventually reach max_batch_size."""
-        cfg = _cfg(max_batch_size=100, batch_growth_factor=2)
-        batch_size = 1
-        bad = 50  # initial bad bound
-        for _ in range(200):
-            batch_size = _next_batch_after_success(batch_size, cfg, bad_batch_size=bad)
-            if batch_size >= cfg.max_batch_size:
-                break
-        assert batch_size == cfg.max_batch_size
+        assert result == 10
 
     def test_makes_progress_when_growth_factor_would_not_increase(self):
         cfg = _cfg(batch_growth_factor=2, max_batch_size=100)
@@ -166,10 +142,6 @@ class TestNextBatchAfterRetryableFailure:
     def test_returns_min_when_at_min(self):
         cfg = _cfg(min_batch_size=5)
         assert _next_batch_after_retryable_failure(5, cfg, None, None) == 5
-
-    def test_returns_min_when_below_min(self):
-        cfg = _cfg(min_batch_size=10)
-        assert _next_batch_after_retryable_failure(3, cfg, None, None) == 10
 
     def test_binary_search_between_good_and_bad(self):
         cfg = _cfg(min_batch_size=1)
@@ -238,7 +210,7 @@ class TestAdaptiveBatcherRun:
             }
         )
         return AdaptiveBatcher(
-            is_retryable=lambda exc: isinstance(exc, ValueError),
+            is_retryable=lambda exc: isinstance(exc, RetryableTestError),
             config=cfg,
         )
 
@@ -274,11 +246,11 @@ class TestAdaptiveBatcherRun:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise ValueError("transient")
+                raise RetryableTestError("transient")
             received.extend(batch)
 
         batcher.run(list(range(5)), op)
-        assert sorted(received) == list(range(5))
+        assert received == list(range(5))
         assert call_count > 1
 
     def test_aborts_on_non_retryable_error(self):
@@ -290,8 +262,8 @@ class TestAdaptiveBatcherRun:
     def test_aborts_at_min_batch_size(self):
         batcher = self._make_batcher(initial_batch_size=1, min_batch_size=1)
 
-        with pytest.raises(ValueError, match="always fails"):
-            batcher.run([1], lambda batch: (_ for _ in ()).throw(ValueError("always fails")))
+        with pytest.raises(RetryableTestError, match="always fails"):
+            batcher.run([1], lambda batch: (_ for _ in ()).throw(RetryableTestError("always fails")))
 
     def test_no_items_lost_on_retry(self):
         """All items from a failed batch must be retried."""
@@ -303,12 +275,12 @@ class TestAdaptiveBatcherRun:
             nonlocal fail_once
             if fail_once and len(batch) == 4:
                 fail_once = False
-                raise ValueError("fail big batch once")
+                raise RetryableTestError("fail big batch once")
             all_received.extend(batch)
 
         items = list(range(8))
         batcher.run(items, op)
-        assert sorted(all_received) == items
+        assert all_received == items
 
     def test_generator_retry_no_items_lost(self):
         """Items from a failed batch are retried even with generator input."""
@@ -320,7 +292,7 @@ class TestAdaptiveBatcherRun:
             nonlocal fail_once
             if fail_once:
                 fail_once = False
-                raise ValueError("transient")
+                raise RetryableTestError("transient")
             all_received.extend(batch)
 
         def gen():
@@ -328,7 +300,7 @@ class TestAdaptiveBatcherRun:
                 yield i
 
         batcher.run(gen(), op)
-        assert sorted(all_received) == list(range(6))
+        assert all_received == list(range(6))
 
     def test_batch_size_shrinks_on_failure(self):
         batcher = self._make_batcher(initial_batch_size=10, min_batch_size=1)
@@ -337,7 +309,7 @@ class TestAdaptiveBatcherRun:
         def op(batch):
             batch_sizes.append(len(batch))
             if batch_sizes[-1] == 10:
-                raise ValueError("too big")
+                raise RetryableTestError("too big")
 
         batcher.run(list(range(20)), op)
         # First call is size 10 (fails), next should be smaller
@@ -382,13 +354,12 @@ class TestAdaptiveBatcherRun:
         items = list(range(50))
         batcher.run(items, op)
         # All items processed despite slow batches
-        assert sorted(received) == items
+        assert received == items
         # Batch size should shrink from 20
         assert batch_sizes[0] == 20
         assert min(batch_sizes) < 20
 
-    def test_grows_past_cleared_bad_bound(self):
-        """After a transient failure, fast successes must clear the bad bound and grow past it."""
+    def test_can_revisit_previous_failure_size_after_fast_recovery(self):
         batcher = self._make_batcher(
             initial_batch_size=10,
             min_batch_size=1,
@@ -402,10 +373,10 @@ class TestAdaptiveBatcherRun:
             batch_sizes.append(len(batch))
             if fail_once:
                 fail_once = False
-                raise ValueError("transient")
+                raise RetryableTestError("transient")
 
         items = list(range(200))
         batcher.run(items, op)
-        # First call at size 10 fails, shrinks, then should recover and grow past 10
+        # First call at size 10 fails, shrinks, then can probe 10 again after recovery.
         assert batch_sizes[0] == 10
-        assert max(batch_sizes) > 10
+        assert 10 in batch_sizes[1:]

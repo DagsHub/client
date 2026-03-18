@@ -1,14 +1,11 @@
 import datetime
-from gql.transport import exceptions as gql_transport_exceptions
-from requests import ConnectionError as RequestsConnectionError, Timeout as RequestsTimeout
 from typing import Optional
 
-from dagshub.data_engine.model.errors import DataEngineGqlError
+from gql.transport.exceptions import TransportError, TransportQueryError
+from requests import ConnectionError as RequestsConnectionError
+from requests import Timeout as RequestsTimeout
 
-TransportServerError = gql_transport_exceptions.TransportServerError
-# Some supported gql versions (e.g. 3.4.x) do not expose this symbol.
-# Fallback to an empty tuple so isinstance(...) still works without broad try/except imports.
-TransportConnectionFailed = getattr(gql_transport_exceptions, "TransportConnectionFailed", tuple())
+from dagshub.data_engine.model.errors import DataEngineGqlError
 
 
 def _get_datetime_utc_offset(t: datetime.datetime) -> Optional[str]:
@@ -31,14 +28,12 @@ def _get_datetime_utc_offset(t: datetime.datetime) -> Optional[str]:
 
 
 def is_retryable_metadata_upload_error(exc: Exception) -> bool:
-    if isinstance(exc, DataEngineGqlError) and isinstance(exc.original_exception, Exception):
+    if isinstance(exc, DataEngineGqlError):
         return is_retryable_metadata_upload_error(exc.original_exception)
 
-    return isinstance(
+    return (isinstance(exc, TransportError) and not isinstance(exc, TransportQueryError)) or isinstance(
         exc,
         (
-            TransportServerError,
-            TransportConnectionFailed,
             TimeoutError,
             ConnectionError,
             RequestsConnectionError,

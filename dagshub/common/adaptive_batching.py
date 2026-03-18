@@ -1,13 +1,12 @@
+import itertools
 import logging
 import time
 from dataclasses import dataclass
-import itertools
-from types import SimpleNamespace
 from typing import Callable, Iterable, List, Optional, Sized, TypeVar
 
 import rich.progress
-from tenacity import wait_exponential
 
+import dagshub.common.config as dgs_config
 from dagshub.common.rich_util import get_rich_progress
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ T = TypeVar("T")
 MIN_TARGET_BATCH_TIME_SECONDS = 0.01
 
 
-@dataclass(frozen=True)
+@dataclass
 class AdaptiveBatchConfig:
     max_batch_size: int
     min_batch_size: int
@@ -38,8 +37,6 @@ class AdaptiveBatchConfig:
         retry_backoff_base_seconds: Optional[float] = None,
         retry_backoff_max_seconds: Optional[float] = None,
     ) -> "AdaptiveBatchConfig":
-        import dagshub.common.config as dgs_config
-
         if max_batch_size is None:
             max_batch_size = dgs_config.dataengine_metadata_upload_batch_size_max
         if min_batch_size is None:
@@ -82,21 +79,23 @@ def _next_batch_after_success(
     config: AdaptiveBatchConfig,
     bad_batch_size: Optional[int],
 ) -> int:
-    """Pick the next batch size after a successful (fast) batch.
+    """Pick the next batch size after a fast successful batch.
 
     Strategy:
-    - If we have a known-bad upper bound, binary-search toward it.
+    - If we have a previous slow/failing size, binary-search toward it as a soft upper hint.
     - Otherwise, multiply by the growth factor.
-    - Always guarantee at least +1 progress (so we never stall).
+    - If the midpoint rounds back to the current size, advance by 1 so the search
+      keeps moving. That may revisit the previous failing size, because these hints
+      are soft signals rather than permanent bans.
     """
     if bad_batch_size is not None and batch_size < bad_batch_size:
-        # Binary search: try the midpoint between current and bad
+        # Binary search: try the midpoint between current and the soft upper hint.
         candidate = (batch_size + bad_batch_size) // 2
     else:
-        # No upper bound (or we've already passed it): grow aggressively
+        # No upper hint (or we've already reached it): grow aggressively.
         candidate = batch_size * config.batch_growth_factor
 
-    # Must advance by at least 1 to avoid stalling
+    # Always make forward progress in the search.
     candidate = max(candidate, batch_size + 1)
 
     return _clamp(candidate, config.min_batch_size, config.max_batch_size)
@@ -135,15 +134,12 @@ def _next_batch_after_retryable_failure(
 
 
 def _get_retry_delay_seconds(consecutive_retryable_failures: int, config: AdaptiveBatchConfig) -> float:
-    # SimpleNamespace duck-types the .attempt_number attribute that tenacity's
-    # wait strategies read, avoiding the heavier RetryCallState constructor.
-    strategy = wait_exponential(
-        multiplier=config.retry_backoff_base_seconds,
-        min=config.retry_backoff_base_seconds,
-        max=config.retry_backoff_max_seconds,
-    )
-    retry_state = SimpleNamespace(attempt_number=max(1, consecutive_retryable_failures))
-    return float(strategy(retry_state))  # type: ignore[arg-type]
+    if config.retry_backoff_base_seconds <= 0.0 or config.retry_backoff_max_seconds <= 0.0:
+        return 0.0
+
+    attempt_number = max(1, consecutive_retryable_failures)
+    delay = config.retry_backoff_base_seconds * (2 ** (attempt_number - 1))
+    return min(delay, config.retry_backoff_max_seconds)
 
 
 class AdaptiveBatcher:
@@ -166,14 +162,12 @@ class AdaptiveBatcher:
 
         config = self._config
         current_batch_size = config.initial_batch_size
+        # Consume the source iterable incrementally across retries and successes.
         it = iter(items)
         pending: List[T] = []
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-        total_task = progress.add_task(
-            f"{self._progress_label} (adaptive batch {config.min_batch_size}-{config.max_batch_size})...",
-            total=total,
-        )
+        total_task = progress.add_task(f"{self._progress_label}...", total=total)
 
         last_good_batch_size: Optional[int] = None
         last_bad_batch_size: Optional[int] = None
@@ -191,10 +185,6 @@ class AdaptiveBatcher:
                     break
                 batch_size = len(batch)
 
-                progress.update(
-                    total_task,
-                    description=f"{self._progress_label} (batch size {batch_size})...",
-                )
                 logger.debug(f"{self._progress_label}: {batch_size} entries...")
 
                 start_time = time.monotonic()
@@ -240,6 +230,7 @@ class AdaptiveBatcher:
                     pending = batch + pending
                     continue
 
+                # On success.
                 elapsed = time.monotonic() - start_time
                 consecutive_retryable_failures = 0
                 processed += batch_size
@@ -249,11 +240,15 @@ class AdaptiveBatcher:
                     last_good_batch_size = (
                         batch_size if last_good_batch_size is None else max(last_good_batch_size, batch_size)
                     )
-                    # Clear stale bad bound if we succeeded fast at or above it
+                    # Clear the soft upper hint if we succeeded fast at or above it.
                     if last_bad_batch_size is not None and batch_size >= last_bad_batch_size:
                         last_bad_batch_size = None
                     current_batch_size = _next_batch_after_success(batch_size, config, last_bad_batch_size)
                 else:
+                    logger.debug(
+                        f"{self._progress_label} batch size {batch_size} took {elapsed:.2f}s "
+                        f"(target {config.target_batch_time_seconds:.2f}s); shrinking."
+                    )
                     last_bad_batch_size = (
                         batch_size if last_bad_batch_size is None else min(last_bad_batch_size, batch_size)
                     )

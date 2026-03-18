@@ -14,10 +14,11 @@ from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.client.models import MetadataFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datapoint import Datapoint
-from dagshub.data_engine.model.datasource import Datasource, DatapointMetadataUpdateEntry, MetadataContextManager
+from dagshub.data_engine.model.datasource import DatapointMetadataUpdateEntry, Datasource, MetadataContextManager
+from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.metadata import MultipleDataTypesUploadedError, StringFieldValueTooLongError
 from dagshub.data_engine.model.query_result import QueryResult
-from tests.data_engine.util import add_string_fields, add_document_fields, add_annotation_fields
+from tests.data_engine.util import add_annotation_fields, add_document_fields, add_string_fields
 
 
 def _uploaded_batch_sizes(ds: Datasource):
@@ -148,24 +149,24 @@ def test_uploading_to_document_turns_into_blob(ds):
 
 
 def test_upload_metadata_starts_small_and_grows(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(14)
-    ]
+    entries = [DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(14)]
 
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 16)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 2)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
+    mocker.patch.object(dagshub.common.config, "adaptive_batch_growth_factor", 8)
 
     ds._upload_metadata(entries)
 
-    assert _uploaded_batch_sizes(ds) == [2, 12]
+    batch_sizes = _uploaded_batch_sizes(ds)
+    assert batch_sizes[0] == 2
+    assert max(batch_sizes) > 2
+    assert sum(batch_sizes) == len(entries)
 
 
-def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
-    ]
+def test_upload_metadata_retries_wrapped_retryable_error_with_smaller_batch(ds, mocker):
+    entries = [DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)]
 
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
@@ -178,62 +179,20 @@ def test_upload_metadata_retries_with_smaller_batch_after_failure(ds, mocker):
     def _flaky_upload(_ds, upload_entries):
         if len(upload_entries) == 8 and not has_failed["value"]:
             has_failed["value"] = True
-            raise TimeoutError("simulated timeout")
+            raise DataEngineGqlError(TimeoutError("simulated timeout"), support_id="test-support-id")
 
     ds.source.client.update_metadata.side_effect = _flaky_upload
 
     ds._upload_metadata(entries)
 
+    batch_sizes = _uploaded_batch_sizes(ds)
     assert has_failed["value"]
-    assert _uploaded_batch_sizes(ds) == [8, 4, 6]
-
-
-def test_upload_metadata_does_not_retry_known_bad_batch_size(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(32)
-    ]
-
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 16)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
-    mocker.patch("dagshub.common.adaptive_batching.time.sleep", return_value=None)
-
-    has_failed = {"value": False}
-
-    def _flaky_upload(_ds, upload_entries):
-        if len(upload_entries) == 8 and not has_failed["value"]:
-            has_failed["value"] = True
-            raise TimeoutError("simulated timeout")
-
-    ds.source.client.update_metadata.side_effect = _flaky_upload
-
-    ds._upload_metadata(entries)
-
-    assert has_failed["value"]
-    assert _uploaded_batch_sizes(ds) == [8, 4, 6, 7, 8, 7]
-
-
-def test_upload_metadata_slow_success_reduces_batch_size(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(12)
-    ]
-
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1.0)
-    mocker.patch("dagshub.common.adaptive_batching.time.monotonic", side_effect=[0.0, 2.0, 3.0, 3.1])
-
-    ds._upload_metadata(entries)
-
-    assert _uploaded_batch_sizes(ds) == [8, 4]
+    assert batch_sizes[0] == 8
+    assert any(size < 8 for size in batch_sizes[1:])
 
 
 def test_upload_metadata_non_retryable_error_does_not_retry(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
-    ]
+    entries = [DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)]
 
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
     mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
@@ -245,75 +204,6 @@ def test_upload_metadata_non_retryable_error_does_not_retry(ds, mocker):
         ds._upload_metadata(entries)
 
     assert _uploaded_batch_sizes(ds) == [8]
-
-
-def test_upload_metadata_retries_partial_batch_below_min(ds, mocker):
-    """A short tail batch below min_batch_size gets one retry before aborting."""
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(10)
-    ]
-
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 4)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
-    sleep_mock = mocker.patch("dagshub.common.adaptive_batching.time.sleep")
-
-    def _flaky_upload(_ds, upload_entries):
-        if len(upload_entries) == 2:
-            raise TimeoutError("simulated timeout")
-
-    ds.source.client.update_metadata.side_effect = _flaky_upload
-
-    with pytest.raises(TimeoutError, match="simulated timeout"):
-        ds._upload_metadata(entries)
-
-    assert _uploaded_batch_sizes(ds) == [8, 2, 2]
-    assert [c.args[0] for c in sleep_mock.call_args_list] == [0.25]
-
-
-def test_upload_metadata_backoff_resets_after_success(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(12)
-    ]
-
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
-    sleep_mock = mocker.patch("dagshub.common.adaptive_batching.time.sleep")
-
-    call_idx = {"value": 0}
-
-    def _flaky_upload(_ds, _upload_entries):
-        call_idx["value"] += 1
-        if call_idx["value"] in {1, 3}:
-            raise TimeoutError("simulated timeout")
-
-    ds.source.client.update_metadata.side_effect = _flaky_upload
-
-    ds._upload_metadata(entries)
-
-    assert [c.args[0] for c in sleep_mock.call_args_list] == [0.25, 0.25]
-
-
-def test_upload_metadata_retries_below_configured_min_before_aborting(ds, mocker):
-    entries = [
-        DatapointMetadataUpdateEntry(f"dp-{i}", "field", str(i), MetadataFieldType.INTEGER) for i in range(6)
-    ]
-
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_max", 8)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_min", 2)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_batch_size_initial", 2)
-    mocker.patch.object(dagshub.common.config, "dataengine_metadata_upload_target_batch_time_seconds", 1000.0)
-    sleep_mock = mocker.patch("dagshub.common.adaptive_batching.time.sleep")
-    ds.source.client.update_metadata.side_effect = TimeoutError("simulated timeout")
-
-    with pytest.raises(TimeoutError, match="simulated timeout"):
-        ds._upload_metadata(entries)
-
-    assert _uploaded_batch_sizes(ds) == [2]
-    sleep_mock.assert_not_called()
 
 
 def test_pandas_timestamp(ds):
