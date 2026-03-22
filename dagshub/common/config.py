@@ -91,9 +91,7 @@ adaptive_batch_retry_backoff_base_seconds = float(
 )
 
 DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_MAX_KEY = "DAGSHUB_DE_METADATA_UPLOAD_RETRY_BACKOFF_MAX"
-adaptive_batch_retry_backoff_max_seconds = float(
-    os.environ.get(DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_MAX_KEY, 4.0)
-)
+adaptive_batch_retry_backoff_max_seconds = float(os.environ.get(DATAENGINE_METADATA_UPLOAD_RETRY_BACKOFF_MAX_KEY, 60.0))
 
 DISABLE_ANALYTICS_KEY = "DAGSHUB_DISABLE_ANALYTICS"
 disable_analytics = "DAGSHUB_DISABLE_ANALYTICS" in os.environ
