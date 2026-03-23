@@ -1,3 +1,5 @@
+:orphan:
+
 Metric Logging (``dagshub.logger``)
 ====================================
 
