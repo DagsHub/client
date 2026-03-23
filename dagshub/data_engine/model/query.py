@@ -2,14 +2,13 @@ import datetime
 import enum
 import logging
 import uuid
-from typing import Optional, Union, Dict
+from typing import Dict, Optional, Union
 
-import pytz
-from treelib import Tree, Node
+from treelib import Node, Tree
 
+from dagshub.data_engine.dtypes import MetadataFieldType
 from dagshub.data_engine.model.errors import WrongOperatorError
 from dagshub.data_engine.model.schema_util import metadata_type_lookup, metadata_type_lookup_reverse
-from dagshub.data_engine.dtypes import MetadataFieldType
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ def bytes_deserializer(val: str) -> bytes:
 _metadataTypeCustomConverters = {
     bool: lambda x: x.lower() == "true",
     bytes: bytes_deserializer,
-    datetime.datetime: lambda x: datetime.datetime.fromtimestamp(int(x) / 1000).astimezone(pytz.utc),
+    datetime.datetime: lambda x: datetime.datetime.fromtimestamp(int(x) / 1000, tz=datetime.timezone.utc),
 }
 
 
