@@ -9,6 +9,7 @@
 import os
 import sys
 import types
+from datetime import datetime
 
 project_root = os.path.join(__file__, "../../..")
 sys.path.insert(0, os.path.abspath(project_root))
@@ -19,7 +20,7 @@ _env_mod.is_mlflow_installed = False
 sys.modules["dagshub.common.environment"] = _env_mod
 
 project = "DagsHub Client"
-copyright = "2026, DagsHub"
+copyright = f"{datetime.now().year}, DagsHub"
 author = "DagsHub"
 
 # -- General configuration ---------------------------------------------------
