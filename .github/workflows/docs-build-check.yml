@@ -1,0 +1,36 @@
+name: Docs Build Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  docs-build:
+    name: Check Sphinx docs build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: "./docs"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install client and dependencies
+        working-directory: "./"
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install .
+
+      - name: Install docs dependencies
+        run: |
+          pip install -r requirements-docs.txt
+
+      - name: Build documentation
+        run: SPHINXOPTS="-W" make html
