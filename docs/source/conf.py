@@ -6,6 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import importlib.machinery
 import os
 import sys
 from unittest import mock
@@ -13,10 +14,29 @@ from unittest import mock
 project_root = os.path.join(__file__, "../../..")
 sys.path.insert(0, os.path.abspath(project_root))
 
-# Python modules that don't get installed in the doc build environment due to heaviness, so they get mocked
-MOCK_MODULES = ["mlflow", "mlflow.artifacts", "fiftyone", "datasets", "tensorflow", "IPython"]
+# Python modules that don't get installed in the doc build environment due to heaviness, so they get mocked.
+# Each mock needs a real ModuleSpec so that importlib.util.find_spec() doesn't raise ValueError.
+MOCK_MODULES = [
+    "mlflow",
+    "mlflow.artifacts",
+    "mlflow.entities",
+    "fiftyone",
+    "datasets",
+    "tensorflow",
+    "IPython",
+]
 for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+    spec = importlib.machinery.ModuleSpec(mod_name, None)
+    pkg = mod_name.rsplit(".", 1)[0] if "." in mod_name else mod_name
+    mod = mock.MagicMock(
+        __spec__=spec, __name__=mod_name, __path__=[], __file__=None, __loader__=None, __package__=pkg,
+    )
+    sys.modules[mod_name] = mod
+    parts = mod_name.split(".")
+    if len(parts) > 1:
+        parent = sys.modules.get(parts[0])
+        if parent is not None:
+            setattr(parent, parts[-1], mod)
 
 project = "DagsHub Client"
 copyright = "2026, DagsHub"
