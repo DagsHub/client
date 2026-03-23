@@ -8,12 +8,18 @@
 
 import os
 import sys
+from unittest import mock
 
 project_root = os.path.join(__file__, "../../..")
 sys.path.insert(0, os.path.abspath(project_root))
 
+# Python modules that don't get installed in the doc build environment due to heaviness, so they get mocked
+MOCK_MODULES = ["mlflow", "mlflow.artifacts", "fiftyone", "datasets", "tensorflow", "IPython"]
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
+
 project = "DagsHub Client"
-copyright = "2023, DagsHub"
+copyright = "2026, DagsHub"
 author = "DagsHub"
 
 # -- General configuration ---------------------------------------------------
