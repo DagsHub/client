@@ -1,45 +1,43 @@
 import datetime
 import logging
-from typing import Any, Optional, List, Dict, Union, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import dacite
 import gql
 import rich.progress
-from gql.transport.exceptions import TransportQueryError, TransportServerError
+from gql.transport.exceptions import TransportError
 from gql.transport.requests import RequestsHTTPTransport
 
 import dagshub.auth
 import dagshub.common.config
 from dagshub.common import config
-from dagshub.common.tracing import build_traceparent
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.rich_util import get_rich_progress
+from dagshub.common.tracing import build_traceparent
 from dagshub.data_engine.client.gql_introspections import GqlIntrospections, TypesIntrospection
-from dagshub.data_engine.client.models import (
-    DatasourceResult,
-    DatasetResult,
-    MetadataFieldSchema,
-    DatapointHistoryResult,
-)
-from dagshub.data_engine.client.models import ScanOption
 from dagshub.data_engine.client.gql_mutations import GqlMutations
 from dagshub.data_engine.client.gql_queries import GqlQueries
+from dagshub.data_engine.client.models import (
+    DatapointHistoryResult,
+    DatasetResult,
+    DatasourceResult,
+    MetadataFieldSchema,
+    ScanOption,
+)
 from dagshub.data_engine.client.query_builder import GqlQuery
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.query_result import QueryResult
-
-
 from dagshub.data_engine.model.schema_util import dacite_config
 
 if TYPE_CHECKING:
     from dagshub.data_engine.datasources import DatasourceState
-    from dagshub.data_engine.model.datasource import (
-        Datasource,
-        DatapointMetadataUpdateEntry,
-        DatapointDeleteMetadataEntry,
-        DatapointDeleteEntry,
-    )
     from dagshub.data_engine.model.datapoint import Datapoint
+    from dagshub.data_engine.model.datasource import (
+        DatapointDeleteEntry,
+        DatapointDeleteMetadataEntry,
+        DatapointMetadataUpdateEntry,
+        Datasource,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -191,8 +189,8 @@ class DataClient:
             traceparent = build_traceparent()
             headers["traceparent"] = traceparent
         try:
-            resp = self.client.execute(q, variable_values=params, extra_args={'headers': headers})
-        except (TransportQueryError, TransportServerError) as e:
+            resp = self.client.execute(q, variable_values=params, extra_args={"headers": headers})
+        except TransportError as e:
             support_id = self.client.transport.response_headers.get("X-DagsHub-Support-Id")
             if support_id is None:
                 support_id = traceparent
