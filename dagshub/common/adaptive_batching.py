@@ -216,6 +216,7 @@ class AdaptiveBatcher:
                     break
                 actual_batch_size = len(batch)
 
+                progress.update(total_task, description=f"{self._progress_label} (batch size: {actual_batch_size})...")
                 logger.debug(f"{self._progress_label}: {actual_batch_size} entries...")
 
                 start_time = time.monotonic()
