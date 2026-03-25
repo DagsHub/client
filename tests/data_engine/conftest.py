@@ -5,7 +5,7 @@ import pytest
 from dagshub.common.api import UserAPI
 from dagshub.common.api.responses import UserAPIResponse
 from dagshub.data_engine import datasources
-from dagshub.data_engine.client.models import MetadataSelectFieldSchema, PreprocessingStatus
+from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema, PreprocessingStatus
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource import DatasetState, Datasource
 from dagshub.data_engine.model.query_result import QueryResult
@@ -26,6 +26,7 @@ def other_ds(mocker, mock_dagshub_auth) -> Datasource:
 
 def _create_mock_datasource(mocker, id, name) -> Datasource:
     ds_state = datasources.DatasourceState(id=id, name=name, repo="kirill/repo")
+    ds_state.source_type = DatasourceType.REPOSITORY
     ds_state.path = "repo://kirill/repo/data/"
     ds_state.preprocessing_status = PreprocessingStatus.READY
     mocker.patch.object(ds_state, "client")

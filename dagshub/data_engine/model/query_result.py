@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, 
 import dacite
 import dagshub_annotation_converter.converters.yolo
 import rich.progress
+from dagshub_annotation_converter.converters.coco import export_to_coco_file
+from dagshub_annotation_converter.formats.coco import CocoContext
 from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
@@ -30,6 +32,7 @@ from dagshub.common.helpers import log_message, prompt_user, sizeof_fmt
 from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation import MetadataAnnotations
+from dagshub.data_engine.annotation.metadata import ErrorMetadataAnnotations, UnsupportedMetadataAnnotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_ls_annotations,
     add_voxel_annotations,
@@ -37,7 +40,13 @@ from dagshub.data_engine.annotation.voxel_conversion import (
 from dagshub.data_engine.client.loaders.base import DagsHubDataset
 from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType
-from dagshub.data_engine.model.datapoint import Datapoint, _generated_fields, _get_blob
+from dagshub.data_engine.model.datapoint import (
+    BlobDownloadError,
+    BlobHashMetadata,
+    Datapoint,
+    _generated_fields,
+    _get_blob,
+)
 from dagshub.data_engine.model.schema_util import dacite_config
 from dagshub.data_engine.voxel_plugin_server.utils import set_voxel_envvars
 
@@ -389,10 +398,9 @@ class QueryResult:
         for dp in self.entries:
             for fld in fields:
                 field_value = dp.metadata.get(fld)
-                # If field_value is a blob or a path, then ignore, means it's already been downloaded
-                if not isinstance(field_value, str):
+                if not isinstance(field_value, BlobHashMetadata):
                     continue
-                download_task = (dp, fld, dp.blob_url(field_value), dp.blob_cache_location / field_value)
+                download_task = (dp, fld, dp.blob_url(field_value.hash), dp.blob_cache_location / field_value.hash)
                 to_download.append(download_task)
 
         progress = get_rich_progress(rich.progress.MofNCompleteColumn())
@@ -402,8 +410,6 @@ class QueryResult:
 
         def _get_blob_fn(dp: Datapoint, field: str, url: str, blob_path: Path):
             blob_or_path = _get_blob(url, blob_path, auth, cache_on_disk, load_into_memory, path_format)
-            if isinstance(blob_or_path, str) and path_format != "str":
-                logger.warning(f"Error while downloading blob for field {field} in datapoint {dp.path}:{blob_or_path}")
             dp.metadata[field] = blob_or_path
 
         with progress:
@@ -415,7 +421,7 @@ class QueryResult:
                         logger.warning(f"Got exception {type(exc)} while downloading blob: {exc}")
                     progress.update(task, advance=1)
 
-        self._convert_annotation_fields(*fields, load_into_memory=load_into_memory)
+        self._convert_annotation_fields(*fields)
 
         # Convert any downloaded document fields
         document_fields = [f for f in fields if f in self.document_fields]
@@ -424,49 +430,63 @@ class QueryResult:
         if document_fields:
             for dp in self:
                 for fld in document_fields:
-                    if fld in dp.metadata:
-                        # Override the load_into_memory flag, because we need the contents
-                        if not load_into_memory:
-                            dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
-                        dp.metadata[fld] = dp.metadata[fld].decode("utf-8")
+                    if fld not in dp.metadata:
+                        continue
+                    try:
+                        content = dp.get_blob(fld)
+                        dp.metadata[fld] = content.decode("utf-8")
+                    except BlobDownloadError as e:
+                        logger.warning(f"Failed to download document field '{fld}' for datapoint '{dp.path}': {e}")
 
         return self
 
-    def _convert_annotation_fields(self, *fields, load_into_memory):
+    def _convert_annotation_fields(self, *fields):
         # Convert any downloaded annotation column
         annotation_fields = [f for f in fields if f in self.annotation_fields]
+        if not annotation_fields:
+            return
 
+        # List of datapoints with annotations that couldn't be parsed
         bad_annotations = defaultdict(list)
 
-        if annotation_fields:
-            # Convert them
-            for dp in self:
-                for fld in annotation_fields:
-                    if fld in dp.metadata:
-                        # Already loaded - skip
-                        if isinstance(dp.metadata[fld], MetadataAnnotations):
-                            continue
-                        # Override the load_into_memory flag, because we need the contents
-                        if not load_into_memory:
-                            dp.metadata[fld] = Path(dp.metadata[fld]).read_bytes()
-                        try:
-                            dp.metadata[fld] = MetadataAnnotations.from_ls_task(
-                                datapoint=dp, field=fld, ls_task=dp.metadata[fld]
-                            )
-                        except ValidationError:
-                            bad_annotations[fld].append(dp.path)
-                    else:
-                        dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+        for dp in self:
+            for fld in annotation_fields:
+                metadata_value = dp.metadata.get(fld)
+                # No value - create empty annotation container
+                if metadata_value is None:
+                    dp.metadata[fld] = MetadataAnnotations(datapoint=dp, field=fld)
+                    continue
+                # Already loaded - skip
+                elif isinstance(metadata_value, MetadataAnnotations):
+                    continue
+                # Parse annotation from the content of the field
+                else:
+                    try:
+                        annotation_content = dp.get_blob(fld)
+                        dp.metadata[fld] = MetadataAnnotations.from_ls_task(
+                            datapoint=dp, field=fld, ls_task=annotation_content
+                        )
+                    except BlobDownloadError as e:
+                        dp.metadata[fld] = ErrorMetadataAnnotations(datapoint=dp, field=fld, error_message=e.message)
+                        bad_annotations[fld].append(dp.path)
+                    except ValidationError:
+                        dp.metadata[fld] = UnsupportedMetadataAnnotations(
+                            datapoint=dp, field=fld, original_value=annotation_content
+                        )
+                        bad_annotations[fld].append(dp.path)
 
         if bad_annotations:
             log_message(
-                "Warning: The following datapoints had invalid annotations, "
-                "any annotation-related operations will not work on these:"
+                "Warning: The following datapoints had unsupported or invalid annotations, "
+                "convenience functions like `add_bounding_box` won't work on these:"
             )
             err_msg = ""
             for fld, dps in bad_annotations.items():
-                err_msg += f'Field "{fld}" in datapoints:\n\t'
-                err_msg += "\n\t".join(dps)
+                err_msg += f'\nField "{fld}" in datapoints:\n\t'
+                if len(dps) > 10:
+                    err_msg += "\n\t".join(dps[:10]) + f"\n\t... and {len(dps) - 10} more"
+                else:
+                    err_msg += "\n\t".join(dps)
             log_message(err_msg)
 
     def download_binary_columns(
@@ -760,6 +780,16 @@ class QueryResult:
                 annotations.extend(dp.metadata[annotation_field].annotations)
         return annotations
 
+    def _resolve_annotation_field(self, annotation_field: Optional[str]) -> str:
+        if annotation_field is not None:
+            return annotation_field
+        annotation_fields = sorted([f.name for f in self.fields if f.is_annotation()])
+        if len(annotation_fields) == 0:
+            raise ValueError("No annotation fields found in the datasource")
+        annotation_field = annotation_fields[0]
+        log_message(f"Using annotations from field {annotation_field}")
+        return annotation_field
+
     def export_as_yolo(
         self,
         download_dir: Optional[Union[str, Path]] = None,
@@ -785,12 +815,7 @@ class QueryResult:
         Returns:
             The path to the YAML file with the metadata. Pass this path to ``YOLO.train()`` to train a model.
         """
-        if annotation_field is None:
-            annotation_fields = sorted([f.name for f in self.fields if f.is_annotation()])
-            if len(annotation_fields) == 0:
-                raise ValueError("No annotation fields found in the datasource")
-            annotation_field = annotation_fields[0]
-            log_message(f"Using annotations from field {annotation_field}")
+        annotation_field = self._resolve_annotation_field(annotation_field)
 
         if download_dir is None:
             download_dir = Path("dagshub_export")
@@ -842,6 +867,54 @@ class QueryResult:
         yaml_path = dagshub_annotation_converter.converters.yolo.export_to_fs(context, annotations)
         log_message(f"Done! Saved YOLO Dataset, YAML file is at {yaml_path.absolute()}")
         return yaml_path
+
+    def export_as_coco(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        output_filename: str = "annotations.json",
+        classes: Optional[Dict[int, str]] = None,
+    ) -> Path:
+        """
+        Downloads the files and exports annotations in COCO format.
+
+        Args:
+            download_dir: Where to download the files. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            output_filename: Name of the output COCO JSON file. Default is ``annotations.json``.
+            classes: Category mapping for the COCO dataset as ``{id: name}``.
+                If ``None``, categories will be inferred from the annotations.
+
+        Returns:
+            Path to the exported COCO JSON file.
+        """
+        annotation_field = self._resolve_annotation_field(annotation_field)
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir)
+
+        annotations = self._get_all_annotations(annotation_field)
+        if not annotations:
+            raise RuntimeError("No annotations found to export")
+
+        context = CocoContext()
+        if classes is not None:
+            context.categories = dict(classes)
+
+        # Add the source prefix to all annotations
+        for ann in annotations:
+            ann.filename = os.path.join(self.datasource.source.source_prefix, ann.filename)
+
+        image_download_path = download_dir / "data"
+        log_message("Downloading image files...")
+        self.download_files(image_download_path)
+
+        output_path = download_dir / output_filename
+        log_message("Exporting COCO annotations...")
+        result_path = export_to_coco_file(annotations, output_path, context=context)
+        log_message(f"Done! Saved COCO annotations to {result_path.absolute()}")
+        return result_path
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":
         """

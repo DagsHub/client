@@ -1,24 +1,31 @@
-from typing import TYPE_CHECKING, Optional, Sequence, Tuple, Union, Literal, Dict
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Tuple, Union
 
-from dagshub_annotation_converter.formats.label_studio.task import parse_ls_task, LabelStudioTask
-from dagshub_annotation_converter.formats.yolo import import_lookup, import_yolo_result, YoloContext
+from dagshub_annotation_converter.formats.label_studio.task import LabelStudioTask, parse_ls_task
+from dagshub_annotation_converter.formats.yolo import YoloContext, import_lookup, import_yolo_result
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.ir.image import (
-    IRBBoxImageAnnotation,
     CoordinateStyle,
-    IRSegmentationImageAnnotation,
-    IRSegmentationPoint,
+    IRBBoxImageAnnotation,
     IRPoseImageAnnotation,
     IRPosePoint,
+    IRSegmentationImageAnnotation,
+    IRSegmentationPoint,
 )
 from dagshub_annotation_converter.ir.image.annotations.base import IRAnnotationBase, IRImageAnnotationBase
 
 from dagshub.common.api import UserAPI
 from dagshub.common.helpers import log_message
+from dagshub.data_engine.util.not_implemented import NotImplementedMeta
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.model.datapoint import Datapoint
     import ultralytics.engine.results
+
+    from dagshub.data_engine.model.datapoint import Datapoint
+
+from dagshub_annotation_converter.formats.label_studio.videorectangle import VideoRectangleAnnotation
+from dagshub_annotation_converter.formats.label_studio.task import task_lookup as _task_lookup
+
+_task_lookup["videorectangle"] = VideoRectangleAnnotation
 
 
 class AnnotationMetaDict(dict):
@@ -269,6 +276,28 @@ class MetadataAnnotations:
         self.annotations.append(ann)
         self._update_datapoint()
 
+    def add_coco_annotation(
+        self,
+        coco_json: str,
+    ):
+        """
+        Add annotations from a COCO-format JSON string.
+
+        Args:
+            coco_json: A COCO-format JSON string with ``categories``, ``images``, and ``annotations`` keys.
+        """
+        from dagshub_annotation_converter.converters.coco import load_coco_from_json_string
+
+        grouped, _ = load_coco_from_json_string(coco_json)
+        new_anns: list[IRAnnotationBase] = []
+        for anns in grouped.values():
+            for ann in anns:
+                ann.filename = self.datapoint.path
+                new_anns.append(ann)
+        self.annotations.extend(new_anns)
+        log_message(f"Added {len(new_anns)} COCO annotation(s) to datapoint {self.datapoint.path}")
+        self._update_datapoint()
+
     def add_yolo_annotation(
         self,
         annotation_type: Literal["bbox", "segmentation", "pose"],
@@ -315,3 +344,44 @@ class MetadataAnnotations:
         for cat_id, cat_name in categories.items():
             cats.add(cat_name, cat_id)
         return YoloContext(annotation_type=annotation_type, categories=cats)
+
+
+class UnsupportedMetadataAnnotations(MetadataAnnotations, metaclass=NotImplementedMeta):
+    def __init__(
+        self,
+        datapoint: "Datapoint",
+        field: str,
+        original_value: bytes,
+    ):
+        super().__init__(datapoint, field, None, None, original_value)
+
+    @property
+    def value(self) -> Optional[bytes]:
+        return self._original_value
+
+    def to_ls_task(self) -> Optional[bytes]:
+        return self._original_value
+
+    def __repr__(self):
+        return "Label Studio annotations of unrecognized type"
+
+
+class ErrorMetadataAnnotations(MetadataAnnotations, metaclass=NotImplementedMeta):
+    def __init__(
+        self,
+        datapoint: "Datapoint",
+        field: str,
+        error_message: str,
+    ):
+        super().__init__(datapoint, field, None, None, None)
+        self._error_message = error_message
+
+    @property
+    def value(self) -> Optional[bytes]:
+        raise ValueError(self._error_message)
+
+    def to_ls_task(self) -> Optional[bytes]:
+        raise ValueError(self._error_message)
+
+    def __repr__(self):
+        return f"Label Studio annotation download error: {self._error_message}"
