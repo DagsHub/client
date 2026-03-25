@@ -7,10 +7,11 @@ from unittest.mock import patch, PropertyMock
 
 import pytest
 from dagshub_annotation_converter.ir.image import CoordinateStyle
-from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation, IRVideoSequence
 
 from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationsNotFoundError
 from dagshub.data_engine.annotation.metadata import MetadataAnnotations
+from dagshub.data_engine.annotation.video import build_video_sequence_from_annotations
 from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datapoint import Datapoint
@@ -23,27 +24,31 @@ def mock_source_prefix(ds):
         yield
 
 
-# --- _is_video_annotation_dict ---
+# --- _is_video_annotation ---
 
 
 def test_is_video_dict_int_keys():
-    assert AnnotationImporter._is_video_annotation_dict({0: [], 1: []}) is True
+    assert AnnotationImporter._is_video_annotation({0: [], 1: []}) is True
 
 
 def test_is_video_dict_str_keys():
-    assert AnnotationImporter._is_video_annotation_dict({"file.jpg": []}) is False
+    assert AnnotationImporter._is_video_annotation({"file.jpg": []}) is False
 
 
 def test_is_video_dict_empty():
-    assert AnnotationImporter._is_video_annotation_dict({}) is False
+    assert AnnotationImporter._is_video_annotation({}) is False
 
 
 def test_is_video_dict_non_dict():
-    assert AnnotationImporter._is_video_annotation_dict([]) is False
+    assert AnnotationImporter._is_video_annotation([]) is False
 
 
 def test_is_video_dict_mixed_first_int():
-    assert AnnotationImporter._is_video_annotation_dict({0: [], "a": []}) is True
+    assert AnnotationImporter._is_video_annotation({0: [], "a": []}) is True
+
+
+def test_is_video_sequence():
+    assert AnnotationImporter._is_video_annotation(IRVideoSequence.from_annotations([_make_video_bbox()])) is True
 
 
 # --- is_video_format ---
@@ -92,6 +97,37 @@ def test_flatten_video_name_override(ds, tmp_path):
     )
     result = importer._flatten_video_annotations({0: [_make_video_bbox()]})
     assert "custom.mp4" in result
+
+
+def test_flatten_sequence(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "test_video", load_from="disk")
+    sequence = IRVideoSequence.from_annotations([_make_video_bbox(frame=0), _make_video_bbox(frame=5)])
+    result = importer._flatten_video_annotations(sequence)
+
+    assert "test_video" in result
+    assert len(result["test_video"]) == 2
+
+
+def test_build_video_sequence_without_legacy_image_dimensions():
+    anns = [
+        IRVideoBBoxFrameAnnotation(
+            track_id=0,
+            frame_number=0,
+            left=100.0,
+            top=150.0,
+            width=50.0,
+            height=80.0,
+            video_width=1920,
+            video_height=1080,
+            categories={"person": 1.0},
+            coordinate_style=CoordinateStyle.DENORMALIZED,
+        )
+    ]
+
+    sequence = build_video_sequence_from_annotations(anns, filename="video.mp4")
+
+    assert sequence.video_width == 1920
+    assert sequence.video_height == 1080
 
 
 # --- import ---
@@ -297,8 +333,8 @@ def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monk
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
     anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
     for ann in anns:
-        ann.image_width = 0
-        ann.image_height = 0
+        ann.video_width = 0
+        ann.video_height = 0
         ann.filename = "video.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
     qr = _make_qr(ds, [dp], ann_field="ann")
@@ -332,7 +368,7 @@ def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
     return IRVideoBBoxFrameAnnotation(
         track_id=track_id, frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
-        image_width=1920, image_height=1080,
+        video_width=1920, video_height=1080,
         categories={"person": 1.0},
         coordinate_style=CoordinateStyle.DENORMALIZED,
     )

@@ -4,12 +4,13 @@ from pathlib import PurePosixPath
 from unittest.mock import patch, PropertyMock
 
 import pytest
-from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_xml_string
+from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_xml_bytes
 from dagshub_annotation_converter.ir.image import IRBBoxImageAnnotation, CoordinateStyle
 from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 
 from dagshub.data_engine.annotation.importer import AnnotationImporter
 from dagshub.data_engine.annotation.metadata import MetadataAnnotations
+from dagshub.data_engine.annotation.video import build_video_sequence_from_annotations
 from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datapoint import Datapoint
@@ -178,8 +179,8 @@ def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_pat
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
     anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
     for ann in anns:
-        ann.image_width = 0
-        ann.image_height = 0
+        ann.video_width = 0
+        ann.video_height = 0
         ann.filename = "video.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)
     qr = _make_qr(ds, [dp], ann_field="ann")
@@ -220,8 +221,8 @@ def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_pat
 def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
     ann = _make_video_bbox(frame=0, track_id=0)
-    ann.image_width = 0
-    ann.image_height = 0
+    ann.video_width = 0
+    ann.video_height = 0
     ann.filename = "missing.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[ann])
     qr = _make_qr(ds, [dp], ann_field="ann")
@@ -243,7 +244,7 @@ def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
     return IRVideoBBoxFrameAnnotation(
         track_id=track_id, frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
-        image_width=1920, image_height=1080,
+        video_width=1920, video_height=1080,
         categories={"person": 1.0},
         coordinate_style=CoordinateStyle.DENORMALIZED,
     )
@@ -251,7 +252,8 @@ def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
 
 def _make_cvat_video_xml() -> bytes:
     anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
-    return export_cvat_video_to_xml_string(anns)
+    sequence = build_video_sequence_from_annotations(anns, filename="video.mp4")
+    return export_cvat_video_to_xml_bytes(sequence, video_name="video.mp4")
 
 
 def _make_video_qr(ds):

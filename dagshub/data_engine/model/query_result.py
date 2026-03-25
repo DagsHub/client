@@ -35,6 +35,7 @@ from dagshub.common.rich_util import get_rich_progress
 from dagshub.common.util import lazy_load, multi_urljoin
 from dagshub.data_engine.annotation import MetadataAnnotations
 from dagshub.data_engine.annotation.metadata import ErrorMetadataAnnotations, UnsupportedMetadataAnnotations
+from dagshub.data_engine.annotation.video import build_video_sequence_from_annotations
 from dagshub.data_engine.annotation.voxel_conversion import (
     add_ls_annotations,
     add_voxel_annotations,
@@ -786,6 +787,22 @@ class QueryResult:
         all_anns = self._get_all_annotations(annotation_field)
         return [a for a in all_anns if isinstance(a, IRVideoBBoxFrameAnnotation)]
 
+    @staticmethod
+    def _annotations_to_sequences(
+        video_annotations: List[IRVideoBBoxFrameAnnotation],
+    ) -> List["IRVideoSequence"]:
+        """Reconstruct IRVideoSequence objects from a flat list of frame annotations, grouped by filename."""
+        # Group annotations by source filename
+        by_source: Dict[str, List[IRVideoBBoxFrameAnnotation]] = {}
+        for ann in video_annotations:
+            filename = QueryResult._get_annotation_filename(ann) or ""
+            by_source.setdefault(filename, []).append(ann)
+
+        return [
+            build_video_sequence_from_annotations(anns, filename=source_filename or None)
+            for source_filename, anns in by_source.items()
+        ]
+
     def _prepare_video_file_for_export(self, local_root: Path, repo_relative_filename: str) -> Optional[Path]:
         ann_path = Path(repo_relative_filename)
         primary = local_root / ann_path
@@ -952,6 +969,8 @@ class QueryResult:
             local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
 
         log_message("Exporting MOT annotations...")
+        sequences = self._annotations_to_sequences(video_annotations)
+
         if has_multiple_sources:
             video_files: Optional[Dict[str, Union[str, Path]]] = None
             if local_download_root is not None:
@@ -974,7 +993,7 @@ class QueryResult:
             context = MOTContext()
             context.image_width = image_width
             context.image_height = image_height
-            export_mot_sequences_to_dirs(video_annotations, context, labels_dir, video_files=video_files)
+            export_mot_sequences_to_dirs(sequences, context, labels_dir, video_files=video_files)
             result_path = labels_dir
         else:
             video_file: Optional[Path] = None
@@ -994,7 +1013,7 @@ class QueryResult:
             context.image_height = image_height
             single_name = Path(source_names[0]).stem if source_names else "sequence"
             output_dir = labels_dir / single_name
-            result_path = export_mot_to_dir(video_annotations, context, output_dir, video_file=video_file)
+            result_path = export_mot_to_dir(sequences[0], context, output_dir, video_file=video_file)
 
         log_message(f"Done! Saved MOT annotations to {result_path.absolute()}")
         return result_path
@@ -1041,6 +1060,8 @@ class QueryResult:
         has_multiple_sources = len(source_names) > 1
 
         log_message("Exporting CVAT video annotations...")
+        sequences = self._annotations_to_sequences(video_annotations)
+
         local_download_root: Optional[Path] = None
         if not has_multiple_sources and (image_width is None or image_height is None):
             log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
@@ -1072,7 +1093,7 @@ class QueryResult:
             output_dir = download_dir / "labels"
             output_dir.mkdir(parents=True, exist_ok=True)
             export_cvat_videos_to_zips(
-                video_annotations,
+                sequences,
                 output_dir,
                 image_width=image_width,
                 image_height=image_height,
@@ -1100,7 +1121,7 @@ class QueryResult:
                 output_name = "annotations.zip"
             output_path = labels_dir / output_name
             result_path = export_cvat_video_to_zip(
-                video_annotations,
+                sequences[0],
                 output_path,
                 video_name=video_name,
                 image_width=image_width,

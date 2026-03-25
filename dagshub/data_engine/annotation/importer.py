@@ -19,6 +19,7 @@ from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 from dagshub.common.api import UserAPI
 from dagshub.common.api.repo import PathNotFoundError
 from dagshub.common.helpers import log_message
+from dagshub.data_engine.annotation.video import build_video_sequence_from_annotations
 
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
@@ -99,7 +100,7 @@ class AnnotationImporter:
                     annotation_dict = self._flatten_cvat_fs_annotations(load_cvat_from_fs(annotations_file))
                 else:
                     result = load_cvat_from_zip(annotations_file)
-                    if self._is_video_annotation_dict(result):
+                    if self._is_video_annotation(result):
                         annotation_dict = self._flatten_video_annotations(result)
                     else:
                         annotation_dict = result
@@ -144,13 +145,13 @@ class AnnotationImporter:
                     annotation_dict = self._flatten_cvat_fs_annotations(raw)
                 elif annotations_file.suffix == ".zip":
                     result = load_cvat_from_zip(annotations_file, **cvat_kwargs)
-                    if self._is_video_annotation_dict(result):
+                    if self._is_video_annotation(result):
                         annotation_dict = self._flatten_video_annotations(result)
                     else:
                         annotation_dict = result
                 else:
                     result = load_cvat_from_xml_file(annotations_file, **cvat_kwargs)
-                    if self._is_video_annotation_dict(result):
+                    if self._is_video_annotation(result):
                         annotation_dict = self._flatten_video_annotations(result)
                     else:
                         annotation_dict = result
@@ -160,8 +161,12 @@ class AnnotationImporter:
             return annotation_dict
 
     @staticmethod
-    def _is_video_annotation_dict(result) -> bool:
-        """Check if the result from a CVAT loader is video annotations (int keys) vs image annotations (str keys)."""
+    def _is_video_annotation(result) -> bool:
+        """Check if the result from a CVAT loader is video annotations (IRVideoSequence or int keys) vs image annotations (str keys)."""
+        from dagshub_annotation_converter.ir.video import IRVideoSequence
+
+        if isinstance(result, IRVideoSequence):
+            return True
         if not isinstance(result, dict) or len(result) == 0:
             return False
         first_key = next(iter(result.keys()))
@@ -169,48 +174,62 @@ class AnnotationImporter:
 
     def _flatten_video_annotations(
         self,
-        frame_annotations: Dict[int, Sequence[IRAnnotationBase]],
+        video_data,
     ) -> Dict[str, Sequence[IRAnnotationBase]]:
-        """Flatten frame-indexed video annotations into a single entry keyed by video name."""
+        """Flatten video annotations (IRVideoSequence or frame-indexed dict) into a single entry keyed by video name."""
+        from dagshub_annotation_converter.ir.video import IRVideoSequence
+
         video_name = self.additional_args.get("video_name", self.annotations_file.stem)
-        all_anns: List[IRAnnotationBase] = []
-        for frame_anns in frame_annotations.values():
-            all_anns.extend(frame_anns)
-        return {video_name: all_anns}
+        if isinstance(video_data, IRVideoSequence):
+            return {video_name: video_data.to_annotations()}
+        else:
+            # Legacy dict[int, list[annotation]] format
+            all_anns: List[IRAnnotationBase] = []
+            for frame_anns in video_data.values():
+                all_anns.extend(frame_anns)
+            return {video_name: all_anns}
 
     def _flatten_cvat_fs_annotations(
         self, fs_annotations: Mapping[str, object]
     ) -> Dict[str, Sequence[IRAnnotationBase]]:
+        from dagshub_annotation_converter.ir.video import IRVideoSequence
+
         flattened: Dict[str, List[IRAnnotationBase]] = {}
         for rel_path, result in fs_annotations.items():
-            if not isinstance(result, dict):
-                continue
-            if self._is_video_annotation_dict(result):
+            if isinstance(result, IRVideoSequence):
                 video_key = Path(rel_path).stem
                 flattened.setdefault(video_key, [])
-                for frame_anns in result.values():
-                    flattened[video_key].extend(frame_anns)
-            else:
-                for filename, anns in result.items():
-                    flattened.setdefault(filename, [])
-                    flattened[filename].extend(anns)
+                flattened[video_key].extend(result.to_annotations())
+            elif isinstance(result, dict):
+                if self._is_video_annotation(result):
+                    video_key = Path(rel_path).stem
+                    flattened.setdefault(video_key, [])
+                    for frame_anns in result.values():
+                        flattened[video_key].extend(frame_anns)
+                else:
+                    for filename, anns in result.items():
+                        flattened.setdefault(filename, [])
+                        flattened[filename].extend(anns)
         return flattened
 
     def _flatten_mot_fs_annotations(
         self,
         fs_annotations: Mapping[str, object],
     ) -> Dict[str, Sequence[IRAnnotationBase]]:
+        from dagshub_annotation_converter.ir.video import IRVideoSequence
+
         flattened: Dict[str, List[IRAnnotationBase]] = {}
         for rel_path, result in fs_annotations.items():
             if not isinstance(result, tuple) or len(result) != 2:
                 continue
-            frame_annotations = result[0]
-            if not isinstance(frame_annotations, dict):
-                continue
+            sequence_or_dict = result[0]
             sequence_name = Path(rel_path).stem if rel_path not in (".", "") else self.annotations_file.stem
             flattened.setdefault(sequence_name, [])
-            for frame_anns in frame_annotations.values():
-                flattened[sequence_name].extend(frame_anns)
+            if isinstance(sequence_or_dict, IRVideoSequence):
+                flattened[sequence_name].extend(sequence_or_dict.to_annotations())
+            elif isinstance(sequence_or_dict, dict):
+                for frame_anns in sequence_or_dict.values():
+                    flattened[sequence_name].extend(frame_anns)
         return flattened
 
     def download_annotations(self, dest_dir: Path):
@@ -262,6 +281,9 @@ class AnnotationImporter:
             remap_func: Function that maps from an annotation path to a datapoint path. \
                 If None, we try to guess it by getting a datapoint and remapping that path
         """
+        if not annotations:
+            return {}
+
         if remap_func is None:
             first_ann = list(annotations.keys())[0]
             first_ann_filename = Path(first_ann).name
@@ -440,8 +462,9 @@ class AnnotationImporter:
             video_anns = [a for a in anns if isinstance(a, IRVideoBBoxFrameAnnotation)]
             if not video_anns:
                 continue
+            sequence = build_video_sequence_from_annotations(video_anns, filename=filename)
             video_path = self.ds.source.raw_path(filename)
-            ls_tasks = video_ir_to_ls_video_tasks(video_anns, video_path=video_path)
+            ls_tasks = video_ir_to_ls_video_tasks(sequence, video_path=video_path)
             if ls_tasks:
                 tasks[filename] = ls_tasks[0].model_dump_json().encode("utf-8")
         return tasks
