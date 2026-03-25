@@ -22,11 +22,6 @@ if TYPE_CHECKING:
 
     from dagshub.data_engine.model.datapoint import Datapoint
 
-from dagshub_annotation_converter.formats.label_studio.videorectangle import VideoRectangleAnnotation
-from dagshub_annotation_converter.formats.label_studio.task import task_lookup as _task_lookup
-
-_task_lookup["videorectangle"] = VideoRectangleAnnotation
-
 
 class AnnotationMetaDict(dict):
     def __init__(self, annotation: "MetadataAnnotations", *args, **kwargs):

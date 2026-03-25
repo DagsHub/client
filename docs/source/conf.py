@@ -8,12 +8,19 @@
 
 import os
 import sys
+import types
+from datetime import datetime
 
 project_root = os.path.join(__file__, "../../..")
 sys.path.insert(0, os.path.abspath(project_root))
 
+# Fix for is_mlflow_installed reading the spec of the module that is not imported in the doc build environment
+_env_mod = types.ModuleType("dagshub.common.environment")
+_env_mod.is_mlflow_installed = False
+sys.modules["dagshub.common.environment"] = _env_mod
+
 project = "DagsHub Client"
-copyright = "2023, DagsHub"
+copyright = f"{datetime.now().year}, DagsHub"
 author = "DagsHub"
 
 # -- General configuration ---------------------------------------------------
