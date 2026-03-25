@@ -14,7 +14,6 @@ from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, ContextManager, Dict, List, Literal, Optional, Set, Tuple, Union
 
-import rich.progress
 from dataclasses_json import DataClassJsonMixin, LetterCase, config
 from pathvalidate import sanitize_filepath
 
@@ -53,6 +52,8 @@ from dagshub.data_engine.model.metadata import (
     run_preupload_transforms,
     validate_uploading_metadata,
 )
+from dagshub.common.adaptive_batching import AdaptiveBatcher
+from dagshub.data_engine.model.metadata.util import is_retryable_metadata_upload_error
 from dagshub.data_engine.model.metadata.dtypes import DatapointMetadataUpdateEntry
 from dagshub.data_engine.model.metadata.transforms import DatasourceFieldInfo, _add_metadata
 from dagshub.data_engine.model.metadata_field_builder import MetadataFieldBuilder
@@ -753,19 +754,11 @@ class Datasource:
         validate_uploading_metadata(precalculated_info)
         run_preupload_transforms(self, metadata_entries, precalculated_info)
 
-        progress = get_rich_progress(rich.progress.MofNCompleteColumn())
-
-        upload_batch_size = dagshub.common.config.dataengine_metadata_upload_batch_size
-        total_entries = len(metadata_entries)
-        total_task = progress.add_task(f"Uploading metadata (batch size {upload_batch_size})...", total=total_entries)
-
-        with progress:
-            for start in range(0, total_entries, upload_batch_size):
-                entries = metadata_entries[start : start + upload_batch_size]
-                logger.debug(f"Uploading {len(entries)} metadata entries...")
-                self.source.client.update_metadata(self, entries)
-                progress.update(total_task, advance=upload_batch_size)
-            progress.update(total_task, completed=total_entries, refresh=True)
+        batcher = AdaptiveBatcher(
+            is_retryable=is_retryable_metadata_upload_error,
+            progress_label="Uploading metadata",
+        )
+        batcher.run(metadata_entries, lambda batch: self.source.client.update_metadata(self, batch))
 
         # Update the status from dagshub, so we get back the new metadata columns
         self.source.get_from_dagshub()

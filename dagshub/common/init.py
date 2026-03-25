@@ -87,8 +87,19 @@ def init(
     try:
         repo_api.get_repo_info()
     except RepoNotFoundError:
-        log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
-        create_repo(repo_name)
+        should_create_under_org = False
+        if repo_owner:
+            current_user = UserAPI.get_current_user(host=host)
+            should_create_under_org = repo_owner != current_user.username
+
+        if should_create_under_org:
+            log_message(
+                f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".'
+            )
+            create_repo(repo_name, org_name=repo_owner, host=host)
+        else:
+            log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
+            create_repo(repo_name, host=host)
 
     # Get the token for the configs
     token = get_token(host=host)
@@ -96,7 +107,7 @@ def init(
     # Configure MLFlow
     if mlflow:
         os.environ["MLFLOW_TRACKING_URI"] = f"{url}.mlflow"
-        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token).username
+        os.environ["MLFLOW_TRACKING_USERNAME"] = UserAPI.get_user_from_token(token, host=host).username
         os.environ["MLFLOW_TRACKING_PASSWORD"] = token
 
         log_message(f'Initialized MLflow to track repo "{repo_owner}/{repo_name}"')

@@ -3,13 +3,14 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dagshub.data_engine.client.models import Datapoint
-    import fiftyone as fo
+    import fiftyone
+
+    from dagshub.data_engine.model.datapoint import Datapoint
 
 logger = logging.getLogger(__name__)
 
 
-def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+def add_voxel_annotations(sample: "fiftyone.Sample", datapoint: "Datapoint", *annotation_fields: str):
     """
     Adds annotation to the voxel sample.
 
@@ -26,7 +27,7 @@ def add_voxel_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotati
         sample.add_labels(label, label_field=field)
 
 
-def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_fields: str):
+def add_ls_annotations(sample: "fiftyone.Sample", datapoint: "Datapoint", *annotation_fields: str):
     """
     Adds LabelStudio annotation to the voxel sample.
 
@@ -35,17 +36,17 @@ def add_ls_annotations(sample: "fo.Sample", datapoint: "Datapoint", *annotation_
         datapoint: Data Engine datapoint to get metadata from
         annotation_fields: fields from which to get annotations
     """
-    from fiftyone.utils.labelstudio import import_label_studio_annotation
     from fiftyone import (
-        Detections,
-        Detection,
         Classification,
         Classifications,
+        Detection,
+        Detections,
         Keypoint,
         Keypoints,
-        Polylines,
         Polyline,
+        Polylines,
     )
+    from fiftyone.utils.labelstudio import import_label_studio_annotation
 
     for field in annotation_fields:
         annotations = datapoint.metadata.get(field)
