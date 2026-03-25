@@ -14,7 +14,7 @@ from dagshub_annotation_converter.converters.label_studio_video import video_ir_
 from dagshub_annotation_converter.formats.label_studio.task import LabelStudioTask
 from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.ir.image.annotations.base import IRAnnotationBase
-from dagshub_annotation_converter.ir.video import IRVideoBBoxAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 
 from dagshub.common.api import UserAPI
 from dagshub.common.api.repo import PathNotFoundError
@@ -437,7 +437,7 @@ class AnnotationImporter:
         """
         tasks = {}
         for filename, anns in annotations.items():
-            video_anns = [a for a in anns if isinstance(a, IRVideoBBoxAnnotation)]
+            video_anns = [a for a in anns if isinstance(a, IRVideoBBoxFrameAnnotation)]
             if not video_anns:
                 continue
             video_path = self.ds.source.raw_path(filename)

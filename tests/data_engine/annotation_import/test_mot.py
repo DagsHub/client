@@ -7,7 +7,7 @@ from unittest.mock import patch, PropertyMock
 
 import pytest
 from dagshub_annotation_converter.ir.image import CoordinateStyle
-from dagshub_annotation_converter.ir.video import IRVideoBBoxAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 
 from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationsNotFoundError
 from dagshub.data_engine.annotation.metadata import MetadataAnnotations
@@ -107,7 +107,7 @@ def test_import_mot_from_dir(ds, tmp_path):
     assert len(result) == 1
     anns = list(result.values())[0]
     assert len(anns) == 2
-    assert all(isinstance(a, IRVideoBBoxAnnotation) for a in anns)
+    assert all(isinstance(a, IRVideoBBoxFrameAnnotation) for a in anns)
 
 
 def test_import_mot_from_zip(ds, tmp_path):
@@ -328,8 +328,8 @@ def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monk
 # --- helpers ---
 
 
-def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxAnnotation:
-    return IRVideoBBoxAnnotation(
+def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
+    return IRVideoBBoxFrameAnnotation(
         track_id=track_id, frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
         image_width=1920, image_height=1080,

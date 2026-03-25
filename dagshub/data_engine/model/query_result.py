@@ -22,7 +22,7 @@ from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
 from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
-from dagshub_annotation_converter.ir.video import IRVideoBBoxAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 from pydantic import ValidationError
 
 from dagshub.auth import get_token
@@ -782,9 +782,9 @@ class QueryResult:
                 annotations.extend(dp.metadata[annotation_field].annotations)
         return annotations
 
-    def _get_all_video_annotations(self, annotation_field: str) -> List[IRVideoBBoxAnnotation]:
+    def _get_all_video_annotations(self, annotation_field: str) -> List[IRVideoBBoxFrameAnnotation]:
         all_anns = self._get_all_annotations(annotation_field)
-        return [a for a in all_anns if isinstance(a, IRVideoBBoxAnnotation)]
+        return [a for a in all_anns if isinstance(a, IRVideoBBoxFrameAnnotation)]
 
     def _prepare_video_file_for_export(self, local_root: Path, repo_relative_filename: str) -> Optional[Path]:
         ann_path = Path(repo_relative_filename)
@@ -798,7 +798,7 @@ class QueryResult:
         return None
 
     @staticmethod
-    def _get_annotation_filename(ann: IRVideoBBoxAnnotation) -> Optional[str]:
+    def _get_annotation_filename(ann: IRVideoBBoxFrameAnnotation) -> Optional[str]:
         filename = ann.filename
         if filename is None:
             return None

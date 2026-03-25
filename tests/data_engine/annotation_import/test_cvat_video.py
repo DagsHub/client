@@ -6,7 +6,7 @@ from unittest.mock import patch, PropertyMock
 import pytest
 from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_xml_string
 from dagshub_annotation_converter.ir.image import IRBBoxImageAnnotation, CoordinateStyle
-from dagshub_annotation_converter.ir.video import IRVideoBBoxAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 
 from dagshub.data_engine.annotation.importer import AnnotationImporter
 from dagshub.data_engine.annotation.metadata import MetadataAnnotations
@@ -35,7 +35,7 @@ def test_import_cvat_video(ds, tmp_path):
     assert len(result) == 1
     anns = list(result.values())[0]
     assert len(anns) == 2
-    assert all(isinstance(a, IRVideoBBoxAnnotation) for a in anns)
+    assert all(isinstance(a, IRVideoBBoxFrameAnnotation) for a in anns)
 
 
 # --- _get_all_video_annotations ---
@@ -58,7 +58,7 @@ def test_get_all_video_filters(ds):
     qr = _make_qr(ds, [dp], ann_field="ann")
     result = qr._get_all_video_annotations("ann")
     assert len(result) == 1
-    assert isinstance(result[0], IRVideoBBoxAnnotation)
+    assert isinstance(result[0], IRVideoBBoxFrameAnnotation)
 
 
 def test_get_all_video_empty(ds):
@@ -239,8 +239,8 @@ def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
 # --- helpers ---
 
 
-def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxAnnotation:
-    return IRVideoBBoxAnnotation(
+def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
+    return IRVideoBBoxFrameAnnotation(
         track_id=track_id, frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
         image_width=1920, image_height=1080,
