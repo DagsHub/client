@@ -162,7 +162,7 @@ class AnnotationImporter:
 
     @staticmethod
     def _is_video_annotation(result) -> bool:
-        """Check if the result from a CVAT loader is video annotations (IRVideoSequence or int keys) vs image annotations (str keys)."""
+        """Check whether a loader result contains video annotations."""
         from dagshub_annotation_converter.ir.video import IRVideoSequence
 
         if isinstance(result, IRVideoSequence):
@@ -176,18 +176,17 @@ class AnnotationImporter:
         self,
         video_data,
     ) -> Dict[str, Sequence[IRAnnotationBase]]:
-        """Flatten video annotations (IRVideoSequence or frame-indexed dict) into a single entry keyed by video name."""
+        """Flatten video annotations into a single entry keyed by video name."""
         from dagshub_annotation_converter.ir.video import IRVideoSequence
 
         video_name = self.additional_args.get("video_name", self.annotations_file.stem)
         if isinstance(video_data, IRVideoSequence):
             return {video_name: video_data.to_annotations()}
-        else:
-            # Legacy dict[int, list[annotation]] format
-            all_anns: List[IRAnnotationBase] = []
-            for frame_anns in video_data.values():
-                all_anns.extend(frame_anns)
-            return {video_name: all_anns}
+
+        all_anns: List[IRAnnotationBase] = []
+        for frame_anns in video_data.values():
+            all_anns.extend(frame_anns)
+        return {video_name: all_anns}
 
     def _flatten_cvat_fs_annotations(
         self, fs_annotations: Mapping[str, object]

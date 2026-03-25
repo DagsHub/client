@@ -108,7 +108,7 @@ def test_flatten_sequence(ds, tmp_path):
     assert len(result["test_video"]) == 2
 
 
-def test_build_video_sequence_without_legacy_image_dimensions():
+def test_build_video_sequence_sets_top_level_dimensions():
     anns = [
         IRVideoBBoxFrameAnnotation(
             track_id=0,

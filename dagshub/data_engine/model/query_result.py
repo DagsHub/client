@@ -791,8 +791,7 @@ class QueryResult:
     def _annotations_to_sequences(
         video_annotations: List[IRVideoBBoxFrameAnnotation],
     ) -> List["IRVideoSequence"]:
-        """Reconstruct IRVideoSequence objects from a flat list of frame annotations, grouped by filename."""
-        # Group annotations by source filename
+        """Group frame annotations into per-source video sequences."""
         by_source: Dict[str, List[IRVideoBBoxFrameAnnotation]] = {}
         for ann in video_annotations:
             filename = QueryResult._get_annotation_filename(ann) or ""
