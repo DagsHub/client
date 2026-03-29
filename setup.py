@@ -1,5 +1,6 @@
-import setuptools
 import os.path
+
+import setuptools
 
 
 # Thank you pip contributors
@@ -41,7 +42,11 @@ install_requires = [
     "python-dateutil",
     "boto3",
     "semver",
-    "dagshub-annotation-converter>=0.1.12",
+    # FIXME: roll back to main after merging
+    # "dagshub-annotation-converter>=0.1.12",
+    "dagshub-annotation-converter @ "
+    + "git+https://github.com/DagsHub/"
+    + "dagshub-annotation-converter@coco_converter#egg=dagshub-annotation-converter",
 ]
 
 extras_require = {
