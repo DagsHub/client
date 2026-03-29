@@ -1,7 +1,6 @@
 import datetime
 import json
-from pathlib import PurePosixPath
-from unittest.mock import patch, PropertyMock
+from unittest.mock import patch
 
 import pytest
 from dagshub_annotation_converter.ir.image import (
@@ -15,12 +14,6 @@ from dagshub.data_engine.client.models import MetadataSelectFieldSchema
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.query_result import QueryResult
-
-
-@pytest.fixture(autouse=True)
-def mock_source_prefix(ds):
-    with patch.object(type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath()):
-        yield
 
 
 # --- import ---
@@ -56,19 +49,6 @@ def test_coco_convert_to_ls_tasks(ds, tmp_path, mock_dagshub_auth):
     task_json = json.loads(tasks["test.jpg"])
     assert "annotations" in task_json
     assert len(task_json["annotations"]) > 0
-
-
-# --- add_coco_annotation ---
-
-
-def test_add_coco_annotation_rewrites_filename(ds, mock_dagshub_auth):
-    dp = Datapoint(datasource=ds, path="my_images/photo.jpg", datapoint_id=0, metadata={})
-    meta_ann = MetadataAnnotations(datapoint=dp, field="ann")
-    meta_ann.add_coco_annotation(json.dumps(_make_coco_json()))
-
-    assert len(meta_ann.annotations) == 1
-    assert isinstance(meta_ann.annotations[0], IRBBoxImageAnnotation)
-    assert meta_ann.annotations[0].filename == "my_images/photo.jpg"
 
 
 # --- _resolve_annotation_field ---

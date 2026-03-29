@@ -900,7 +900,10 @@ class QueryResult:
 
         context = CocoContext()
         if classes is not None:
-            context.categories = dict(classes)
+            categories = Categories()
+            for category_id, category_name in classes.items():
+                categories.add(category_name, category_id)
+            context.categories = categories
 
         # Add the source prefix to all annotations
         for ann in annotations:

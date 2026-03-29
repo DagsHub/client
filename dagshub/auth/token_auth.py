@@ -37,7 +37,7 @@ class DagshubAuthenticator(Auth):
 
     def can_renegotiate(self):
         # Env var tokens cannot renegotiate, every other token type can
-        return type(self._token) is not EnvVarDagshubToken
+        return not type(self._token) is EnvVarDagshubToken
 
     def renegotiate_token(self):
         if not self._token_storage.is_valid_token(self._token, self._host):

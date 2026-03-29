@@ -95,6 +95,7 @@ class AnnotationImporter:
         log_message("Downloading annotations from repository")
         repoApi = self.ds.source.repoApi
         if self.annotations_type == "cvat":
+            # Download just the annotation file
             repoApi.download(self.annotations_file.as_posix(), dest_dir, keep_source_prefix=True)
         elif self.annotations_type == "yolo":
             # Download the dataset .yaml file and the images + annotations
@@ -107,6 +108,7 @@ class AnnotationImporter:
             assert context.path is not None
             repoApi.download(self.annotations_file.parent / context.path, dest_dir, keep_source_prefix=True)
         elif self.annotations_type == "coco":
+            # Download just the annotation file
             repoApi.download(self.annotations_file.as_posix(), dest_dir, keep_source_prefix=True)
 
     @staticmethod
@@ -157,10 +159,8 @@ class AnnotationImporter:
                 )
                 continue
             for ann in anns:
-                if ann.filename is not None:
-                    ann.filename = remap_func(ann.filename)
-                else:
-                    ann.filename = new_filename
+                assert ann.filename is not None
+                ann.filename = remap_func(ann.filename)
             remapped[new_filename] = anns
 
         return remapped

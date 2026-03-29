@@ -271,28 +271,6 @@ class MetadataAnnotations:
         self.annotations.append(ann)
         self._update_datapoint()
 
-    def add_coco_annotation(
-        self,
-        coco_json: str,
-    ):
-        """
-        Add annotations from a COCO-format JSON string.
-
-        Args:
-            coco_json: A COCO-format JSON string with ``categories``, ``images``, and ``annotations`` keys.
-        """
-        from dagshub_annotation_converter.converters.coco import load_coco_from_json_string
-
-        grouped, _ = load_coco_from_json_string(coco_json)
-        new_anns: list[IRAnnotationBase] = []
-        for anns in grouped.values():
-            for ann in anns:
-                ann.filename = self.datapoint.path
-                new_anns.append(ann)
-        self.annotations.extend(new_anns)
-        log_message(f"Added {len(new_anns)} COCO annotation(s) to datapoint {self.datapoint.path}")
-        self._update_datapoint()
-
     def add_yolo_annotation(
         self,
         annotation_type: Literal["bbox", "segmentation", "pose"],
