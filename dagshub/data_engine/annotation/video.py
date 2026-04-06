@@ -1,24 +1,45 @@
+from collections import defaultdict
 from typing import Optional, Sequence
 
-from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation, IRVideoSequence
+from dagshub_annotation_converter.ir.video import (
+    IRVideoBBoxFrameAnnotation,
+    IRVideoAnnotationTrack,
+    IRVideoSequence,
+)
 
 
 def build_video_sequence_from_annotations(
     annotations: Sequence[IRVideoBBoxFrameAnnotation],
     filename: Optional[str] = None,
 ) -> IRVideoSequence:
-    sequence = IRVideoSequence.from_annotations(annotations, filename=filename)
+    # Pre-group annotations into tracks (required by new from_annotations API)
+    by_track: dict[str, list[IRVideoBBoxFrameAnnotation]] = defaultdict(list)
+    for ann in annotations:
+        object_id = getattr(ann, "object_id", None)
+        if object_id is None and ann.__pydantic_extra__ is not None:
+            object_id = ann.__pydantic_extra__.get("object_id")
+        if object_id is None:
+            object_id = ann.imported_id
+        if object_id is None:
+            raise ValueError("Video annotation is missing an object identifier")
+        by_track[str(object_id)].append(ann)
 
-    resolved_width = sequence.resolved_video_width()
-    if sequence.video_width is None and resolved_width is not None:
-        sequence.video_width = resolved_width
+    tracks = [
+        IRVideoAnnotationTrack.from_annotations(anns, object_id=str(tid))
+        for tid, anns in by_track.items()
+    ]
 
-    resolved_height = sequence.resolved_video_height()
-    if sequence.video_height is None and resolved_height is not None:
-        sequence.video_height = resolved_height
+    sequence = IRVideoSequence.from_annotations(tracks=tracks, filename=filename)
 
-    resolved_length = sequence.resolved_sequence_length()
-    if sequence.sequence_length is None and resolved_length is not None:
-        sequence.sequence_length = resolved_length
+    if filename is not None:
+        for track in sequence.tracks:
+            for ann in track.annotations:
+                if ann.filename is None:
+                    ann.filename = filename
+
+    # resolved_* methods now cache results automatically
+    sequence.resolved_video_width()
+    sequence.resolved_video_height()
+    sequence.resolved_sequence_length()
 
     return sequence

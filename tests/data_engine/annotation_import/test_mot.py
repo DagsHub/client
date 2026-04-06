@@ -48,7 +48,8 @@ def test_is_video_dict_mixed_first_int():
 
 
 def test_is_video_sequence():
-    assert AnnotationImporter._is_video_annotation(IRVideoSequence.from_annotations([_make_video_bbox()])) is True
+    seq = build_video_sequence_from_annotations([_make_video_bbox()])
+    assert AnnotationImporter._is_video_annotation(seq) is True
 
 
 # --- is_video_format ---
@@ -101,17 +102,41 @@ def test_flatten_video_name_override(ds, tmp_path):
 
 def test_flatten_sequence(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "test_video", load_from="disk")
-    sequence = IRVideoSequence.from_annotations([_make_video_bbox(frame=0), _make_video_bbox(frame=5)])
+    sequence = build_video_sequence_from_annotations([_make_video_bbox(frame=0), _make_video_bbox(frame=5)])
     result = importer._flatten_video_annotations(sequence)
 
     assert "test_video" in result
     assert len(result["test_video"]) == 2
 
 
+def test_flatten_sequence_preserves_sequence_filename(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "dataset", load_from="disk")
+    sequence = build_video_sequence_from_annotations(
+        [_make_video_bbox(frame=0), _make_video_bbox(frame=5)],
+        filename="nested/videos/video.mp4",
+    )
+
+    result = importer._flatten_video_annotations(sequence)
+
+    assert "nested/videos/video.mp4" in result
+
+
+def test_flatten_mot_fs_preserves_relative_video_path(ds, tmp_path):
+    importer = AnnotationImporter(ds, "mot", tmp_path / "dataset", load_from="disk")
+    sequence = build_video_sequence_from_annotations(
+        [_make_video_bbox(frame=0), _make_video_bbox(frame=5)],
+        filename="nested/video.mp4",
+    )
+
+    result = importer._flatten_mot_fs_annotations({Path("nested/video.mp4"): (sequence, object())})
+
+    assert "nested/video.mp4" in result
+
+
 def test_build_video_sequence_sets_top_level_dimensions():
     anns = [
         IRVideoBBoxFrameAnnotation(
-            track_id=0,
+            object_id=0,
             frame_number=0,
             left=100.0,
             top=150.0,
@@ -158,16 +183,16 @@ def test_import_mot_from_zip(ds, tmp_path):
     assert len(list(result.values())[0]) == 2
 
 
-def test_import_mot_from_fs_passes_datasource_path_from_source_prefix(ds, tmp_path, monkeypatch):
+def test_import_mot_from_fs_passes_dimensions(ds, tmp_path, monkeypatch):
+    # Create the labels/ subdir so the importer takes the load_mot_from_fs path
+    (tmp_path / "labels").mkdir()
     captured = {}
 
-    def _mock_load_mot_from_fs(import_dir, image_width=None, image_height=None, video_files=None, datasource_path=""):
+    def _mock_load_mot_from_fs(import_dir, image_width=None, image_height=None, **kwargs):
         captured["import_dir"] = import_dir
         captured["image_width"] = image_width
         captured["image_height"] = image_height
-        captured["video_files"] = video_files
-        captured["datasource_path"] = datasource_path
-        return {"seq_a": ({0: [_make_video_bbox(frame=0)]}, object())}
+        return {Path("seq_a"): ({0: [_make_video_bbox(frame=0)]}, object())}
 
     monkeypatch.setattr("dagshub.data_engine.annotation.importer.load_mot_from_fs", _mock_load_mot_from_fs)
 
@@ -181,12 +206,9 @@ def test_import_mot_from_fs_passes_datasource_path_from_source_prefix(ds, tmp_pa
             load_from="disk",
             image_width=1280,
             image_height=720,
-            video_files={"seq_a": "dummy.mp4"},
         )
         result = importer.import_annotations()
 
-    assert captured["datasource_path"] == "data/videos"
-    assert captured["video_files"] == {"seq_a": "dummy.mp4"}
     assert captured["image_width"] == 1280
     assert captured["image_height"] == 720
     assert "seq_a" in result
@@ -260,8 +282,8 @@ def test_export_mot_explicit_dimensions(ds, tmp_path, monkeypatch):
         output_dir.mkdir(parents=True, exist_ok=True)
         config = configparser.ConfigParser()
         config["Sequence"] = {
-            "imWidth": str(context.image_width),
-            "imHeight": str(context.image_height),
+            "imWidth": str(context.video_width),
+            "imHeight": str(context.video_height),
         }
         with open(output_dir / "seqinfo.ini", "w") as f:
             config.write(f)
@@ -296,25 +318,29 @@ def test_export_mot_multiple_videos(ds, tmp_path, monkeypatch):
     dps = []
     for i in range(2):
         dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
-        ann = _make_video_bbox(frame=i, track_id=i)
+        ann = _make_video_bbox(frame=i, object_id=i)
         ann.filename = dp.path
         dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=[ann])
         dps.append(dp)
 
+    captured = {}
+
     def _mock_download_files(self, target_dir, *args, **kwargs):
+        captured["download_dir"] = target_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         for i in range(2):
             (target_dir / f"video_{i}.mp4").write_bytes(b"fake")
         return target_dir
 
-    def _mock_export_mot_sequences_to_dirs(video_annotations, context, labels_dir, video_files=None):
+    def _mock_export_mot_sequences_to_dirs(video_annotations, context, output_dir):
+        captured["output_dir"] = output_dir
         for i in range(2):
-            seq_dir = labels_dir / f"video_{i}"
+            seq_dir = output_dir / "labels" / f"video_{i}"
             seq_dir.mkdir(parents=True, exist_ok=True)
             (seq_dir / "gt").mkdir(parents=True, exist_ok=True)
             (seq_dir / "gt" / "gt.txt").write_text("")
             (seq_dir / "gt" / "labels.txt").write_text("person\n")
-        return labels_dir
+        return output_dir / "labels"
 
     monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
     monkeypatch.setattr(
@@ -324,14 +350,16 @@ def test_export_mot_multiple_videos(ds, tmp_path, monkeypatch):
     qr = _make_qr(ds, dps, ann_field="ann")
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
-    assert result == tmp_path / "labels"
-    assert (result / "video_0" / "gt" / "gt.txt").exists()
-    assert (result / "video_1" / "gt" / "gt.txt").exists()
+    assert result == tmp_path
+    assert captured["download_dir"] == tmp_path / "videos"
+    assert captured["output_dir"] == tmp_path
+    assert (result / "labels" / "video_0" / "gt" / "gt.txt").exists()
+    assert (result / "labels" / "video_1" / "gt" / "gt.txt").exists()
 
 
 def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
+    anns = [_make_video_bbox(frame=0, object_id=1), _make_video_bbox(frame=1, object_id=1)]
     for ann in anns:
         ann.video_width = 0
         ann.video_height = 0
@@ -364,9 +392,9 @@ def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monk
 # --- helpers ---
 
 
-def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
+def _make_video_bbox(frame=0, object_id=0) -> IRVideoBBoxFrameAnnotation:
     return IRVideoBBoxFrameAnnotation(
-        track_id=track_id, frame_number=frame,
+        object_id=object_id, frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
         video_width=1920, video_height=1080,
         categories={"person": 1.0},
@@ -399,7 +427,7 @@ def _zip_mot_dir(tmp_path: Path, mot_dir: Path) -> Path:
 
 def _make_video_qr(ds):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0, track_id=1), _make_video_bbox(frame=1, track_id=1)]
+    anns = [_make_video_bbox(frame=0, object_id=1), _make_video_bbox(frame=1, object_id=1)]
     for ann in anns:
         ann.filename = "video.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)

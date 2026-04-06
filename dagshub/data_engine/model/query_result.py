@@ -21,8 +21,9 @@ from dagshub_annotation_converter.formats.mot import MOTContext
 from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
+from dagshub_annotation_converter.ir.base import IRTaskAnnotation
 from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
-from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoAnnotationTrack, IRVideoBBoxFrameAnnotation
 from pydantic import ValidationError
 
 from dagshub.auth import get_token
@@ -773,8 +774,8 @@ class QueryResult:
         download_files(download_args, skip_if_exists=not redownload)
         return target_path
 
-    def _get_all_annotations(self, annotation_field: str) -> List[IRImageAnnotationBase]:
-        annotations = []
+    def _get_all_annotations(self, annotation_field: str) -> List[IRTaskAnnotation]:
+        annotations: List[IRTaskAnnotation] = []
         for dp in self.entries:
             if annotation_field in dp.metadata:
                 if not hasattr(dp.metadata[annotation_field], "annotations"):
@@ -783,9 +784,21 @@ class QueryResult:
                 annotations.extend(dp.metadata[annotation_field].annotations)
         return annotations
 
+    def _get_all_image_annotations(self, annotation_field: str) -> List[IRImageAnnotationBase]:
+        return [ann for ann in self._get_all_annotations(annotation_field) if isinstance(ann, IRImageAnnotationBase)]
+
     def _get_all_video_annotations(self, annotation_field: str) -> List[IRVideoBBoxFrameAnnotation]:
-        all_anns = self._get_all_annotations(annotation_field)
-        return [a for a in all_anns if isinstance(a, IRVideoBBoxFrameAnnotation)]
+        video_annotations: List[IRVideoBBoxFrameAnnotation] = []
+        for ann in self._get_all_annotations(annotation_field):
+            if isinstance(ann, IRVideoBBoxFrameAnnotation):
+                video_annotations.append(ann)
+            elif isinstance(ann, IRVideoAnnotationTrack):
+                video_annotations.extend(
+                    track_ann
+                    for track_ann in ann.to_annotations()
+                    if isinstance(track_ann, IRVideoBBoxFrameAnnotation)
+                )
+        return video_annotations
 
     @staticmethod
     def _annotations_to_sequences(
@@ -867,7 +880,7 @@ class QueryResult:
             download_dir = Path("dagshub_export")
         download_dir = Path(download_dir) / "data"
 
-        annotations = self._get_all_annotations(annotation_field)
+        annotations = self._get_all_image_annotations(annotation_field)
 
         categories = Categories()
         if classes is not None:
@@ -924,13 +937,13 @@ class QueryResult:
         """
         Exports video annotations in MOT (Multiple Object Tracking) format.
 
-        The output follows the MOT Challenge directory structure::
+        Single-video exports write a MOT sequence directory under ``output_dir/labels/``.
+        Multi-video exports write a dataset root compatible with
+        ``load_mot_from_fs()``::
 
             output_dir/
-              gt/
-                gt.txt
-                labels.txt
-              seqinfo.ini
+              videos/
+              labels/
 
         Args:
             download_dir: Where to export. Defaults to ``./dagshub_export``
@@ -946,8 +959,6 @@ class QueryResult:
         if download_dir is None:
             download_dir = Path("dagshub_export")
         download_dir = Path(download_dir)
-        labels_dir = download_dir / "labels"
-        labels_dir.mkdir(parents=True, exist_ok=True)
 
         video_annotations = self._get_all_video_annotations(annotation_field)
         if not video_annotations:
@@ -963,37 +974,22 @@ class QueryResult:
         has_multiple_sources = len(source_names) > 1
 
         local_download_root: Optional[Path] = None
-        if image_width is None or image_height is None:
+        if has_multiple_sources:
+            log_message("Downloading videos into MOT dataset layout...")
+            self.download_files(download_dir / "videos")
+        elif image_width is None or image_height is None:
             log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
-            local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
+            local_download_root = self.download_files(download_dir / "videos")
 
         log_message("Exporting MOT annotations...")
         sequences = self._annotations_to_sequences(video_annotations)
 
         if has_multiple_sources:
-            video_files: Optional[Dict[str, Union[str, Path]]] = None
-            if local_download_root is not None:
-                video_files = {}
-                for ann_filename in {
-                    self._get_annotation_filename(ann)
-                    for ann in video_annotations
-                    if self._get_annotation_filename(ann)
-                }:
-                    assert ann_filename is not None
-                    sequence_name = Path(ann_filename).stem
-                    local_video = self._prepare_video_file_for_export(local_download_root, ann_filename)
-                    if local_video is None:
-                        raise FileNotFoundError(
-                            f"Could not find local downloaded video file for '{ann_filename}' under "
-                            f"'{local_download_root}'."
-                        )
-                    video_files[sequence_name] = local_video
-
             context = MOTContext()
-            context.image_width = image_width
-            context.image_height = image_height
-            export_mot_sequences_to_dirs(sequences, context, labels_dir, video_files=video_files)
-            result_path = labels_dir
+            context.video_width = image_width
+            context.video_height = image_height
+            export_mot_sequences_to_dirs(sequences, context, download_dir)
+            result_path = download_dir
         else:
             video_file: Optional[Path] = None
             if local_download_root is not None:
@@ -1008,8 +1004,10 @@ class QueryResult:
                     )
 
             context = MOTContext()
-            context.image_width = image_width
-            context.image_height = image_height
+            context.video_width = image_width
+            context.video_height = image_height
+            labels_dir = download_dir / "labels"
+            labels_dir.mkdir(parents=True, exist_ok=True)
             single_name = Path(source_names[0]).stem if source_names else "sequence"
             output_dir = labels_dir / single_name
             result_path = export_mot_to_dir(sequences[0], context, output_dir, video_file=video_file)

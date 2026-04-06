@@ -6,13 +6,15 @@ from unittest.mock import MagicMock
 
 import pytest
 from dagshub_annotation_converter.ir.image import IRSegmentationImageAnnotation
+from dagshub_annotation_converter.ir.video import CoordinateStyle, IRVideoBBoxFrameAnnotation
 from pytest import MonkeyPatch
 
 from dagshub.data_engine.annotation import MetadataAnnotations
+from dagshub.data_engine.annotation.video import build_video_sequence_from_annotations
 from dagshub.data_engine.annotation.metadata import ErrorMetadataAnnotations, UnsupportedMetadataAnnotations
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model import datapoint, query_result
-from dagshub.data_engine.model.datapoint import BlobDownloadError, BlobHashMetadata
+from dagshub.data_engine.model.datapoint import BlobDownloadError, BlobHashMetadata, Datapoint
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.query_result import QueryResult
 from tests.data_engine.util import add_metadata_field
@@ -168,3 +170,44 @@ def test_nonexistent_annotation(ds_with_nonexistent_annotation):
 def test_blob_metadata_is_wrapped_from_backend(ds_with_document_annotation):
     qr = ds_with_document_annotation.all(load_documents=False, load_annotations=False)
     assert isinstance(qr[0].metadata[_annotation_field_name], BlobHashMetadata)
+
+
+def test_video_tracks_to_ls_task_use_video_data_and_sequence_length(ds):
+    dp = Datapoint(datasource=ds, path="nested/video.mp4", datapoint_id=1, metadata={})
+    frame_annotations = [
+        IRVideoBBoxFrameAnnotation(
+            object_id=1,
+            frame_number=0,
+            left=100.0,
+            top=150.0,
+            width=50.0,
+            height=80.0,
+            video_width=1920,
+            video_height=1080,
+            categories={"person": 1.0},
+            coordinate_style=CoordinateStyle.DENORMALIZED,
+        ),
+        IRVideoBBoxFrameAnnotation(
+            object_id=1,
+            frame_number=5,
+            left=110.0,
+            top=155.0,
+            width=50.0,
+            height=80.0,
+            video_width=1920,
+            video_height=1080,
+            categories={"person": 1.0},
+            coordinate_style=CoordinateStyle.DENORMALIZED,
+        ),
+    ]
+    for ann in frame_annotations:
+        ann.filename = dp.path
+
+    sequence = build_video_sequence_from_annotations(frame_annotations, filename=dp.path)
+    annotations = MetadataAnnotations(dp, _annotation_field_name, annotations=sequence.tracks)
+
+    task = json.loads(annotations.to_ls_task())
+
+    assert task["data"]["video"] == dp.download_url
+    assert task["annotations"][0]["result"][0]["type"] == "videorectangle"
+    assert task["annotations"][0]["result"][0]["value"]["framesCount"] == sequence.sequence_length

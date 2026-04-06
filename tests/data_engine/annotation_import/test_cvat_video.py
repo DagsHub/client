@@ -39,6 +39,18 @@ def test_import_cvat_video(ds, tmp_path):
     assert all(isinstance(a, IRVideoBBoxFrameAnnotation) for a in anns)
 
 
+def test_flatten_cvat_fs_preserves_sequence_filename(ds, tmp_path):
+    importer = AnnotationImporter(ds, "cvat_video", tmp_path / "dataset", load_from="disk")
+    sequence = build_video_sequence_from_annotations(
+        [_make_video_bbox(frame=0), _make_video_bbox(frame=5)],
+        filename="nested/folder/video.mp4",
+    )
+
+    result = importer._flatten_cvat_fs_annotations({"nested/annotations.xml": sequence})
+
+    assert "nested/folder/video.mp4" in result
+
+
 # --- _get_all_video_annotations ---
 
 
@@ -81,6 +93,21 @@ def test_get_all_video_aggregates_across_datapoints(ds):
 
     qr = _make_qr(ds, dps, ann_field="ann")
     assert len(qr._get_all_video_annotations("ann")) == 3
+
+
+def test_get_all_video_expands_tracks(ds):
+    dp = Datapoint(datasource=ds, path="nested/video.mp4", datapoint_id=0, metadata={})
+    sequence = build_video_sequence_from_annotations(
+        [_make_video_bbox(frame=0), _make_video_bbox(frame=5)],
+        filename=dp.path,
+    )
+    dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=sequence.tracks)
+
+    qr = _make_qr(ds, [dp], ann_field="ann")
+    result = qr._get_all_video_annotations("ann")
+
+    assert len(result) == 2
+    assert all(ann.filename == dp.path for ann in result)
 
 
 # --- export_as_cvat_video ---
@@ -151,7 +178,7 @@ def test_export_cvat_video_multiple_datapoints(ds, tmp_path, monkeypatch):
     dps = []
     for i in range(2):
         dp = Datapoint(datasource=ds, path=f"video_{i}.mp4", datapoint_id=i, metadata={})
-        ann = _make_video_bbox(frame=i, track_id=i)
+        ann = _make_video_bbox(frame=i, object_id=i)
         ann.filename = dp.path
         dp.metadata["ann"] = MetadataAnnotations(
             datapoint=dp, field="ann",
@@ -177,7 +204,7 @@ def test_export_cvat_video_multiple_datapoints(ds, tmp_path, monkeypatch):
 
 def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_path, monkeypatch):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
+    anns = [_make_video_bbox(frame=0, object_id=0), _make_video_bbox(frame=5, object_id=0)]
     for ann in anns:
         ann.video_width = 0
         ann.video_height = 0
@@ -220,7 +247,7 @@ def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_pat
 
 def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    ann = _make_video_bbox(frame=0, track_id=0)
+    ann = _make_video_bbox(frame=0, object_id=0)
     ann.video_width = 0
     ann.video_height = 0
     ann.filename = "missing.mp4"
@@ -240,9 +267,9 @@ def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
 # --- helpers ---
 
 
-def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
+def _make_video_bbox(frame=0, object_id=0) -> IRVideoBBoxFrameAnnotation:
     return IRVideoBBoxFrameAnnotation(
-        track_id=track_id, frame_number=frame,
+        object_id=object_id, frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
         video_width=1920, video_height=1080,
         categories={"person": 1.0},
@@ -251,14 +278,14 @@ def _make_video_bbox(frame=0, track_id=0) -> IRVideoBBoxFrameAnnotation:
 
 
 def _make_cvat_video_xml() -> bytes:
-    anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
+    anns = [_make_video_bbox(frame=0, object_id=0), _make_video_bbox(frame=5, object_id=0)]
     sequence = build_video_sequence_from_annotations(anns, filename="video.mp4")
     return export_cvat_video_to_xml_bytes(sequence, video_name="video.mp4")
 
 
 def _make_video_qr(ds):
     dp = Datapoint(datasource=ds, path="video.mp4", datapoint_id=0, metadata={})
-    anns = [_make_video_bbox(frame=0, track_id=0), _make_video_bbox(frame=5, track_id=0)]
+    anns = [_make_video_bbox(frame=0, object_id=0), _make_video_bbox(frame=5, object_id=0)]
     for ann in anns:
         ann.filename = "video.mp4"
     dp.metadata["ann"] = MetadataAnnotations(datapoint=dp, field="ann", annotations=anns)

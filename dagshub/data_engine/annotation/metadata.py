@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Tuple, Unio
 from dagshub_annotation_converter.formats.label_studio.task import LabelStudioTask, parse_ls_task
 from dagshub_annotation_converter.formats.yolo import YoloContext, import_lookup, import_yolo_result
 from dagshub_annotation_converter.formats.yolo.categories import Categories
+from dagshub_annotation_converter.ir.base import IRAnnotationBase, IRTaskAnnotation
 from dagshub_annotation_converter.ir.image import (
     CoordinateStyle,
     IRBBoxImageAnnotation,
@@ -11,7 +12,8 @@ from dagshub_annotation_converter.ir.image import (
     IRSegmentationImageAnnotation,
     IRSegmentationPoint,
 )
-from dagshub_annotation_converter.ir.image.annotations.base import IRAnnotationBase, IRImageAnnotationBase
+from dagshub_annotation_converter.ir.image.annotations.base import IRImageAnnotationBase
+from dagshub_annotation_converter.ir.video import IRVideoAnnotationTrack
 
 from dagshub.common.api import UserAPI
 from dagshub.common.helpers import log_message
@@ -68,13 +70,13 @@ class MetadataAnnotations:
         self,
         datapoint: "Datapoint",
         field: str,
-        annotations: Optional[Sequence["IRAnnotationBase"]] = None,
+        annotations: Optional[Sequence["IRTaskAnnotation"]] = None,
         meta: Optional[Dict] = None,
         original_value: Optional[bytes] = None,
     ):
         self.datapoint = datapoint
         self.field = field
-        self.annotations: list["IRAnnotationBase"]
+        self.annotations: list["IRTaskAnnotation"]
         if annotations is None:
             annotations = []
         self.annotations = list(annotations)
@@ -99,11 +101,33 @@ class MetadataAnnotations:
         task = LabelStudioTask(
             user_id=UserAPI.get_current_user(self.datapoint.datasource.source.repoApi.host).user_id,
         )
-        task.data["image"] = self.datapoint.download_url
-        # TODO: need to filter out non-image annotations here maybe?
-        task.add_ir_annotations(self.annotations)
+        if any(isinstance(ann, IRVideoAnnotationTrack) for ann in self.annotations):
+            task.data["video"] = self.datapoint.download_url
+            frames_count = self._get_video_frames_count()
+            for ann in self.annotations:
+                if isinstance(ann, IRVideoAnnotationTrack):
+                    ls_ann = VideoRectangleAnnotation.from_ir_track(ann, frames_count=frames_count)
+                    if ann.__pydantic_extra__ is not None:
+                        ls_ann.__pydantic_extra__ = ann.__pydantic_extra__.copy()
+                    task.add_annotation(ls_ann)
+                else:
+                    task.add_ir_annotation(ann)
+        else:
+            task.data["image"] = self.datapoint.download_url
+            task.add_ir_annotations(self.annotations)
         task.meta.update(self.meta)
         return task.model_dump_json().encode("utf-8")
+
+    def _get_video_frames_count(self) -> Optional[int]:
+        max_frame: Optional[int] = None
+        for ann in self.annotations:
+            if not isinstance(ann, IRVideoAnnotationTrack):
+                continue
+            for track_ann in ann.annotations:
+                max_frame = track_ann.frame_number if max_frame is None else max(max_frame, track_ann.frame_number)
+        if max_frame is None:
+            return None
+        return max_frame + 1
 
     @property
     def value(self) -> Optional[bytes]:
