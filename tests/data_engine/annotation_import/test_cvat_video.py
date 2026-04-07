@@ -273,7 +273,7 @@ def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
 
     monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
 
-    with pytest.raises(FileNotFoundError, match="missing.mp4"):
+    with pytest.raises(FileNotFoundError, match=r"missing\.mp4"):
         qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
 
