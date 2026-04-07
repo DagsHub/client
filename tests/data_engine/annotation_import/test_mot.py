@@ -155,6 +155,42 @@ def test_build_video_sequence_sets_top_level_dimensions():
     assert sequence.video_height == 1080
 
 
+def test_video_export_layout_uses_datasource_prefix(ds):
+    qr, _ = _make_video_qr(ds)
+    with patch.object(
+        type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("my_ds_path")
+    ):
+        video_dir, labels_dir, dataset_root = qr._get_media_export_layout(Path("export"), "videos")
+
+    assert video_dir == Path("export") / "data" / "my_ds_path" / "videos"
+    assert labels_dir == Path("export") / "data" / "my_ds_path" / "labels"
+    assert dataset_root == Path("export") / "data" / "my_ds_path"
+
+
+def test_video_export_layout_reuses_existing_videos_suffix(ds):
+    qr, _ = _make_video_qr(ds)
+    with patch.object(
+        type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("my_ds_path/videos")
+    ):
+        video_dir, labels_dir, dataset_root = qr._get_media_export_layout(Path("export"), "videos")
+
+    assert video_dir == Path("export") / "data" / "my_ds_path" / "videos"
+    assert labels_dir == Path("export") / "data" / "my_ds_path" / "labels"
+    assert dataset_root == Path("export") / "data" / "my_ds_path"
+
+
+def test_video_export_layout_strips_leading_data_prefix(ds):
+    qr, _ = _make_video_qr(ds)
+    with patch.object(
+        type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("data/videos")
+    ):
+        video_dir, labels_dir, dataset_root = qr._get_media_export_layout(Path("export"), "videos")
+
+    assert video_dir == Path("export") / "data" / "videos"
+    assert labels_dir == Path("export") / "data" / "labels"
+    assert dataset_root == Path("export") / "data"
+
+
 # --- import ---
 
 
@@ -244,8 +280,11 @@ def test_convert_video_empty_skipped(ds, tmp_path):
 
 def test_export_mot_directory_structure(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+    captured = {}
 
     def _mock_download_files(self, target_dir, *args, **kwargs):
+        captured["download_dir"] = target_dir
+        captured["keep_source_prefix"] = kwargs.get("keep_source_prefix", True)
         (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
         (target_dir / "video.mp4").write_bytes(b"fake")
         return target_dir
@@ -269,7 +308,9 @@ def test_export_mot_directory_structure(ds, tmp_path, monkeypatch):
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
-    assert result == tmp_path / "labels" / "video"
+    assert result == tmp_path / "data" / "labels" / "video"
+    assert captured["download_dir"] == tmp_path / "data" / "videos"
+    assert captured["keep_source_prefix"] is False
     assert (result / "gt" / "gt.txt").exists()
     assert (result / "gt" / "labels.txt").exists()
     assert (result / "seqinfo.ini").exists()
@@ -277,6 +318,13 @@ def test_export_mot_directory_structure(ds, tmp_path, monkeypatch):
 
 def test_export_mot_explicit_dimensions(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+    captured = {}
+
+    def _mock_download_files(self, target_dir, *args, **kwargs):
+        captured["download_dir"] = target_dir
+        (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
+        (target_dir / "video.mp4").write_bytes(b"fake")
+        return target_dir
 
     def _mock_export_mot_to_dir(video_annotations, context, output_dir, video_file=None):
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -292,6 +340,7 @@ def test_export_mot_explicit_dimensions(ds, tmp_path, monkeypatch):
         (output_dir / "gt" / "labels.txt").write_text("person\n")
         return output_dir
 
+    monkeypatch.setattr(QueryResult, "download_files", _mock_download_files)
     monkeypatch.setattr(
         "dagshub.data_engine.model.query_result.export_mot_to_dir",
         _mock_export_mot_to_dir,
@@ -301,6 +350,7 @@ def test_export_mot_explicit_dimensions(ds, tmp_path, monkeypatch):
     )
 
     seqinfo = (result / "seqinfo.ini").read_text()
+    assert captured["download_dir"] == tmp_path / "data" / "videos"
     assert "1280" in seqinfo
     assert "720" in seqinfo
 
@@ -350,9 +400,9 @@ def test_export_mot_multiple_videos(ds, tmp_path, monkeypatch):
     qr = _make_qr(ds, dps, ann_field="ann")
     result = qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
-    assert result == tmp_path
-    assert captured["download_dir"] == tmp_path / "videos"
-    assert captured["output_dir"] == tmp_path
+    assert result == tmp_path / "data"
+    assert captured["download_dir"] == tmp_path / "data" / "videos"
+    assert captured["output_dir"] == tmp_path / "data"
     assert (result / "labels" / "video_0" / "gt" / "gt.txt").exists()
     assert (result / "labels" / "video_1" / "gt" / "gt.txt").exists()
 
@@ -386,6 +436,7 @@ def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monk
     qr.export_as_mot(download_dir=tmp_path, annotation_field="ann")
 
     assert captured["video_file"] is not None
+    assert "data/videos" in captured["video_file"]
     assert captured["video_file"].endswith("video.mp4")
 
 

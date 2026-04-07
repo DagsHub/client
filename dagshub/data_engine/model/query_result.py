@@ -826,6 +826,23 @@ class QueryResult:
             return with_prefix
         return None
 
+    def _get_media_export_layout(self, download_dir: Path, media_dir_name: str) -> Tuple[Path, Path, Path]:
+        data_root = download_dir / "data"
+        source_prefix = self.datasource.source.source_prefix
+        prefix_parts = source_prefix.parts
+        if prefix_parts and prefix_parts[0] == "data":
+            prefix_parts = prefix_parts[1:]
+
+        media_dir = data_root
+        if prefix_parts:
+            media_dir = media_dir.joinpath(*prefix_parts)
+        if not prefix_parts or prefix_parts[-1] != media_dir_name:
+            media_dir = media_dir / media_dir_name
+
+        dataset_root = media_dir.parent
+        labels_dir = dataset_root / "labels"
+        return media_dir, labels_dir, dataset_root
+
     @staticmethod
     def _get_annotation_filename(ann: IRVideoBBoxFrameAnnotation) -> Optional[str]:
         filename = ann.filename
@@ -959,6 +976,7 @@ class QueryResult:
         if download_dir is None:
             download_dir = Path("dagshub_export")
         download_dir = Path(download_dir)
+        video_dir, labels_dir, dataset_root = self._get_media_export_layout(download_dir, "videos")
 
         video_annotations = self._get_all_video_annotations(annotation_field)
         if not video_annotations:
@@ -973,13 +991,8 @@ class QueryResult:
         )
         has_multiple_sources = len(source_names) > 1
 
-        local_download_root: Optional[Path] = None
-        if has_multiple_sources:
-            log_message("Downloading videos into MOT dataset layout...")
-            self.download_files(download_dir / "videos")
-        elif image_width is None or image_height is None:
-            log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
-            local_download_root = self.download_files(download_dir / "videos")
+        log_message(f"Downloading videos into {video_dir}...")
+        local_download_root = self.download_files(video_dir, keep_source_prefix=False)
 
         log_message("Exporting MOT annotations...")
         sequences = self._annotations_to_sequences(video_annotations)
@@ -988,25 +1001,23 @@ class QueryResult:
             context = MOTContext()
             context.video_width = image_width
             context.video_height = image_height
-            export_mot_sequences_to_dirs(sequences, context, download_dir)
-            result_path = download_dir
+            export_mot_sequences_to_dirs(sequences, context, dataset_root)
+            result_path = dataset_root
         else:
             video_file: Optional[Path] = None
-            if local_download_root is not None:
-                ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
-                if ref_filename is None:
-                    raise FileNotFoundError("Missing annotation filename for MOT export.")
-                video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
-                if video_file is None:
-                    raise FileNotFoundError(
-                        f"Could not find local downloaded video file for '{ref_filename}' "
-                        f"under '{local_download_root}'."
-                    )
+            ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
+            if ref_filename is None:
+                raise FileNotFoundError("Missing annotation filename for MOT export.")
+            video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+            if video_file is None:
+                raise FileNotFoundError(
+                    f"Could not find local downloaded video file for '{ref_filename}' "
+                    f"under '{local_download_root}'."
+                )
 
             context = MOTContext()
             context.video_width = image_width
             context.video_height = image_height
-            labels_dir = download_dir / "labels"
             labels_dir.mkdir(parents=True, exist_ok=True)
             single_name = Path(source_names[0]).stem if source_names else "sequence"
             output_dir = labels_dir / single_name
@@ -1042,6 +1053,7 @@ class QueryResult:
         if download_dir is None:
             download_dir = Path("dagshub_export")
         download_dir = Path(download_dir)
+        video_dir, labels_dir, _ = self._get_media_export_layout(download_dir, "videos")
 
         video_annotations = self._get_all_video_annotations(annotation_field)
         if not video_annotations:
@@ -1059,16 +1071,12 @@ class QueryResult:
         log_message("Exporting CVAT video annotations...")
         sequences = self._annotations_to_sequences(video_annotations)
 
-        local_download_root: Optional[Path] = None
-        if not has_multiple_sources and (image_width is None or image_height is None):
-            log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
-            local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
+        log_message(f"Downloading videos into {video_dir}...")
+        local_download_root = self.download_files(video_dir, keep_source_prefix=False)
 
         if has_multiple_sources:
             video_files: Optional[Dict[str, Union[str, Path]]] = None
             if image_width is None or image_height is None:
-                log_message("Missing video dimensions in annotations, downloading videos for converter-side probing...")
-                local_download_root = self.download_files(download_dir / "data", keep_source_prefix=True)
                 video_files = {}
                 for ann_filename in {
                     self._get_annotation_filename(ann)
@@ -1087,7 +1095,7 @@ class QueryResult:
                     video_files[ann_path.name] = local_video
                     video_files[ann_path.stem] = local_video
 
-            output_dir = download_dir / "labels"
+            output_dir = labels_dir
             output_dir.mkdir(parents=True, exist_ok=True)
             export_cvat_videos_to_zips(
                 sequences,
@@ -1098,19 +1106,16 @@ class QueryResult:
             )
             result_path = output_dir
         else:
-            single_video_file: Optional[Path] = None
-            if local_download_root is not None:
-                ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
-                if ref_filename is None:
-                    raise FileNotFoundError("Missing annotation filename for single-video CVAT export.")
-                single_video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
-                if single_video_file is None:
-                    raise FileNotFoundError(
-                        f"Could not find local downloaded video file for '{ref_filename}' "
-                        f"under '{local_download_root}'."
-                    )
+            ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
+            if ref_filename is None:
+                raise FileNotFoundError("Missing annotation filename for single-video CVAT export.")
+            single_video_file = self._prepare_video_file_for_export(local_download_root, ref_filename)
+            if single_video_file is None:
+                raise FileNotFoundError(
+                    f"Could not find local downloaded video file for '{ref_filename}' "
+                    f"under '{local_download_root}'."
+                )
 
-            labels_dir = download_dir / "labels"
             labels_dir.mkdir(parents=True, exist_ok=True)
             if source_names:
                 output_name = f"{Path(source_names[0]).name}.zip"

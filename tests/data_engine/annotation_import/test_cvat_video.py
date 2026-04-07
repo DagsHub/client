@@ -115,8 +115,11 @@ def test_get_all_video_expands_tracks(ds):
 
 def test_export_cvat_video_xml(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+    captured = {}
 
     def _mock_download_files(self, target_dir, *args, **kwargs):
+        captured["download_dir"] = target_dir
+        captured["keep_source_prefix"] = kwargs.get("keep_source_prefix", True)
         (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
         (target_dir / "video.mp4").write_bytes(b"fake")
         return target_dir
@@ -125,7 +128,9 @@ def test_export_cvat_video_xml(ds, tmp_path, monkeypatch):
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert result.exists()
-    assert result == tmp_path / "labels" / "video.mp4.zip"
+    assert result == tmp_path / "data" / "labels" / "video.mp4.zip"
+    assert captured["download_dir"] == tmp_path / "data" / "videos"
+    assert captured["keep_source_prefix"] is False
     with zipfile.ZipFile(result, "r") as z:
         content = z.read("annotations.xml").decode("utf-8")
     assert "<track" in content
@@ -143,8 +148,10 @@ def test_export_cvat_video_no_annotations_raises(ds, tmp_path):
 
 def test_export_cvat_video_custom_name(ds, tmp_path, monkeypatch):
     qr, _ = _make_video_qr(ds)
+    captured = {}
 
     def _mock_download_files(self, target_dir, *args, **kwargs):
+        captured["download_dir"] = target_dir
         (target_dir / "video.mp4").parent.mkdir(parents=True, exist_ok=True)
         (target_dir / "video.mp4").write_bytes(b"fake")
         return target_dir
@@ -154,6 +161,7 @@ def test_export_cvat_video_custom_name(ds, tmp_path, monkeypatch):
         download_dir=tmp_path, annotation_field="ann", video_name="my_clip.avi"
     )
 
+    assert captured["download_dir"] == tmp_path / "data" / "videos"
     with zipfile.ZipFile(result, "r") as z:
         content = z.read("annotations.xml").decode("utf-8")
     assert "my_clip.avi" in content
@@ -186,7 +194,10 @@ def test_export_cvat_video_multiple_datapoints(ds, tmp_path, monkeypatch):
         )
         dps.append(dp)
 
+    captured = {}
+
     def _mock_download_files(self, target_dir, *args, **kwargs):
+        captured["download_dir"] = target_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         for i in range(2):
             (target_dir / f"video_{i}.mp4").write_bytes(b"fake")
@@ -197,7 +208,8 @@ def test_export_cvat_video_multiple_datapoints(ds, tmp_path, monkeypatch):
     result = qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert result.is_dir()
-    assert result == tmp_path / "labels"
+    assert result == tmp_path / "data" / "labels"
+    assert captured["download_dir"] == tmp_path / "data" / "videos"
     zips = list(result.glob("*.zip"))
     assert len(zips) == 2
 
@@ -242,6 +254,7 @@ def test_export_cvat_video_passes_video_file_when_dimensions_missing(ds, tmp_pat
     qr.export_as_cvat_video(download_dir=tmp_path, annotation_field="ann")
 
     assert captured["video_file"] is not None
+    assert "data/videos" in captured["video_file"]
     assert captured["video_file"].endswith("video.mp4")
 
 
