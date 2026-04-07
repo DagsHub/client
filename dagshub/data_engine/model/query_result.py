@@ -23,7 +23,7 @@ from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
 from dagshub_annotation_converter.ir.base import IRTaskAnnotation
 from dagshub_annotation_converter.ir.image import IRImageAnnotationBase
-from dagshub_annotation_converter.ir.video import IRVideoAnnotationTrack, IRVideoBBoxFrameAnnotation
+from dagshub_annotation_converter.ir.video import IRVideoAnnotationTrack, IRVideoBBoxFrameAnnotation, IRVideoSequence
 from pydantic import ValidationError
 
 from dagshub.auth import get_token

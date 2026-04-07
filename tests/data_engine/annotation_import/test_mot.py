@@ -7,7 +7,7 @@ from unittest.mock import patch, PropertyMock
 
 import pytest
 from dagshub_annotation_converter.ir.image import CoordinateStyle
-from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation, IRVideoSequence
+from dagshub_annotation_converter.ir.video import IRVideoBBoxFrameAnnotation
 
 from dagshub.data_engine.annotation.importer import AnnotationImporter, AnnotationsNotFoundError
 from dagshub.data_engine.annotation.metadata import MetadataAnnotations
