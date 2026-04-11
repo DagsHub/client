@@ -327,7 +327,7 @@ def repo():
     pass
 
 
-@repo.command()
+@repo.command(short_help="Create a repo; optional data upload and local clone.")
 @click.argument("repo_name")
 @click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
 @click.option("-c", "--clone", is_flag=True, help="Clone repository locally")
