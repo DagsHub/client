@@ -1668,6 +1668,16 @@ class Datasource:
 
         Keyword Args:
             yolo_type: Type of YOLO annotations to import. Either ``bbox``, ``segmentation`` or ``pose``.
+            image_width: (MOT, CVAT video) Width of the video frames in pixels. \
+                Used when the annotation file does not contain dimension metadata.
+            image_height: (MOT, CVAT video) Height of the video frames in pixels. \
+                Used when the annotation file does not contain dimension metadata.
+            video_name: (MOT) Name/path of the video file these annotations belong to. \
+                Used to key the resulting annotations when it cannot be inferred from the annotation file.
+            video_dir_name: (MOT filesystem layout) Name of the subdirectory containing video files. \
+                Defaults to ``"videos"``.
+            label_dir_name: (MOT filesystem layout) Name of the subdirectory containing label files. \
+                Defaults to ``"labels"``.
 
         Example to import segmentation annotations into an ``imported_annotations`` field,
         using YOLO information from an ``annotations.yaml`` file (can be local, or in the repo)::

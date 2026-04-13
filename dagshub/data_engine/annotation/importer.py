@@ -1,14 +1,16 @@
 from difflib import SequenceMatcher
 from pathlib import Path, PurePosixPath, PurePath
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Dict, Iterable, Literal, Optional, Union, Sequence, Mapping, Callable, List
+from typing import TYPE_CHECKING, Dict, Iterable, Literal, Optional, Union, Sequence, Mapping, Callable, List, Tuple
 
 from dagshub_annotation_converter.converters.cvat import (
+    CVATAnnotations,
     load_cvat_from_fs,
     load_cvat_from_zip,
     load_cvat_from_xml_file,
 )
 from dagshub_annotation_converter.converters.mot import load_mot_from_dir, load_mot_from_fs, load_mot_from_zip
+from dagshub_annotation_converter.formats.mot.context import MOTContext
 from dagshub_annotation_converter.converters.yolo import load_yolo_from_fs
 from dagshub_annotation_converter.converters.label_studio_video import video_ir_to_ls_video_task
 from dagshub_annotation_converter.formats.label_studio.task import LabelStudioTask
@@ -164,8 +166,6 @@ class AnnotationImporter:
     @staticmethod
     def _is_video_annotation(result) -> bool:
         """Check whether a loader result contains video annotations."""
-        from dagshub_annotation_converter.ir.video import IRVideoSequence
-
         if isinstance(result, IRVideoSequence):
             return True
         if not isinstance(result, dict) or len(result) == 0:
@@ -175,7 +175,7 @@ class AnnotationImporter:
 
     def _flatten_video_annotations(
         self,
-        video_data,
+        video_data: CVATAnnotations,
     ) -> Dict[str, Sequence[IRTaskAnnotation]]:
         """Flatten video annotations into a single entry keyed by the source video path."""
         video_name = self.additional_args.get("video_name")
@@ -194,7 +194,7 @@ class AnnotationImporter:
         return {video_name: all_anns}
 
     def _flatten_cvat_fs_annotations(
-        self, fs_annotations: Mapping[str, object]
+        self, fs_annotations: Mapping[str, CVATAnnotations]
     ) -> Dict[str, Sequence[IRTaskAnnotation]]:
         flattened: Dict[str, List[IRTaskAnnotation]] = {}
         for rel_path, result in fs_annotations.items():
@@ -202,39 +202,23 @@ class AnnotationImporter:
                 video_key = self._resolve_video_annotation_key(result.filename, fallback=str(rel_path))
                 flattened.setdefault(video_key, [])
                 flattened[video_key].extend(result.to_annotations())
-            elif isinstance(result, dict):
-                if self._is_video_annotation(result):
-                    video_key = self._first_video_annotation_filename(result.values())
-                    video_key = self._resolve_video_annotation_key(video_key, fallback=str(rel_path))
-                    flattened.setdefault(video_key, [])
-                    for frame_anns in result.values():
-                        flattened[video_key].extend(frame_anns)
-                else:
-                    for filename, anns in result.items():
-                        flattened.setdefault(filename, [])
-                        flattened[filename].extend(anns)
+            elif isinstance(result, dict):  # CVATImageAnnotations: Dict[str, Sequence[IRImageAnnotationBase]]
+                for filename, anns in result.items():
+                    flattened.setdefault(filename, [])
+                    flattened[filename].extend(anns)
         return flattened
 
     def _flatten_mot_fs_annotations(
         self,
-        fs_annotations: Mapping[str, object],
+        fs_annotations: Mapping[Path, Tuple[IRVideoSequence, MOTContext]],
     ) -> Dict[str, Sequence[IRTaskAnnotation]]:
         flattened: Dict[str, List[IRTaskAnnotation]] = {}
-        for rel_path, result in fs_annotations.items():
-            if not isinstance(result, tuple) or len(result) != 2:
-                continue
-            sequence_or_dict = result[0]
+        for rel_path, (sequence, _) in fs_annotations.items():
             rel_path_str = self._stringify_video_path(rel_path)
             sequence_name = self.annotations_file.stem if rel_path_str in (None, "", ".") else rel_path_str
-            if isinstance(sequence_or_dict, IRVideoSequence):
-                sequence_name = self._resolve_video_annotation_key(sequence_or_dict.filename, fallback=sequence_name)
-                flattened.setdefault(sequence_name, [])
-                flattened[sequence_name].extend(sequence_or_dict.to_annotations())
-            elif isinstance(sequence_or_dict, dict):
-                sequence_name = self._first_video_annotation_filename(sequence_or_dict.values()) or sequence_name
-                flattened.setdefault(sequence_name, [])
-                for frame_anns in sequence_or_dict.values():
-                    flattened[sequence_name].extend(frame_anns)
+            sequence_name = self._resolve_video_annotation_key(sequence.filename, fallback=sequence_name)
+            flattened.setdefault(sequence_name, [])
+            flattened[sequence_name].extend(sequence.to_annotations())
         return flattened
 
     @staticmethod
@@ -266,7 +250,7 @@ class AnnotationImporter:
     ) -> Optional[str]:
         for frame_anns in frame_groups:
             for ann in frame_anns:
-                ann_filename = cls._stringify_video_path(getattr(ann, "filename", None))
+                ann_filename = cls._stringify_video_path(ann.filename)
                 if ann_filename not in (None, "", "."):
                     return ann_filename
         return None
@@ -275,6 +259,7 @@ class AnnotationImporter:
         log_message("Downloading annotations from repository")
         repoApi = self.ds.source.repoApi
         if self.annotations_type in ("cvat", "cvat_video"):
+            # Download just the annotation file
             repoApi.download(self.annotations_file.as_posix(), dest_dir, keep_source_prefix=True)
         elif self.annotations_type == "yolo":
             # Download the dataset .yaml file and the images + annotations
