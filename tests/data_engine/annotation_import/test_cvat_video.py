@@ -46,7 +46,7 @@ def test_flatten_cvat_fs_preserves_sequence_filename(ds, tmp_path):
         filename="nested/folder/video.mp4",
     )
 
-    result = importer._flatten_cvat_fs_annotations({"nested/annotations.xml": sequence})
+    result = importer._key_cvat_fs_annotations_by_filename({"nested/annotations.xml": sequence})
 
     assert "nested/folder/video.mp4" in result
 

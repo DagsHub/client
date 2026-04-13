@@ -100,11 +100,11 @@ class AnnotationImporter:
                 )
             elif self.annotations_type == "cvat":
                 if annotations_file.is_dir():
-                    annotation_dict = self._flatten_cvat_fs_annotations(load_cvat_from_fs(annotations_file))
+                    annotation_dict = self._key_cvat_fs_annotations_by_filename(load_cvat_from_fs(annotations_file))
                 else:
                     result = load_cvat_from_zip(annotations_file)
                     if self._determine_cvat_annotation(result) == "video":
-                        annotation_dict = self._flatten_video_annotations(result)
+                        annotation_dict = self._key_video_annotations_by_filename(result)
                     else:
                         annotation_dict = result
             elif self.annotations_type == "mot":
@@ -127,16 +127,16 @@ class AnnotationImporter:
                             video_dir_name=video_dir_name,
                             label_dir_name=label_dir_name,
                         )
-                        annotation_dict = self._flatten_mot_fs_annotations(mot_results)
+                        annotation_dict = self._key_mot_fs_annotations_by_filename(mot_results)
                     else:
                         video_anns, _ = load_mot_from_dir(annotations_file, **mot_kwargs)
-                        annotation_dict = self._flatten_video_annotations(video_anns)
+                        annotation_dict = self._key_video_annotations_by_filename(video_anns)
                 elif annotations_file.suffix == ".zip":
                     video_anns, _ = load_mot_from_zip(annotations_file, **mot_kwargs)
-                    annotation_dict = self._flatten_video_annotations(video_anns)
+                    annotation_dict = self._key_video_annotations_by_filename(video_anns)
                 else:
                     video_anns, _ = load_mot_from_dir(annotations_file, **mot_kwargs)
-                    annotation_dict = self._flatten_video_annotations(video_anns)
+                    annotation_dict = self._key_video_annotations_by_filename(video_anns)
             elif self.annotations_type == "cvat_video":
                 cvat_kwargs = {}
                 if "image_width" in self.additional_args:
@@ -145,17 +145,17 @@ class AnnotationImporter:
                     cvat_kwargs["image_height"] = self.additional_args["image_height"]
                 if annotations_file.is_dir():
                     raw = load_cvat_from_fs(annotations_file, **cvat_kwargs)
-                    annotation_dict = self._flatten_cvat_fs_annotations(raw)
+                    annotation_dict = self._key_cvat_fs_annotations_by_filename(raw)
                 elif annotations_file.suffix == ".zip":
                     result = load_cvat_from_zip(annotations_file, **cvat_kwargs)
                     if self._determine_cvat_annotation(result) == "video":
-                        annotation_dict = self._flatten_video_annotations(result)
+                        annotation_dict = self._key_video_annotations_by_filename(result)
                     else:
                         annotation_dict = result
                 else:
                     result = load_cvat_from_xml_file(annotations_file, **cvat_kwargs)
                     if self._determine_cvat_annotation(result) == "video":
-                        annotation_dict = self._flatten_video_annotations(result)
+                        annotation_dict = self._key_video_annotations_by_filename(result)
                     else:
                         annotation_dict = result
             else:
@@ -170,7 +170,7 @@ class AnnotationImporter:
             return "video"
         return "image"
 
-    def _flatten_video_annotations(
+    def _key_video_annotations_by_filename(
         self,
         video_data: CVATAnnotations,
     ) -> Dict[str, Sequence[IRTaskAnnotation]]:
@@ -190,7 +190,7 @@ class AnnotationImporter:
             all_anns.extend(frame_anns)
         return {video_name: all_anns}
 
-    def _flatten_cvat_fs_annotations(
+    def _key_cvat_fs_annotations_by_filename(
         self, fs_annotations: Mapping[str, CVATAnnotations]
     ) -> Dict[str, Sequence[IRTaskAnnotation]]:
         flattened: Dict[str, List[IRTaskAnnotation]] = {}
@@ -205,7 +205,7 @@ class AnnotationImporter:
                     flattened[filename].extend(anns)
         return flattened
 
-    def _flatten_mot_fs_annotations(
+    def _key_mot_fs_annotations_by_filename(
         self,
         fs_annotations: Mapping[Path, Tuple[IRVideoSequence, MOTContext]],
     ) -> Dict[str, Sequence[IRTaskAnnotation]]:

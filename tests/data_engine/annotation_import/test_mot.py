@@ -24,34 +24,6 @@ def mock_source_prefix(ds):
         yield
 
 
-# --- _is_video_annotation ---
-
-
-def test_is_video_dict_int_keys():
-    assert AnnotationImporter._is_video_annotation({0: [], 1: []}) is True
-
-
-def test_is_video_dict_str_keys():
-    assert AnnotationImporter._is_video_annotation({"file.jpg": []}) is False
-
-
-def test_is_video_dict_empty():
-    assert AnnotationImporter._is_video_annotation({}) is False
-
-
-def test_is_video_dict_non_dict():
-    assert AnnotationImporter._is_video_annotation([]) is False
-
-
-def test_is_video_dict_mixed_first_int():
-    assert AnnotationImporter._is_video_annotation({0: [], "a": []}) is True
-
-
-def test_is_video_sequence():
-    seq = build_video_sequence_from_annotations([_make_video_bbox()])
-    assert AnnotationImporter._is_video_annotation(seq) is True
-
-
 # --- is_video_format ---
 
 
@@ -73,12 +45,12 @@ def test_is_video_format(ds, ann_type, expected, tmp_path):
     assert importer.is_video_format is expected
 
 
-# --- _flatten_video_annotations ---
+# --- _key_video_annotations_by_filename ---
 
 
 def test_flatten_merges_frames(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "test_video", load_from="disk")
-    result = importer._flatten_video_annotations({
+    result = importer._key_video_annotations_by_filename({
         0: [_make_video_bbox(frame=0)],
         5: [_make_video_bbox(frame=5)],
     })
@@ -88,7 +60,7 @@ def test_flatten_merges_frames(ds, tmp_path):
 
 def test_flatten_defaults_to_file_stem(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "my_sequence", load_from="disk")
-    result = importer._flatten_video_annotations({0: [_make_video_bbox()]})
+    result = importer._key_video_annotations_by_filename({0: [_make_video_bbox()]})
     assert "my_sequence" in result
 
 
@@ -96,14 +68,14 @@ def test_flatten_video_name_override(ds, tmp_path):
     importer = AnnotationImporter(
         ds, "mot", tmp_path / "test_video", load_from="disk", video_name="custom.mp4"
     )
-    result = importer._flatten_video_annotations({0: [_make_video_bbox()]})
+    result = importer._key_video_annotations_by_filename({0: [_make_video_bbox()]})
     assert "custom.mp4" in result
 
 
 def test_flatten_sequence(ds, tmp_path):
     importer = AnnotationImporter(ds, "mot", tmp_path / "test_video", load_from="disk")
     sequence = build_video_sequence_from_annotations([_make_video_bbox(frame=0), _make_video_bbox(frame=5)])
-    result = importer._flatten_video_annotations(sequence)
+    result = importer._key_video_annotations_by_filename(sequence)
 
     assert "test_video" in result
     assert len(result["test_video"]) == 2
@@ -116,7 +88,7 @@ def test_flatten_sequence_preserves_sequence_filename(ds, tmp_path):
         filename="nested/videos/video.mp4",
     )
 
-    result = importer._flatten_video_annotations(sequence)
+    result = importer._key_video_annotations_by_filename(sequence)
 
     assert "nested/videos/video.mp4" in result
 
@@ -128,7 +100,7 @@ def test_flatten_mot_fs_preserves_relative_video_path(ds, tmp_path):
         filename="nested/video.mp4",
     )
 
-    result = importer._flatten_mot_fs_annotations({Path("nested/video.mp4"): (sequence, object())})
+    result = importer._key_mot_fs_annotations_by_filename({Path("nested/video.mp4"): (sequence, object())})
 
     assert "nested/video.mp4" in result
 
@@ -160,7 +132,7 @@ def test_video_export_layout_uses_datasource_prefix(ds):
     with patch.object(
         type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("my_ds_path")
     ):
-        video_dir, labels_dir, dataset_root = qr._get_media_export_layout(Path("export"), "videos")
+        video_dir, labels_dir, dataset_root = qr._resolve_export_dirs(Path("export"), "videos")
 
     assert video_dir == Path("export") / "data" / "my_ds_path" / "videos"
     assert labels_dir == Path("export") / "data" / "my_ds_path" / "labels"
@@ -172,7 +144,7 @@ def test_video_export_layout_reuses_existing_videos_suffix(ds):
     with patch.object(
         type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("my_ds_path/videos")
     ):
-        video_dir, labels_dir, dataset_root = qr._get_media_export_layout(Path("export"), "videos")
+        video_dir, labels_dir, dataset_root = qr._resolve_export_dirs(Path("export"), "videos")
 
     assert video_dir == Path("export") / "data" / "my_ds_path" / "videos"
     assert labels_dir == Path("export") / "data" / "my_ds_path" / "labels"
@@ -184,7 +156,7 @@ def test_video_export_layout_strips_leading_data_prefix(ds):
     with patch.object(
         type(ds.source), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath("data/videos")
     ):
-        video_dir, labels_dir, dataset_root = qr._get_media_export_layout(Path("export"), "videos")
+        video_dir, labels_dir, dataset_root = qr._resolve_export_dirs(Path("export"), "videos")
 
     assert video_dir == Path("export") / "data" / "videos"
     assert labels_dir == Path("export") / "data" / "labels"
