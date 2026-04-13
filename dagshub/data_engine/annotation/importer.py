@@ -103,7 +103,7 @@ class AnnotationImporter:
                     annotation_dict = self._flatten_cvat_fs_annotations(load_cvat_from_fs(annotations_file))
                 else:
                     result = load_cvat_from_zip(annotations_file)
-                    if self._is_video_annotation(result):
+                    if self._determine_cvat_annotation(result) == "video":
                         annotation_dict = self._flatten_video_annotations(result)
                     else:
                         annotation_dict = result
@@ -148,13 +148,13 @@ class AnnotationImporter:
                     annotation_dict = self._flatten_cvat_fs_annotations(raw)
                 elif annotations_file.suffix == ".zip":
                     result = load_cvat_from_zip(annotations_file, **cvat_kwargs)
-                    if self._is_video_annotation(result):
+                    if self._determine_cvat_annotation(result) == "video":
                         annotation_dict = self._flatten_video_annotations(result)
                     else:
                         annotation_dict = result
                 else:
                     result = load_cvat_from_xml_file(annotations_file, **cvat_kwargs)
-                    if self._is_video_annotation(result):
+                    if self._determine_cvat_annotation(result) == "video":
                         annotation_dict = self._flatten_video_annotations(result)
                     else:
                         annotation_dict = result
@@ -164,14 +164,11 @@ class AnnotationImporter:
             return annotation_dict
 
     @staticmethod
-    def _is_video_annotation(result) -> bool:
-        """Check whether a loader result contains video annotations."""
+    def _determine_cvat_annotation(result: CVATAnnotations) -> Literal["video", "image"]:
+        """Determine whether a CVAT loader result contains video or image annotations."""
         if isinstance(result, IRVideoSequence):
-            return True
-        if not isinstance(result, dict) or len(result) == 0:
-            return False
-        first_key = next(iter(result.keys()))
-        return isinstance(first_key, int)
+            return "video"
+        return "image"
 
     def _flatten_video_annotations(
         self,
@@ -327,10 +324,7 @@ class AnnotationImporter:
             for ann in anns:
                 if isinstance(ann, IRVideoAnnotationTrack):
                     for track_ann in ann.annotations:
-                        if track_ann.filename is not None:
-                            track_ann.filename = remap_func(track_ann.filename)
-                        else:
-                            track_ann.filename = new_filename
+                        track_ann.filename = new_filename
                     continue
 
                 if ann.filename is not None:
@@ -505,7 +499,7 @@ class AnnotationImporter:
         annotations: Sequence[IRTaskAnnotation],
         filename: str,
     ) -> Optional[IRVideoSequence]:
-        tracks = [ann.model_copy(deep=True) for ann in annotations if isinstance(ann, IRVideoAnnotationTrack)]
+        tracks = [ann for ann in annotations if isinstance(ann, IRVideoAnnotationTrack)]
         frame_annotations = [ann for ann in annotations if isinstance(ann, IRVideoBBoxFrameAnnotation)]
         if frame_annotations:
             tracks.extend(build_video_sequence_from_annotations(frame_annotations).tracks)
