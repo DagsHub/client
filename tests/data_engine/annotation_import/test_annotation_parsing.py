@@ -176,7 +176,7 @@ def test_video_tracks_to_ls_task_use_video_data_and_sequence_length(ds):
     dp = Datapoint(datasource=ds, path="nested/video.mp4", datapoint_id=1, metadata={})
     frame_annotations = [
         IRVideoBBoxFrameAnnotation(
-            object_id=1,
+            imported_id="1",
             frame_number=0,
             left=100.0,
             top=150.0,
@@ -188,7 +188,7 @@ def test_video_tracks_to_ls_task_use_video_data_and_sequence_length(ds):
             coordinate_style=CoordinateStyle.DENORMALIZED,
         ),
         IRVideoBBoxFrameAnnotation(
-            object_id=1,
+            imported_id="1",
             frame_number=5,
             left=110.0,
             top=155.0,

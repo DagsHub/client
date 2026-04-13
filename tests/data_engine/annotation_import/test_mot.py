@@ -108,7 +108,7 @@ def test_flatten_mot_fs_preserves_relative_video_path(ds, tmp_path):
 def test_build_video_sequence_sets_top_level_dimensions():
     anns = [
         IRVideoBBoxFrameAnnotation(
-            object_id=0,
+            imported_id="0",
             frame_number=0,
             left=100.0,
             top=150.0,
@@ -200,7 +200,8 @@ def test_import_mot_from_fs_passes_dimensions(ds, tmp_path, monkeypatch):
         captured["import_dir"] = import_dir
         captured["image_width"] = image_width
         captured["image_height"] = image_height
-        return {Path("seq_a"): ({0: [_make_video_bbox(frame=0)]}, object())}
+        seq = build_video_sequence_from_annotations([_make_video_bbox(frame=0)], filename="seq_a")
+        return {Path("seq_a"): (seq, object())}
 
     monkeypatch.setattr("dagshub.data_engine.annotation.importer.load_mot_from_fs", _mock_load_mot_from_fs)
 
@@ -417,7 +418,7 @@ def test_export_mot_passes_video_file_when_dimensions_missing(ds, tmp_path, monk
 
 def _make_video_bbox(frame=0, object_id=0) -> IRVideoBBoxFrameAnnotation:
     return IRVideoBBoxFrameAnnotation(
-        object_id=object_id, frame_number=frame,
+        imported_id=str(object_id), frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
         video_width=1920, video_height=1080,
         categories={"person": 1.0},

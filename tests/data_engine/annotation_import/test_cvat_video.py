@@ -282,7 +282,7 @@ def test_export_cvat_video_missing_local_file_raises(ds, tmp_path, monkeypatch):
 
 def _make_video_bbox(frame=0, object_id=0) -> IRVideoBBoxFrameAnnotation:
     return IRVideoBBoxFrameAnnotation(
-        object_id=object_id, frame_number=frame,
+        imported_id=str(object_id), frame_number=frame,
         left=100.0, top=150.0, width=50.0, height=80.0,
         video_width=1920, video_height=1080,
         categories={"person": 1.0},
