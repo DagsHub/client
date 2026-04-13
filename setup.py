@@ -45,7 +45,7 @@ install_requires = [
     # "dagshub-annotation-converter>=0.1.12",
     "dagshub-annotation-converter @ "
     + "git+https://github.com/DagsHub/"
-    + "dagshub-annotation-converter@video_converters#egg=dagshub-annotation-converter",
+    + "dagshub-annotation-converter@main#egg=dagshub-annotation-converter",
 ]
 
 extras_require = {
