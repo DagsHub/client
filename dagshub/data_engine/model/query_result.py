@@ -18,6 +18,8 @@ import rich.progress
 from dagshub_annotation_converter.converters.cvat import export_cvat_video_to_zip, export_cvat_videos_to_zips
 from dagshub_annotation_converter.converters.mot import export_mot_sequences_to_dirs, export_mot_to_dir
 from dagshub_annotation_converter.formats.mot import MOTContext
+from dagshub_annotation_converter.converters.coco import export_to_coco_file
+from dagshub_annotation_converter.formats.coco import CocoContext
 from dagshub_annotation_converter.formats.yolo import YoloContext
 from dagshub_annotation_converter.formats.yolo.categories import Categories
 from dagshub_annotation_converter.formats.yolo.common import ir_mapping
@@ -1120,6 +1122,57 @@ class QueryResult:
                 video_file=single_video_file,
             )
         log_message(f"Done! Saved CVAT video annotations to {result_path.absolute()}")
+        return result_path
+
+    def export_as_coco(
+        self,
+        download_dir: Optional[Union[str, Path]] = None,
+        annotation_field: Optional[str] = None,
+        output_filename: str = "annotations.json",
+        classes: Optional[Dict[int, str]] = None,
+    ) -> Path:
+        """
+        Downloads the files and exports annotations in COCO format.
+
+        Args:
+            download_dir: Where to download the files. Defaults to ``./dagshub_export``
+            annotation_field: Field with the annotations. If None, uses the first alphabetical annotation field.
+            output_filename: Name of the output COCO JSON file. Default is ``annotations.json``.
+            classes: Category mapping for the COCO dataset as ``{id: name}``.
+                If ``None``, categories will be inferred from the annotations.
+
+        Returns:
+            Path to the exported COCO JSON file.
+        """
+        annotation_field = self._resolve_annotation_field(annotation_field)
+
+        if download_dir is None:
+            download_dir = Path("dagshub_export")
+        download_dir = Path(download_dir)
+
+        annotations = self._get_all_annotations(annotation_field)
+        if not annotations:
+            raise RuntimeError("No annotations found to export")
+
+        context = CocoContext()
+        if classes is not None:
+            categories = Categories()
+            for category_id, category_name in classes.items():
+                categories.add(category_name, category_id)
+            context.categories = categories
+
+        # Add the source prefix to all annotations
+        for ann in annotations:
+            ann.filename = os.path.join(self.datasource.source.source_prefix, ann.filename)
+
+        image_download_path = download_dir / "data"
+        log_message("Downloading image files...")
+        self.download_files(image_download_path)
+
+        output_path = download_dir / output_filename
+        log_message("Exporting COCO annotations...")
+        result_path = export_to_coco_file(annotations, output_path, context=context)
+        log_message(f"Done! Saved COCO annotations to {result_path.absolute()}")
         return result_path
 
     def to_voxel51_dataset(self, **kwargs) -> "fo.Dataset":

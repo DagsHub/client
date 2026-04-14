@@ -3,6 +3,7 @@ from pathlib import Path, PurePosixPath, PurePath
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Dict, Iterable, Literal, Optional, Union, Sequence, Mapping, Callable, List, Tuple
 
+from dagshub_annotation_converter.converters.coco import load_coco_from_file
 from dagshub_annotation_converter.converters.cvat import (
     CVATAnnotations,
     load_cvat_from_fs,
@@ -27,7 +28,7 @@ from dagshub.data_engine.annotation.video import build_video_sequence_from_annot
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
-AnnotationType = Literal["yolo", "cvat", "mot", "cvat_video"]
+AnnotationType = Literal["yolo", "cvat", "coco", "mot", "cvat_video"]
 AnnotationLocation = Literal["repo", "disk"]
 
 
@@ -107,6 +108,8 @@ class AnnotationImporter:
                         annotation_dict = self._key_video_annotations_by_filename(result)
                     else:
                         annotation_dict = result
+            elif self.annotations_type == "coco":
+                annotation_dict, _ = load_coco_from_file(annotations_file)
             elif self.annotations_type == "mot":
                 mot_kwargs = {}
                 if "image_width" in self.additional_args:
@@ -269,6 +272,9 @@ class AnnotationImporter:
             assert context.path is not None
             repoApi.download(self.annotations_file.parent / context.path, dest_dir, keep_source_prefix=True)
         elif self.annotations_type == "mot":
+            repoApi.download(self.annotations_file.as_posix(), dest_dir, keep_source_prefix=True)
+        elif self.annotations_type == "coco":
+            # Download just the annotation file
             repoApi.download(self.annotations_file.as_posix(), dest_dir, keep_source_prefix=True)
 
     @staticmethod

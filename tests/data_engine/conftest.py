@@ -1,4 +1,6 @@
 import datetime
+from pathlib import PurePosixPath
+from unittest.mock import PropertyMock
 
 import pytest
 
@@ -34,6 +36,7 @@ def _create_mock_datasource(mocker, id, name) -> Datasource:
     mocker.patch.object(ds_state, "get_from_dagshub")
     # Stub out root path so all the content_path/etc work without also mocking out RepoAPI
     mocker.patch.object(ds_state, "_root_path", return_value="http://example.com")
+    mocker.patch.object(type(ds_state), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath())
     ds_state.repoApi = MockRepoAPI("kirill/repo")
     return Datasource(ds_state)
 
