@@ -42,11 +42,7 @@ install_requires = [
     "python-dateutil",
     "boto3",
     "semver",
-    # FIXME: roll back to main after merging
-    # "dagshub-annotation-converter>=0.1.12",
-    "dagshub-annotation-converter @ "
-    + "git+https://github.com/DagsHub/"
-    + "dagshub-annotation-converter@main#egg=dagshub-annotation-converter",
+    "dagshub-annotation-converter>=0.2.0",
 ]
 
 extras_require = {
