@@ -981,13 +981,7 @@ class QueryResult:
         if not video_annotations:
             raise RuntimeError("No video annotations found to export")
 
-        source_names = sorted(
-            {
-                Path(ann_filename).name
-                for ann_filename in (ann.filename for ann in video_annotations)
-                if ann_filename
-            }
-        )
+        source_names = sorted({Path(ann.filename).name for ann in video_annotations if ann.filename})
         has_multiple_sources = len(source_names) > 1
 
         log_message(f"Downloading videos into {video_dir}...")
@@ -1060,13 +1054,7 @@ class QueryResult:
         if not video_annotations:
             raise RuntimeError("No video annotations found to export")
 
-        source_names = sorted(
-            {
-                Path(ann_filename).name
-                for ann_filename in (ann.filename for ann in video_annotations)
-                if ann_filename
-            }
-        )
+        source_names = sorted({Path(ann.filename).name for ann in video_annotations if ann.filename})
         has_multiple_sources = len(source_names) > 1
 
         log_message("Exporting CVAT video annotations...")
@@ -1084,12 +1072,7 @@ class QueryResult:
             video_files: Optional[Dict[str, Union[str, Path]]] = None
             if image_width is None or image_height is None:
                 video_files = {}
-                for ann_filename in {
-                    ann.filename
-                    for ann in video_annotations
-                    if ann.filename
-                }:
-                    assert ann_filename is not None
+                for ann_filename in {ann.filename for ann in video_annotations if ann.filename}:
                     local_video = self._resolve_local_path(local_download_root, ann_filename)
                     if local_video is None:
                         raise FileNotFoundError(
