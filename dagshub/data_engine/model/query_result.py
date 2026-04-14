@@ -803,7 +803,7 @@ class QueryResult:
         """Group frame annotations into per-source video sequences."""
         by_source: Dict[str, List[IRVideoFrameAnnotationBase]] = {}
         for ann in video_annotations:
-            filename = QueryResult._get_annotation_filename(ann) or ""
+            filename = ann.filename or ""
             by_source.setdefault(filename, []).append(ann)
 
         return [
@@ -854,10 +854,6 @@ class QueryResult:
         dataset_root = media_dir.parent
         labels_dir = dataset_root / "labels"
         return media_dir, labels_dir, dataset_root
-
-    @staticmethod
-    def _get_annotation_filename(ann: IRVideoFrameAnnotationBase) -> Optional[str]:
-        return ann.filename
 
     def _resolve_annotation_field(self, annotation_field: Optional[str]) -> str:
         if annotation_field is not None:
@@ -988,7 +984,7 @@ class QueryResult:
         source_names = sorted(
             {
                 Path(ann_filename).name
-                for ann_filename in (self._get_annotation_filename(ann) for ann in video_annotations)
+                for ann_filename in (ann.filename for ann in video_annotations)
                 if ann_filename
             }
         )
@@ -1067,7 +1063,7 @@ class QueryResult:
         source_names = sorted(
             {
                 Path(ann_filename).name
-                for ann_filename in (self._get_annotation_filename(ann) for ann in video_annotations)
+                for ann_filename in (ann.filename for ann in video_annotations)
                 if ann_filename
             }
         )
@@ -1089,9 +1085,9 @@ class QueryResult:
             if image_width is None or image_height is None:
                 video_files = {}
                 for ann_filename in {
-                    self._get_annotation_filename(ann)
+                    ann.filename
                     for ann in video_annotations
-                    if self._get_annotation_filename(ann)
+                    if ann.filename
                 }:
                     assert ann_filename is not None
                     local_video = self._resolve_local_path(local_download_root, ann_filename)
@@ -1116,7 +1112,7 @@ class QueryResult:
             )
             result_path = output_dir
         else:
-            ref_filename = next((self._get_annotation_filename(a) for a in video_annotations), None)
+            ref_filename = next((a.filename for a in video_annotations), None)
             if ref_filename is None:
                 raise FileNotFoundError("Missing annotation filename for single-video CVAT export.")
             single_video_file = self._resolve_local_path(local_download_root, ref_filename)
