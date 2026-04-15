@@ -113,6 +113,10 @@ class MockRepoAPI(RepoAPI):
     def default_branch(self) -> str:
         return self._default_branch
 
+    @property
+    def id(self) -> int:
+        return 1
+
     def get_connected_storages(self) -> List[StorageAPIEntry]:
         return self.storages
 

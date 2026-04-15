@@ -3,6 +3,7 @@ from pathlib import Path, PurePosixPath, PurePath
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Literal, Optional, Union, Sequence, Mapping, Callable, List
 
+from dagshub_annotation_converter.converters.coco import load_coco_from_file
 from dagshub_annotation_converter.converters.cvat import load_cvat_from_zip
 from dagshub_annotation_converter.converters.yolo import load_yolo_from_fs
 from dagshub_annotation_converter.formats.label_studio.task import LabelStudioTask
@@ -16,7 +17,7 @@ from dagshub.common.helpers import log_message
 if TYPE_CHECKING:
     from dagshub.data_engine.model.datasource import Datasource
 
-AnnotationType = Literal["yolo", "cvat"]
+AnnotationType = Literal["yolo", "cvat", "coco"]
 AnnotationLocation = Literal["repo", "disk"]
 
 
@@ -85,6 +86,8 @@ class AnnotationImporter:
                 )
             elif self.annotations_type == "cvat":
                 annotation_dict = load_cvat_from_zip(annotations_file)
+            elif self.annotations_type == "coco":
+                annotation_dict, _ = load_coco_from_file(annotations_file)
 
             return annotation_dict
 
@@ -104,6 +107,9 @@ class AnnotationImporter:
             # Download the annotation data
             assert context.path is not None
             repoApi.download(self.annotations_file.parent / context.path, dest_dir, keep_source_prefix=True)
+        elif self.annotations_type == "coco":
+            # Download just the annotation file
+            repoApi.download(self.annotations_file.as_posix(), dest_dir, keep_source_prefix=True)
 
     @staticmethod
     def determine_load_location(ds: "Datasource", annotations_path: Union[str, Path]) -> AnnotationLocation:

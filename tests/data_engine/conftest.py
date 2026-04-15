@@ -1,11 +1,13 @@
 import datetime
+from pathlib import PurePosixPath
+from unittest.mock import PropertyMock
 
 import pytest
 
 from dagshub.common.api import UserAPI
 from dagshub.common.api.responses import UserAPIResponse
 from dagshub.data_engine import datasources
-from dagshub.data_engine.client.models import MetadataSelectFieldSchema, PreprocessingStatus
+from dagshub.data_engine.client.models import DatasourceType, MetadataSelectFieldSchema, PreprocessingStatus
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource import DatasetState, Datasource
 from dagshub.data_engine.model.query_result import QueryResult
@@ -26,6 +28,7 @@ def other_ds(mocker, mock_dagshub_auth) -> Datasource:
 
 def _create_mock_datasource(mocker, id, name) -> Datasource:
     ds_state = datasources.DatasourceState(id=id, name=name, repo="kirill/repo")
+    ds_state.source_type = DatasourceType.REPOSITORY
     ds_state.path = "repo://kirill/repo/data/"
     ds_state.preprocessing_status = PreprocessingStatus.READY
     mocker.patch.object(ds_state, "client")
@@ -33,6 +36,7 @@ def _create_mock_datasource(mocker, id, name) -> Datasource:
     mocker.patch.object(ds_state, "get_from_dagshub")
     # Stub out root path so all the content_path/etc work without also mocking out RepoAPI
     mocker.patch.object(ds_state, "_root_path", return_value="http://example.com")
+    mocker.patch.object(type(ds_state), "source_prefix", new_callable=PropertyMock, return_value=PurePosixPath())
     ds_state.repoApi = MockRepoAPI("kirill/repo")
     return Datasource(ds_state)
 
