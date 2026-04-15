@@ -1,6 +1,5 @@
-import os.path
-
 import setuptools
+import os.path
 
 
 # Thank you pip contributors
