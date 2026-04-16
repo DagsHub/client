@@ -52,7 +52,7 @@ username = os.environ.get(DAGSHUB_USERNAME_KEY)
 password = os.environ.get(DAGSHUB_PASSWORD_KEY)
 custom_user_agent_suffix = f" dagshub-client-python/{__version__}"
 requests_headers = {"user-agent": USER_AGENT + custom_user_agent_suffix}
-http_timeout = int(os.environ.get(HTTP_TIMEOUT_KEY, 30))
+http_timeout = os.environ.get(HTTP_TIMEOUT_KEY, 30)
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 
 quiet = _get_boolean_env(DAGSHUB_QUIET_KEY)
