@@ -50,9 +50,9 @@ class ConfigTestCase(unittest.TestCase):
         self.assertFalse(config.quiet)
         self.assertTrue(config.disable_traceparent)
 
-    def test_http_timeout_is_loaded_as_a_number(self):
-        with patch.dict(os.environ, {"DAGSHUB_HTTP_TIMEOUT": "12.5"}, clear=False):
+    def test_http_timeout_is_loaded_as_an_integer(self):
+        with patch.dict(os.environ, {"DAGSHUB_HTTP_TIMEOUT": "12"}, clear=False):
             config = load_config_module()
 
-        self.assertEqual(config.http_timeout, 12.5)
-        self.assertIsInstance(config.http_timeout, float)
+        self.assertEqual(config.http_timeout, 12)
+        self.assertIsInstance(config.http_timeout, int)
