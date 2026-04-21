@@ -122,16 +122,21 @@ class DagsHubFilesystem:
         if not project_root:
             try:
                 self.project_root = get_project_root(Path(os.path.abspath(".")))
-            except ValueError:
+            except ValueError as err:
                 if repo_url:
                     self.project_root = Path(os.path.abspath("."))
+                    log_message(
+                        f"No git repo detected; mounting DagsHub filesystem for {repo_url} at "
+                        f"current working directory: {self.project_root}",
+                        logger,
+                    )
                 else:
                     raise ValueError(
                         "Could not find a git repo. Either run the function inside of a git repo, "
                         "specify `project_root` with the path to a cloned DagsHub repository, "
                         "or specify `repo_url` (url of repo on DagsHub) and "
                         "`project_root` (path to the folder where to mount the filesystem) arguments"
-                    )
+                    ) from err
 
         else:
             self.project_root = Path(os.path.abspath(project_root))
