@@ -191,7 +191,7 @@ def upload_files(
     remote_path: Optional[str] = None,
     bucket: bool = False,
     **kwargs,
-):
+) -> str:
     """
     Upload file(s) into a repository.
 
@@ -204,10 +204,13 @@ def upload_files(
         bucket: Upload the file(s) to the DagsHub Storage bucket
 
     For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
+
+    Returns:
+        str: The DagsHub URL where the uploaded file(s) can be viewed.
     """
     owner, repo = validate_owner_repo(repo)
     repo_obj = Repo(owner, repo)
-    repo_obj.upload(local_path, commit_message=commit_message, remote_path=remote_path, bucket=bucket, **kwargs)
+    return repo_obj.upload(local_path, commit_message=commit_message, remote_path=remote_path, bucket=bucket, **kwargs)
 
 
 def upload_file_to_s3(
@@ -293,7 +296,7 @@ class Repo:
         remote_path: Optional[str] = None,
         bucket: bool = False,
         **kwargs,
-    ):
+    ) -> str:
         """
         Upload a file or a directory to the repo.
 
@@ -307,6 +310,9 @@ class Repo:
             commit_message will be ignored.
 
         The kwargs are the parameters of :func:`upload_files`
+
+        Returns:
+            str: The DagsHub URL where the uploaded file(s) can be viewed.
         """
         if commit_message is None:
             commit_message = DEFAULT_COMMIT_MESSAGE
@@ -331,6 +337,8 @@ class Repo:
             else:
                 file_to_upload = DataSet.get_file(str(local_path), PurePosixPath(remote_path))
                 self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
+
+        return self.get_files_ui_url(remote_path)
 
     @retry(retry=retry_if_exception_type(InternalServerErrorError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     def upload_files(
