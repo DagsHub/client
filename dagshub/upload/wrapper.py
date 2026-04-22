@@ -191,7 +191,7 @@ def upload_files(
     remote_path: Optional[str] = None,
     bucket: bool = False,
     **kwargs,
-) -> str:
+) -> Optional[str]:
     """
     Upload file(s) into a repository.
 
@@ -206,7 +206,8 @@ def upload_files(
     For kwarg docs look at :func:`Repo.upload() <dagshub.upload.Repo.upload>`.
 
     Returns:
-        str: The DagsHub URL where the uploaded file(s) can be viewed.
+        Optional[str]: The DagsHub URL where the uploaded file(s) can be viewed,
+        or ``None`` for bucket uploads (see :func:`Repo.upload`).
     """
     owner, repo = validate_owner_repo(repo)
     repo_obj = Repo(owner, repo)
@@ -296,7 +297,7 @@ class Repo:
         remote_path: Optional[str] = None,
         bucket: bool = False,
         **kwargs,
-    ) -> str:
+    ) -> Optional[str]:
         """
         Upload a file or a directory to the repo.
 
@@ -312,7 +313,9 @@ class Repo:
         The kwargs are the parameters of :func:`upload_files`
 
         Returns:
-            str: The DagsHub URL where the uploaded file(s) can be viewed.
+            Optional[str]: When uploading to the repo, returns the DagsHub file-browser URL for ``remote_path``
+            on the target branch (``new_branch`` kwarg if provided, otherwise ``self.branch``).
+            Returns ``None`` for bucket uploads, which don't have a canonical file-browser URL.
         """
         if commit_message is None:
             commit_message = DEFAULT_COMMIT_MESSAGE
@@ -330,15 +333,17 @@ class Repo:
 
         if bucket:
             self.upload_files_to_bucket(local_path, remote_path, **kwargs)
-        else:
-            if local_path.is_dir():
-                dir_to_upload = self.directory(remote_path)
-                dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
-            else:
-                file_to_upload = DataSet.get_file(str(local_path), PurePosixPath(remote_path))
-                self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
+            return None
 
-        return self.get_files_ui_url(remote_path)
+        if local_path.is_dir():
+            dir_to_upload = self.directory(remote_path)
+            dir_to_upload.add_dir(str(local_path), commit_message=commit_message, **kwargs)
+        else:
+            file_to_upload = DataSet.get_file(str(local_path), PurePosixPath(remote_path))
+            self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
+
+        target_branch = kwargs.get("new_branch") or self.branch
+        return self.get_repo_url(FILES_UI_URL, remote_path, branch=target_branch)
 
     @retry(retry=retry_if_exception_type(InternalServerErrorError), wait=wait_fixed(3), stop=stop_after_attempt(5))
     def upload_files(
