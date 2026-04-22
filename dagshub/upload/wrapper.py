@@ -329,7 +329,7 @@ class Repo:
             except ValueError:
                 # local_path is outside cwd, use only its basename
                 remote_path = local_path.name
-        remote_path = cast(str, Path(remote_path).as_posix())
+        remote_path = posixpath.normpath(cast(str, Path(remote_path).as_posix()))
 
         if bucket:
             self.upload_files_to_bucket(local_path, remote_path, **kwargs)
@@ -602,7 +602,7 @@ class Repo:
                 owner=self.owner,
                 reponame=self.name,
                 branch=branch,
-                path=urllib.parse.quote(directory, safe=""),
+                path=urllib.parse.quote(directory, safe="/"),
             ),
         )
 
