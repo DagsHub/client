@@ -1,6 +1,6 @@
 setuptools==82.0.1
 pytest==9.0.3
-respx==0.22.0
+respx==0.23.1
 pytest-git==1.8.0
 pytest-env==1.1.5
 pytest-mock==3.14.0
