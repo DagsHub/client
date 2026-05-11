@@ -1,0 +1,15 @@
+{
+  "trailingSlash": "auto",
+  "forwardingGateway": {
+    "allowedForwardedHosts": ["dagshub.com", "test.dagshub.com"]
+  },
+  "globalHeaders": {
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  },
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/404.html",
+      "statusCode": 404
+    }
+  }
+}
