@@ -68,7 +68,7 @@ jobs:
           mkdir -p dist/docs/client
           cp -r build/html/. dist/docs/client/
           cp docs/deploy/root-index.html dist/index.html
-          cp docs/deploy/staticwebapp.config.test.json dist/staticwebapp.config.json
+          cp docs/deploy/staticwebapp.config.json dist/staticwebapp.config.json
           curl -sSf https://test.dagshub.com/this-does-not-exist -o dist/404.html
 
       - name: Deploy to test SWA
@@ -96,7 +96,7 @@ jobs:
           mkdir -p dist/docs/client
           cp -r build/html/. dist/docs/client/
           cp docs/deploy/root-index.html dist/index.html
-          cp docs/deploy/staticwebapp.config.prod.json dist/staticwebapp.config.json
+          cp docs/deploy/staticwebapp.config.json dist/staticwebapp.config.json
           curl -sSf https://dagshub.com/this-does-not-exist -o dist/404.html
 
       - name: Deploy to prod SWA

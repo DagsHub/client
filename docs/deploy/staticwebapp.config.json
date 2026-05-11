@@ -1,7 +1,7 @@
 {
   "trailingSlash": "auto",
   "forwardingGateway": {
-    "allowedForwardedHosts": ["dagshub.com"]
+    "allowedForwardedHosts": ["dagshub.com", "test.dagshub.com"]
   },
   "globalHeaders": {
     "Referrer-Policy": "strict-origin-when-cross-origin"
