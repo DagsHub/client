@@ -69,7 +69,7 @@ jobs:
           cp -r build/html/. dist/docs/client/
           cp docs/deploy/root-index.html dist/index.html
           cp docs/deploy/staticwebapp.config.json dist/staticwebapp.config.json
-          curl -sSf https://test.dagshub.com/this-does-not-exist -o dist/404.html
+          cp docs/deploy/404.html dist/404.html
 
       - name: Deploy to test SWA
         env:
@@ -97,7 +97,7 @@ jobs:
           cp -r build/html/. dist/docs/client/
           cp docs/deploy/root-index.html dist/index.html
           cp docs/deploy/staticwebapp.config.json dist/staticwebapp.config.json
-          curl -sSf https://dagshub.com/this-does-not-exist -o dist/404.html
+          cp docs/deploy/404.html dist/404.html
 
       - name: Deploy to prod SWA
         env:

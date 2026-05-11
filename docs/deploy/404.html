@@ -1,0 +1,2995 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="DagsHub Documentation - Learn how to use DagsHub and improve your data science workflow">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="/docs/assets/images/favicon-black.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.34">
+    
+    
+      
+        <title>DagsHub Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/main.35f28582.min.css">
+      
+        
+        <link rel="stylesheet" href="/docs/assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/header.css">
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/footer.css">
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/swagger-ui.css">
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/custom-search.css">
+    
+      <link rel="stylesheet" href="/docs/assets/stylesheets/dark-mode-toggle.css">
+    
+    <script>__md_scope=new URL("/docs/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      <!-- Google Tag Manager -->
+<script>
+    if (document.location.hostname.toLowerCase() === "dagshub.com") {
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-PGHTMDN');
+    }
+</script>
+<!-- End Google Tag Manager -->
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+      integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU"
+      crossorigin="anonymous" />
+<script src="/docs/js/jquery-3.6.0.min.js"></script>
+
+<!-- The image needs to have an absolute URL -->
+
+
+<!-- Open graph meta tags -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://dagshub.com/docs/" />
+<meta property="og:image" content="https://dagshub.com/docs/assets/images/open_graph/dagshub-logo.png" />
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<!-- Twitter meta tags -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@TheRealDagsHub" />
+<meta name="twitter:creator" content="@TheRealDagsHub" />
+<meta property="twitter:image:src" content="https://dagshub.com/docs/assets/images/open_graph/dagshub-logo.png">
+<meta property="twitter:image:width" content="1200">
+<meta property="twitter:image:height" content="630">
+
+
+<meta property="og:title" content=" | DagsHub Docs" />
+<meta property="og:description" content="DagsHub Documentation - Learn how to use DagsHub and improve your data science workflow" />
+<meta name="twitter:description" content="DagsHub Documentation - Learn how to use DagsHub and improve your data science workflow" />
+
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [{
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Docs · DagsHub",
+      "item": "https://dagshub.com/docs"
+    },{
+      "@type": "ListItem",
+      "position": 2,
+      "name": "",
+      "item": "https://dagshub.com/docs/"
+    }]
+  }
+</script>
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      <script>
+    // Constants
+    const SIGN_IN_STATUS_ATTRIBUTE = 'data-md-signed-in',
+        SIGNED_IN_STATUS = 'true',
+        SIGNED_OUT_STATUS = 'false';
+
+    const SIGN_IN_USERNAME_COOKIE = 'dags_awesome',
+        SIGN_IN_USER_ID_COOKIE = 'ajs_user_id';
+
+    const getCookie = (name) => {
+        let match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        if (match) return match[2];
+    };
+
+    $(document).ready(() => {
+        // favicon light/dark mode
+        const faviconEl = document.querySelector('link[rel="icon"]')
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+        mediaQuery.addEventListener('change', themeChange)
+        function themeChange(event) {
+            const currentHref = faviconEl.getAttribute('href');
+            if (event.matches) {
+                faviconEl.setAttribute('href', currentHref.replace('/favicon-black.svg', '/favicon.svg'))
+            } else {
+                faviconEl.setAttribute('href', currentHref.replace('/favicon.svg', '/favicon-black.svg'))
+            }
+        }
+        // Run once at startup to get the correct theme
+        themeChange(mediaQuery);
+
+        // Handling Signed in status
+        let username = getCookie(SIGN_IN_USERNAME_COOKIE);
+        let user_id = getCookie(SIGN_IN_USER_ID_COOKIE);
+
+        if (username && user_id) {
+            document.body.setAttribute(
+                SIGN_IN_STATUS_ATTRIBUTE,
+                SIGNED_IN_STATUS
+            );
+            $('.profile-menu .avatar').attr("src", "/avatars/" + user_id);
+            $('.profile-menu .name').text(username);
+            $('#user-profile-link').attr("href", "/" + username);
+        } else {
+            document.body.setAttribute(
+                SIGN_IN_STATUS_ATTRIBUTE,
+                SIGNED_OUT_STATUS
+            );
+        }
+        // Dropdown handling functions
+        $(".dropdown.md-tabs__item").hover(function (e) {
+            $(this).children(".menu").slideToggle(100);
+        })
+    })
+
+</script>
+<!-- Add sidebar on home and about pages on narrow display or mobile only -->
+<!-- Begin mobile navbar -->
+<header class="md-header" data-md-component="header">
+    <div class="pusher">
+        <div class="ui full height">
+            <div class="navbar-container">
+                <div id="menu-container" class="dagshub-navbar">
+                    <div class="left-menu">
+                        <div class="fixed-content">
+                            <a href="/" tabindex="0">
+                                <img width="34" height="30" alt="DagsHub navbar logo" class="navbar-logo"
+                                     aria-label="DagsHub Home" src="/docs/assets/images/favicon.svg">
+                            </a>
+                            <!-- Button to open search modal -->
+                            
+                            <label class="md-header__button md-icon" for="__search">
+                                
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+                            </label>
+
+                            <!-- Search interface -->
+                            <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+                            
+                        </div>
+                        <a class="navbar-item show-when-signed-in" tabindex="0"
+                           href="/issues" onclick="trackAnalyticsEvent('IssuesTab_Clicked')">Issues</a>
+                        <a class="navbar-item show-when-signed-in" tabindex="0"
+                           href="/pulls" onclick="trackAnalyticsEvent('PullRequests_Clicked')">Pull Requests</a>
+                        <div class="dropdown navbar-item" tabindex="0">
+                            Resources &nbsp; <img class="flip" src="/docs/assets/images/navbar/chevron-icon.svg">
+                            <div class="submenu">
+                                <a class="active"
+                                   href="/docs" onclick="trackAnalyticsEvent('Resources_Docs_Clicked')">Docs</a>
+                                <a class=""
+                                   href="/blog" onclick="trackAnalyticsEvent('Resources_Blog_Clicked')">Blog</a>
+                                <a class="navbar-item" data-analytics-event="Resources_Datasets_Clicked" tabindex="0" href="/datasets">Datasets</a>
+                                <a class="navbar-item" data-analytics-event="Resources_Glossary_Clicked" tabindex="0" href="/glossary">Glossary</a>
+                                <a class="navbar-item" onclick="trackAnalyticsEvent('Resources_Case_Studies_Clicked')" tabindex="0" href="/blog/tag/case-study">Case Studies</a>
+                                <a class="navbar-item" onclick="trackAnalyticsEvent('Resources_Tutorials_Clicked')" tabindex="0" href="/blog/tag/tutorials">Tutorials & Webinars</a>
+                            </div>
+                        </div>
+                        <a class="navbar-item" tabindex="0"
+                           href="/explore/repos" onclick="trackAnalyticsEvent('ExploreTab_Clicked')">Explore</a>
+                      	<a class="navbar-item" tabindex="0"
+                           href="/pricing">Pricing</a>
+                        <div class="dropdown navbar-item show-when-signed-out" tabindex="0">
+                            Product &nbsp; <img class="flip" src="/docs/assets/images/navbar/chevron-icon.svg">
+                            <div class="submenu">
+                            <a class="navbar-item" tabindex="0" href="/data-engine">Data Engine</a>
+                            <a class="navbar-item" tabindex="0" href="/use-cases/llm">LLMs</a>
+                            <a class="navbar-item" tabindex="0" href="/product">Platform</a>
+                            <a class="navbar-item" tabindex="0" href="/enterprise">Enterprise</a>
+                            </div>
+                        </div>
+                    </div><!-- end top menu -->
+                    <label id="menu-toggle-label" for="__drawer"><img src="/docs/assets/images/navbar/menu-open.svg"></label>
+                    <div id="menu-close-label" style="display: none;"><img src="/docs/assets/images/navbar/x.svg"></div>
+                    <div id="menu-open-label" style="display: none;"><img src="/docs/assets/images/navbar/menu-open.svg"></div>
+                    <div class="right-menu">
+                        
+                        <form class="md-header__option" data-md-component="palette">
+                            
+                            
+                            
+                            
+                            <input
+                                    class="md-option"
+                                    data-md-color-media=""
+                                    data-md-color-scheme="default"
+                                    data-md-color-primary="teal"
+                                    data-md-color-accent="teal"
+                                    
+                                    aria-label="Switch to dark mode"
+                                    
+                                    type="radio"
+                                    name="__palette"
+                                    id="__palette_1"
+                            />
+                            
+                            <label
+                                    class="md-header__button md-icon"
+                                    title="Switch to dark mode"
+                                    for="__palette_2"
+                                    hidden
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+                            </label>
+                            
+                            
+                            
+                            
+                            
+                            <input
+                                    class="md-option"
+                                    data-md-color-media=""
+                                    data-md-color-scheme="slate"
+                                    data-md-color-primary="teal"
+                                    data-md-color-accent="teal"
+                                    
+                                    aria-label="Switch to light mode"
+                                    
+                                    type="radio"
+                                    name="__palette"
+                                    id="__palette_2"
+                            />
+                            
+                            <label
+                                    class="md-header__button md-icon"
+                                    title="Switch to light mode"
+                                    for="__palette_1"
+                                    hidden
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+                            </label>
+                            
+                            
+                        </form>
+                        
+                        <a aria-label="join our discord"
+                           class="navbar-icon tooltip" tabindex="0"
+                           aria-label="Connect to our Discord channel"
+                           href="https://discord.com/invite/9gU36Y6" onclick="trackAnalyticsEvent('DiscordIcon_Clicked')">
+                            <img  src="/docs/assets/images/navbar/social_icons/discord.svg">
+                        </a>
+                        <div class="dropdown primary button show-when-signed-in" tabindex="0" onclick="trackAnalyticsEvent('Create_Clicked')"
+                                 data-content="Create..."
+                                 style="position: relative;">
+                                Create
+                                <img src="/docs/assets/images/navbar/plus-icon.svg">
+                                <div class="right submenu">
+                                    <a href="/repo/create" onclick="trackAnalyticsEvent('Create_New_Clicked')">
+                                        <div class="icon-wrapper"><img src="/docs/assets/images/navbar/plus-icon.svg"></div> New Repository
+                                    </a>
+                                    <div class="line-divider"></div>
+                                    <a href="/org/create" onclick="trackAnalyticsEvent('Create_Org_Clicked')">
+                                        <div class="icon-wrapper"><img src="/docs/assets/images/navbar/custom_icons/org-icon.svg"></div> New Organization
+                                    </a>
+                                </div><!-- end content create new menu -->
+                            </div><!-- end dropdown menu create new -->
+                        <div class="dropdown profile-menu show-when-signed-in"
+                                 tabindex="0"
+                                 data-content="User profile and more"
+                                 data-variation="tiny inverted">
+                                <img class="avatar" alt="Avatar" src="">
+                                <span class="sr-only">User profile and more</span>
+                                <img class="flip" src="/docs/assets/images/navbar/chevron-icon.svg">
+                                <div class="right submenu">
+                                    <div class="name">
+                                    </div>
+                                    <div class="line-divider"></div>
+                                    <a id="user-profile-link" href="">
+                                        Your Profile
+                                    </a>
+                                    <a href="/user/settings/organizations">
+                                        Your Organizations
+                                    </a>
+                                    <a href="/user/settings">
+                                        Your Settings
+                                    </a>
+
+                                    <div class="line-divider"></div>
+                                    <a href="/user/logout">
+                                        Sign Out
+                                    </a>
+                                </div><!-- end content avatar menu -->
+                            </div><!-- end dropdown avatar menu -->
+                        <div class="primary button show-when-signed-out">
+                            <a id="sign-up-navbar" tabindex="0" class=""
+                               href="/user/sign_up?redirect_to=%2fdocs">
+                            Register
+                            </a>
+                        </div>
+                        <a id="sign-in-navbar" tabindex="0" class="secondary button show-when-signed-out"
+                           href="/user/login?redirect_to=%2fdocs">
+                        Login
+                        </a>
+                    </div>
+                </div><!-- end container -->
+            </div><!-- end bar -->
+        </div>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="/docs/." title="DagsHub Docs" class="md-nav__button md-logo" aria-label="DagsHub Docs" data-md-component="logo">
+      
+  <img src="/docs/assets/images/logo.svg" alt="logo">
+
+    </a>
+    DagsHub Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/quick_start/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Quick Start
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Quick Start
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://colab.research.google.com/#fileId=https%3a%2f%2fdagshub.com%2fDagsHub%2fhello-world-vision%2fraw%2fmain%2fhello-world-vision.ipynb" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hello World Colab
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    1. Create a DagsHub Repository
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            1. Create a DagsHub Repository
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/create_new_project/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Creating a New Repository
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/connect_existing_project/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Connect an Existing Repository
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    2. Upload, Connect, or Version Data
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            2. Upload, Connect, or Version Data
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/upload_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Upload Data
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/connect_external_storage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Connect External Storage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/version_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Version Data
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    3. Build and Curate a Dataset
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            3. Build and Curate a Dataset
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/create_dataset/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Create a Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/add_edit_metadata/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Add Metadata
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/quick_start/query_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Query & Filter a Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/annotation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Annotate Data
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/auto_labeling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    AI-Assisted Labeling
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/train_model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Export & Augment a Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/track_ml_experiments/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Track Experiments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/use_cases/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Use Cases
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Use Cases
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/use_cases/data_engine/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Curate Datasets
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            Curate Datasets
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/connect_datasource/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Create a Datasource
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/version_datasets/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Version Datasets
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/enrich_datasource/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Enrich Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/query_and_create_subsets/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Query Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/visualizing_datasets/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Visualize Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_engine/train_model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Export & Augment a Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/track_ml_experiments/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Track Experiments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/annotation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Annotate Data
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/deploy_ml_model_to_cloud/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Deploy ML Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/data_versioning/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data Versioning
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/auto_labeling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    AI-Assisted Labeling
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/active_learning/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Active Learning
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/use_cases/reproduce_experiment_results/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reproduce Experiments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/teamwork/data_science_peer_review/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data Science Peer Review
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/feature_guide/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Feature Guide
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Feature Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/experiment_tracking/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Experiment Tracking
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/data_engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/dagshub_storage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Storage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/connect_external_storage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Connect External Storage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/annotations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Annotations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/dagshub_diffing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Diffing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/dagshub_discussions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Discussions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/pipeline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Pipelines
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/data_science_pull_requests/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data Science Pull Requests
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/topics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Topics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/project_templates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Templates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/feature_guide/automation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DagsHub Automation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/integration_guide/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Integration Guide
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Integration Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/github/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    GitHub
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/google_colab/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Google Colab
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/dvc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DVC
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/mlflow_tracking/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MLflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/jenkins/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jenkins
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/label_studio/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Label Studio
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/set_up_remote_storage_for_data_and_models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    External Storage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/connect_a_git_server_to_dagshub/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    External Git Server
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/webhook/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Webhooks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/google_drive_to_dagshub_storage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Google Drive
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/weights_and_biases/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Weights & Biases
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/hugging_face/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hugging Face
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/apple_mlx_lm/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Apple MLX-LM
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/pycaret/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    PyCaret
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/giskard/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Giskard
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/integration_guide/new_relic_monitoring/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New Relic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/workshops/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Workshops
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Workshops
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/workshops/interactive_session/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Interactive Session
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/workshops/mlflow_crash_course/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MLflow Crash Course
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/workshops/dvc_and_dda/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DVC and DDA
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/workshops/label_studio/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Label Studio
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/workshops/generative_ai_comics_strip/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Generative AI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/tutorials/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Tutorials
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Tutorials
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://colab.research.google.com/#fileId=https%3a%2f%2fdagshub.com%2fDagsHub%2fhello-world-vision%2fraw%2fmain%2fhello-world-vision.ipynb" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hello World Vision
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://colab.research.google.com/#fileId=https%3A//dagshub.com/DagsHub/Onboarding_Notebook/raw/main/hello-world/hello-world.ipynb" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hello World Tabular
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/build_data_pipeline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Build Data Pipelines
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/build_custom_dataloader/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Build Custom Dataloaders
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_6" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/tutorials/experiment_tutorial/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Text Classification Tutorial
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_6" id="__nav_7_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_6">
+            <span class="md-nav__icon md-icon"></span>
+            Text Classification Tutorial
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/experiment_tutorial/0_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    0. Data Exploration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/experiment_tutorial/1_setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1. Setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/experiment_tutorial/2_data_versioning/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    2. Data Versioning
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/experiment_tutorial/3_experiments/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    3. Experimentation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_7" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="/docs/tutorials/pipeline_tutorial/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    MNIST Pipeline Tutorial - Advanced
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_7" id="__nav_7_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_7">
+            <span class="md-nav__icon md-icon"></span>
+            MNIST Pipeline Tutorial - Advanced
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/pipeline_tutorial/setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/pipeline_tutorial/pipeline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Defining the Pipeline
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/tutorials/pipeline_tutorial/experiment_repro/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reproducing Results
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/troubleshooting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Troubleshooting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/docs/api/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://dagshub.com/docs/client" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Python Client
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+<div class="not_found">
+    <div class="not_found_content">
+        <img src="/docs/assets/images/404/error-img.png" />
+        <h2>We couldn't find the page you were looking for</h2>
+        <p>Maybe it was moved. Head over to the docs <a href="/docs">homepage</a> or select another page from the sidebar</p>
+        <p class="back_arrow">
+            <a href="/docs">Back to Docs Home <span class="fas fa-arrow-right"></span></a>
+        </p>
+    </div>
+</div>
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+    <!--  BEGIN NEXT PREVIOUS BUTTONS – DO NOT CHANGE  -->
+    
+    
+    
+    <!--  END NEXT PREVIOUS BUTTONS  -->
+    <div class="ui footer">
+        <div class="dagshub-footer">
+            <a href="/">
+                <img alt="footer DAGsHub logo" id="footer-logo" class="ui centered image"
+                     src="/docs/assets/images/footer/footerlogo.svg">
+            </a>
+            <div id="footer-social" class="">
+                
+                
+                
+                
+                
+                
+                <a href="https://x.com/TheRealDagsHub" target="_blank" rel="noopener" title="x.com" class="social_link">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8l164.9-188.5L26.8 48h145.6l100.5 132.9zm-24.8 373.8h39.1L151.1 88h-42z"/></svg>
+                </a>
+                
+                
+                
+                
+                
+                
+                <a href="https://www.youtube.com/channel/UCeuZrCdpIY69XNWqn9OeSYQ" target="_blank" rel="noopener" title="www.youtube.com" class="social_link">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M549.655 124.083c-6.281-23.65-24.787-42.276-48.284-48.597C458.781 64 288 64 288 64S117.22 64 74.629 75.486c-23.497 6.322-42.003 24.947-48.284 48.597-11.412 42.867-11.412 132.305-11.412 132.305s0 89.438 11.412 132.305c6.281 23.65 24.787 41.5 48.284 47.821C117.22 448 288 448 288 448s170.78 0 213.371-11.486c23.497-6.321 42.003-24.171 48.284-47.821 11.412-42.867 11.412-132.305 11.412-132.305s0-89.438-11.412-132.305m-317.51 213.508V175.185l142.739 81.205z"/></svg>
+                </a>
+                
+                
+                
+                
+                
+                
+                <a href="https://www.linkedin.com/company/dagshub" target="_blank" rel="noopener" title="www.linkedin.com" class="social_link">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3M135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5m282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9z"/></svg>
+                </a>
+                
+                
+                
+                
+                
+                
+                <a href="https://discord.com/invite/9gU36Y6" target="_blank" rel="noopener" title="discord.com" class="social_link">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M524.531 69.836a1.5 1.5 0 0 0-.764-.7A485 485 0 0 0 404.081 32.03a1.82 1.82 0 0 0-1.923.91 338 338 0 0 0-14.9 30.6 447.9 447.9 0 0 0-134.426 0 310 310 0 0 0-15.135-30.6 1.89 1.89 0 0 0-1.924-.91 483.7 483.7 0 0 0-119.688 37.107 1.7 1.7 0 0 0-.788.676C39.068 183.651 18.186 294.69 28.43 404.354a2.02 2.02 0 0 0 .765 1.375 487.7 487.7 0 0 0 146.825 74.189 1.9 1.9 0 0 0 2.063-.676A348 348 0 0 0 208.12 430.4a1.86 1.86 0 0 0-1.019-2.588 321 321 0 0 1-45.868-21.853 1.885 1.885 0 0 1-.185-3.126 251 251 0 0 0 9.109-7.137 1.82 1.82 0 0 1 1.9-.256c96.229 43.917 200.41 43.917 295.5 0a1.81 1.81 0 0 1 1.924.233 235 235 0 0 0 9.132 7.16 1.884 1.884 0 0 1-.162 3.126 301.4 301.4 0 0 1-45.89 21.83 1.875 1.875 0 0 0-1 2.611 391 391 0 0 0 30.014 48.815 1.86 1.86 0 0 0 2.063.7A486 486 0 0 0 610.7 405.729a1.88 1.88 0 0 0 .765-1.352c12.264-126.783-20.532-236.912-86.934-334.541M222.491 337.58c-28.972 0-52.844-26.587-52.844-59.239s23.409-59.241 52.844-59.241c29.665 0 53.306 26.82 52.843 59.239 0 32.654-23.41 59.241-52.843 59.241m195.38 0c-28.971 0-52.843-26.587-52.843-59.239s23.409-59.241 52.843-59.241c29.667 0 53.307 26.82 52.844 59.239 0 32.654-23.177 59.241-52.844 59.241"/></svg>
+                </a>
+                
+            </div>
+            <div class="links">
+                <a class="footer-item" rel="noopener noreferrer" href="/about">Our Story</a>
+                <a class="footer-item" rel="noopener noreferrer" href="/careers">Careers</a>
+                <a id="merch-store" class="footer-item" rel="noopener noreferrer"
+                   href="https://teespring.com/stores/dagshub">Merch</a>
+                <a class="footer-item" rel="noopener noreferrer" href="/enterprise">Enterprise</a>
+                <a class="footer-item" rel="noopener noreferrer" href="/pricing">Pricing</a>
+            </div>
+            <h2>The home for data science collaboration</h2>
+            <div class="legal">
+                <p><b>© Copyright Dagshub 2026</b></p>
+                <div class="">
+                    <a class="footer-item" rel="noopener noreferrer" href="/terms">Terms of Service</a>
+                    <a class="footer-item" rel="noopener noreferrer" href="/privacy">Privacy Policy</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "/docs/", "features": ["navigation.indexes", "navigation.top", "navigation.footer", "content.action.edit", "content.code.copy"], "search": "/docs/assets/javascripts/workers/search.07f07601.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="/docs/assets/javascripts/bundle.56dfad97.min.js"></script>
+      
+        <script src="/docs/assets/javascripts/redirects.js"></script>
+      
+        <script src="/docs/assets/javascripts/header.js"></script>
+      
+        <script src="/docs/js/jquery-3.6.0.min.js"></script>
+      
+    
+  </body>
+</html>
