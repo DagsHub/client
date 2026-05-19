@@ -134,8 +134,8 @@ class DagsHubFilesystem:
                     raise ValueError(
                         "Could not find a git repo. Either run the function inside of a git repo, "
                         "specify `project_root` with the path to a cloned DagsHub repository, "
-                        "or specify `repo_url` (url of repo on DagsHub) and "
-                        "`project_root` (path to the folder where to mount the filesystem) arguments"
+                        "or specify `repo_url` (url of repo on DagsHub); "
+                        "optionally provide `project_root` (defaults to current working directory)"
                     ) from err
 
         else:
