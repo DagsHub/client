@@ -297,6 +297,17 @@ class DataClient:
 
         return self._exec(q, params)
 
+    def delete_metadata_field(self, datasource: "Datasource", field_name: str):
+        q = GqlMutations.delete_metadata_field()
+
+        assert datasource.source.id is not None
+
+        params = GqlMutations.delete_metadata_field_params(
+            datasource_id=datasource.source.id, field_name=field_name
+        )
+
+        return self._exec(q, params)
+
     def get_datasources(self, id: Optional[str], name: Optional[str]) -> List[DatasourceResult]:
         """
         Retrieve a list of datasources based on optional filtering criteria.

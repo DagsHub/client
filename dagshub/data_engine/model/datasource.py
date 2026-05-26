@@ -525,6 +525,32 @@ class Datasource:
         self.source.client.update_metadata_fields(self, [builder.schema for builder in field_builders])
         self.source.get_from_dagshub()
 
+    def delete_field(self, field_name: str, force: bool = False):
+        """
+        Delete a metadata field schema from this datasource.
+
+        This removes the field definition (and all its stored values) from the datasource.
+        After deletion you can recreate the field with a different type using
+        :func:`metadata_field() <dagshub.data_engine.model.datasource.Datasource.metadata_field>`.
+
+        .. warning::
+            This is a destructive operation. All metadata values stored under this field will be lost.
+
+        Args:
+            field_name: Name of the field to delete.
+            force: Skip the confirmation prompt.
+        """
+        if not force:
+            user_response = prompt_user(
+                f"You are about to delete the metadata field '{field_name}' and all its stored values "
+                f"from datasource '{self.source.name}'. This action cannot be undone."
+            )
+            if not user_response:
+                print("Field deletion cancelled")
+                return
+        self.source.client.delete_metadata_field(self, field_name)
+        self.source.get_from_dagshub()
+
     @property
     def implicit_update_context(self) -> "MetadataContextManager":
         """

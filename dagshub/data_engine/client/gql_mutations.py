@@ -255,3 +255,32 @@ class GqlMutations:
         return {
             "id": dataset_id,
         }
+
+    @staticmethod
+    @functools.lru_cache()
+    def delete_metadata_field():
+        q = (
+            GqlQuery()
+            .operation(
+                "mutation",
+                name="deleteMetadataField",
+                input={"$datasource": "ID!", "$fieldName": "String!"},
+            )
+            .query("deleteMetadataField", input={"datasource": "$datasource", "fieldName": "$fieldName"})
+            .fields(
+                [
+                    "name",
+                    "valueType",
+                    "multiple",
+                    "tags",
+                ]
+            )
+        )
+        return q
+
+    @staticmethod
+    def delete_metadata_field_params(datasource_id: Union[int, str], field_name: str):
+        return {
+            "datasource": datasource_id,
+            "fieldName": field_name,
+        }
