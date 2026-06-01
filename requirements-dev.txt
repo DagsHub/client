@@ -2,7 +2,7 @@ setuptools==82.0.1
 pytest==9.0.3
 respx==0.23.1
 pytest-git==1.8.0
-pytest-env==1.1.5
+pytest-env==1.6.0
 pytest-mock==3.14.0
 fiftyone==1.5.2
 datasets==3.6.0
