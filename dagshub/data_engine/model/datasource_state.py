@@ -121,7 +121,13 @@ class DatasourceState:
         """
         Returns the path for the blob of a datasource
         """
-        return f"{self.repoApi.data_engine_url}/blob/{sha}"
+        url = f"{self.repoApi.data_engine_url}/blob/{sha}"
+        if self.id is None:
+            return url
+        # Blobs are stored per datasource. The server can find the blob without this, but only
+        # by searching the repo's datasources, so tell it where to look. Older servers ignore
+        # the unknown parameter and still serve the blob.
+        return f"{url}?datasource={self.id}"
 
     @cached_property
     def root_content_path(self) -> str:

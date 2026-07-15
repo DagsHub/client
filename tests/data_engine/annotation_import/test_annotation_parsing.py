@@ -3,6 +3,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Union
 from unittest.mock import MagicMock
+from urllib.parse import urlsplit
 
 import pytest
 from dagshub_annotation_converter.ir.image import IRSegmentationImageAnnotation
@@ -60,7 +61,9 @@ def mock_annotation_query_result(
 
 def mock_get_blob(*args, **kwargs) -> Union[bytes, PathLike]:
     download_url: str = args[0]
-    blob_hash = download_url.split("/")[-1]
+    # The hash is the last path segment; the url may also carry a ?datasource= hint, which
+    # the real server reads separately and which is not part of the hash.
+    blob_hash = urlsplit(download_url).path.split("/")[-1]
     load_into_memory = args[4]
     blob_path = _res_folder / f"{blob_hash}.json"
 

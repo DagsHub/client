@@ -84,3 +84,19 @@ def test_bucket_regex_incorrect(in_str, mock_dagshub_auth):
     ds.source_type = DatasourceType.REPOSITORY
     with pytest.raises(InvalidPathFormatError):
         ds.path_parts()
+
+
+def test_blob_path_includes_datasource(ds):
+    source = ds.source
+    sha = "a" * 64
+
+    assert source.blob_path(sha) == f"{source.repoApi.data_engine_url}/blob/{sha}?datasource={source.id}"
+
+
+def test_blob_path_without_datasource_id(mock_dagshub_auth):
+    # The server falls back to searching the repo's datasources when the hint is absent,
+    # so an unsaved datasource must still produce a usable url rather than "datasource=None".
+    source = DatasourceState(repo="user/repo")
+    sha = "a" * 64
+
+    assert source.blob_path(sha) == f"{source.repoApi.data_engine_url}/blob/{sha}"
