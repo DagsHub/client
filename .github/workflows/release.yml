@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type (ignored if explicit_version is set)"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      explicit_version:
+        description: "Explicit version to release, e.g. 1.2.3 (overrides bump)"
+        required: false
+        type: string
+      release_title_suffix:
+        description: "Optional summary appended to the release title, e.g. \"- COCO annotation support\""
+        required: false
+        type: string
+      draft:
+        description: "Create the GitHub release as a draft instead of publishing immediately (skips PyPI publish until you hit Publish)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compute new version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT_VERSION: ${{ inputs.explicit_version }}
+        run: |
+          set -euo pipefail
+          current=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dagshub/__init__.py)
+          if [ -z "$current" ]; then
+            echo "Could not find __version__ in dagshub/__init__.py" >&2
+            exit 1
+          fi
+
+          if [ -n "$EXPLICIT_VERSION" ]; then
+            if ! [[ "$EXPLICIT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "explicit_version '$EXPLICIT_VERSION' is not a valid X.Y.Z semver" >&2
+              exit 1
+            fi
+            new="$EXPLICIT_VERSION"
+          else
+            IFS='.' read -r major minor patch <<< "$current"
+            case "$BUMP" in
+              major) new="$((major + 1)).0.0" ;;
+              minor) new="${major}.$((minor + 1)).0" ;;
+              patch) new="${major}.${minor}.$((patch + 1))" ;;
+              *) echo "Unknown bump type '$BUMP'" >&2; exit 1 ;;
+            esac
+          fi
+
+          if [ "$new" = "$current" ]; then
+            echo "New version '$new' is the same as the current version" >&2
+            exit 1
+          fi
+
+          if git rev-parse "$new" >/dev/null 2>&1; then
+            echo "Tag '$new' already exists" >&2
+            exit 1
+          fi
+
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version and commit to main
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" dagshub/__init__.py
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dagshub/__init__.py
+          git commit -m "${NEW_VERSION} version bump"
+          git push origin HEAD:main
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
+          TITLE_SUFFIX: ${{ inputs.release_title_suffix }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          set -euo pipefail
+          title="${NEW_VERSION} ${TITLE_SUFFIX}"
+          draft_flag=()
+          if [ "$DRAFT" = "true" ]; then
+            draft_flag=(--draft)
+          fi
+          gh release create "$NEW_VERSION" \
+            --target main \
+            --title "$title" \
+            --generate-notes \
+            "${draft_flag[@]}"
