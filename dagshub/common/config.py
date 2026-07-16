@@ -22,6 +22,7 @@ DAGSHUB_PASSWORD_KEY = "DAGSHUB_PASSWORD"
 HTTP_TIMEOUT_KEY = "DAGSHUB_HTTP_TIMEOUT"
 DAGSHUB_QUIET_KEY = "DAGSHUB_QUIET"
 DISABLE_TRACEPARENT_KEY = "DAGSHUB_DISABLE_TRACEPARENT"
+TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def set_host(new_host: str):
@@ -31,6 +32,13 @@ def set_host(new_host: str):
 
     global hostname, host, parsed_host
     hostname, host, parsed_host = _hostname, _host, _parsed_host
+
+
+def _get_boolean_env(key: str, default: bool = False) -> bool:
+    value = os.environ.get(key)
+    if value is None:
+        return default
+    return value.strip().lower() in TRUE_VALUES
 
 
 hostname = ""
@@ -48,9 +56,9 @@ requests_headers = {"user-agent": USER_AGENT + custom_user_agent_suffix}
 http_timeout = os.environ.get(HTTP_TIMEOUT_KEY, 30)
 REPO_INFO_URL = "api/v1/repos/{owner}/{reponame}"
 
-quiet = bool(os.environ.get(DAGSHUB_QUIET_KEY, False))
+quiet = _get_boolean_env(DAGSHUB_QUIET_KEY)
 
-disable_traceparent = bool(os.environ.get(DISABLE_TRACEPARENT_KEY, False))
+disable_traceparent = _get_boolean_env(DISABLE_TRACEPARENT_KEY)
 
 # DVC config templates
 CONFIG_GITIGNORE = "/config.local\n/tmp\n/cache"
