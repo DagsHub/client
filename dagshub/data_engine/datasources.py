@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from typing import Optional, Union, List, TYPE_CHECKING, Dict
@@ -5,6 +6,7 @@ from typing import Optional, Union, List, TYPE_CHECKING, Dict
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.common.util import lazy_load, removeprefix
+from dagshub.common.util import to_timestamp
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
@@ -58,6 +60,29 @@ def create_datasource(repo: str, name: str, path: str, revision: Optional[str] =
 def create(*args, **kwargs) -> Datasource:
     """Alias for :func:`create_datasource`"""
     return create_datasource(*args, **kwargs)
+
+
+def copy_datasource(
+    repo: str,
+    source: Union[str, int, Datasource],
+    name: str,
+    as_of: Optional[Union[float, int, datetime.datetime]] = None,
+) -> Datasource:
+    """Create a new datasource from the source's latest state or a point-in-time snapshot.
+
+    The copy runs asynchronously. Its preprocessing status exposes progress through the
+    same APIs used for newly scanned datasources. Version history before the selected
+    snapshot is not copied.
+    """
+    source_id = source.source.id if isinstance(source, Datasource) else source
+    if source_id is None:
+        raise ValueError("source datasource must have an id")
+    result = DataClient(repo).copy_datasource(
+        source=source_id,
+        name=name,
+        as_of=to_timestamp(as_of) if as_of is not None else None,
+    )
+    return Datasource(DatasourceState.from_gql_result(repo, result))
 
 
 def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = None) -> Datasource:
@@ -236,6 +261,7 @@ def _load_datasources_from_run(
 __all__ = [
     create_datasource.__name__,
     create.__name__,
+    copy_datasource.__name__,
     create_from_bucket.__name__,
     create_from_repo.__name__,
     get_datasource.__name__,

@@ -29,6 +29,24 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
+    def copy_datasource():
+        return (
+            GqlQuery()
+            .operation(
+                "mutation",
+                name="copyDatasource",
+                input={"$source": "ID!", "$name": "String!", "$asOf": "DateTime"},
+            )
+            .query("copyDatasource", input={"source": "$source", "name": "$name", "asOf": "$asOf"})
+            .fields(["id", "name", "rootUrl", "integrationStatus", "preprocessingStatus", "type"])
+        )
+
+    @staticmethod
+    def copy_datasource_params(source: Union[int, str], name: str, as_of: Optional[int]):
+        return {"source": source, "name": name, "asOf": as_of}
+
+    @staticmethod
+    @functools.lru_cache()
     def update_metadata():
         q = (
             GqlQuery()

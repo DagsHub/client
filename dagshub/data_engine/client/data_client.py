@@ -83,6 +83,12 @@ class DataClient:
         res = self._exec(q, params)
         return dacite.from_dict(DatasourceResult, res["createDatasource"], config=dacite_config)
 
+    def copy_datasource(self, source: Union[int, str], name: str, as_of: Optional[int] = None) -> DatasourceResult:
+        q = GqlMutations.copy_datasource()
+        params = GqlMutations.copy_datasource_params(source=source, name=name, as_of=as_of)
+        res = self._exec(q, params)
+        return dacite.from_dict(DatasourceResult, res["copyDatasource"], config=dacite_config)
+
     def head(self, datasource: "Datasource", size: Optional[int] = None) -> QueryResult:
         """
         Retrieve a subset of data from the datasource headers.

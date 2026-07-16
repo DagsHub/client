@@ -173,6 +173,16 @@ class Datasource:
 
         self.ngrok_listener = None
 
+    def copy(
+        self,
+        name: str,
+        as_of: Optional[Union[float, int, datetime.datetime]] = None,
+    ) -> "Datasource":
+        """Create an asynchronous copy of this datasource at the requested snapshot."""
+        from dagshub.data_engine.datasources import copy_datasource
+
+        return copy_datasource(self.source.repo, self, name, as_of)
+
     @property
     def has_explicit_context(self):
         return self._explicit_update_ctx is not None
