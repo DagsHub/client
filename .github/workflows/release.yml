@@ -123,5 +123,5 @@ jobs:
         if: inputs.draft != true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TARGET_SHA: ${{ steps.commit.outputs.sha }}
-        run: gh workflow run python-publish.yml --ref "$TARGET_SHA"
+          RELEASE_TAG: ${{ steps.version.outputs.new }}
+        run: gh workflow run python-publish.yml --ref "$RELEASE_TAG"
