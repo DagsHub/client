@@ -28,6 +28,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
@@ -114,3 +115,13 @@ jobs:
             --title "$title" \
             --generate-notes \
             "${draft_flag[@]}"
+
+      # GitHub Actions does not cascade the `release: published` event when the release is
+      # created using the default GITHUB_TOKEN, so python-publish.yml would never fire on its
+      # own. Dispatch it explicitly instead of relying on that event.
+      - name: Trigger PyPI publish
+        if: inputs.draft != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_SHA: ${{ steps.commit.outputs.sha }}
+        run: gh workflow run python-publish.yml --ref "$TARGET_SHA"
