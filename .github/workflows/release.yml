@@ -82,6 +82,7 @@ jobs:
           echo "new=$new" >> "$GITHUB_OUTPUT"
 
       - name: Bump version and commit to main
+        id: commit
         env:
           NEW_VERSION: ${{ steps.version.outputs.new }}
         run: |
@@ -92,6 +93,7 @@ jobs:
           git add dagshub/__init__.py
           git commit -m "${NEW_VERSION} version bump"
           git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
         env:
@@ -99,6 +101,7 @@ jobs:
           NEW_VERSION: ${{ steps.version.outputs.new }}
           TITLE_SUFFIX: ${{ inputs.release_title_suffix }}
           DRAFT: ${{ inputs.draft }}
+          TARGET_SHA: ${{ steps.commit.outputs.sha }}
         run: |
           set -euo pipefail
           title="${NEW_VERSION} ${TITLE_SUFFIX}"
@@ -107,7 +110,7 @@ jobs:
             draft_flag=(--draft)
           fi
           gh release create "$NEW_VERSION" \
-            --target main \
+            --target "$TARGET_SHA" \
             --title "$title" \
             --generate-notes \
             "${draft_flag[@]}"
