@@ -76,6 +76,7 @@ def init(
             repo, branch = determine_repo(root)
             url = repo.repo_url
 
+        url = url.rstrip("/")
         if url.endswith(".git"):
             url = url[:-4]
         # Extract the owner and name from the repo_url
