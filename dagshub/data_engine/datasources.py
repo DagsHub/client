@@ -1,4 +1,3 @@
-import datetime
 import json
 import logging
 from typing import Optional, Union, List, TYPE_CHECKING, Dict
@@ -6,7 +5,6 @@ from typing import Optional, Union, List, TYPE_CHECKING, Dict
 from dagshub.common.analytics import send_analytics_event
 from dagshub.common.api.repo import RepoAPI
 from dagshub.common.util import lazy_load, removeprefix
-from dagshub.common.util import to_timestamp
 from dagshub.data_engine.client.data_client import DataClient
 from dagshub.data_engine.model.datasource import Datasource
 from dagshub.data_engine.model.datasource_state import DatasourceState, DatasourceType, path_regexes
