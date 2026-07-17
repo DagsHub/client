@@ -60,6 +60,35 @@ def create(*args, **kwargs) -> Datasource:
     return create_datasource(*args, **kwargs)
 
 
+def copy_datasource(
+    repo: str,
+    source: Union[str, int, Datasource],
+    name: str,
+    query: Optional[Dict] = None,
+) -> Datasource:
+    """Materialize a new datasource from a query over an existing datasource.
+
+    The copy runs asynchronously. Its preprocessing status exposes progress through the
+    same APIs used for newly scanned datasources. When ``source`` is a Datasource, its
+    current filters, projection, limit, and as-of timestamp are used automatically.
+    Version history before the materialized state is not copied.
+    """
+    if isinstance(source, Datasource):
+        source_id = source.source.id
+        if query is None:
+            query = source.serialize_gql_query_input()
+    else:
+        source_id = source
+    if source_id is None:
+        raise ValueError("source datasource must have an id")
+    result = DataClient(repo).copy_datasource(
+        source=source_id,
+        name=name,
+        query_input=query,
+    )
+    return Datasource(DatasourceState.from_gql_result(repo, result))
+
+
 def get_or_create(repo: str, name: str, path: str, revision: Optional[str] = None) -> Datasource:
     """
     First attempts to get the repo datasource with the given name, and only if that fails,
@@ -236,6 +265,7 @@ def _load_datasources_from_run(
 __all__ = [
     create_datasource.__name__,
     create.__name__,
+    copy_datasource.__name__,
     create_from_bucket.__name__,
     create_from_repo.__name__,
     get_datasource.__name__,
