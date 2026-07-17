@@ -66,21 +66,27 @@ def copy_datasource(
     repo: str,
     source: Union[str, int, Datasource],
     name: str,
-    as_of: Optional[Union[float, int, datetime.datetime]] = None,
+    query: Optional[Dict] = None,
 ) -> Datasource:
-    """Create a new datasource from the source's latest state or a point-in-time snapshot.
+    """Materialize a new datasource from a query over an existing datasource.
 
     The copy runs asynchronously. Its preprocessing status exposes progress through the
-    same APIs used for newly scanned datasources. Version history before the selected
-    snapshot is not copied.
+    same APIs used for newly scanned datasources. When ``source`` is a Datasource, its
+    current filters, projection, limit, and as-of timestamp are used automatically.
+    Version history before the materialized state is not copied.
     """
-    source_id = source.source.id if isinstance(source, Datasource) else source
+    if isinstance(source, Datasource):
+        source_id = source.source.id
+        if query is None:
+            query = source.serialize_gql_query_input()
+    else:
+        source_id = source
     if source_id is None:
         raise ValueError("source datasource must have an id")
     result = DataClient(repo).copy_datasource(
         source=source_id,
         name=name,
-        as_of=to_timestamp(as_of) if as_of is not None else None,
+        query_input=query,
     )
     return Datasource(DatasourceState.from_gql_result(repo, result))
 

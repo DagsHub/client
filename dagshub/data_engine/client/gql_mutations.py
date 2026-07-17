@@ -35,15 +35,27 @@ class GqlMutations:
             .operation(
                 "mutation",
                 name="copyDatasource",
-                input={"$source": "ID!", "$name": "String!", "$asOf": "DateTime"},
+                input={"$source": "ID!", "$name": "String!", "$query": "QueryInput"},
             )
-            .query("copyDatasource", input={"source": "$source", "name": "$name", "asOf": "$asOf"})
-            .fields(["id", "name", "rootUrl", "integrationStatus", "preprocessingStatus", "type"])
+            .query("copyDatasource", input={"source": "$source", "name": "$name", "query": "$query"})
+            .fields(
+                [
+                    "id",
+                    "name",
+                    "rootUrl",
+                    "integrationStatus",
+                    "preprocessingStatus",
+                    "type",
+                    "origin {sourceDatasourceId sourceRepoId sourceName sourceRootUrl sourceType "
+                    "sourceBackingType creatorId createdAt query}",
+                ]
+            )
+            .param_validator(Validators.query_input_validator("query"))
         )
 
     @staticmethod
-    def copy_datasource_params(source: Union[int, str], name: str, as_of: Optional[int]):
-        return {"source": source, "name": name, "asOf": as_of}
+    def copy_datasource_params(source: Union[int, str], name: str, query: Optional[Dict[str, Any]]):
+        return {"source": source, "name": name, "query": query}
 
     @staticmethod
     @functools.lru_cache()

@@ -102,6 +102,19 @@ class MetadataSelectFieldSchema(MetadataFieldSchema):
 
 
 @dataclass
+class DatasourceOriginResult:
+    sourceDatasourceId: Union[str, int]
+    sourceRepoId: Union[str, int]
+    sourceName: str
+    sourceRootUrl: str
+    sourceType: DatasourceType
+    sourceBackingType: str
+    creatorId: Union[str, int]
+    createdAt: int
+    query: str
+
+
+@dataclass
 class DatasourceResult:
     id: Union[str, int]
     name: str
@@ -110,6 +123,7 @@ class DatasourceResult:
     preprocessingStatus: PreprocessingStatus
     type: DatasourceType
     metadataFields: Optional[List[MetadataFieldSchema]]
+    origin: Optional[DatasourceOriginResult] = None
 
 
 @dataclass

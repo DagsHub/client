@@ -83,9 +83,11 @@ class DataClient:
         res = self._exec(q, params)
         return dacite.from_dict(DatasourceResult, res["createDatasource"], config=dacite_config)
 
-    def copy_datasource(self, source: Union[int, str], name: str, as_of: Optional[int] = None) -> DatasourceResult:
+    def copy_datasource(
+        self, source: Union[int, str], name: str, query_input: Optional[Dict[str, Any]] = None
+    ) -> DatasourceResult:
         q = GqlMutations.copy_datasource()
-        params = GqlMutations.copy_datasource_params(source=source, name=name, as_of=as_of)
+        params = GqlMutations.copy_datasource_params(source=source, name=name, query=query_input)
         res = self._exec(q, params)
         return dacite.from_dict(DatasourceResult, res["copyDatasource"], config=dacite_config)
 
