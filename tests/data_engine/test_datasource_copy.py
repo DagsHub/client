@@ -77,7 +77,7 @@ def test_datasource_copy_materializes_current_query(monkeypatch):
 
     monkeypatch.setattr("dagshub.data_engine.datasources.copy_datasource", fake_copy)
 
-    assert queried.copy("projection") == "copied"
+    assert queried.copy_to("projection") == "copied"
     assert captured["repo"] == "owner/repo"
     assert captured["source"] is queried
     assert captured["name"] == "projection"

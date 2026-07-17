@@ -173,7 +173,7 @@ class Datasource:
 
         self.ngrok_listener = None
 
-    def copy(
+    def copy_to(
         self,
         name: str,
     ) -> "Datasource":
