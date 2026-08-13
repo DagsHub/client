@@ -76,11 +76,19 @@ def init(
             repo, branch = determine_repo(root)
             url = repo.repo_url
 
+        # Strip a trailing slash first, so that a URL copied from the browser
+        # address bar doesn't shift every segment by one.
+        url = url.rstrip("/")
         if url.endswith(".git"):
             url = url[:-4]
         # Extract the owner and name from the repo_url
-        parts = url.split("/")
-        repo_owner, repo_name = parts[-2], parts[-1]
+        parts = url.rstrip("/").split("/")
+        repo_owner, repo_name = parts[-2] if len(parts) > 1 else "", parts[-1]
+        if not repo_owner or not repo_name:
+            raise ValueError(
+                f"Could not determine the repo owner and name from the url {url!r}. "
+                f"Expected a url of the form https://dagshub.com/<owner>/<repo>."
+            )
 
     # Create the repo if it wasn't created
     repo_api = RepoAPI(f"{repo_owner}/{repo_name}", host=host)
@@ -93,9 +101,7 @@ def init(
             should_create_under_org = repo_owner != current_user.username
 
         if should_create_under_org:
-            log_message(
-                f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".'
-            )
+            log_message(f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".')
             create_repo(repo_name, org_name=repo_owner, host=host)
         else:
             log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")

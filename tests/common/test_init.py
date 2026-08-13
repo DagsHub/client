@@ -84,3 +84,35 @@ def test_init_creates_repo_under_org_from_url(
     mock_log_message.assert_any_call(
         'Repository my-repo doesn\'t exist, creating it under organization "my-org".'
     )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://dagshub.com/my-org/my-repo/",
+        "https://dagshub.com/my-org/my-repo.git/",
+        "https://dagshub.com/my-org/my-repo///",
+    ],
+)
+def test_init_from_url_tolerates_trailing_slash(
+    url, mock_repo_api, mock_user_api, mock_create_repo, mock_get_token, mock_log_message
+):
+    """
+    A url copied from the browser address bar carries a trailing slash, which
+    used to shift every segment by one and yield repo_owner="my-repo" with an
+    empty repo_name.
+    """
+    dagshub.init(url=url, mlflow=False, dvc=False)
+
+    mock_repo_api.assert_called_once_with("my-org/my-repo", host="https://dagshub.com")
+    mock_create_repo.assert_called_once_with("my-repo", org_name="my-org", host="https://dagshub.com")
+
+
+@pytest.mark.parametrize("url", ["https://dagshub.com/", "https://dagshub.com", "my-repo"])
+def test_init_from_url_without_owner_and_name_raises(url, mock_get_token):
+    """
+    A url that carries no owner/name pair should fail loudly instead of
+    calling the API with empty segments.
+    """
+    with pytest.raises(ValueError, match="Could not determine the repo owner and name"):
+        dagshub.init(url=url, mlflow=False, dvc=False)
