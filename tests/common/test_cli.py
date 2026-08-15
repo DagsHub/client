@@ -28,9 +28,20 @@ def test_repo_create_help_keeps_its_structure():
     """
     output = _help("repo", "create")
 
-    assert "- upload files to 'data' from a URL dir using the `-u` flag." in output
-    assert "- clone the repo locally using the `--clone` flag." in output
-    assert "Example 1:" in output
-    assert "Example 2:" in output
+    # Assert the rendered structure, not just that fragments appear somewhere:
+    # a later rewrap could satisfy substring checks while breaking the layout.
+    lines = [line.rstrip() for line in output.splitlines()]
+
+    assert "  - upload a file to 'data' from a URL using the `-u` flag." in lines
+    assert "    .zip and .tar files are extracted, other formats are copied as is." in lines
+    assert "  - clone the repo locally using the `--clone` flag." in lines
+
+    assert "  Example 1:" in lines
+    assert (
+        '    dagshub repo create mytutorial -u "http://example.com/data.csv" --clone'
+        in lines
+    )
+    assert "  Example 2:" in lines
+
     # The rewrapped remnant of the un-escaped bullet.
     assert "are extracted,   other formats" not in output

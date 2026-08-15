@@ -339,7 +339,7 @@ def create(ctx, repo_name, upload_data, clone, verbose, quiet):
     Create a repo and optionally:
 
     \b
-    - upload files to 'data' from a URL dir using the `-u` flag.
+    - upload a file to 'data' from a URL using the `-u` flag.
       .zip and .tar files are extracted, other formats are copied as is.
     - clone the repo locally using the `--clone` flag.
 
