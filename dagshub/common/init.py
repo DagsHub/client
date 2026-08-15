@@ -20,6 +20,32 @@ from dagshub.common.util import lazy_load
 git = lazy_load("git")
 
 
+def _parse_repo_url(url: str) -> tuple:
+    """Extract (owner, name) from a repository url.
+
+    The owner and name are taken from the url *path*, not from the last two
+    slash-separated pieces of the whole string. Splitting the whole string lets
+    the hostname stand in for the owner: "https://dagshub.com/my-repo" has only
+    one path segment, but its last two pieces are "dagshub.com" and "my-repo",
+    which looks valid and is not.
+
+    A bare "owner/repo" with no scheme is still accepted, since that is a
+    reasonable thing to pass.
+    """
+
+    parsed = urllib.parse.urlparse(url)
+    # With no scheme, urlparse puts everything in `path`, which is what we want
+    # for a bare "owner/repo"; with one, `netloc` holds the host and is skipped.
+    segments = [segment for segment in parsed.path.split("/") if segment]
+
+    if len(segments) < 2:
+        raise ValueError(
+            f"Could not determine the repo owner and name from the url {url!r}. "
+            f"Expected a url of the form https://dagshub.com/<owner>/<repo>."
+        )
+    return segments[-2], segments[-1]
+
+
 def init(
     repo_name: Optional[str] = None,
     repo_owner: Optional[str] = None,
@@ -81,14 +107,7 @@ def init(
         url = url.rstrip("/")
         if url.endswith(".git"):
             url = url[:-4]
-        # Extract the owner and name from the repo_url
-        parts = url.rstrip("/").split("/")
-        repo_owner, repo_name = parts[-2] if len(parts) > 1 else "", parts[-1]
-        if not repo_owner or not repo_name:
-            raise ValueError(
-                f"Could not determine the repo owner and name from the url {url!r}. "
-                f"Expected a url of the form https://dagshub.com/<owner>/<repo>."
-            )
+        repo_owner, repo_name = _parse_repo_url(url)
 
     # Create the repo if it wasn't created
     repo_api = RepoAPI(f"{repo_owner}/{repo_name}", host=host)

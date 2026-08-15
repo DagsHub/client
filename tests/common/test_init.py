@@ -108,7 +108,18 @@ def test_init_from_url_tolerates_trailing_slash(
     mock_create_repo.assert_called_once_with("my-repo", org_name="my-org", host="https://dagshub.com")
 
 
-@pytest.mark.parametrize("url", ["https://dagshub.com/", "https://dagshub.com", "my-repo"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://dagshub.com/",
+        "https://dagshub.com",
+        "my-repo",
+        # One path segment only: the last two slash-separated pieces are
+        # "dagshub.com" and "my-repo", which looks like owner/name and is not.
+        "https://dagshub.com/my-repo",
+        "https://dagshub.com/my-repo/",
+    ],
+)
 def test_init_from_url_without_owner_and_name_raises(url, mock_get_token):
     """
     A url that carries no owner/name pair should fail loudly instead of
