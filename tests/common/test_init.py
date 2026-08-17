@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -127,3 +128,56 @@ def test_init_from_url_without_owner_and_name_raises(url, mock_get_token):
     """
     with pytest.raises(ValueError, match="Could not determine the repo owner and name"):
         dagshub.init(url=url, mlflow=False, dvc=False)
+
+
+@pytest.fixture
+def clean_environ(mocker):
+    """Let the test read what init() wrote to os.environ, then put it back."""
+    return mocker.patch.dict(os.environ, {}, clear=False)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://dagshub.com/my-org//my-repo",
+        "https://dagshub.com//my-org/my-repo/",
+        "https://dagshub.com/my-org/my-repo.git",
+    ],
+)
+def test_init_hands_a_canonical_url_to_mlflow(
+    url, clean_environ, mock_repo_api, mock_user_api, mock_create_repo, mock_get_token, mock_log_message
+):
+    """
+    Empty path segments are skipped when reading the owner and name, so they
+    must be skipped in the url too - otherwise the API is called with
+    "my-org/my-repo" while MLflow is pointed at ".../my-org//my-repo.mlflow".
+    """
+    dagshub.init(url=url, mlflow=True, dvc=False)
+
+    mock_repo_api.assert_called_once_with("my-org/my-repo", host="https://dagshub.com")
+    assert os.environ["MLFLOW_TRACKING_URI"] == "https://dagshub.com/my-org/my-repo.mlflow"
+
+
+def test_init_does_not_leak_url_credentials_to_mlflow(
+    clean_environ, mock_repo_api, mock_user_api, mock_create_repo, mock_get_token, mock_log_message
+):
+    """
+    A token pasted into the url must not travel on into the tracking URI - the
+    same url is also written to .dvc/config, which is committed.
+    """
+    dagshub.init(url="https://user:s3cret-token@dagshub.com/my-org/my-repo", mlflow=True, dvc=False)
+
+    assert os.environ["MLFLOW_TRACKING_URI"] == "https://dagshub.com/my-org/my-repo.mlflow"
+    assert "s3cret-token" not in os.environ["MLFLOW_TRACKING_URI"]
+
+
+def test_init_does_not_leak_url_credentials_in_the_error_message(mock_get_token):
+    """
+    The url is quoted back when it cannot be parsed, and that message is likely
+    to be logged, so it must not carry the userinfo it was given.
+    """
+    with pytest.raises(ValueError) as excinfo:
+        dagshub.init(url="https://user:s3cret-token@dagshub.com/my-repo", mlflow=False, dvc=False)
+
+    assert "s3cret-token" not in str(excinfo.value)
+    assert "user:" not in str(excinfo.value)
