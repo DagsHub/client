@@ -168,6 +168,19 @@ def get_datasources(repo: str) -> List[Datasource]:
     return [Datasource(DatasourceState.from_gql_result(repo, source)) for source in sources]
 
 
+def copy_datasource(source: Datasource, name: str) -> Datasource:
+    """Create a datasource containing a snapshot of ``source``'s current query.
+
+    The copy runs asynchronously on DagsHub. Call ``wait_until_ready`` on the
+    returned datasource before reading it.
+
+    Args:
+        source: Datasource, including any filter/select query, to copy.
+        name: Name of the new datasource.
+    """
+    return source.copy_datasource(name)
+
+
 def get_from_mlflow(
     run: Optional[Union["mlflow.entities.Run", str]] = None, artifact_name: Optional[str] = None
 ) -> Dict[str, Datasource]:
@@ -238,6 +251,7 @@ __all__ = [
     create.__name__,
     create_from_bucket.__name__,
     create_from_repo.__name__,
+    copy_datasource.__name__,
     get_datasource.__name__,
     get_datasources.__name__,
     get.__name__,

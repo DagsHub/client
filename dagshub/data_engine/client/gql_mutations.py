@@ -170,6 +170,38 @@ class GqlMutations:
 
     @staticmethod
     @functools.lru_cache()
+    def copy_datasource():
+        return (
+            GqlQuery()
+            .operation(
+                "mutation",
+                name="copyDatasource",
+                input={"$source": "ID!", "$name": "String!", "$query": "QueryInput"},
+            )
+            .query(
+                "copyDatasource",
+                input={"source": "$source", "name": "$name", "query": "$query"},
+            )
+            .fields(
+                [
+                    "id",
+                    "name",
+                    "rootUrl",
+                    "integrationStatus",
+                    "preprocessingStatus",
+                    "metadataFields {name valueType multiple tags}",
+                    "type",
+                    "origin {sourceDatasourceId sourceRepoId sourceName sourceRootUrl sourceType creatorId createdAt query}",
+                ]
+            )
+        )
+
+    @staticmethod
+    def copy_datasource_params(source_id: Union[int, str], name: str, query: Dict[str, Any]):
+        return {"source": source_id, "name": name, "query": query}
+
+    @staticmethod
+    @functools.lru_cache()
     def scan_datasource():
         q = (
             GqlQuery()
