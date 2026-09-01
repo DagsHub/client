@@ -22,6 +22,7 @@ from dagshub.data_engine.client.models import (
 from dagshub.data_engine.dtypes import MetadataFieldType, ReservedTags
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.datasource import DatapointMetadataUpdateEntry, Datasource, MetadataContextManager
+from dagshub.data_engine.model.datasource_state import DatasourceState
 from dagshub.data_engine.model.errors import DataEngineGqlError
 from dagshub.data_engine.model.metadata import MultipleDataTypesUploadedError, StringFieldValueTooLongError
 from dagshub.data_engine.model.query_result import QueryResult
@@ -89,6 +90,45 @@ def test_copy_datasource_returns_new_source_with_origin(ds):
     assert copied.source.name == "copied-datasource"
     assert copied.source.preprocessing_status == PreprocessingStatus.IN_PROGRESS
     assert copied.source.origin == origin
+
+
+def test_copy_datasource_preserves_origin_when_refresh_omits_it(ds):
+    origin = DatasourceOriginResult(
+        sourceDatasourceId=ds.source.id,
+        sourceRepoId=12,
+        sourceName=ds.source.name,
+        sourceRootUrl=ds.source.path,
+        sourceType=DatasourceType.REPOSITORY,
+        creatorId=7,
+        createdAt=datetime.datetime.now(datetime.timezone.utc),
+        query="{}",
+    )
+    copied = DatasourceState.from_gql_result(
+        ds.source.repo,
+        DatasourceResult(
+            id=2,
+            name="copied-datasource",
+            rootUrl=ds.source.path,
+            integrationStatus=IntegrationStatus.VALID,
+            preprocessingStatus=PreprocessingStatus.IN_PROGRESS,
+            type=DatasourceType.REPOSITORY,
+            origin=origin,
+        ),
+    )
+
+    copied._update_from_ds_result(
+        DatasourceResult(
+            id=2,
+            name="copied-datasource",
+            rootUrl=ds.source.path,
+            integrationStatus=IntegrationStatus.VALID,
+            preprocessingStatus=PreprocessingStatus.READY,
+            type=DatasourceType.REPOSITORY,
+        )
+    )
+
+    assert copied.preprocessing_status == PreprocessingStatus.READY
+    assert copied.origin == origin
 
 
 @pytest.mark.parametrize("column", ["key3", 3])

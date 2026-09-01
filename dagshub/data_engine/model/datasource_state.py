@@ -222,7 +222,8 @@ class DatasourceState:
         self.source_type = ds.type
         self.preprocessing_status = ds.preprocessingStatus
         self.metadata_fields = [] if ds.metadataFields is None else ds.metadataFields
-        self.origin = ds.origin
+        if ds.origin is not None:
+            self.origin = ds.origin
         if self.source_type == DatasourceType.REPOSITORY:
             self.revision = self.path_parts()["revision"]
 

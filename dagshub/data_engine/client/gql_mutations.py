@@ -191,7 +191,8 @@ class GqlMutations:
                     "preprocessingStatus",
                     "metadataFields {name valueType multiple tags}",
                     "type",
-                    "origin {sourceDatasourceId sourceRepoId sourceName sourceRootUrl sourceType creatorId createdAt query}",
+                    "origin {sourceDatasourceId sourceRepoId sourceName sourceRootUrl sourceType "
+                    "creatorId createdAt query}",
                 ]
             )
         )
