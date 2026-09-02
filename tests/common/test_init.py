@@ -74,6 +74,15 @@ def test_init_creates_repo_under_current_user_from_url(
     )
 
 
+def test_init_from_url_ignores_trailing_slash(
+    mock_repo_api, mock_user_api, mock_create_repo, mock_get_token, mock_log_message
+):
+    dagshub.init(url="https://dagshub.com/testuser/my-repo/", mlflow=False, dvc=False)
+
+    mock_repo_api.assert_called_once_with("testuser/my-repo", host="https://dagshub.com")
+    mock_create_repo.assert_called_once_with("my-repo", host="https://dagshub.com")
+
+
 def test_init_creates_repo_under_org_from_url(
     mock_repo_api, mock_user_api, mock_create_repo, mock_get_token, mock_log_message
 ):
