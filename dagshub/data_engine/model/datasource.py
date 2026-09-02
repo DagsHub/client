@@ -702,6 +702,21 @@ class Datasource:
                 return
         self.source.client.delete_datasource(self)
 
+    def copy_datasource(self, name: str) -> "Datasource":
+        """Create a datasource containing a snapshot of this datasource's current query.
+
+        The copy runs asynchronously on DagsHub. Use :meth:`wait_until_ready` on
+        the returned datasource before reading it.
+
+        Args:
+            name: Name of the new datasource.
+
+        Returns:
+            The newly created datasource.
+        """
+        result = self.source.client.copy_datasource(self, name)
+        return Datasource(DatasourceState.from_gql_result(self.source.repo, result))
+
     def delete_dataset(self, force: bool = False):
         """
         Deletes the dataset, if this object was created from a dataset

@@ -329,6 +329,18 @@ class DataClient:
         params = GqlMutations.delete_datasource_params(datasource_id=datasource.source.id)
         return self._exec(q, params)
 
+    def copy_datasource(self, datasource: "Datasource", name: str) -> DatasourceResult:
+        """Create a new datasource from the source's current query snapshot."""
+        assert datasource.source.id is not None
+        q = GqlMutations.copy_datasource()
+        params = GqlMutations.copy_datasource_params(
+            source_id=datasource.source.id,
+            name=name,
+            query=datasource.serialize_gql_query_input(),
+        )
+        res = self._exec(q, params)["copyDatasource"]
+        return dacite.from_dict(DatasourceResult, res, config=dacite_config)
+
     def scan_datasource(self, datasource: "Datasource", options: Optional[List[ScanOption]]):
         """
         Initiate a scan operation on the specified datasource.

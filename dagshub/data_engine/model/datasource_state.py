@@ -7,7 +7,13 @@ from typing import Optional, Union, Mapping, Any, Dict, List
 from os import PathLike
 from dagshub.common.api.repo import RepoAPI, PathNotFoundError
 from dagshub.data_engine.client.data_client import DataClient
-from dagshub.data_engine.client.models import DatasourceType, DatasourceResult, PreprocessingStatus, MetadataFieldSchema
+from dagshub.data_engine.client.models import (
+    DatasourceOriginResult,
+    DatasourceType,
+    DatasourceResult,
+    PreprocessingStatus,
+    MetadataFieldSchema,
+)
 from dagshub.data_engine.model.datapoint import Datapoint
 from dagshub.data_engine.model.errors import DatasourceAlreadyExistsError, DatasourceNotFoundError
 from dagshub.common.util import multi_urljoin
@@ -43,6 +49,7 @@ class DatasourceState:
     client: DataClient = field(init=False)
     repoApi: RepoAPI = field(init=False)
     metadata_fields: List[MetadataFieldSchema] = field(init=False)
+    origin: Optional[DatasourceOriginResult] = field(init=False, default=None)
 
     _revision: Optional[str] = field(init=False, default=None)
 
@@ -215,6 +222,8 @@ class DatasourceState:
         self.source_type = ds.type
         self.preprocessing_status = ds.preprocessingStatus
         self.metadata_fields = [] if ds.metadataFields is None else ds.metadataFields
+        if ds.origin is not None:
+            self.origin = ds.origin
         if self.source_type == DatasourceType.REPOSITORY:
             self.revision = self.path_parts()["revision"]
 
