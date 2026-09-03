@@ -89,36 +89,52 @@ def create_repo(
     template: str = "custom",
     host: str = "",
 ):
-    """
-    Creates a repository on DagsHub for the current user or an organization passed as an argument
+    """Create a new repository on DagsHub for the authenticated user or an organization.
+
+    Sends a POST request to the user or organization repository-creation API and returns a
+    :class:`Repo` handle for the new repository (default branch ``main``).
 
     Args:
-        repo_name: Name of the repository to be created.
-        org_name (optional): Organization that will own the repo. Alternative to creating a repository owned by you.
-        description: Repository description.
-        private: Set to ``True`` to make repository private.
-        auto_init: Set to True to create an initial commit with README, .gitignore and LICENSE.
-        gitignores: Which gitignore template(s) to use in a comma separated string.
-        license: Which license file to use.
-        readme: Readme template to initialize with.
-        template: Which project template to use, options are:
+        repo_name (str): Name of the repository to create.
+        org_name (str, optional): Organization that will own the repository. If omitted or
+            whitespace-only, the repository is created under the authenticated user.
+        description (str, optional): Repository description shown on DagsHub.
+        private (bool): If ``True``, create a private repository. Defaults to ``False``.
+        auto_init (bool): If ``True``, create an initial commit with README, ``.gitignore``, and
+            LICENSE when applicable. Defaults to ``False``.
+        gitignores (str): Comma-separated gitignore template name(s). Defaults to ``"Python"``.
+        license (str): License template for the generated ``LICENSE`` file, if any.
+        readme (str): Readme template to initialize with, if any.
+        template (str): Project template. Allowed values include:
 
-            - ``"none"`` - creates an empty repo
-            - ``"custom"`` - creates a repo with your specified ``gitignores``, ``license`` and ``readme``
+            - ``"none"`` - empty repository
+            - ``"custom"`` - use the given ``gitignores``, ``license``, and ``readme``
             - ``"notebook-template"``
             - ``"cookiecutter-mlops"``
             - ``"cookiecutter-dagshub-dvc"``
 
-            By default, creates an empty repo if none of ``gitignores``, ``license`` or ``readme`` were provided.
-            Otherwise, the template is ``"custom"``.
+            If ``gitignores``, ``license``, or ``readme`` is set while ``template`` is ``"none"``,
+            the implementation switches the template to ``"custom"``. If those are all empty,
+            the default is an empty repo unless overridden by ``template``.
 
-        host: URL of the DagsHub instance to host the repo on.
-
-    .. note::
-        To learn more about the templates, visit https://dagshub.com/docs/feature_guide/project_templates/
+        host (str, optional): Base URL of the DagsHub instance. Defaults to the ``host`` in
+            ``dagshub.common.config`` (typically ``https://dagshub.com``).
 
     Returns:
-        :class:`.Repo`: Repo object of the repository created.
+        Repo: A :class:`Repo` instance for the created repository.
+
+    Raises:
+        RuntimeError: If there is no valid authentication, if the API responds with ``422``
+            (invalid name or repository already exists), or if creation fails for any other reason.
+
+    Example:
+        >>> from dagshub.upload import create_repo
+        >>> repo = create_repo("my-dataset", description="Example project", private=False)
+        >>> # Use ``repo.upload`` or ``repo.directory`` to add content.
+
+    Note:
+        For more on project templates, see
+        https://dagshub.com/docs/feature_guide/project_templates/
     """
     if template == "":
         template = "none"
