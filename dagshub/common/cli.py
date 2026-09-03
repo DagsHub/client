@@ -327,7 +327,7 @@ def repo():
     pass
 
 
-@repo.command()
+@repo.command(short_help="Create a repo, optionally uploading data to it and cloning it locally")
 @click.argument("repo_name")
 @click.option("-u", "--upload-data", help="Upload data from specified url to new repository")
 @click.option("-c", "--clone", is_flag=True, help="Clone repository locally")
@@ -336,17 +336,21 @@ def repo():
 @click.pass_context
 def create(ctx, repo_name, upload_data, clone, verbose, quiet):
     """
-    create a repo and optionally:
+    Create a repo and optionally:
 
-    - upload files to 'data' from a URL dir using `-u` flag. .zip and .tar files are extracted,
-      other formats copied as is.
+    \b
+    - upload a file to 'data' from a URL using the `-u` flag.
+      .zip and .tar files are extracted, other formats are copied as is.
+    - clone the repo locally using the `--clone` flag.
 
-    - clone the repo locally using `--clone` flag
+    \b
+    Example 1:
+      dagshub repo create mytutorial -u "http://example.com/data.csv" --clone
 
-    example 1:  dagshub repo create mytutorial -u "http://example.com/data.csv" --clone
-
-    example 2:  dagshub --host "https://www.dagshub.com"
-                    repo create mytutorial2 -u "http://0.0.0.0:8080/index.html" --clone --verbose
+    \b
+    Example 2:
+      dagshub --host "https://www.dagshub.com" repo create mytutorial2
+        -u "http://0.0.0.0:8080/index.html" --clone --verbose
     """
 
     config.quiet = quiet or ctx.obj["quiet"]
