@@ -357,3 +357,49 @@ def test_annotation_in_dataframe(ds):
 
 def test_annotation_in_dataframe_to_new_datasource(ds, other_ds):
     _test_dataframe_annotation_addition(ds, other_ds)
+
+
+def test_get_datapoint_by_path(ds):
+    datapoint_path = "folder/file.jpg"
+    expected = Datapoint(
+        datasource=ds,
+        path=datapoint_path,
+        datapoint_id=123,
+        metadata={},
+    )
+    query_result = QueryResult(
+        _entries=[expected],
+        datasource=ds,
+        fields=[],
+    )
+    ds.source.client.head.return_value = query_result
+
+    actual = ds.get_datapoint(datapoint_path)
+
+    assert actual is expected
+
+    queried_ds, size = ds.source.client.head.call_args.args
+    assert size == 1
+    assert queried_ds.get_query().filter.tree_to_dict() == {
+        "eq": {
+            "data": {
+                "field": "path",
+                "value": datapoint_path,
+            }
+        }
+    }
+
+
+def test_get_datapoint_by_path_not_found(ds):
+    datapoint_path = "missing/file.jpg"
+    query_result = QueryResult(
+        _entries=[],
+        datasource=ds,
+        fields=[],
+    )
+    ds.source.client.head.return_value = query_result
+
+    with pytest.raises(KeyError) as exc_info:
+        ds.get_datapoint(datapoint_path)
+
+    assert exc_info.value.args == (datapoint_path,)
