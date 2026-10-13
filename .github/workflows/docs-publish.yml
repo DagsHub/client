@@ -2,18 +2,31 @@ name: Docs
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to publish to production (leave empty to deploy the selected ref to test)"
+        required: false
+        type: string
   push:
     branches:
       - main
-  release:
-    types: [ published ]
+  workflow_run:
+    workflows: [Upload Python Package]
+    types: [completed]
   pull_request:
     branches:
       - main
 
+permissions:
+  contents: read
+
+env:
+  DOCS_REF: ${{ inputs.release_tag || github.event.workflow_run.head_sha || github.ref }}
+
 jobs:
   build:
     name: Build documentation
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     defaults:
@@ -22,6 +35,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DOCS_REF }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -51,11 +66,13 @@ jobs:
   deploy-test:
     name: Deploy to test.dagshub.com
     needs: build
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release_tag == '')
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DOCS_REF }}
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -79,11 +96,16 @@ jobs:
   deploy-prod:
     name: Deploy to dagshub.com
     needs: build
-    if: github.event_name == 'release'
+    if: github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     runs-on: ubuntu-latest
+    concurrency:
+      group: client-docs-production
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DOCS_REF }}
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
