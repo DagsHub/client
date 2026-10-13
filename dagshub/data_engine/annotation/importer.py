@@ -99,15 +99,6 @@ class AnnotationImporter:
                 annotation_dict, _ = load_yolo_from_fs(
                     annotation_type=self.additional_args["yolo_type"], meta_file=annotations_file
                 )
-            elif self.annotations_type == "cvat":
-                if annotations_file.is_dir():
-                    annotation_dict = self._key_cvat_fs_annotations_by_filename(load_cvat_from_fs(annotations_file))
-                else:
-                    result = load_cvat_from_zip(annotations_file)
-                    if self._determine_cvat_annotation(result) == "video":
-                        annotation_dict = self._key_video_annotations_by_filename(result)
-                    else:
-                        annotation_dict = result
             elif self.annotations_type == "coco":
                 annotation_dict, _ = load_coco_from_file(annotations_file)
             elif self.annotations_type == "mot":
@@ -140,7 +131,7 @@ class AnnotationImporter:
                 else:
                     video_anns, _ = load_mot_from_dir(annotations_file, **mot_kwargs)
                     annotation_dict = self._key_video_annotations_by_filename(video_anns)
-            elif self.annotations_type == "cvat_video":
+            elif self.annotations_type in ("cvat", "cvat_video"):
                 cvat_kwargs = {}
                 if "image_width" in self.additional_args:
                     cvat_kwargs["image_width"] = self.additional_args["image_width"]
