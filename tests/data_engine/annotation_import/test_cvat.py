@@ -31,3 +31,4 @@ def test_import_cvat_image_annotations(ds, tmp_path, as_zip):
     assert list(result.keys()) == ["img.jpg"]
     assert len(result["img.jpg"]) == 1
     assert isinstance(result["img.jpg"][0], IRBBoxImageAnnotation)
+    assert not importer.is_video_format
