@@ -61,6 +61,8 @@ class AnnotationImporter:
         self.annotations_file = Path(annotations_file)
         self.load_from = load_from if load_from is not None else self.determine_load_location(ds, annotations_file)
         self.additional_args = kwargs
+        # Set when a "cvat" import turns out to contain video annotations
+        self._loaded_cvat_video = False
 
         if self.annotations_type == "yolo":
             if "yolo_type" not in kwargs:
@@ -71,7 +73,7 @@ class AnnotationImporter:
 
     @property
     def is_video_format(self) -> bool:
-        return self.annotations_type in ("mot", "cvat_video")
+        return self.annotations_type in ("mot", "cvat_video") or self._loaded_cvat_video
 
     def import_annotations(self) -> Mapping[str, Sequence[IRTaskAnnotation]]:
         # Double check that the annotation file exists
@@ -99,15 +101,6 @@ class AnnotationImporter:
                 annotation_dict, _ = load_yolo_from_fs(
                     annotation_type=self.additional_args["yolo_type"], meta_file=annotations_file
                 )
-            elif self.annotations_type == "cvat":
-                if annotations_file.is_dir():
-                    annotation_dict = self._key_cvat_fs_annotations_by_filename(load_cvat_from_fs(annotations_file))
-                else:
-                    result = load_cvat_from_zip(annotations_file)
-                    if self._determine_cvat_annotation(result) == "video":
-                        annotation_dict = self._key_video_annotations_by_filename(result)
-                    else:
-                        annotation_dict = result
             elif self.annotations_type == "coco":
                 annotation_dict, _ = load_coco_from_file(annotations_file)
             elif self.annotations_type == "mot":
@@ -140,7 +133,7 @@ class AnnotationImporter:
                 else:
                     video_anns, _ = load_mot_from_dir(annotations_file, **mot_kwargs)
                     annotation_dict = self._key_video_annotations_by_filename(video_anns)
-            elif self.annotations_type == "cvat_video":
+            elif self.annotations_type in ("cvat", "cvat_video"):
                 cvat_kwargs = {}
                 if "image_width" in self.additional_args:
                     cvat_kwargs["image_width"] = self.additional_args["image_width"]
@@ -148,16 +141,20 @@ class AnnotationImporter:
                     cvat_kwargs["image_height"] = self.additional_args["image_height"]
                 if annotations_file.is_dir():
                     raw = load_cvat_from_fs(annotations_file, **cvat_kwargs)
+                    if any(self._determine_cvat_annotation(r) == "video" for r in raw.values()):
+                        self._loaded_cvat_video = True
                     annotation_dict = self._key_cvat_fs_annotations_by_filename(raw)
                 elif annotations_file.suffix == ".zip":
                     result = load_cvat_from_zip(annotations_file, **cvat_kwargs)
                     if self._determine_cvat_annotation(result) == "video":
+                        self._loaded_cvat_video = True
                         annotation_dict = self._key_video_annotations_by_filename(result)
                     else:
                         annotation_dict = result
                 else:
                     result = load_cvat_from_xml_file(annotations_file, **cvat_kwargs)
                     if self._determine_cvat_annotation(result) == "video":
+                        self._loaded_cvat_video = True
                         annotation_dict = self._key_video_annotations_by_filename(result)
                     else:
                         annotation_dict = result

@@ -26,12 +26,16 @@ def mock_source_prefix(ds):
 # --- import ---
 
 
-def test_import_cvat_video(ds, tmp_path):
+@pytest.mark.parametrize("annotation_type", ["cvat_video", "cvat"])
+def test_import_cvat_video(ds, tmp_path, annotation_type):
     xml_file = tmp_path / "annotations.xml"
     xml_file.write_bytes(_make_cvat_video_xml())
 
-    importer = AnnotationImporter(ds, "cvat_video", xml_file, load_from="disk")
+    importer = AnnotationImporter(ds, annotation_type, xml_file, load_from="disk")
     result = importer.import_annotations()
+
+    # "cvat" detects the video data, so Label Studio conversion makes video tasks
+    assert importer.is_video_format
 
     assert len(result) == 1
     anns = list(result.values())[0]
