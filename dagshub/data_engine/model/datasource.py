@@ -337,6 +337,11 @@ class Datasource:
             ds = self.limit(None)
         return ds.fetch(load_documents=load_documents, load_annotations=load_annotations)
 
+    def get_datapoint(self, path: str) -> Datapoint:
+        """Get a datapoint by its path."""
+        result = (self[self["path"] == path]).head(1)
+        return result[path]
+
     def select(self, *selected: Union[str, Field]) -> "Datasource":
         """
         Select which fields should appear in the query result.
