@@ -20,6 +20,60 @@ from dagshub.common.util import lazy_load
 git = lazy_load("git")
 
 
+def _sanitize_repo_url(parsed: urllib.parse.ParseResult, path: str) -> str:
+    """Rebuild a url from its parsed pieces, keeping only scheme, host and path.
+
+    Any userinfo is dropped: `url` is written into MLflow's tracking URI and
+    into .dvc/config, and .dvc/config is a committed file, so a token pasted
+    into the url as "https://user:token@dagshub.com/owner/repo" would end up in
+    the repository. Credentials for both are set separately from the token.
+    """
+
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    if not parsed.scheme and not parsed.netloc:
+        # A bare "owner/repo" - nothing to rebuild around.
+        return path
+    return urllib.parse.urlunparse((parsed.scheme, host, path, "", "", ""))
+
+
+def _parse_repo_url(url: str) -> tuple:
+    """Extract (url, owner, name) from a repository url.
+
+    The owner and name are taken from the url *path*, not from the last two
+    slash-separated pieces of the whole string. Splitting the whole string lets
+    the hostname stand in for the owner: "https://dagshub.com/my-repo" has only
+    one path segment, but its last two pieces are "dagshub.com" and "my-repo",
+    which looks valid and is not.
+
+    The url is returned alongside them, rebuilt from the same parsed segments,
+    so that the value handed to MLflow and DVC agrees with the owner and name
+    that were derived from it. Parsing alone is not enough: empty segments are
+    skipped when reading owner and name, so without this
+    "https://dagshub.com/my-org//my-repo" would yield the right pair while
+    still sending a doubled slash downstream.
+
+    A bare "owner/repo" with no scheme is still accepted, since that is a
+    reasonable thing to pass.
+    """
+
+    parsed = urllib.parse.urlparse(url)
+    # With no scheme, urlparse puts everything in `path`, which is what we want
+    # for a bare "owner/repo"; with one, `netloc` holds the host and is skipped.
+    segments = [segment for segment in parsed.path.split("/") if segment]
+
+    if len(segments) < 2:
+        # The url is reported back redacted - a raw one can carry a token in
+        # its userinfo or query, and this message is likely to be logged.
+        raise ValueError(
+            f"Could not determine the repo owner and name from the url "
+            f"{_sanitize_repo_url(parsed, parsed.path)!r}. "
+            f"Expected a url of the form https://dagshub.com/<owner>/<repo>."
+        )
+    return _sanitize_repo_url(parsed, "/".join(segments)), segments[-2], segments[-1]
+
+
 def init(
     repo_name: Optional[str] = None,
     repo_owner: Optional[str] = None,
@@ -76,11 +130,12 @@ def init(
             repo, branch = determine_repo(root)
             url = repo.repo_url
 
+        # Strip a trailing slash first, so that a URL copied from the browser
+        # address bar doesn't shift every segment by one.
+        url = url.rstrip("/")
         if url.endswith(".git"):
             url = url[:-4]
-        # Extract the owner and name from the repo_url
-        parts = url.split("/")
-        repo_owner, repo_name = parts[-2], parts[-1]
+        url, repo_owner, repo_name = _parse_repo_url(url)
 
     # Create the repo if it wasn't created
     repo_api = RepoAPI(f"{repo_owner}/{repo_name}", host=host)
@@ -93,9 +148,7 @@ def init(
             should_create_under_org = repo_owner != current_user.username
 
         if should_create_under_org:
-            log_message(
-                f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".'
-            )
+            log_message(f'Repository {repo_name} doesn\'t exist, creating it under organization "{repo_owner}".')
             create_repo(repo_name, org_name=repo_owner, host=host)
         else:
             log_message(f"Repository {repo_name} doesn't exist, creating it under current user.")
