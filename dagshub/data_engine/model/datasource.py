@@ -155,6 +155,21 @@ class Field:
 _metadata_contexts: Dict[Union[int, str], "MetadataContextManager"] = {}
 
 
+def _reject_brotli_parquet(file_path: str) -> None:
+    # CVE-2026-111497 is an out-of-bounds write in the Brotli decoder.
+    # pyarrow wheels bundle that decoder. The Parquet footer is not Brotli,
+    # so this check reads the footer and does not decode column pages.
+    # Remove the check after a pyarrow wheel bundles Brotli 1.0.10, 1.1.1, or 1.2.1.
+    import pyarrow.parquet as pq
+
+    metadata = pq.ParquetFile(file_path).metadata
+    for row_group_index in range(metadata.num_row_groups):
+        row_group = metadata.row_group(row_group_index)
+        for column_index in range(row_group.num_columns):
+            if row_group.column(column_index).compression == "BROTLI":
+                raise ValueError("Parquet files that use Brotli compression are not supported")
+
+
 class Datasource:
     def __init__(
         self,
@@ -1630,6 +1645,7 @@ class Datasource:
         if file_path.lower().endswith(".csv"):
             df = pandas.read_csv(file_path)
         elif file_path.lower().endswith(".parquet"):
+            _reject_brotli_parquet(file_path)
             df = pandas.read_parquet(file_path)
         elif file_path.lower().endswith(".zip"):
             df = pandas.read_csv(file_path, compression="zip")
