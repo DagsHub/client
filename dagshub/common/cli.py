@@ -18,7 +18,7 @@ import dagshub.common.logging_util
 from dagshub import init, __version__
 from dagshub.common import config, rich_console
 from dagshub.common.api.repo import RepoAPI
-from dagshub.upload import create_repo, Repo
+from dagshub.upload import create_repo, create_dataset, Repo
 from dagshub.common.helpers import http_request, log_message
 from dagshub.upload.errors import UpdateNotAllowedError
 from dagshub.upload.wrapper import add_dataset_to_repo, DEFAULT_DATA_DIR_NAME
@@ -317,6 +317,40 @@ def version():
     Prints the current installed version of the DagsHub client
     """
     print(__version__)
+
+
+@cli.command("create_dataset")
+@click.argument("repo_name")
+@click.argument("local_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option("--glob-exclude", default="", help="Glob pattern to exclude files from the upload")
+@click.option("--org-name", default="", help="Organization that will own the repository")
+@click.option("--private", is_flag=True, default=False, help="Create a private repository")
+@click.option("-v", "--verbose", default=0, count=True, help="Verbosity level")
+@click.option("-q", "--quiet", is_flag=True, help="Suppress print output")
+@click.option("--host", help="DagsHub instance to use")
+@click.pass_context
+def create_dataset_cmd(ctx, repo_name, local_path, glob_exclude, org_name, private, verbose, quiet, host):
+    """
+    Create a new repository and upload a local dataset directory to it.
+
+    Example:
+
+        dagshub create_dataset my-dataset ./data --private
+    """
+    config.host = host or ctx.obj["host"] or config.host
+    config.quiet = quiet or ctx.obj["quiet"]
+
+    logger = logging.getLogger()
+    logger.setLevel(to_log_level(verbose))
+
+    repo = create_dataset(
+        repo_name,
+        local_path,
+        glob_exclude=glob_exclude,
+        org_name=org_name,
+        private=private,
+    )
+    log_message(f"Created dataset repository: {config.host}/{repo.owner}/{repo.name}", logger)
 
 
 @cli.group()
