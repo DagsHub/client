@@ -337,7 +337,7 @@ def create_dataset_cmd(ctx, repo_name, local_path, glob_exclude, org_name, priva
 
         dagshub create_dataset my-dataset ./data --private
     """
-    config.host = host or ctx.obj["host"] or config.host
+    config.set_host(host or ctx.obj["host"] or config.host)
     config.quiet = quiet or ctx.obj["quiet"]
 
     logger = logging.getLogger()
