@@ -18,7 +18,13 @@ def test_bucket_downloader_path_extraction(in_url, expected):
 
 
 @pytest.mark.parametrize(
-    "in_url", ["https://dagshub.com/api/v1/repos/kirill/bucket-repo/raw/main/images/047.png", "https://google.com"]
+    "in_url",
+    [
+        "https://dagshub.com/api/v1/repos/kirill/bucket-repo/raw/main/images/047.png",
+        "https://google.com",
+        # bucket URL with an empty in-bucket path has no file to download
+        "https://dagshub.com/api/v1/repos/kirill/bucket-repo/storage/raw/s3/dagshub-storage/",
+    ],
 )
 def test_bucket_download_path_extraction_fail(in_url):
     actual = download_url_to_bucket_path(in_url)

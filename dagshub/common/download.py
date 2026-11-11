@@ -26,7 +26,7 @@ DownloadFunctionType = Callable[[str, Path], None]
 
 storage_download_url_regex = re.compile(
     r".*/api/v1/repos/(?P<user>[\w\-_.]+)/(?P<repo>[\w\-_.]+)/storage/raw/(?P<proto>s3|gs|azure)/"
-    r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.*)"
+    r"(?P<bucket>[a-z0-9.-]+)/(?P<path>.+)"
 )
 
 
