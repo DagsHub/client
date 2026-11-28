@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 import httpx
 import rich.progress
 import rich.status
-from tenacity import retry, retry_if_exception_type, wait_fixed, stop_after_attempt
+from tenacity import RetryCallState, retry, wait_fixed, stop_after_attempt
 
 import dagshub.auth
 from dagshub.auth.token_auth import EnvVarDagshubToken
@@ -42,6 +42,21 @@ s.follow_redirects = True
 s.headers.update(config.requests_headers)
 
 FileUploadStruct = Tuple[str, BinaryIO]
+
+
+def _should_retry_upload(retry_state: RetryCallState) -> bool:
+    if retry_state.outcome is None or not isinstance(retry_state.outcome.exception(), InternalServerErrorError):
+        return False
+
+    files = retry_state.args[1] if len(retry_state.args) > 1 else retry_state.kwargs["files"]
+    for _, data in files:
+        if isinstance(data, (bytes, str)):
+            continue
+        try:
+            data.seek(0)
+        except (AttributeError, OSError, ValueError):
+            return False
+    return True
 
 
 def create_dataset(repo_name: str, local_path: str, glob_exclude: str = "", org_name: str = "", private=False):
@@ -332,7 +347,7 @@ class Repo:
                 file_to_upload = DataSet.get_file(str(local_path), PurePosixPath(remote_path))
                 self.upload_files([file_to_upload], commit_message=commit_message, **kwargs)
 
-    @retry(retry=retry_if_exception_type(InternalServerErrorError), wait=wait_fixed(3), stop=stop_after_attempt(5))
+    @retry(retry=_should_retry_upload, wait=wait_fixed(3), stop=stop_after_attempt(5))
     def upload_files(
         self,
         files: List[FileUploadStruct],
@@ -348,6 +363,7 @@ class Repo:
         Upload a list of binary files to the specified directory.
         This function is lower level than :func:`upload`,
         but useful when you don't have the files stored on the filesystem.
+        An internal server error is retried only when all file bodies can be read again.
 
         Args:
             files: List of Tuples of (path in repo, binaryIO) of files to upload
